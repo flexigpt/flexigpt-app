@@ -236,6 +236,42 @@ func BuildWorkflowProjection(
 	return output
 }
 
+func BuildSessionSnapshotProjection(
+	session Session,
+) SessionSnapshotProjection {
+	value := cloneSession(session)
+	messages := make([]Activity, 0)
+	for _, activity := range value.Timeline {
+		if activity.Kind == ActivityKindMessage &&
+			activity.Visibility != ActivityVisibilityAudit {
+			messages = append(messages, activity)
+		}
+	}
+
+	conversation := ConversationProjection{
+		SchemaVersion:   SchemaVersion,
+		SessionID:       value.ID,
+		SessionRevision: value.Revision,
+		Title:           value.Title,
+		Messages:        messages,
+	}
+	activities := ActivityProjection{
+		SchemaVersion:   SchemaVersion,
+		SessionID:       value.ID,
+		SessionRevision: value.Revision,
+		Activities:      append([]Activity(nil), value.Timeline...),
+	}
+
+	return SessionSnapshotProjection{
+		SchemaVersion: SchemaVersion,
+		Session:       value,
+		Conversation:  conversation,
+		Activities:    activities,
+		Runtime:       BuildSessionRuntimeProjection(value),
+		Workflow:      BuildWorkflowProjection(value),
+	}
+}
+
 func cloneCanonicalValues(values []CanonicalValue) []CanonicalValue {
 	if len(values) == 0 {
 		return nil

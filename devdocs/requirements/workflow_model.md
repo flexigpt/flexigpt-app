@@ -2028,6 +2028,9 @@ Required source coverage:
 #### Phase 1 implementation status
 
 - [x] V3 user-message Skill template preparation and instruction Skill preview use typed Runtime, setup-domain, and Wails routes.
+- [x] V3 persists resolved existing-surface defaults on normal message activities and supports typed per-message and per-continuation overrides with clear semantics.
+- [x] V3 persists conversation-level and invocation-level normal execution budgets through normal ProgramFrame creation and child budget narrowing.
+- [x] V3 exposes a consolidated frontend-ready Session snapshot derived only from the authoritative Session document.
 - [ ] The full V2-equivalent normal Session configuration model, per-message overrides, per-continuation overrides, execution budgets, and immutable operation configuration facts remain incomplete.
 - [ ] The full V2 command, projection, and frontend snapshot parity ledger remains incomplete.
 
@@ -2085,6 +2088,12 @@ Required source coverage:
 - `internal/agentruntime-go/sessionv3/`
 - `internal/agentruntimesetup/sessionv3runtime/`
 - `internal/sessionstorev3/`
+
+#### Phase 3 implementation status
+
+- [x] Every accepted Workflow `retry` declaration now uses a durable retry-boundary ProgramFrame with persisted child attempts and Runtime-owned timer waits.
+- [x] Retry boundaries retain resolved target-set membership, use effect-contract replay safety, preserve keyed operation keys, and stop replay after uncertainty or unsafe confirmed effects.
+- [ ] The source-to-runtime audit must still verify all retry interactions with every externally supplied Service and Activity binding.
 
 ### Phase 4: Complete the Workflow v1 source-to-runtime audit
 

@@ -77,11 +77,23 @@ func (r *Runtime) UpdateContinuationInput(
 				}, nil
 			}
 
-			execution.Continuation = continuationFromMessageInput(
+			continuation, inputErr := continuationFromMessageInput(
 				execution.Continuation,
 				input,
+				session.Defaults,
 				r.now(),
 			)
+			if inputErr != nil {
+				return &CommandReceipt{
+					CommandID:         command.Meta.ID,
+					SessionID:         session.ID,
+					ExecutionID:       execution.ID,
+					SessionRevision:   session.Revision,
+					ExecutionRevision: execution.Revision,
+					Message:           inputErr.Error(),
+				}, nil
+			}
+			execution.Continuation = continuation
 			r.touchExecutionLocked(session, execution)
 			return &CommandReceipt{
 				CommandID:         command.Meta.ID,
@@ -534,17 +546,24 @@ func (r *Runtime) EditAndResend(
 func continuationFromMessageInput(
 	previous ContinuationInput,
 	input MessageInput,
+	defaults SessionDefaults,
 	now time.Time,
-) ContinuationInput {
-	return ContinuationInput{
-		Revision:         previous.Revision + 1,
-		ConsumedRevision: previous.ConsumedRevision,
-		Text:             input.Text,
-		Attachments:      append([]Attachment(nil), input.Attachments...),
-		AppContext:       cloneAppContextUpdates(previous.AppContext),
-		Metadata:         input.Metadata.Clone(),
-		UpdatedAt:        now,
+) (ContinuationInput, error) {
+	resolved, err := resolveSessionInvocationDefaults(defaults, input.Defaults)
+	if err != nil {
+		return ContinuationInput{}, err
 	}
+	return ContinuationInput{
+		Revision:           previous.Revision + 1,
+		ConsumedRevision:   previous.ConsumedRevision,
+		Text:               input.Text,
+		Attachments:        append([]Attachment(nil), input.Attachments...),
+		AppContext:         cloneAppContextUpdates(previous.AppContext),
+		Metadata:           input.Metadata.Clone(),
+		InvocationDefaults: cloneInvocationDefaults(&resolved),
+		InvocationBudget:   cloneBudget(input.InvocationBudget),
+		UpdatedAt:          now,
+	}, nil
 }
 
 func hasContinuationInput(value ContinuationInput) bool {
@@ -565,15 +584,17 @@ func (r *Runtime) consumeContinuationLocked(
 
 	staged := execution.Continuation
 	input := MessageInput{
-		Text:        staged.Text,
-		Attachments: append([]Attachment(nil), staged.Attachments...),
-		Metadata:    staged.Metadata.Clone(),
+		Text:             staged.Text,
+		Attachments:      append([]Attachment(nil), staged.Attachments...),
+		Metadata:         staged.Metadata.Clone(),
+		InvocationBudget: cloneBudget(staged.InvocationBudget),
 	}
-	activity, err := r.submitNormalMessageLocked(
+	activity, err := r.submitNormalMessageWithDefaultsLocked(
 		session,
 		execution,
 		input,
 		nil,
+		staged.InvocationDefaults,
 	)
 	if err != nil {
 		return nil, false, err
@@ -588,6 +609,8 @@ func (r *Runtime) consumeContinuationLocked(
 	execution.Continuation.Attachments = nil
 	execution.Continuation.AppContext = nil
 	execution.Continuation.Metadata = nil
+	execution.Continuation.InvocationDefaults = nil
+	execution.Continuation.InvocationBudget = nil
 	execution.Continuation.UpdatedAt = r.now()
 	r.touchExecutionLocked(session, execution)
 	return []ActivityID{activity.ID}, true, nil
@@ -599,9 +622,35 @@ func (r *Runtime) submitNormalMessageLocked(
 	input MessageInput,
 	carried []ToolResultActivity,
 ) (Activity, error) {
+	return r.submitNormalMessageWithDefaultsLocked(
+		session,
+		execution,
+		input,
+		carried,
+		nil,
+	)
+}
+
+func (r *Runtime) submitNormalMessageWithDefaultsLocked(
+	session *Session,
+	execution *Execution,
+	input MessageInput,
+	carried []ToolResultActivity,
+	resolvedDefaults *SessionDefaults,
+) (Activity, error) {
 	frame := normalConversationFrame(execution)
 	if frame == nil || frame.Status.Terminal() {
 		return Activity{}, errors.New("conversation frame is unavailable")
+	}
+	if resolvedDefaults == nil {
+		value, err := resolveSessionInvocationDefaults(
+			session.Defaults,
+			input.Defaults,
+		)
+		if err != nil {
+			return Activity{}, err
+		}
+		resolvedDefaults = &value
 	}
 
 	now := r.now()
@@ -613,12 +662,14 @@ func (r *Runtime) submitNormalMessageLocked(
 		ExecutionID: execution.ID,
 		FrameID:     frame.ID,
 		Message: &MessageActivity{
-			Role:        MessageRoleUser,
-			Status:      "accepted",
-			Text:        input.Text,
-			Attachments: append([]Attachment(nil), input.Attachments...),
-			ToolResults: append([]ToolResultActivity(nil), carried...),
-			Metadata:    input.Metadata.Clone(),
+			Role:               MessageRoleUser,
+			Status:             "accepted",
+			Text:               input.Text,
+			Attachments:        append([]Attachment(nil), input.Attachments...),
+			ToolResults:        append([]ToolResultActivity(nil), carried...),
+			Metadata:           input.Metadata.Clone(),
+			InvocationDefaults: cloneInvocationDefaults(resolvedDefaults),
+			InvocationBudget:   cloneBudget(input.InvocationBudget),
 		},
 	}
 	session.Timeline = append(session.Timeline, activity)
@@ -627,8 +678,10 @@ func (r *Runtime) submitNormalMessageLocked(
 		execution,
 		frame.ID,
 		ProgramEvent{
-			Kind:       ProgramEventActivity,
-			ActivityID: activity.ID,
+			Kind:               ProgramEventActivity,
+			ActivityID:         activity.ID,
+			InvocationDefaults: cloneInvocationDefaults(resolvedDefaults),
+			InvocationBudget:   cloneBudget(input.InvocationBudget),
 		},
 	); err != nil {
 		return Activity{}, err

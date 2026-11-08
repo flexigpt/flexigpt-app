@@ -1074,6 +1074,9 @@ Required source coverage:
 #### Phase 1 implementation status
 
 - [x] V3 exposes typed user-message Skill template preparation and instruction Skill preview through SessionV3Wrapper and setup-owned Skill resolution.
+- [x] V3 persists resolved per-message and per-continuation existing-surface defaults before normal Agent-loop dispatch.
+- [x] V3 persists conversation and invocation execution-budget facts for normal conversation ProgramFrames.
+- [x] V3 exposes a durable-document-only consolidated frontend snapshot projection.
 - [ ] V3 still lacks the complete V2-equivalent typed configuration, override, execution-budget, command, projection, and frontend snapshot surface.
 
 ### Phase 2: Complete Workflow v1 semantic closure
@@ -1132,6 +1135,12 @@ Required source coverage:
 - `internal/agentruntimesetup/mcpruntime/`
 - `internal/agentruntimesetup/skillruntime/`
 - `internal/sessionstorev3/`
+
+#### Phase 3 implementation status
+
+- [x] Accepted Workflow retry declarations route through a durable retry-boundary ProgramFrame and Runtime-owned timer waits.
+- [x] Retry-boundary state persists retry attempts, selected target-set facts, child settlement facts, and retry timing through recovery and cancellation.
+- [ ] The full Service and Activity binding audit remains required to verify every domain-specific effect contract and retry result adaptation.
 
 ### Phase 4: Complete the functional backend audit
 

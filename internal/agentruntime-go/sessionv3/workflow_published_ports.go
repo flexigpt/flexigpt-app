@@ -58,13 +58,6 @@ func validateWorkflowFramePortBoundary(
 				err,
 			)
 		}
-		if err := portSchemaCompatible(plan.Schema, channel.Schema); err != nil {
-			return fmt.Errorf(
-				"workflow child port %q callable schema is incompatible with target channel schema: %w",
-				plan.Name,
-				err,
-			)
-		}
 	}
 	return nil
 }

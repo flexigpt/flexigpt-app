@@ -24,6 +24,7 @@ type WorkflowScopeContext struct {
 	MergeState         bool                        `json:"mergeState,omitempty"`
 	OuterState         CanonicalValue              `json:"outerState,omitempty"`
 	StateOwner         *WorkflowStateOwner         `json:"stateOwner,omitempty"`
+	TargetSets         []WorkflowTargetSetState    `json:"targetSets,omitempty"`
 	OuterOutcomes      []WorkflowStepOutcome       `json:"outerOutcomes,omitempty"`
 	OuterSubscriptions []WorkflowSubscriptionState `json:"outerSubscriptions,omitempty"`
 	Context            *CanonicalValue             `json:"context,omitempty"`
@@ -48,6 +49,9 @@ func (s WorkflowScopeContext) Validate() error {
 		if err := s.StateOwner.Validate(); err != nil {
 			return err
 		}
+	}
+	if err := validateWorkflowTargetSetStates(s.TargetSets); err != nil {
+		return err
 	}
 	if s.Context != nil && !s.Context.Valid() {
 		return errors.New("Workflow scope context is invalid")

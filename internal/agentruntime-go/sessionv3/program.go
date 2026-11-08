@@ -10,19 +10,28 @@ import (
 )
 
 const (
-	BuiltinConversationInterpreterID = "builtin.conversation"
-	BuiltinAgentLoopInterpreterID    = "builtin.agent-loop"
-	BuiltinSingleModelInterpreterID  = "builtin.single-model"
-	BuiltinInterpreterVersion        = uint32(1)
+	BuiltinConversationInterpreterID  = "builtin.conversation"
+	BuiltinAgentLoopInterpreterID     = "builtin.agent-loop"
+	BuiltinSingleModelInterpreterID   = "builtin.single-model"
+	BuiltinRetryBoundaryInterpreterID = "builtin.retry-boundary"
+	BuiltinInterpreterVersion         = uint32(1)
 )
 
 type (
 	conversationProgramPayload struct {
 		Defaults SessionDefaults `json:"defaults"`
 	}
+	conversationQueuedActivity struct {
+		ID                 ActivityID       `json:"id"`
+		InvocationDefaults *SessionDefaults `json:"invocationDefaults,omitempty"`
+		InvocationBudget   *ExecutionBudget `json:"invocationBudget,omitempty"`
+	}
 	conversationProgramState struct {
-		QueuedActivityIDs []ActivityID   `json:"queuedActivityIDs,omitempty"`
-		ActiveFrameID     ProgramFrameID `json:"activeFrameID,omitempty"`
+		// QueuedActivityIDs preserves recovery compatibility for documents
+		// created before immutable message invocation facts existed.
+		QueuedActivityIDs []ActivityID                 `json:"queuedActivityIDs,omitempty"`
+		QueuedActivities  []conversationQueuedActivity `json:"queuedActivities,omitempty"`
+		ActiveFrameID     ProgramFrameID               `json:"activeFrameID,omitempty"`
 	}
 )
 
@@ -51,7 +60,12 @@ type singleModelProgramState struct {
 }
 
 func NewBuiltinInterpreters() []ProgramInterpreter {
-	return []ProgramInterpreter{conversationInterpreter{}, agentLoopInterpreter{}, singleModelInterpreter{}}
+	return []ProgramInterpreter{
+		conversationInterpreter{},
+		agentLoopInterpreter{},
+		singleModelInterpreter{},
+		retryBoundaryInterpreter{},
+	}
 }
 
 func NewConversationProgram(defaults SessionDefaults) (ProgramSnapshot, error) {
@@ -158,8 +172,16 @@ func (conversationInterpreter) Advance(frame ProgramFrame, _ Execution, event Pr
 	}
 	switch event.Kind {
 	case ProgramEventActivity:
+		defaults := cloneInvocationDefaults(event.InvocationDefaults)
 		if event.ActivityID != "" {
-			state.QueuedActivityIDs = append(state.QueuedActivityIDs, event.ActivityID)
+			state.QueuedActivities = append(
+				state.QueuedActivities,
+				conversationQueuedActivity{
+					ID:                 event.ActivityID,
+					InvocationDefaults: defaults,
+					InvocationBudget:   cloneBudget(event.InvocationBudget),
+				},
+			)
 		}
 	case ProgramEventChildSettled:
 		if event.ChildFrameID == state.ActiveFrameID {
@@ -171,18 +193,37 @@ func (conversationInterpreter) Advance(frame ProgramFrame, _ Execution, event Pr
 		status := ProgramFrameStateCancelled
 		return ProgramTransition{State: encodeConversationState(state), Status: &status}, nil
 	}
-	if state.ActiveFrameID != "" || len(state.QueuedActivityIDs) == 0 {
+	if len(state.QueuedActivities) == 0 &&
+		len(state.QueuedActivityIDs) != 0 {
+		for _, id := range state.QueuedActivityIDs {
+			state.QueuedActivities = append(
+				state.QueuedActivities,
+				conversationQueuedActivity{ID: id},
+			)
+		}
+		state.QueuedActivityIDs = nil
+	}
+	if state.ActiveFrameID != "" || len(state.QueuedActivities) == 0 {
 		return ProgramTransition{State: encodeConversationState(state)}, nil
 	}
-	input := state.QueuedActivityIDs[0]
-	state.QueuedActivityIDs = state.QueuedActivityIDs[1:]
-	program, err := NewAgentLoopProgram(payload.Defaults, input)
+	queued := state.QueuedActivities[0]
+	state.QueuedActivities = state.QueuedActivities[1:]
+
+	defaults := cloneSessionDefaults(payload.Defaults)
+	if queued.InvocationDefaults != nil {
+		defaults = cloneSessionDefaults(*queued.InvocationDefaults)
+	}
+	program, err := NewAgentLoopProgram(defaults, queued.ID)
 	if err != nil {
 		return ProgramTransition{}, err
 	}
 	return ProgramTransition{
-		State:  encodeConversationState(state),
-		Frames: []ProgramFrameIntent{{Path: "conversation/" + string(input), Program: program}},
+		State: encodeConversationState(state),
+		Frames: []ProgramFrameIntent{{
+			Path:    "conversation/" + string(queued.ID),
+			Program: program,
+			Budget:  cloneBudget(queued.InvocationBudget),
+		}},
 	}, nil
 }
 

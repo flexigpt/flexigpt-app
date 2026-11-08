@@ -328,6 +328,16 @@ func (w *SessionV3Wrapper) SessionRuntimeProjection(
 	return store.ReadSessionRuntimeProjection(id)
 }
 
+func (w *SessionV3Wrapper) Snapshot(
+	id sessionv3Runtime.SessionID,
+) (sessionv3Runtime.SessionSnapshotProjection, error) {
+	store, err := w.projectionStore()
+	if err != nil {
+		return sessionv3Runtime.SessionSnapshotProjection{}, err
+	}
+	return store.ReadSessionSnapshotProjection(id)
+}
+
 func (w *SessionV3Wrapper) ModelOperations(
 	id sessionv3Runtime.SessionID,
 ) ([]sessionv3Runtime.ModelOperationProjection, error) {

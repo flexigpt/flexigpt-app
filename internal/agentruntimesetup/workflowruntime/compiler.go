@@ -251,12 +251,6 @@ func compileWorkflowStep(
 		output.OutputSchema = schema
 	}
 	if input.Retry != nil {
-		if !workflowStepSupportsRetry(document, input) {
-			return sessionv3Runtime.WorkflowStep{}, unsupportedWorkflowOperation(
-				"steps/"+input.ID,
-				"retry for this operation or target kind",
-			)
-		}
 		retry, err := compileWorkflowRetry(*input.Retry)
 		if err != nil {
 			return sessionv3Runtime.WorkflowStep{}, err

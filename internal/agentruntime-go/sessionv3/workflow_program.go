@@ -482,7 +482,7 @@ func (i *WorkflowInterpreter) InitialState(
 		Version:     WorkflowInterpreterVersion,
 		State:       initialState,
 		Outcomes:    []WorkflowStepOutcome{},
-		TargetSets:  []WorkflowTargetSetState{},
+		TargetSets:  program.Scope.TargetSets,
 		Messages:    MustCanonicalValue(map[string][]WorkflowChannelMessageSnapshot{}),
 		LogicalTime: time.Now().UTC(),
 	}
@@ -935,6 +935,16 @@ func (i *WorkflowInterpreter) drive(
 				state,
 				state.ExitValue,
 				state.Exit,
+			)
+		}
+
+		if step.Retry != nil && step.Retry.MaxAttempts > 1 {
+			return i.startWorkflowRetry(
+				frame,
+				program,
+				state,
+				step,
+				path,
 			)
 		}
 

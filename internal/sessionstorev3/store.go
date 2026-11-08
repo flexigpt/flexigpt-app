@@ -370,6 +370,18 @@ func (s *Store) ReadSessionRuntimeProjection(
 	return sessionv3Runtime.BuildSessionRuntimeProjection(session), nil
 }
 
+// ReadSessionSnapshotProjection returns all frontend-oriented V3 projections
+// from one authoritative durable Session document.
+func (s *Store) ReadSessionSnapshotProjection(
+	id sessionv3Runtime.SessionID,
+) (sessionv3Runtime.SessionSnapshotProjection, error) {
+	session, err := s.ReadSession(id)
+	if err != nil {
+		return sessionv3Runtime.SessionSnapshotProjection{}, err
+	}
+	return sessionv3Runtime.BuildSessionSnapshotProjection(session), nil
+}
+
 func (s *Store) ReadWorkflow(id sessionv3Runtime.SessionID) (sessionv3Runtime.WorkflowProjection, error) {
 	session, err := s.ReadSession(id)
 	if err != nil {

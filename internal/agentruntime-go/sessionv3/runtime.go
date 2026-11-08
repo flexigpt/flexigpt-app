@@ -460,51 +460,62 @@ func (r *Runtime) SubmitMessage(ctx context.Context, command SubmitMessageComman
 		r.mu.Unlock()
 		return receipt, nil
 	}
-	previous := cloneSession(*session)
-	now := r.now()
-	activity := Activity{
-		ID:         ActivityID(r.newID()),
-		Kind:       ActivityKindMessage,
-		Visibility: ActivityVisibilityBoth,
-		CreatedAt:  now,
-		Message: &MessageActivity{
-			Role:   MessageRoleUser,
-			Status: "accepted",
-			Text:   command.Input.Text,
-			Attachments: appendMessageAttachments(
-				command.Input.Attachments,
-				admittedAttachments,
-			),
-			Metadata: command.Input.Metadata.Clone(),
-		},
+
+	input := command.Input
+	input.Attachments = appendMessageAttachments(
+		input.Attachments,
+		admittedAttachments,
+	)
+	input.AttachmentSources = nil
+	resolvedDefaults, defaultsErr := resolveSessionInvocationDefaults(
+		session.Defaults,
+		input.Defaults,
+	)
+	if defaultsErr != nil {
+		receipt := r.rejectLocked(
+			session,
+			command.Meta,
+			command,
+			defaultsErr.Error(),
+		)
+		r.mu.Unlock()
+		return receipt, nil
 	}
-	session.Timeline = append(session.Timeline, activity)
+
+	previous := cloneSession(*session)
 	execution, err := r.conversationExecutionLocked(session)
 	if err != nil {
 		*session = previous
 		r.mu.Unlock()
 		return nil, err
 	}
-	session.Timeline[len(session.Timeline)-1].ExecutionID = execution.ID
-	if err := r.advanceFrameLocked(
+
+	activity, err := r.submitNormalMessageWithDefaultsLocked(
 		session,
 		execution,
-		execution.ProgramFrames[0].ID,
-		ProgramEvent{Kind: ProgramEventActivity, ActivityID: activity.ID},
-	); err != nil {
+		input,
+		nil,
+		&resolvedDefaults,
+	)
+	if err != nil {
 		*session = previous
 		r.mu.Unlock()
 		return nil, err
 	}
-	r.refreshExecutionStateLocked(execution)
-	r.touchSessionLocked(session)
+	current := mutableSessionExecution(session, execution.ID)
+	if current == nil {
+		*session = previous
+		r.mu.Unlock()
+		return nil, errors.New("conversation execution disappeared during message submission")
+	}
+	r.refreshExecutionStateLocked(current)
 	receipt := CommandReceipt{
 		CommandID:         command.Meta.ID,
 		Accepted:          true,
 		SessionID:         session.ID,
-		ExecutionID:       execution.ID,
+		ExecutionID:       current.ID,
 		SessionRevision:   session.Revision,
-		ExecutionRevision: execution.Revision,
+		ExecutionRevision: current.Revision,
 		ActivityIDs:       []ActivityID{activity.ID},
 	}
 	r.rememberCommandLocked(session, command.Meta, command, receipt)
@@ -513,10 +524,10 @@ func (r *Runtime) SubmitMessage(ctx context.Context, command SubmitMessageComman
 		r.mu.Unlock()
 		return nil, err
 	}
-	ready := r.readyWorkLocked(*execution)
-	r.publishLocked(ctx, session, execution.ID, RuntimeEventExecutionChanged)
+	ready := r.readyWorkLocked(*current)
+	r.publishLocked(ctx, session, current.ID, RuntimeEventExecutionChanged)
 	r.mu.Unlock()
-	r.launchWork(ctx, session.ID, execution.ID, ready)
+	r.launchWork(ctx, session.ID, current.ID, ready)
 	return &receipt, nil
 }
 
@@ -1855,6 +1866,19 @@ func (r *Runtime) conversationExecutionLocked(session *Session) (*Execution, err
 	if err != nil {
 		return nil, err
 	}
+
+	budget := ExecutionBudget{}
+	var deadline *time.Time
+	if session.Defaults.ConversationBudget != nil {
+		budget, deadline, err = initialExecutionBudget(
+			*session.Defaults.ConversationBudget,
+			r.now(),
+		)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	interpreter := r.interpreterLocked(program)
 	if interpreter == nil {
 		return nil, errors.New("conversation interpreter unavailable")
@@ -1872,6 +1896,10 @@ func (r *Runtime) conversationExecutionLocked(session *Session) (*Execution, err
 		State:     ExecutionStateWaiting,
 		CreatedAt: now,
 		UpdatedAt: now,
+		Deadline:  deadline,
+		Budget:    budget,
+		Usage:     ExecutionBudgetUsage{},
+		Cleanup:   CleanupState{},
 		ProgramFrames: []ProgramFrame{
 			{
 				ID:        ProgramFrameID(r.newID()),
@@ -1882,6 +1910,7 @@ func (r *Runtime) conversationExecutionLocked(session *Session) (*Execution, err
 				Path:      "conversation",
 				CreatedAt: now,
 				UpdatedAt: now,
+				Deadline:  cloneTime(deadline),
 			},
 		},
 		WorkItems: []WorkItem{},

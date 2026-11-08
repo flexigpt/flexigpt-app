@@ -57,7 +57,44 @@ type SessionDefaults struct {
 	Skills             []ArtifactSelection  `json:"skills,omitempty"`
 	ActiveSkills       []ArtifactSelection  `json:"activeSkills,omitempty"`
 	MCP                []MCPServerSelection `json:"mcp,omitempty"`
+	ConversationBudget *ExecutionBudget     `json:"conversationBudget,omitempty"`
 }
+
+// SessionDefaultsOverride changes only the existing V3 normal-session
+// configuration surface for one submitted message or continuation.
+//
+// Set values apply first. Clear values apply last, so clear semantics are
+// explicit and stable when an older client sends both representations.
+type SessionDefaultsOverride struct {
+	Model              *ArtifactSelection    `json:"model,omitempty"`
+	Agent              *ArtifactSelection    `json:"agent,omitempty"`
+	Workspace          *ArtifactSelection    `json:"workspace,omitempty"`
+	SystemInstructions *[]Instruction        `json:"systemInstructions,omitempty"`
+	Temperature        *float64              `json:"temperature,omitempty"`
+	Metadata           *CanonicalValue       `json:"metadata,omitempty"`
+	History            *HistorySelection     `json:"history,omitempty"`
+	Tools              *[]ArtifactSelection  `json:"tools,omitempty"`
+	Skills             *[]ArtifactSelection  `json:"skills,omitempty"`
+	ActiveSkills       *[]ArtifactSelection  `json:"activeSkills,omitempty"`
+	MCP                *[]MCPServerSelection `json:"mcp,omitempty"`
+	Clear              []SessionDefaultField `json:"clear,omitempty"`
+}
+
+type SessionDefaultField string
+
+const (
+	SessionDefaultFieldModel              SessionDefaultField = "model"
+	SessionDefaultFieldAgent              SessionDefaultField = "agent"
+	SessionDefaultFieldWorkspace          SessionDefaultField = "workspace"
+	SessionDefaultFieldSystemInstructions SessionDefaultField = "systemInstructions"
+	SessionDefaultFieldTemperature        SessionDefaultField = "temperature"
+	SessionDefaultFieldMetadata           SessionDefaultField = "metadata"
+	SessionDefaultFieldHistory            SessionDefaultField = "history"
+	SessionDefaultFieldTools              SessionDefaultField = "tools"
+	SessionDefaultFieldSkills             SessionDefaultField = "skills"
+	SessionDefaultFieldActiveSkills       SessionDefaultField = "activeSkills"
+	SessionDefaultFieldMCP                SessionDefaultField = "mcp"
+)
 
 type HistorySelection struct {
 	All                      bool `json:"all,omitempty"`
@@ -169,14 +206,16 @@ type Activity struct {
 }
 
 type MessageActivity struct {
-	Role        MessageRole          `json:"role"`
-	Status      string               `json:"status,omitempty"`
-	Text        string               `json:"text,omitempty"`
-	Attachments []Attachment         `json:"attachments,omitempty"`
-	ToolResults []ToolResultActivity `json:"toolResults,omitempty"`
-	AppContext  []AppContextUpdate   `json:"appContext,omitempty"`
-	Metadata    CanonicalValue       `json:"metadata,omitempty"`
-	Error       *SanitizedError      `json:"error,omitempty"`
+	Role               MessageRole          `json:"role"`
+	Status             string               `json:"status,omitempty"`
+	Text               string               `json:"text,omitempty"`
+	Attachments        []Attachment         `json:"attachments,omitempty"`
+	ToolResults        []ToolResultActivity `json:"toolResults,omitempty"`
+	AppContext         []AppContextUpdate   `json:"appContext,omitempty"`
+	Metadata           CanonicalValue       `json:"metadata,omitempty"`
+	Error              *SanitizedError      `json:"error,omitempty"`
+	InvocationDefaults *SessionDefaults     `json:"invocationDefaults,omitempty"`
+	InvocationBudget   *ExecutionBudget     `json:"invocationBudget,omitempty"`
 }
 
 type AttachmentKind string
@@ -1197,13 +1236,15 @@ type AppInstance struct {
 }
 
 type ContinuationInput struct {
-	Revision         Revision           `json:"revision"`
-	ConsumedRevision Revision           `json:"consumedRevision,omitempty"`
-	Text             string             `json:"text,omitempty"`
-	Attachments      []Attachment       `json:"attachments,omitempty"`
-	AppContext       []AppContextUpdate `json:"appContext,omitempty"`
-	Metadata         CanonicalValue     `json:"metadata,omitempty"`
-	UpdatedAt        time.Time          `json:"updatedAt,omitzero"`
+	Revision           Revision           `json:"revision"`
+	ConsumedRevision   Revision           `json:"consumedRevision,omitempty"`
+	Text               string             `json:"text,omitempty"`
+	Attachments        []Attachment       `json:"attachments,omitempty"`
+	AppContext         []AppContextUpdate `json:"appContext,omitempty"`
+	Metadata           CanonicalValue     `json:"metadata,omitempty"`
+	InvocationDefaults *SessionDefaults   `json:"invocationDefaults,omitempty"`
+	InvocationBudget   *ExecutionBudget   `json:"invocationBudget,omitempty"`
+	UpdatedAt          time.Time          `json:"updatedAt,omitzero"`
 }
 
 // LLMStreamState is the durable incremental output observed before a final
@@ -1376,11 +1417,13 @@ const (
 )
 
 type ProgramEvent struct {
-	Kind         ProgramEventKind `json:"kind"`
-	At           time.Time        `json:"at"`
-	ActivityID   ActivityID       `json:"activityID,omitempty"`
-	WorkItemID   WorkItemID       `json:"workItemID,omitempty"`
-	ChildFrameID ProgramFrameID   `json:"childFrameID,omitempty"`
+	Kind               ProgramEventKind `json:"kind"`
+	At                 time.Time        `json:"at"`
+	ActivityID         ActivityID       `json:"activityID,omitempty"`
+	WorkItemID         WorkItemID       `json:"workItemID,omitempty"`
+	ChildFrameID       ProgramFrameID   `json:"childFrameID,omitempty"`
+	InvocationDefaults *SessionDefaults `json:"invocationDefaults,omitempty"`
+	InvocationBudget   *ExecutionBudget `json:"invocationBudget,omitempty"`
 }
 
 type ProgramFrameIntent struct {
@@ -1756,10 +1799,12 @@ type SignalExecutionCommand struct {
 }
 
 type MessageInput struct {
-	Text              string             `json:"text,omitempty"`
-	Attachments       []Attachment       `json:"attachments,omitempty"`
-	AttachmentSources []AttachmentSource `json:"attachmentSources,omitempty"`
-	Metadata          CanonicalValue     `json:"metadata,omitempty"`
+	Text              string                   `json:"text,omitempty"`
+	Attachments       []Attachment             `json:"attachments,omitempty"`
+	AttachmentSources []AttachmentSource       `json:"attachmentSources,omitempty"`
+	Metadata          CanonicalValue           `json:"metadata,omitempty"`
+	Defaults          *SessionDefaultsOverride `json:"defaults,omitempty"`
+	InvocationBudget  *ExecutionBudget         `json:"invocationBudget,omitempty"`
 }
 
 // UserMessageSkillTemplatePreparationRequest renders a selected Skill with
@@ -1949,6 +1994,18 @@ type ActivityProjection struct {
 	SessionID       SessionID  `json:"sessionID"`
 	SessionRevision Revision   `json:"sessionRevision"`
 	Activities      []Activity `json:"activities"`
+}
+
+// SessionSnapshotProjection is the frontend-ready V3 read. Every field is
+// derived from the durable Session document, with no provider, Artifact,
+// browser, Wails, credential, or process-private binding dependency.
+type SessionSnapshotProjection struct {
+	SchemaVersion string                   `json:"schemaVersion"`
+	Session       Session                  `json:"session"`
+	Conversation  ConversationProjection   `json:"conversation"`
+	Activities    ActivityProjection       `json:"activities"`
+	Runtime       SessionRuntimeProjection `json:"runtime"`
+	Workflow      WorkflowProjection       `json:"workflow"`
 }
 
 type WorkflowProjection struct {

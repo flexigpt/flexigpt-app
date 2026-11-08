@@ -162,6 +162,12 @@ func validateDefaults(value SessionDefaults) error {
 		return errors.New("session temperature must be finite")
 	}
 
+	if value.ConversationBudget != nil {
+		if err := value.ConversationBudget.Validate(); err != nil {
+			return err
+		}
+	}
+
 	instructions := make(map[string]struct{}, len(value.SystemInstructions))
 	for index, instruction := range value.SystemInstructions {
 		if strings.TrimSpace(instruction.Content) == "" {
@@ -387,6 +393,16 @@ func (a Activity) Validate() error {
 		if a.Message == nil || !a.Message.Metadata.Valid() {
 			return errors.New("invalid message activity")
 		}
+		if a.Message.InvocationDefaults != nil {
+			if err := validateDefaults(*a.Message.InvocationDefaults); err != nil {
+				return err
+			}
+		}
+		if a.Message.InvocationBudget != nil {
+			if err := a.Message.InvocationBudget.Validate(); err != nil {
+				return err
+			}
+		}
 		for _, attachment := range a.Message.Attachments {
 			if err := attachment.Validate(); err != nil {
 				return err
@@ -479,6 +495,11 @@ func (s AttachmentSource) Validate() error {
 func (m MessageInput) Validate() error {
 	if !m.Metadata.Valid() {
 		return errors.New("message metadata is invalid")
+	}
+	if m.InvocationBudget != nil {
+		if err := m.InvocationBudget.Validate(); err != nil {
+			return err
+		}
 	}
 	for index := range m.Attachments {
 		if err := m.Attachments[index].Validate(); err != nil {
