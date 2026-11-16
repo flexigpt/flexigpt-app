@@ -203,14 +203,13 @@ export function CopyButton({
 		}
 		setCopyState('copying');
 
-		void writeRequest.then(
-			() => {
+		void writeRequest
+			.then(() => {
 				finishCopySuccess(operationID);
-			},
-			(error: unknown) => {
+			})
+			.catch((error: unknown) => {
 				finishCopyFailure(operationID, error);
-			}
-		);
+			});
 	};
 
 	const copying = copyState === 'copying';

@@ -165,7 +165,7 @@ function ModalConfirmDialogContent({
 							return;
 						}
 
-						void Promise.resolve(result).then(complete, fail);
+						void Promise.resolve(result).then(complete).catch(fail);
 					} catch (failure) {
 						fail(failure);
 					}

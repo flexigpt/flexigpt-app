@@ -139,7 +139,7 @@ async function loadAgentManagementPageData(signal: AbortSignal): Promise<AgentMa
 				agentManagementPageDataLoad = undefined;
 			}
 		};
-		void promise.then(clear, clear);
+		void promise.then(clear).catch(clear);
 	}
 
 	const data = await load.promise;

@@ -654,7 +654,7 @@ const ConversationMessageList = memo(function ConversationMessageList(props: {
 		if (!canBuildDiffCandidatePaths) {
 			diffCandidatePathBuildCancelRef.current?.();
 			diffCandidatePathBuildCancelRef.current = null;
-			// oxlint-disable-next-line react/set-state-in-effect
+			// oxlint-disable-next-line react/set-state-in-effect react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
 			setDiffCandidatePathsState(null);
 			return;
 		}
@@ -662,6 +662,7 @@ const ConversationMessageList = memo(function ConversationMessageList(props: {
 		if (!conversationMayContainApplicableDiff(messages)) {
 			diffCandidatePathBuildCancelRef.current?.();
 			diffCandidatePathBuildCancelRef.current = null;
+			// oxlint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
 			setDiffCandidatePathsState(null);
 			return;
 		}

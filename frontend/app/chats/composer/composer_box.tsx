@@ -127,7 +127,6 @@ export const ComposerBox = memo(
 
 		useEffect(() => {
 			if (!isActive || !isBusy) {
-				// oxlint-disable-next-line react/set-state-in-effect
 				setAbortConfirmationRequested(false);
 			}
 		}, [isActive, isBusy]);

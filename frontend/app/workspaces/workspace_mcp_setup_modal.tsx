@@ -164,15 +164,13 @@ function WorkspaceMCPSetupForm({
 
 		void mcpManagementAPI
 			.applyMCPServerSetup(setup.server, buildSubmission(), reset)
-			.then(
-				() => {
-					onSaved?.();
-					onClose();
-				},
-				(error: unknown) => {
-					setSubmitError(error instanceof Error ? error.message : 'MCP setup could not be saved.');
-				}
-			)
+			.then(() => {
+				onSaved?.();
+				onClose();
+			})
+			.catch((error: unknown) => {
+				setSubmitError(error instanceof Error ? error.message : 'MCP setup could not be saved.');
+			})
 			.finally(() => {
 				setIsSubmitting(false);
 			});

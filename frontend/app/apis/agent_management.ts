@@ -340,7 +340,7 @@ export class AgentManagementAPI {
 					this.pluginAgentLoads.delete(key);
 				}
 			};
-			void load.then(clear, clear);
+			void load.then(clear).catch(clear);
 		}
 
 		try {

@@ -104,11 +104,8 @@ export class MCPAppRPCRouter {
 			return handler();
 		};
 
-		const queued = this.interactiveRequestQueue.then(run, run);
-		this.interactiveRequestQueue = queued.then(
-			() => undefined,
-			() => undefined
-		);
+		const queued = this.interactiveRequestQueue.catch(() => undefined).then(run);
+		this.interactiveRequestQueue = queued.then(() => undefined).catch(() => undefined);
 		return queued;
 	}
 

@@ -209,18 +209,17 @@ function renderMermaidCached(key: string, code: string, config: MermaidConfig): 
 
 	pendingMermaidRenders.set(key, next);
 
-	void next.then(
-		() => {
+	void next
+		.then(() => {
 			if (pendingMermaidRenders.get(key) === next) {
 				pendingMermaidRenders.delete(key);
 			}
-		},
-		() => {
+		})
+		.catch(() => {
 			if (pendingMermaidRenders.get(key) === next) {
 				pendingMermaidRenders.delete(key);
 			}
-		}
-	);
+		});
 
 	return next;
 }

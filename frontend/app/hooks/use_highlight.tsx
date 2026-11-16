@@ -109,18 +109,17 @@ function highlightWithCache(code: string, lang: string): Promise<string> {
 	});
 
 	inFlightByKey.set(key, request);
-	void request.then(
-		() => {
+	void request
+		.then(() => {
 			if (inFlightByKey.get(key) === request) {
 				inFlightByKey.delete(key);
 			}
-		},
-		() => {
+		})
+		.catch(() => {
 			if (inFlightByKey.get(key) === request) {
 				inFlightByKey.delete(key);
 			}
-		}
-	);
+		});
 
 	return request;
 }

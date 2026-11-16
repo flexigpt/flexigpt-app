@@ -56,16 +56,15 @@ function WorkspaceDirectoryRegistrationModalContent({
 		setError('');
 		setIsSubmitting(true);
 
-		void onRegister(selectedPath).then(
-			() => {
+		void onRegister(selectedPath)
+			.then(() => {
 				setIsSubmitting(false);
 				onClose();
-			},
-			(cause: unknown) => {
+			})
+			.catch((cause: unknown) => {
 				setError(cause instanceof Error ? cause.message : 'Workspace directory registration failed.');
 				setIsSubmitting(false);
-			}
-		);
+			});
 	};
 
 	return (
