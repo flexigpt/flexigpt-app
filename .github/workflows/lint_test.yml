@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: lint-test-${{ github.head_ref || github.ref }}
+  group: lint-test-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 env:
@@ -20,17 +20,18 @@ jobs:
   test-lint-linux:
     name: Lint and test
     runs-on: ubuntu-26.04
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
-      - uses: ./.github/actions/bootstrap
-      - uses: awalsh128/cache-apt-pkgs-action@v1
-        with:
-          packages: >-
-            build-essential
-            libgtk-4-dev
-            libwebkitgtk-6.0-dev
+      - name: Install Linux native dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            build-essential \
+            libgtk-4-dev \
+            libwebkitgtk-6.0-dev \
             pkg-config
-          version: ubuntu26.04-gtk4-webkit6-1
+      - uses: ./.github/actions/bootstrap
       - uses: actions/cache@v6
         with:
           path: build/out/cache/golangci-lint
