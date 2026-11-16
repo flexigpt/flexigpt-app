@@ -18,3 +18,6 @@ minimumReleaseAgeExclude:
 permissions:
   compromise:
     skills: false
+
+overrides:
+  katex: "0.19.1"

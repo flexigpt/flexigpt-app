@@ -9,6 +9,7 @@ import (
 	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/attachmentruntime"
 	"github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
+
 	"github.com/flexigpt/llmtools-go/texttool"
 )
 
@@ -57,12 +58,12 @@ func ApplyUnifiedDiffActivityBinding() WorkBinding {
 	return applyUnifiedDiffActivityBinding{}
 }
 
-func (normalizeURLServiceBinding) ID() string {
-	return NormalizeURLServiceID
-}
-
 func (normalizeURLServiceBinding) Version() string {
 	return NormalizeURLServiceVersion
+}
+
+func (normalizeURLServiceBinding) ID() string {
+	return NormalizeURLServiceID
 }
 
 func (normalizeURLServiceBinding) Effect() sessionv3Runtime.EffectContract {
@@ -80,12 +81,9 @@ func (normalizeURLServiceBinding) Bind(
 		return sessionv3Runtime.SemanticBinding{}, nil, err
 	}
 
-	return builtinBinding(
-		builtinServiceBindingVersion,
-		normalizeURLBindingFingerprint,
-	), boundNormalizeURL{
-		Input: input,
-	}, nil
+	b := builtinBinding(builtinServiceBindingVersion, normalizeURLBindingFingerprint)
+	bu := boundNormalizeURL{Input: input}
+	return b, bu, nil
 }
 
 func (normalizeURLServiceBinding) Execute(
