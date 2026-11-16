@@ -107,6 +107,7 @@ flowchart LR
 | ------------------------- | ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
 | Declaration syntax        | `internal/llmartifactory-go/workflow/contract/v1` | Source grammar, static validation, CEL scope, target relationships, portable validity                                       | Session mutation, Artifact mutation, external work               |
 | Workflow planning         | `internal/llmartifactory-go/workflow`             | Artifact-backed relationship resolution and typed target, call-site, context, port, retry, effect, and block-path inventory | Session mutation, dispatch, provider invocation                  |
+| Workflow Artifact API     | `internal/llmartifactory-go/workflow`             | Workflow list, get, admitted document read, source export, callable target resolution, requirement resolution               | Artifact pinning, target binding, Session mutation               |
 | Admission and compilation | `internal/agentruntimesetup/workflowruntime`      | Current Artifact pin verification, lowering from planning facts, target adapter selection, and Service or Activity binding  | Source parsing, source relationship resolution, Session mutation |
 | Durable orchestration     | `internal/agentruntime-go/sessionv3`              | ProgramFrames, WorkItems, Attempts, Waits, timers, effects, recovery, cancellation, durable state                           | Artifact services, source parsing, provider configuration        |
 | Domain binding            | `internal/agentruntimesetup`, domain runtimes     | Model, Tool, MCP, Skill, Workspace, attachment, Service, Activity, provider adaptation                                      | Session persistence roots, Workflow source parsing               |
@@ -187,7 +188,26 @@ The lowerer creates runtime-neutral copies because Session Runtime has no
 Artifact or setup imports. It must not parse Workflow source, interpret
 Workflow directives, or duplicate domain-native request grammars.
 
-### 3.3 LLM declaration registration boundary
+### 3.3 Workflow Artifact API consumption
+
+Workflow runtime setup consumes a resolved Workflow Artifact plan.
+
+The plan supplies:
+
+- callable targets;
+- requirements;
+- selected Artifact references;
+- target callable contracts;
+- declared capability requirements;
+- call, context, port, retry, effect, and block facts.
+
+Runtime setup pins selected Artifact references and binds current target
+adapters. It does not repeat Workflow relationship resolution.
+
+Requirements remain admission prerequisites. They do not enter
+`WorkflowProgram.Targets` and cannot be selected by a Workflow call.
+
+### 3.4 LLM declaration registration boundary
 
 `internal/llmartifactory-go/registration` owns reusable assembly of LLM
 family interpretation registrations, schema codecs, declaration decoders, and
@@ -1013,6 +1033,11 @@ The Wails application composes V2 and V3 independently.
 - [x] Model and Agent adapters accept explicit message input and instruction context forms without converting arbitrary Workflow JSON into provider messages.
 - [x] Agent handoff uses durable child ProgramFrame and conversation-ownership behavior.
 - [x] Workflow-owned adapters use existing Model and Agent domain APIs without requiring domain packages to understand Workflow.
+- [ ] Runtime admission must consume callable targets and requirements as
+      separate Workflow Artifact plan collections.
+- [ ] Runtime admission must consume resolved Artifact references from Workflow
+      target plans without inspecting generic composition target forms.
+- [ ] Runtime admission must evaluate declared callable capability requirements.
 - [ ] Additional callable-interface input and context forms require separate target-specific mappings.
 
 ### 21.6 Structured execution
@@ -1117,6 +1142,26 @@ The source shows these V3 gaps:
 - [ ] V3 needs the source-to-runtime audit that proves every normal V2 capability has one V3 typed equivalent.
 
 ## 22. Remaining implementation phases
+
+### Phase 0: Adopt Workflow Artifact API
+
+Implementation sequence:
+
+1. Inject the Workflow Artifact API into Workflow runtime setup.
+2. Consume callable target and requirement resolution separately.
+3. Pin only Artifact references selected by callable target resolution.
+4. Evaluate declared callable capability requirements through setup-owned
+   target adapters and bindings.
+5. Keep direct capability results unavailable to Workflow execution until a
+   dedicated setup-owned direct target binder exists.
+6. Keep Session Runtime dependent only on runtime-neutral program, pin, and
+   binding facts.
+
+Required source coverage:
+
+- `internal/llmartifactory-go/workflow/`
+- `internal/agentruntimesetup/workflowruntime/`
+- `internal/agentruntime-go/sessionv3/`
 
 ### Phase 1: Complete normal Session Runtime v3 parity
 

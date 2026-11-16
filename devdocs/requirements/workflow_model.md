@@ -152,6 +152,37 @@ An Invocation owns:
 
 The existing Session v3 document is the only durable root for an Invocation.
 
+### 3.5 Workflow Artifact API
+
+Workflow is a source-backed Artifact family. Its Artifact API is read-only and
+contains no Session Runtime, provider, Tool, MCP, Skill, Workspace, or
+credential behavior.
+
+The Workflow Artifact API provides:
+
+- `ListWorkflows`
+- `GetWorkflow`
+- `GetWorkflowDocument`
+- `ResolveWorkflowPlan`
+- `ExportWorkflowSource` where source export is enabled
+- `SetWorkflowEnabled`
+
+`ResolveWorkflowPlan` returns:
+
+- the admitted Workflow document;
+- callable target resolutions;
+- non-callable requirement resolutions;
+- call, context, port, retry, effect, and block planning facts;
+- detailed relationship status and issue facts.
+
+Workflow targets and Workflow requirements are distinct:
+
+- A target can become callable runtime work.
+- A requirement is an admission prerequisite and cannot become callable work.
+
+The Workflow Artifact API exposes Artifact references and declaration facts.
+Runtime setup creates Artifact pins and domain bindings from those facts.
+
 ## 4. Architecture
 
 ```mermaid
@@ -1983,6 +2014,18 @@ The backend is then ready for frontend replacement of Session v2.
 - [x] Workflow does not convert input ports or arbitrary Workflow context into synthetic Model or Agent chat messages.
 - [x] Typed Service and Activity dispatch plans persist binding identity, binding version, input, context, port facts, and effect facts.
 
+### 22.3a Workflow Artifact API status
+
+- [x] Workflow source admission, Definition reconstruction, and Artifact-backed
+      planning are present.
+- [ ] Workflow needs family list, get, typed-document read, source export, and
+      enablement APIs.
+- [ ] Workflow plan needs separate callable target and requirement collections.
+- [ ] Workflow plan needs Artifact-backed target references exposed without
+      requiring runtime setup to inspect generic composition target forms.
+- [ ] Workflow plan needs first-class declared callable capability requirements.
+- [ ] Workflow executable direct-capability policy needs an explicit decision.
+
 ### 22.4 Ports, channels, and messaging
 
 - [x] Local channel emit, retained records, cursors, consume facts, observation behavior, and emit deduplication are durable runtime concepts.
@@ -2072,6 +2115,27 @@ The backend is then ready for frontend replacement of Session v2.
 - [ ] Model and Agent input-port transport remains unavailable because existing provider request contracts have no typed input-port contribution.
 
 ## 23. Remaining implementation phases
+
+### Phase 0: Complete Workflow Artifact API and planning surface
+
+Deliverables:
+
+- Add Workflow list and get projections.
+- Add typed admitted Workflow document retrieval.
+- Add verified Workflow source export.
+- Split callable targets from admission-only requirements.
+- Keep requirement resolution separate from `WorkflowProgram.Targets`.
+- Expose resolved Artifact references through Workflow target plans.
+- Preserve declared callable capability requirements in Workflow target plans.
+- Define executable direct-capability behavior for Workflow targets.
+- Declare repository-backed-only or managed Workflow authoring scope.
+
+Required source coverage:
+
+- `internal/llmartifactory-go/workflow/`
+- `internal/llmartifactory-go/core/composition/`
+- `internal/artifactsetup/`
+- `internal/agentruntimesetup/workflowruntime/`
 
 ### Phase 1: Complete the V3 normal-session model superset
 
