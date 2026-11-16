@@ -7,7 +7,7 @@ env:
 includes:
   upstream:
     taskfile: https://raw.githubusercontent.com/flexigpt/.github/refs/heads/main/tasks/go.yml
-    checksum: 4f3a7e4d867c78ddd8ab2aa72e2edd27b345323013ee1e5b5d9604f1de237240
+    checksum: 0e434f366ab53c150aba922939ffdde13d166932dae020b3d829baabe2c34c65
     dir: "{{.ROOT_DIR}}"
     internal: true
     vars:
