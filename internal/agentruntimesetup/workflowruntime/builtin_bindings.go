@@ -154,13 +154,14 @@ func (applyUnifiedDiffActivityBinding) Bind(
 			"apply unified diff input is invalid",
 		)
 	}
-
-	return builtinBinding(
+	b := builtinBinding(
 		builtinActivityBindingVersion,
 		applyUnifiedDiffBindingFingerprint,
-	), boundApplyUnifiedDiff{
+	)
+	ba := boundApplyUnifiedDiff{
 		Input: input,
-	}, nil
+	}
+	return b, ba, nil
 }
 
 func (applyUnifiedDiffActivityBinding) Execute(
