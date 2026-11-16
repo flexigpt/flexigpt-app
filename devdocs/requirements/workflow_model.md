@@ -14,6 +14,11 @@ Invocation  = one durable execution of a Workflow
 
 An Agent owns reusable reasoning and interaction behavior. A Workflow owns process behavior, coordination, lifecycle, reliability, business control flow, and durable execution semantics.
 
+A Workflow declares orchestration semantics. It does not own target-domain
+execution semantics or durable runtime mechanics. Session Runtime v3 owns
+durable execution state, and each target domain owns its native configuration,
+readiness, credentials, request model, and execution behavior.
+
 Session Runtime v3 is the durable execution host for both normal conversation work and Workflow work.
 
 ```text
@@ -55,11 +60,11 @@ A Workflow source document is stored as an Artifact definition. The standalone s
 
 ### 3.1 Workflow responsibilities
 
-A Workflow owns:
+A Workflow declaration owns orchestration semantics:
 
 - Ordered work.
-- Typed callable invocation.
-- Runtime target selection.
+- Typed callable orchestration declarations.
+- Target-selection rules and selection persistence requirements.
 - Structured control flow.
 - Typed state updates.
 - Parallel and collection execution.
@@ -72,13 +77,21 @@ A Workflow owns:
 - Resource claims and execution budgets.
 - Cancellation and cleanup behavior.
 
+Workflow setup creates current executable target bindings from already planned
+Workflow facts. Session Runtime owns durable ProgramFrames, WorkItems, waits,
+retries, effects, cancellation, recovery, and control-flow execution.
+
 A Workflow does not own:
 
 - Artifact source parsing.
 - Artifact storage.
+- Current execution Artifact pinning.
+- Local enablement decisions for execution.
 - Credentials.
 - Provider configuration.
 - Provider clients.
+- Native target request grammars.
+- Target-domain invocation semantics.
 - Native file access.
 - MCP client sessions.
 - Frontend state.
@@ -87,14 +100,19 @@ A Workflow does not own:
 
 ### 3.4 Workflow target-adapter boundary
 
-Workflow owns orchestration adapters for callable targets.
+Workflow runtime setup owns orchestration-to-domain adapters for callable targets. The Workflow declaration and Workflow artifact layers do not own
+target adapters.
 
-Workflow adapters:
+Workflow setup adapters:
 
 - Depend on existing typed Model, Agent, Tool, Skill, MCP, Workspace, Service, and Activity APIs.
 - Convert Workflow-owned typed declarations and evaluated Workflow values into existing domain request types.
-- Persist Workflow semantic facts before external dispatch.
+- Supply typed semantic binding facts for durable persistence before external dispatch.
 - Keep native domain calls, provider clients, credentials, native paths, and domain-private handles outside Session documents.
+
+An adapter selects and binds a domain operation after runtime setup has pinned
+the selected Artifact, checked local enablement where applicable, and verified
+current domain readiness. It does not redefine native domain behavior.
 
 Domains do not:
 
@@ -155,17 +173,21 @@ The existing Session v3 document is the only durable root for an Invocation.
 ### 3.5 Workflow Artifact API
 
 Workflow is a source-backed Artifact family. Its current Artifact-facing API is
-Workflow plan resolution.
+read-only plan resolution through `workflow.Service.ResolvePlan`.
 
-Workflow source admission uses ordinary generic Source refresh. Workspace and
-built-in Sources are current admission routes. The current source model does
-not require a Workflow-specific source-origin policy.
+Workflow declarations are admitted through ordinary generic Source refresh and
+application-selected canonical declaration decoders. Built-in and Workspace
+Source configuration are application bootstrap choices. Workflow has no
+Workflow-specific source-origin, Source-driver, or package-publication policy.
 
-`ResolveWorkflowPlan` returns:
+The completed plan contract returns:
 
-- the admitted Workflow document;
-- callable target resolutions;
-- non-callable requirement resolutions;
+- the admitted Workflow document and current root Artifact identity facts;
+- `Inventory.CallableTargets`, containing only declarations that a Workflow
+  call can select;
+- `Inventory.Requirements`, containing only admission prerequisites;
+- source-backed `ResolvedArtifactRef` values for resolved Artifact targets;
+- direct-capability identity and evidence for direct targets;
 - call, context, port, retry, effect, and block planning facts;
 - detailed relationship status and issue facts.
 
@@ -174,39 +196,52 @@ the current entity-management operations. No Workflow-specific list, get,
 source export, enablement, Plugin, or managed package API is required until a
 concrete consumer requires one.
 
-Workflow target planning resolves selected Artifact references. Model Provider
-readiness, Agent execution readiness, Tool binding, MCP discovery, Skill
-materialization, and Workspace materialization remain runtime setup concerns.
+An Artifact-backed requirement receives ordinary composition resolution. A
+Service or Activity requirement remains a typed setup-binding prerequisite and
+does not receive a synthetic Artifact resolution. Requirements never enter
+`WorkflowProgram.Targets`, target-set selection, or callable dispatch.
+
+`Plan.Capabilities` remains a recursive composition and diagnostic projection.
+Runtime setup must consume the separate callable-target and requirement
+collections. It must not rebuild target lookup by walking
+`CapabilityPlan.Occurrences`.
 
 Workflow plan resolution is valid for an available Workflow Artifact regardless
-of local enablement. Runtime setup checks enablement when it creates an
-Artifact pin for execution.
+of local enablement. Runtime setup checks root and selected-target enablement
+when it creates an execution pin. Plan resolution does not establish provider,
+credential, policy, Tool, MCP, Skill, Workspace, Service, or Activity
+readiness.
+
+A direct capability remains direct. Workflow planning must not fabricate an
+Artifact, Source, Definition, revision, local-state record, or lifecycle
+record for it.
 
 ## 4. Architecture
 
 ```mermaid
 flowchart TD
-    A[Workflow source v1] --> B[Declaration validation]
-    B --> C[Artifact admission and pinning]
-    C --> D[Typed runtime-neutral WorkflowProgram]
-    D --> E[Session Runtime v3 Workflow ProgramFrame interpreter]
-    E --> F[Setup-owned domain binders]
-    F --> G[Model, Agent, Tool, MCP, Skill, Service, Activity domains]
+    A[Workflow source v1] --> B[Workflow contract validation]
+    B --> C[Generic Artifact admission]
+    C --> D[Read-only Workflow Artifact plan]
+    D --> E[Workflow setup pinning and lowering]
+    E --> F[Session Runtime v3 Workflow ProgramFrame interpreter]
+    F --> G[Setup-owned domain binders]
+    G --> H[Model, Agent, Tool, MCP, Skill, Service, Activity domains]
 
-    E --> H[Session v3 document]
-    H --> I[Session Store v3]
-    I --> J[Derived index and FTS]
+    F --> I[Session v3 document]
+    I --> J[Session Store v3]
+    J --> K[Derived index and FTS]
 ```
 
-| Layer                     | Primary package area                                                    | Responsibilities                                                                                                                                |
-| ------------------------- | ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| Declaration language      | `internal/llmartifactory-go/workflow/contract/v1/`                      | Source grammar, source schema, static validation, JSON Schema validity, CEL scope validity, target relationships, portable declaration validity |
-| Workflow planning         | `internal/llmartifactory-go/workflow/`                                  | Artifact-backed relationship resolution and typed target, call-site, context-use, port-use, retry, effect, and nested-block inventory           |
-| Admission and compilation | `internal/agentruntimesetup/workflowruntime/`                           | Current Artifact pins, lowering from planning facts, target adapter selection, typed WorkflowProgram lowering, and runtime transport admission  |
-| Durable orchestration     | `internal/agentruntime-go/sessionv3/`                                   | ProgramFrames, WorkItems, Attempts, Waits, timers, effects, recovery, cancellation, durable control flow                                        |
-| Domain binding            | `internal/agentruntimesetup/sessionv3runtime/`, domain runtime packages | Model, Agent, Tool, MCP, Skill, Workspace, attachment, Service, Activity, and provider adaptation                                               |
-| Persistence               | `internal/sessionstorev3/`                                              | Authoritative Session v3 documents, tombstones, derived index, derived FTS                                                                      |
-| Desktop composition       | `cmd/agentgo/`                                                          | Wails transport attachment, runtime composition, application binding registration                                                               |
+| Layer                             | Primary package area                                                    | Responsibilities                                                                                                                             |
+| --------------------------------- | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Declaration language              | `internal/llmartifactory-go/workflow/contract/v1/`                      | Source grammar, source schema, static validation, JSON Schema validity, CEL scope validity, target and requirement declaration validity      |
+| Workflow planning                 | `internal/llmartifactory-go/workflow/`                                  | Read-only Artifact-backed relationship resolution, callable-target and requirement inventory, direct Artifact references, and planning facts |
+| Runtime admission and compilation | `internal/agentruntimesetup/workflowruntime/`                           | Current execution Artifact pins, local enablement, target adapter selection, typed WorkflowProgram lowering, and runtime transport admission |
+| Durable orchestration             | `internal/agentruntime-go/sessionv3/`                                   | ProgramFrames, WorkItems, Attempts, Waits, timers, effects, recovery, cancellation, durable control flow                                     |
+| Domain binding                    | `internal/agentruntimesetup/sessionv3runtime/`, domain runtime packages | Domain-native Model, Agent, Tool, MCP, Skill, Workspace, attachment, Service, Activity, and provider adaptation                              |
+| Persistence                       | `internal/sessionstorev3/`                                              | Authoritative Session v3 documents, tombstones, derived index, derived FTS                                                                   |
+| Desktop composition               | `cmd/agentgo/`                                                          | Wails transport attachment, runtime composition, application binding registration                                                            |
 
 Session Runtime v3 has no Artifact Store or setup import. It does not parse source, resolve Artifacts, configure providers, read Workspace files, discover MCP capabilities, render Skills, invoke native Tools directly, or materialize native attachments.
 
@@ -218,14 +253,15 @@ One layer owns each validation class.
 | ------------------------------------------------------------------------------------------------ | ----------------------------------------- | ------------------------------------------ |
 | Artifact envelope, Definition integrity, persistence identity                                    | Artifact Store                            | Consume admitted Artifact facts            |
 | Workflow grammar, source schema, static CEL scope, static source relationships                   | Workflow contract v1                      | Consume typed validated declaration values |
-| Artifact-backed Workflow plan and source relationship resolution                                 | Workflow planning                         | Expose typed plan facts                    |
-| Current Artifact pin, binding, credential, policy, and transport availability                    | Setup adapter that owns the target domain | Return typed admission failure             |
+| Artifact-backed Workflow target and requirement resolution                                       | Workflow planning                         | Expose read-only typed plan facts          |
+| Current execution Artifact pin, enablement, binding, credential, policy, and transport readiness | Setup adapter that owns the target domain | Return typed admission failure             |
 | Durable Session, ProgramFrame, WorkItem, Attempt, Wait, timer, channel, and transition integrity | Session Runtime v3                        | Persist and recover durable facts          |
 | Session document, tombstone, index, and FTS integrity                                            | Session Store v3                          | Rebuild derived records                    |
 
 Workflow setup is a lowerer and binder assembler. It must not become a second
 Workflow grammar validator, a second CEL scope validator, a second target
-relationship resolver, or a second trigger scheduler.
+relationship resolver, a second requirement resolver, or a second trigger
+scheduler.
 
 Runtime-neutral Workflow types are deliberate boundary copies. Runtime cannot
 import Artifact or declaration packages. These copies must contain runtime
@@ -825,16 +861,12 @@ Workflow metadata is not injected through:
 - Tool argument envelopes.
 - Model request envelopes.
 - Agent request envelopes.
-- Tool argument envelopes.
 - Go `context.Context` sidecars.
 - MCP metadata.
 - MCP extensions.
 - Skill Runtime sidecars.
 - Provider metadata.
 - Artifact-domain imports.
-
-The duplicate Tool argument-envelope entry above should be removed while
-applying this amendment.
 
 Setup can adapt a confirmed final native Tool result into a normal Workflow output port after settlement.
 
@@ -1854,7 +1886,7 @@ A valid Workflow declaration has:
 
 Admission resolves:
 
-- Artifact pins.
+- Current execution Artifact pins.
 - Nested Workflow pins.
 - Current Service bindings.
 - Current Activity bindings.
@@ -1863,7 +1895,8 @@ Admission resolves:
 - Model and Agent invocation capability.
 - Current policy and binding availability.
 
-Admission never accepts a valid operation and later ignores it.
+Runtime setup never accepts a valid operation and later ignores it. Workflow
+artifact planning never creates an execution pin or a target-domain binding.
 
 ## 20. Compiler and runtime boundary
 
@@ -1874,7 +1907,13 @@ Workflow source v1
 Declaration validation
         |
         v
-Artifact admission and pinning
+Generic Artifact admission
+        |
+        v
+Read-only Workflow Artifact plan
+        |
+        v
+Runtime setup pinning, binding, and lowering
         |
         v
 Typed runtime-neutral WorkflowProgram
@@ -1894,9 +1933,15 @@ The declaration layer owns:
 - Static target relationships.
 - Portable declaration validity.
 
+Workflow planning owns:
+
+- Read-only target and requirement resolution.
+- Callable-target and requirement inventory projection.
+- Direct source-backed Artifact reference projection.
+
 Runtime setup owns:
 
-- Artifact pinning.
+- Execution Artifact pinning and local enablement checks.
 - Current dependency verification.
 - Provider planning.
 - Tool binding.
@@ -2017,14 +2062,12 @@ The backend is then ready for frontend replacement of Session v2.
 
 - [x] Workflow source admission, Definition reconstruction, Artifact-backed
       planning, and planning inventory are present.
-- [ ] Workflow inventory must split callable targets from requirements.
-- [ ] Workflow target plans must expose resolved Artifact references directly.
-- [x] `BindingRequirements` and the `BindingRequirement` compatibility alias
-      must be removed after requirements have their own collection.
 - [x] Generic Artifact, catalog, Definition, Resource, and enablement APIs
       cover current Workflow entity-management consumers.
 - [x] Workflow Plugins and managed Workflow publication have no current
       consumer and are outside the Workflow Artifact completion scope.
+- [ ] Phase 0 owns the remaining Workflow planning, bootstrap, and
+      duplicate-validation cleanup work.
 
 ### 22.4 Ports, channels, and messaging
 
@@ -2114,21 +2157,55 @@ The backend is then ready for frontend replacement of Session v2.
 
 ## 23. Remaining implementation phases
 
-### Phase 0: Complete Workflow planning surface
+### Phase 0: Complete Workflow artifact planning and bootstrap boundary
+
+This is an Artifact and application-bootstrap phase. It does not add Workflow
+runtime execution behavior, Session Runtime behavior, target-domain behavior,
+tests, frontend work, or migration work.
 
 Deliverables:
 
-- Split callable targets from admission-only requirements.
-- Keep requirement resolution separate from `WorkflowProgram.Targets`.
-- Expose resolved Artifact references through Workflow target plans.
-- Keep generic Artifact, catalog, Definition, Resource, and enablement APIs as
-  the current Workflow entity-management surface.
+- Split `Inventory.Targets` into `Inventory.CallableTargets` and
+  `Inventory.Requirements`.
+- Remove `TargetPlan.Requirement`. A requirement must not become a callable
+  runtime target, a target-set member, or a `WorkflowProgram.Target`.
+- Expose `ResolvedArtifactRef` directly for every source-backed target or
+  requirement resolution.
+- Preserve direct-capability provider identity and evidence without creating a
+  fabricated Artifact reference.
+- Keep recursive `Plan.Capabilities` as a diagnostic composition projection.
+  Runtime setup must consume callable-target and requirement inventory facts,
+  not reconstruct target lookup from composition occurrences.
+- Make `workflow.Service.ResolvePlan` an available-Artifact read. It must not
+  reject a disabled Workflow Artifact. Runtime setup checks local enablement
+  when it creates an execution pin.
+- Preserve the distinction between Artifact-backed requirements and
+  Service or Activity binding requirements.
+- Keep ordinary generic Artifact, catalog, Definition, Resource, and
+  enablement APIs as the current Workflow entity-management surface.
+- Do not add Workflow-specific list, get, export, enablement, Plugin, managed
+  package, source-driver, or implicit-refresh APIs without a concrete consumer.
+- Wire the application registration selection into `llmartifactory.Open`:
+  interpretations, locator factories, direct-capability providers, and
+  Artifact-capability projectors must be the same immutable selection used for
+  generic Store admission.
+- Construct Workflow family services from the shared LLM composition resolver.
+  Bootstrap must not perform normal Workflow planning or Workflow execution.
+- Remove duplicate Workflow admitted-value reconstruction and static validation
+  after a trusted phase has already produced typed facts. Preserve generic
+  Artifact-to-Definition digest, identity, availability, and concurrency checks.
+- Make this document the authority for Workflow Artifact completion. The
+  runtime document defines only downstream plan consumption requirements.
 
 Required source coverage:
 
 - `internal/llmartifactory-go/workflow/`
 - `internal/llmartifactory-go/core/composition/`
-- `internal/agentruntimesetup/workflowruntime/`
+- `internal/llmartifactory-go/core/declaration/interpretation/`
+- `internal/artifactsetup/open.go`
+- `internal/artifactsetup/registration/`
+- `devdocs/requirements/workflow_model.md`
+- `devdocs/requirements/workflow_runtime.md`
 
 ### Phase 1: Complete the V3 normal-session model superset
 
