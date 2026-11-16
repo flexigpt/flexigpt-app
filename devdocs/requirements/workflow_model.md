@@ -154,18 +154,12 @@ The existing Session v3 document is the only durable root for an Invocation.
 
 ### 3.5 Workflow Artifact API
 
-Workflow is a source-backed Artifact family. Its Artifact API is read-only and
-contains no Session Runtime, provider, Tool, MCP, Skill, Workspace, or
-credential behavior.
+Workflow is a source-backed Artifact family. Its current Artifact-facing API is
+Workflow plan resolution.
 
-The Workflow Artifact API provides:
-
-- `ListWorkflows`
-- `GetWorkflow`
-- `GetWorkflowDocument`
-- `ResolveWorkflowPlan`
-- `ExportWorkflowSource` where source export is enabled
-- `SetWorkflowEnabled`
+Workflow source admission uses ordinary generic Source refresh. Workspace and
+built-in Sources are current admission routes. The current source model does
+not require a Workflow-specific source-origin policy.
 
 `ResolveWorkflowPlan` returns:
 
@@ -175,13 +169,18 @@ The Workflow Artifact API provides:
 - call, context, port, retry, effect, and block planning facts;
 - detailed relationship status and issue facts.
 
-Workflow targets and Workflow requirements are distinct:
+Generic Artifact, catalog, Definition, Resource, and enablement APIs provide
+the current entity-management operations. No Workflow-specific list, get,
+source export, enablement, Plugin, or managed package API is required until a
+concrete consumer requires one.
 
-- A target can become callable runtime work.
-- A requirement is an admission prerequisite and cannot become callable work.
+Workflow target planning resolves selected Artifact references. Model Provider
+readiness, Agent execution readiness, Tool binding, MCP discovery, Skill
+materialization, and Workspace materialization remain runtime setup concerns.
 
-The Workflow Artifact API exposes Artifact references and declaration facts.
-Runtime setup creates Artifact pins and domain bindings from those facts.
+Workflow plan resolution is valid for an available Workflow Artifact regardless
+of local enablement. Runtime setup checks enablement when it creates an
+Artifact pin for execution.
 
 ## 4. Architecture
 
@@ -2016,15 +2015,16 @@ The backend is then ready for frontend replacement of Session v2.
 
 ### 22.3a Workflow Artifact API status
 
-- [x] Workflow source admission, Definition reconstruction, and Artifact-backed
-      planning are present.
-- [ ] Workflow needs family list, get, typed-document read, source export, and
-      enablement APIs.
-- [ ] Workflow plan needs separate callable target and requirement collections.
-- [ ] Workflow plan needs Artifact-backed target references exposed without
-      requiring runtime setup to inspect generic composition target forms.
-- [ ] Workflow plan needs first-class declared callable capability requirements.
-- [ ] Workflow executable direct-capability policy needs an explicit decision.
+- [x] Workflow source admission, Definition reconstruction, Artifact-backed
+      planning, and planning inventory are present.
+- [ ] Workflow inventory must split callable targets from requirements.
+- [ ] Workflow target plans must expose resolved Artifact references directly.
+- [x] `BindingRequirements` and the `BindingRequirement` compatibility alias
+      must be removed after requirements have their own collection.
+- [x] Generic Artifact, catalog, Definition, Resource, and enablement APIs
+      cover current Workflow entity-management consumers.
+- [x] Workflow Plugins and managed Workflow publication have no current
+      consumer and are outside the Workflow Artifact completion scope.
 
 ### 22.4 Ports, channels, and messaging
 
@@ -2111,30 +2111,23 @@ The backend is then ready for frontend replacement of Session v2.
 - [x] Generic `messages` and `instructions` JSON envelopes remain disabled. They were a Workflow-local duplicate of Model and Agent invocation behavior.
 - [x] The generic `LLMInvocationPlan` bridge is removed. The Workflow adapter lowers explicit messages to Session Activities and explicit instructions to existing Session instruction values.
 - [x] Admission verifies current Model or Agent target availability, supported call mode, supported instruction context, and output-port transport before Workflow execution starts.
-- [ ] Model and Agent adapters currently support only explicit `input.messages` and `context.instructions` forms. Other arbitrary callable input or context forms require a separate typed adapter mapping.
-- [ ] Model and Agent input-port transport remains unavailable because existing provider request contracts have no typed input-port contribution.
 
 ## 23. Remaining implementation phases
 
-### Phase 0: Complete Workflow Artifact API and planning surface
+### Phase 0: Complete Workflow planning surface
 
 Deliverables:
 
-- Add Workflow list and get projections.
-- Add typed admitted Workflow document retrieval.
-- Add verified Workflow source export.
 - Split callable targets from admission-only requirements.
 - Keep requirement resolution separate from `WorkflowProgram.Targets`.
 - Expose resolved Artifact references through Workflow target plans.
-- Preserve declared callable capability requirements in Workflow target plans.
-- Define executable direct-capability behavior for Workflow targets.
-- Declare repository-backed-only or managed Workflow authoring scope.
+- Keep generic Artifact, catalog, Definition, Resource, and enablement APIs as
+  the current Workflow entity-management surface.
 
 Required source coverage:
 
 - `internal/llmartifactory-go/workflow/`
 - `internal/llmartifactory-go/core/composition/`
-- `internal/artifactsetup/`
 - `internal/agentruntimesetup/workflowruntime/`
 
 ### Phase 1: Complete the V3 normal-session model superset
@@ -2193,7 +2186,6 @@ Deliverables:
 - Preserve child state isolation until the explicit merge boundary.
 - Extend step outcome records with failed and uncertain outcome state, typed error facts, target facts, receipt facts, and effect facts.
 - Expose those durable outcome facts consistently through `steps`.
-- Add Model and Agent invocation adapters that accept all declared callable-interface input and context forms through typed target-specific plans.
 - Preserve the rule that arbitrary Workflow JSON never becomes fallback chat text.
 
 Required source coverage:
@@ -2210,9 +2202,6 @@ Required source coverage:
 - [x] Parallel and Foreach support typed `merge` declarations that create persisted deterministic StateUpdate WorkItems after child settlement.
 - [x] Failed and uncertain step outcomes persist typed error, receipt, effect, and target facts and are exposed through Workflow projections and CEL `steps`.
 - [x] Nested Workflow published-port admission compares caller and callable schemas with the target published channel schema.
-- [x] Typed Model and Agent invocation adapters support explicit `input.messages`, `context.messages`, `context.instructions`, and typed `context.defaults` forms through isolated child V3 ProgramFrames.
-- [ ] Typed Model and Agent invocation adapters need additional target-specific mappings for callable forms beyond explicit messages and instructions.
-- [ ] Model and Agent input-port transport needs an existing typed Model or Agent plan contribution before admission can accept it.
 - [ ] Structured retry remains incomplete for accepted Scope, Choose, Parallel, Foreach, Repeat, Machine, Saga, Start, Handoff, and child-frame boundaries.
 
 ### Phase 3: Complete structured retry and published-port boundary behavior
@@ -2244,6 +2233,7 @@ Required source coverage:
 - [x] Non-stream Workflow output ports deliver only after confirmed WorkItem or completed child-frame settlement.
 - [x] Resumed Service and Activity waits preserve the original external binding wrapper and durable dispatch facts.
 - [ ] The source-to-runtime audit must still verify all retry interactions with every externally supplied Service and Activity binding.
+      Artifact completion note:
 
 #### Architecture cleanup status
 

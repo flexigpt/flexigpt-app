@@ -19,10 +19,6 @@ type Service struct {
 	resolver *composition.Resolver
 }
 
-// BindingRequirement is retained as a compatibility alias. New consumers use
-// Plan.Inventory.Targets, which also contains planning-owned resolution facts.
-type BindingRequirement = TargetPlan
-
 type Plan struct {
 	Workflow artifactModel.ArtifactRef `json:"workflow"`
 	Revision uint64                    `json:"revision"`
@@ -34,11 +30,6 @@ type Plan struct {
 
 	// Capabilities contains recursively resolved declaration relationships.
 	Capabilities composition.CapabilityPlan `json:"capabilities"`
-
-	// BindingRequirements inventories all declared targets and requirements,
-	// including service and activity bindings and MCP Tool operation bindings.
-	// Inclusion does not mean that a binding is unavailable.
-	BindingRequirements []BindingRequirement `json:"bindingRequirements"`
 
 	// CompositionComplete covers only relationships represented in
 	// Capabilities. Direct capabilities count as available composition
@@ -121,6 +112,5 @@ func (s *Service) ResolvePlan(
 		Capabilities:        capabilities,
 		CompositionComplete: capabilities.Complete,
 		Inventory:           inventory,
-		BindingRequirements: append([]BindingRequirement(nil), inventory.Targets...),
 	}, nil
 }
