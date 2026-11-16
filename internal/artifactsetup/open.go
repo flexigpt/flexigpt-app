@@ -18,6 +18,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	mcpOverlay "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/mcp/overlay"
 	modelOverlay "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/overlay"
+	workflowAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workflow"
 )
 
 const secretValuesFileName = "secrets.json"
@@ -26,8 +27,9 @@ const secretValuesFileName = "secrets.json"
 // attachment. The generic Store remains the only aggregate exposing generic
 // entity and flow APIs.
 type Handle struct {
-	Store *compose.Store
-	LLM   *llmartifactory.Artifactory
+	Store    *compose.Store
+	LLM      *llmartifactory.Artifactory
+	Workflow *workflowAPI.Service
 
 	closeOnce sync.Once
 	closeErr  error
@@ -41,6 +43,9 @@ func (h *Handle) Close() error {
 	}
 	h.closeOnce.Do(func() {
 		// LLM Artifactory owns immutable registration/composition state only.
+		if h.Workflow != nil {
+			h.Workflow = nil
+		}
 		// It borrows the generic Store and has no independent shutdown work.
 		if h.LLM != nil {
 			h.LLM = nil
@@ -118,20 +123,34 @@ func OpenArtifactStore(
 		return nil, errors.Join(err, values.Close())
 	}
 
+	// Use the same immutable declaration selection for generic Store
+	// admission and LLM composition. Runtime-specific direct capabilities and
+	// Artifact projectors remain application registration choices.
 	llm, err := llmartifactory.Open(llmartifactory.Config{
-		Artifacts: store.Artifacts,
-		Catalog:   store.Catalog,
-		Resources: store.Resources,
+		Artifacts:        store.Artifacts,
+		Catalog:          store.Catalog,
+		Resources:        store.Resources,
+		Interpretations:  registrations.Interpretations(),
+		LocatorFactories: registrations.LocatorFactories(),
 		Scope: composition.ScopeBinding{
 			BuiltinRoot: topology.BuiltinRootID(),
 		},
+		DirectCapabilities: registrations.DirectCapabilities(),
+		ArtifactCapabilityProjectors: registrations.
+			ArtifactCapabilityProjectors(),
 	})
 	if err != nil {
 		return nil, errors.Join(err, store.Close())
 	}
 
+	workflowService, err := workflowAPI.NewService(llm.Composition())
+	if err != nil {
+		return nil, errors.Join(err, store.Close())
+	}
+
 	return &Handle{
-		Store: store,
-		LLM:   llm,
+		Store:    store,
+		LLM:      llm,
+		Workflow: workflowService,
 	}, nil
 }

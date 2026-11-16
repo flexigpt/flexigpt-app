@@ -29,10 +29,13 @@ func Interpretation() coreinterpretation.Registration {
 }
 
 func workflowRelationships(entry declaration.Entry) ([]coreinterpretation.Relationship, error) {
-	document, err := DecodeAdmittedWorkflowEntry(entry)
-	if err != nil {
+	// Registry validates the admitted Workflow before relationship extraction.
+	// Decode only the typed fields needed to project the trusted relationships.
+	var document WorkflowDocument
+	if err := declaration.DecodeAdmittedEntryInto(entry, &document); err != nil {
 		return nil, err
 	}
+
 	output := make([]coreinterpretation.Relationship, 0, len(document.Targets)+len(document.Requirements))
 	for _, group := range []struct {
 		path   string
@@ -42,7 +45,8 @@ func workflowRelationships(entry declaration.Entry) ([]coreinterpretation.Relati
 		{path: "requirements", values: document.Requirements},
 	} {
 		for _, name := range sortedKeys(group.values) {
-			member, artifactBacked, err := group.values[name].DeclarationMember()
+			target := group.values[name]
+			member, artifactBacked, err := target.declarationMemberForValidatedTarget()
 			if err != nil {
 				return nil, err
 			}

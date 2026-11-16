@@ -914,38 +914,74 @@ func (v *validator) callInterface(call Call, contract *CallableInterface, scope 
 	return nil
 }
 
+// UsesArtifactComposition reports whether this target requires source-backed
+// Artifact composition. It is a classification helper for already validated
+// Workflow declarations and does not validate the target by itself.
+func (t Target) UsesArtifactComposition() bool {
+	switch t.Kind {
+	case TargetAgent, TargetTool, TargetModel, TargetWorkflow:
+		return true
+	default:
+		return false
+	}
+}
+
 // DeclarationMember projects only real source-backed declaration dependencies.
 // Service and activity references remain explicit binding requirements.
 func (t Target) DeclarationMember() (declaration.Entry, bool, error) {
-	if err := storeSpec.ValidateRequiredText("callable reference", t.Ref, storeSpec.MaxURIBytes); err != nil {
+	if err := t.validateDeclarationTarget(); err != nil {
 		return declaration.Entry{}, false, err
 	}
-	if t.Kind == TargetService || t.Kind == TargetActivity {
-		if t.Scope != "" || t.Locator != nil || t.Server != nil {
-			return declaration.Entry{}, false, invalid(
-				"service/activity targets cannot contain Artifact selection fields",
-			)
+	return t.declarationMemberForValidatedTarget()
+}
+
+func (t Target) validateDeclarationTarget() error {
+	if err := storeSpec.ValidateRequiredText("callable reference", t.Ref, storeSpec.MaxURIBytes); err != nil {
+		return err
+	}
+	if !t.UsesArtifactComposition() {
+		switch t.Kind {
+		case TargetService, TargetActivity:
+			if t.Scope != "" || t.Locator != nil || t.Server != nil {
+				return invalid(
+					"service/activity targets cannot contain Artifact selection fields",
+				)
+			}
+			return nil
+
+		default:
+			return invalid("unsupported target kind %q", t.Kind)
 		}
+	}
+
+	if t.Server != nil &&
+		(t.Kind != TargetTool || t.Scope != "" || t.Locator != nil) {
+		return invalid("only Tool targets can select an MCP server")
+	}
+
+	referenceName := t.Ref
+	if t.Server != nil {
+		referenceName = t.Server.Name
+	}
+	return validateName("callable declaration reference", referenceName)
+}
+
+func (t Target) declarationMemberForValidatedTarget() (declaration.Entry, bool, error) {
+	if !t.UsesArtifactComposition() {
 		return declaration.Entry{}, false, nil
 	}
+
 	kind := declaration.Type(t.Kind)
-	switch t.Kind {
-	case TargetAgent, TargetTool, TargetModel, TargetWorkflow:
-	default:
-		return declaration.Entry{}, false, invalid("unsupported target kind %q", t.Kind)
-	}
+
 	reference := Reference{Name: t.Ref, Scope: t.Scope, Locator: t.Locator}
 	if t.Server != nil {
-		if t.Kind != TargetTool || t.Scope != "" || t.Locator != nil {
-			return declaration.Entry{}, false, invalid("only Tool targets can select an MCP server")
-		}
 		kind = declaration.TypeMCP
 		reference = *t.Server
 	}
-	if err := validateName("callable declaration reference", reference.Name); err != nil {
-		return declaration.Entry{}, false, err
+	fields := map[string]any{
+		"type": string(kind),
+		"name": reference.Name,
 	}
-	fields := map[string]any{"type": string(kind), "name": reference.Name}
 	if reference.Scope != "" {
 		fields["scope"] = string(reference.Scope)
 	}
@@ -953,9 +989,6 @@ func (t Target) DeclarationMember() (declaration.Entry, bool, error) {
 		fields["locator"] = reference.Locator
 	}
 	if reference.Server != "" {
-		if kind != declaration.TypeMCP {
-			return declaration.Entry{}, false, invalid("server selector requires MCP")
-		}
 		fields["server"] = reference.Server
 	}
 	entry, err := declaration.NewEntry(fields)
@@ -964,9 +997,6 @@ func (t Target) DeclarationMember() (declaration.Entry, bool, error) {
 	}
 	if _, err := entry.MemberForm(); err != nil {
 		return declaration.Entry{}, false, err
-	}
-	if strings.Contains(reference.Name, "/") {
-		return declaration.Entry{}, false, invalid("declaration reference name is not portable")
 	}
 	return entry, true, nil
 }

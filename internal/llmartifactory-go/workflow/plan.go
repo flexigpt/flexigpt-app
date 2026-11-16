@@ -53,6 +53,9 @@ func NewService(resolver *composition.Resolver) (*Service, error) {
 	return &Service{resolver: resolver}, nil
 }
 
+// ResolvePlan reads an available Workflow Artifact and its current admitted
+// declaration plan. Local Artifact enablement is an execution-admission
+// concern owned by downstream runtime setup.
 func (s *Service) ResolvePlan(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
@@ -60,10 +63,6 @@ func (s *Service) ResolvePlan(
 	if s == nil || s.resolver == nil {
 		return Plan{}, storeSpec.ErrClosed
 	}
-	if err := ref.Validate(); err != nil {
-		return Plan{}, err
-	}
-
 	resolved, err := s.resolver.ResolveWorkflow(ctx, ref)
 	if err != nil {
 		return Plan{}, err
@@ -84,14 +83,24 @@ func (s *Service) ResolvePlan(
 			storeSpec.ErrReferenceUnresolved,
 		)
 	}
-	if resolved.Artifact == nil || !resolved.Artifact.Enabled {
+	if resolved.Artifact == nil {
 		return Plan{}, fmt.Errorf(
-			"%w: selected Workflow is disabled",
+			"%w: selected Workflow has no source-backed Artifact",
 			storeSpec.ErrReferenceUnresolved,
 		)
 	}
 
-	document, err := workflowv1.FromDefinition(*resolved.Definition)
+	entry, found := resolved.AdmittedEntry()
+	if !found {
+		return Plan{}, fmt.Errorf(
+			"%w: Workflow plan has no admitted declaration entry",
+			storeSpec.ErrReferenceUnresolved,
+		)
+	}
+	document, err := workflowv1.DecodeResolvedWorkflowDefinition(
+		*resolved.Definition,
+		entry,
+	)
 	if err != nil {
 		return Plan{}, err
 	}

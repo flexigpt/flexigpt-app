@@ -217,6 +217,8 @@ func (r *Resolver) resolveArtifact(
 		Type:              loaded.declarationType,
 		scopeRootID:       loaded.record.RootID,
 		DeclarationOrigin: pointerArtifact(loaded.record),
+		admittedEntry:     loaded.entry.Clone(),
+		hasAdmittedEntry:  true,
 		Artifact:          pointerArtifact(loaded.record),
 		Definition:        pointerDefinition(loaded.definition),
 		Target:            pointerTarget(target),

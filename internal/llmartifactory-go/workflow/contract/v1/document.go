@@ -192,9 +192,25 @@ func DecodeAdmittedWorkflowJSON(raw []byte) (WorkflowDocument, error) {
 	return DecodeAdmittedWorkflowEntry(entry)
 }
 
-func DecodeAdmittedWorkflowEntry(entry declaration.Entry) (WorkflowDocument, error) {
+// DecodeValidatedAdmittedWorkflowEntry decodes typed Workflow fields from an
+// Entry that the interpretation registry has already semantically validated.
+//
+// It deliberately does not execute Workflow schema or static validation.
+// External input and ordinary Definition reconstruction must use the strict
+// decoding functions instead.
+func DecodeValidatedAdmittedWorkflowEntry(
+	entry declaration.Entry,
+) (WorkflowDocument, error) {
 	var value WorkflowDocument
 	if err := declaration.DecodeAdmittedEntryInto(entry, &value); err != nil {
+		return WorkflowDocument{}, err
+	}
+	return value, nil
+}
+
+func DecodeAdmittedWorkflowEntry(entry declaration.Entry) (WorkflowDocument, error) {
+	value, err := DecodeValidatedAdmittedWorkflowEntry(entry)
+	if err != nil {
 		return WorkflowDocument{}, err
 	}
 	if err := value.validateFields(); err != nil {
@@ -286,6 +302,27 @@ func DefinitionForDocument(document WorkflowDocument) (definitionModel.Definitio
 	})
 }
 
+// DecodeResolvedWorkflowDefinition projects typed Workflow facts from a
+// composition-validated Entry and its current Definition.
+//
+// Composition already checked Artifact availability, Artifact-to-Definition
+// linkage, Definition identity, and Workflow admitted semantics. This method
+// retains only the Definition metadata-to-body integrity check needed by the
+// returned planning document.
+func DecodeResolvedWorkflowDefinition(
+	value definitionModel.Definition,
+	entry declaration.Entry,
+) (WorkflowDocument, error) {
+	document, err := DecodeValidatedAdmittedWorkflowEntry(entry)
+	if err != nil {
+		return WorkflowDocument{}, err
+	}
+	if err := validateDefinitionProjection(value, document); err != nil {
+		return WorkflowDocument{}, err
+	}
+	return document, nil
+}
+
 // FromDefinition reconstructs admitted meaning without executing the family
 // admission schema or recalculating the immutable Definition digest.
 func FromDefinition(value definitionModel.Definition) (WorkflowDocument, error) {
@@ -302,18 +339,29 @@ func FromDefinition(value definitionModel.Definition) (WorkflowDocument, error) 
 	if err != nil {
 		return WorkflowDocument{}, err
 	}
+	if err := validateDefinitionProjection(value, document); err != nil {
+		return WorkflowDocument{}, err
+	}
+	return document, nil
+}
+
+func validateDefinitionProjection(
+	value definitionModel.Definition,
+	document WorkflowDocument,
+) error {
 	displayName := document.DisplayName
 	if displayName == "" {
 		displayName = document.Name
 	}
-	if document.Name != string(value.LogicalName) ||
+	if document.Type != WorkflowType ||
+		document.Name != string(value.LogicalName) ||
 		document.Description != value.Description ||
 		displayName != value.DisplayName ||
 		!maps.Equal(document.Labels, value.Labels) {
-		return WorkflowDocument{}, fmt.Errorf(
+		return fmt.Errorf(
 			"%w: Workflow body differs from Definition metadata",
 			storeSpec.ErrDigestMismatch,
 		)
 	}
-	return document, nil
+	return nil
 }

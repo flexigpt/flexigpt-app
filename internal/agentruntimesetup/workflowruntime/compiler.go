@@ -53,9 +53,6 @@ func compileWorkflowProgramWithInput(
 	input sessionv3Runtime.CanonicalValue,
 	inputBound bool,
 ) (sessionv3Runtime.WorkflowProgram, error) {
-	if err := rejectUnsupportedWorkflowDocument(document); err != nil {
-		return sessionv3Runtime.WorkflowProgram{}, err
-	}
 	resources, err := compileWorkflowResources(document)
 	if err != nil {
 		return sessionv3Runtime.WorkflowProgram{}, err
@@ -114,22 +111,11 @@ func compileWorkflowProgramWithInput(
 	if limits != nil {
 		output.Limits = *limits
 	}
-	if err := output.Validate(); err != nil {
-		return sessionv3Runtime.WorkflowProgram{}, err
-	}
-	if inputBound {
-		if err := output.ValidateInput(); err != nil {
-			return sessionv3Runtime.WorkflowProgram{}, err
-		}
-	}
-	return output, nil
-}
 
-func rejectUnsupportedWorkflowDocument(
-	document workflowv1.WorkflowDocument,
-) error {
-	_ = document
-	return nil
+	// Admission validates the complete program after it has bound callable
+	// targets. Validate only at that boundary so this lowering step does not
+	// repeat runtime checks against an incomplete Targets map.
+	return output, nil
 }
 
 func unsupportedWorkflowOperation(path, operation string) error {

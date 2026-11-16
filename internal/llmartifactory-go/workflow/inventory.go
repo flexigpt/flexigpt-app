@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
@@ -15,24 +16,25 @@ import (
 // lowering. It is built from the already-admitted typed Workflow document.
 //
 // Setup consumes this inventory to select current bindings. It must not
-// reparse source JSON or rediscover Workflow block semantics.
+// reparse source JSON, rediscover Workflow block semantics, or reconstruct
+// Artifact relationship lookup from CapabilityPlan.
 type Inventory struct {
-	Targets     []TargetPlan        `json:"targets"`
-	Calls       []CallSite          `json:"calls"`
-	ContextUses []ContextUse        `json:"contextUses"`
-	PortUses    []PortUse           `json:"portUses"`
-	Retries     []RetryDeclaration  `json:"retries"`
-	Effects     []EffectDeclaration `json:"effects"`
-	Blocks      []BlockPath         `json:"blocks"`
+	CallableTargets []TargetPlan        `json:"callableTargets"`
+	Requirements    []TargetPlan        `json:"requirements"`
+	Calls           []CallSite          `json:"calls"`
+	ContextUses     []ContextUse        `json:"contextUses"`
+	PortUses        []PortUse           `json:"portUses"`
+	Retries         []RetryDeclaration  `json:"retries"`
+	Effects         []EffectDeclaration `json:"effects"`
+	Blocks          []BlockPath         `json:"blocks"`
 }
 
-// TargetPlan describes one named target or requirement declaration and, for
-// Artifact-backed target kinds, its already-resolved composition result.
+// TargetPlan describes one callable target or one admission requirement. Its
+// containing Inventory collection determines its role.
 type TargetPlan struct {
-	Path        string            `json:"path"`
-	Name        string            `json:"name"`
-	Requirement bool              `json:"requirement"`
-	Target      workflowv1.Target `json:"target"`
+	Path   string            `json:"path"`
+	Name   string            `json:"name"`
+	Target workflowv1.Target `json:"target"`
 
 	UsesComposition bool              `json:"usesComposition"`
 	Resolution      *TargetResolution `json:"resolution,omitempty"`
@@ -44,6 +46,11 @@ type TargetResolution struct {
 	Status composition.ResolutionStatus `json:"status"`
 
 	Target *composition.CapabilityTarget `json:"target,omitempty"`
+
+	// ResolvedArtifactRef is set only when normal composition selected an
+	// actual source-backed Artifact. Direct capabilities retain provider
+	// identity, provider-local identity, and evidence in Target instead.
+	ResolvedArtifactRef *artifactModel.ArtifactRef `json:"resolvedArtifactRef,omitempty"`
 
 	Code    string `json:"code,omitempty"`
 	Message string `json:"message,omitempty"`
@@ -159,7 +166,10 @@ func buildWorkflowInventory(
 	document workflowv1.WorkflowDocument,
 	capabilities composition.CapabilityPlan,
 ) (Inventory, error) {
-	targets, err := targetPlansForDocument(document, capabilities)
+	callableTargets, requirements, err := targetPlansForDocument(
+		document,
+		capabilities,
+	)
 	if err != nil {
 		return Inventory{}, err
 	}
@@ -167,13 +177,14 @@ func buildWorkflowInventory(
 	builder := inventoryBuilder{
 		document: document,
 		inventory: Inventory{
-			Targets:     targets,
-			Calls:       []CallSite{},
-			ContextUses: []ContextUse{},
-			PortUses:    []PortUse{},
-			Retries:     []RetryDeclaration{},
-			Effects:     []EffectDeclaration{},
-			Blocks:      []BlockPath{},
+			CallableTargets: callableTargets,
+			Requirements:    requirements,
+			Calls:           []CallSite{},
+			ContextUses:     []ContextUse{},
+			PortUses:        []PortUse{},
+			Retries:         []RetryDeclaration{},
+			Effects:         []EffectDeclaration{},
+			Blocks:          []BlockPath{},
 		},
 		blocks: make(map[string]struct{}),
 	}
@@ -194,14 +205,14 @@ func buildWorkflowInventory(
 func targetPlansForDocument(
 	document workflowv1.WorkflowDocument,
 	capabilities composition.CapabilityPlan,
-) ([]TargetPlan, error) {
+) (t, reqs []TargetPlan, err error) {
 	occurrences := make(
 		map[string]composition.CapabilityOccurrence,
 		len(capabilities.Occurrences),
 	)
 	for _, occurrence := range capabilities.Occurrences {
 		if _, duplicate := occurrences[occurrence.Path]; duplicate {
-			return nil, fmt.Errorf(
+			return nil, nil, fmt.Errorf(
 				"%w: Workflow capability path %q is repeated",
 				storeSpec.ErrIdentityConflict,
 				occurrence.Path,
@@ -210,70 +221,75 @@ func targetPlansForDocument(
 		occurrences[occurrence.Path] = occurrence
 	}
 
+	callableTargets, err := targetPlansForGroup(
+		"targets",
+		document.Targets,
+		occurrences,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+	requirements, err := targetPlansForGroup(
+		"requirements",
+		document.Requirements,
+		occurrences,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+	return callableTargets, requirements, nil
+}
+
+func targetPlansForGroup(
+	groupPath string,
+	values map[string]workflowv1.Target,
+	occurrences map[string]composition.CapabilityOccurrence,
+) ([]TargetPlan, error) {
 	output := make(
 		[]TargetPlan,
 		0,
-		len(document.Targets)+len(document.Requirements),
+		len(values),
 	)
-	for _, group := range []struct {
-		path        string
-		requirement bool
-		values      map[string]workflowv1.Target
-	}{
-		{
-			path:   "targets",
-			values: document.Targets,
-		},
-		{
-			path:        "requirements",
-			requirement: true,
-			values:      document.Requirements,
-		},
-	} {
-		names := sortedTargetNames(group.values)
-		for _, name := range names {
-			target, err := cloneWorkflowTarget(group.values[name])
-			if err != nil {
-				return nil, fmt.Errorf(
-					"clone Workflow %s/%s: %w",
-					group.path,
-					name,
-					err,
-				)
-			}
 
-			_, usesComposition, err := target.DeclarationMember()
-			if err != nil {
-				return nil, fmt.Errorf(
-					"workflow %s/%s declaration target: %w",
-					group.path,
-					name,
-					err,
-				)
-			}
-
-			path := group.path + "/" + name
-			plan := TargetPlan{
-				Path:            path,
-				Name:            name,
-				Requirement:     group.requirement,
-				Target:          target,
-				UsesComposition: usesComposition,
-			}
-			if usesComposition {
-				occurrence, found := occurrences[path]
-				if !found {
-					return nil, fmt.Errorf(
-						"%w: Workflow target %q has no composition result",
-						storeSpec.ErrInvalid,
-						path,
-					)
-				}
-				resolution := targetResolutionForOccurrence(occurrence)
-				plan.Resolution = &resolution
-			}
-			output = append(output, plan)
+	for _, name := range sortedTargetNames(values) {
+		target, err := cloneWorkflowTarget(values[name])
+		if err != nil {
+			return nil, fmt.Errorf(
+				"clone Workflow %s/%s: %w",
+				groupPath,
+				name,
+				err,
+			)
 		}
+
+		path := groupPath + "/" + name
+		plan := TargetPlan{
+			Path:            path,
+			Name:            name,
+			Target:          target,
+			UsesComposition: target.UsesArtifactComposition(),
+		}
+		if plan.UsesComposition {
+			occurrence, found := occurrences[path]
+			if !found {
+				return nil, fmt.Errorf(
+					"%w: Workflow %s %q has no composition result",
+					storeSpec.ErrInvalid,
+					groupPath,
+					name,
+				)
+			}
+			resolution := targetResolutionForOccurrence(occurrence)
+			plan.Resolution = &resolution
+		} else if _, found := occurrences[path]; found {
+			return nil, fmt.Errorf(
+				"%w: Workflow %s %q unexpectedly has a composition result",
+				storeSpec.ErrInvalid,
+				groupPath,
+				name,
+			)
+		}
+		output = append(output, plan)
 	}
 	return output, nil
 }
@@ -289,6 +305,11 @@ func targetResolutionForOccurrence(
 	if occurrence.Target != nil {
 		target := occurrence.Target.Clone()
 		output.Target = &target
+		if target.Form == composition.TargetFormArtifact &&
+			target.Artifact != nil {
+			ref := *target.Artifact
+			output.ResolvedArtifactRef = &ref
+		}
 	}
 	return output
 }

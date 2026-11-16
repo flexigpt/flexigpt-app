@@ -34,8 +34,10 @@ type Registration struct {
 	// execute the family JSON Schema again.
 	ValidateAdmittedEntry func(declaration.Entry) error
 
-	// Relationships returns direct family-owned relationship facts. The core
-	// traverses these facts but does not interpret family document fields.
+	// Relationships returns direct family-owned relationship facts. Registry
+	// entry points validate the matching source or admitted declaration before
+	// they call this function. The core traverses these facts but does not
+	// interpret family document fields.
 	Relationships func(declaration.Entry) ([]Relationship, error)
 
 	// LogicalVersion supplies family-specific Artifact identity qualification.
@@ -363,6 +365,32 @@ func (r *Registry) AdmittedRelationshipsForSchema(
 		return nil, err
 	}
 	return r.admittedRelationships(registration, entry)
+}
+
+// AdmittedRelationshipsForValidatedSchema extracts relationship facts from an
+// Entry that has already passed EntryFromDefinition validation for key.
+//
+// This narrow trusted path is for composition internals. It preserves schema
+// identity checks while avoiding a second family semantic validation pass for
+// the same immutable admitted Definition.
+func (r *Registry) AdmittedRelationshipsForValidatedSchema(
+	key schemaModel.Key,
+	entry declaration.Entry,
+) ([]Relationship, error) {
+	registration, err := r.registrationForSchema(key)
+	if err != nil {
+		return nil, err
+	}
+	if entry.Header().Type != registration.DeclarationType {
+		return nil, fmt.Errorf(
+			"%w: trusted admitted declaration type differs from schema interpretation",
+			storeSpec.ErrInvalid,
+		)
+	}
+	return r.relationshipsForValidatedEntry(
+		registration,
+		entry,
+	)
 }
 
 func (r *Registry) ValidateTree(

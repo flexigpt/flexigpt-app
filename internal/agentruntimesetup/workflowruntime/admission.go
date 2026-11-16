@@ -377,6 +377,9 @@ func (a *Admission) admit(
 			"workflow Artifact changed during admission",
 		)
 	}
+	if err := a.verifyRequirements(ctx, plan); err != nil {
+		return sessionv3Runtime.WorkflowAdmissionResult{}, err
+	}
 
 	var program sessionv3Runtime.WorkflowProgram
 	if inputBound {
@@ -387,7 +390,7 @@ func (a *Admission) admit(
 	if err != nil {
 		return sessionv3Runtime.WorkflowAdmissionResult{}, err
 	}
-	if err := a.bindTargets(ctx, plan, &program, active); err != nil {
+	if err := a.bindCallableTargets(ctx, plan, &program, active); err != nil {
 		return sessionv3Runtime.WorkflowAdmissionResult{}, err
 	}
 	if err := a.verifyWorkflowInvocationTransport(plan.Inventory); err != nil {
@@ -417,7 +420,7 @@ func (a *Admission) admit(
 	}, nil
 }
 
-func (a *Admission) bindTargets(
+func (a *Admission) bindCallableTargets(
 	ctx context.Context,
 	plan workflowAPI.Plan,
 	program *sessionv3Runtime.WorkflowProgram,
@@ -427,7 +430,7 @@ func (a *Admission) bindTargets(
 		return errors.New("workflow program is unavailable")
 	}
 
-	for _, targetPlan := range plan.Inventory.Targets {
+	for _, targetPlan := range plan.Inventory.CallableTargets {
 		if _, duplicate := program.Targets[targetPlan.Name]; duplicate {
 			return fmt.Errorf(
 				"workflow target %q is declared more than once",
@@ -449,6 +452,130 @@ func (a *Admission) bindTargets(
 	return nil
 }
 
+// verifyRequirements checks admission prerequisites without placing them in
+// WorkflowProgram.Targets. Requirements cannot be selected by calls or target
+// sets and do not create runtime dispatch behavior.
+func (a *Admission) verifyRequirements(
+	ctx context.Context,
+	plan workflowAPI.Plan,
+) error {
+	for _, requirement := range plan.Inventory.Requirements {
+		if err := a.verifyRequirement(ctx, requirement); err != nil {
+			return fmt.Errorf(
+				"workflow requirement %q: %w",
+				requirement.Name,
+				err,
+			)
+		}
+	}
+	return nil
+}
+
+func (a *Admission) verifyRequirement(
+	ctx context.Context,
+	targetPlan workflowAPI.TargetPlan,
+) error {
+	target := targetPlan.Target
+	if err := requireWorkflowTargetCapabilities(target); err != nil {
+		return err
+	}
+
+	switch target.Kind {
+	case workflowv1.TargetService:
+		if _, found := a.bindings.Service(target.Ref); !found {
+			return fmt.Errorf(
+				"%w: service requirement %q",
+				ErrBindingUnavailable,
+				target.Ref,
+			)
+		}
+		return nil
+
+	case workflowv1.TargetActivity:
+		if _, found := a.bindings.Activity(target.Ref); !found {
+			return fmt.Errorf(
+				"%w: activity requirement %q",
+				ErrBindingUnavailable,
+				target.Ref,
+			)
+		}
+		return nil
+
+	case workflowv1.TargetTool:
+		ref, err := requireWorkflowTargetArtifactRef(
+			targetPlan,
+			"Tool requirement",
+		)
+		if err != nil {
+			return err
+		}
+		_, err = a.pinArtifact(ctx, ref)
+		return err
+
+	case workflowv1.TargetWorkflow:
+		ref, err := requireWorkflowTargetArtifactRef(
+			targetPlan,
+			"Workflow requirement",
+		)
+		if err != nil {
+			return err
+		}
+		_, err = a.pinArtifact(ctx, ref)
+		return err
+
+	case workflowv1.TargetAgent:
+		if a.invocations == nil {
+			return fmt.Errorf(
+				"%w: workflow Agent requirement %q requires a typed invocation adapter",
+				ErrBindingUnavailable,
+				target.Ref,
+			)
+		}
+		pin, err := a.pinInvocationTarget(ctx, targetPlan)
+		if err != nil {
+			return err
+		}
+		if err := a.invocations.AdmitWorkflowAgentTarget(ctx, pin); err != nil {
+			return fmt.Errorf(
+				"%w: workflow Agent requirement %q: %w",
+				ErrBindingUnavailable,
+				target.Ref,
+				err,
+			)
+		}
+		return nil
+
+	case workflowv1.TargetModel:
+		if a.invocations == nil {
+			return fmt.Errorf(
+				"%w: workflow Model requirement %q requires a typed invocation adapter",
+				ErrBindingUnavailable,
+				target.Ref,
+			)
+		}
+		pin, err := a.pinInvocationTarget(ctx, targetPlan)
+		if err != nil {
+			return err
+		}
+		if err := a.invocations.AdmitWorkflowModelTarget(ctx, pin); err != nil {
+			return fmt.Errorf(
+				"%w: workflow Model requirement %q: %w",
+				ErrBindingUnavailable,
+				target.Ref,
+				err,
+			)
+		}
+		return nil
+
+	default:
+		return fmt.Errorf(
+			"%w: unsupported Workflow requirement kind %q",
+			ErrBindingUnavailable,
+			target.Kind,
+		)
+	}
+}
+
 func (a *Admission) bindTarget(
 	ctx context.Context,
 	document workflowv1.WorkflowDocument,
@@ -456,6 +583,9 @@ func (a *Admission) bindTarget(
 	active map[artifactModel.ArtifactRef]struct{},
 ) (sessionv3Runtime.WorkflowTarget, error) {
 	target := targetPlan.Target
+	if err := requireWorkflowTargetCapabilities(target); err != nil {
+		return sessionv3Runtime.WorkflowTarget{}, err
+	}
 
 	switch target.Kind {
 	case workflowv1.TargetService:
@@ -493,13 +623,12 @@ func (a *Admission) bindTarget(
 		return finalizeWorkflowTarget(document, target, bound)
 
 	case workflowv1.TargetTool:
-		ref, found := workflowTargetArtifactRef(targetPlan)
-		if !found {
-			return sessionv3Runtime.WorkflowTarget{}, fmt.Errorf(
-				"%w: Tool target %q",
-				ErrBindingUnavailable,
-				target.Ref,
-			)
+		ref, err := requireWorkflowTargetArtifactRef(
+			targetPlan,
+			"Tool target",
+		)
+		if err != nil {
+			return sessionv3Runtime.WorkflowTarget{}, err
 		}
 		pin, err := a.pinArtifact(ctx, ref)
 		if err != nil {
@@ -551,13 +680,12 @@ func (a *Admission) bindTarget(
 		)
 
 	case workflowv1.TargetWorkflow:
-		ref, found := workflowTargetArtifactRef(targetPlan)
-		if !found {
-			return sessionv3Runtime.WorkflowTarget{}, fmt.Errorf(
-				"%w: nested Workflow target %q",
-				ErrBindingUnavailable,
-				target.Ref,
-			)
+		ref, err := requireWorkflowTargetArtifactRef(
+			targetPlan,
+			"nested Workflow target",
+		)
+		if err != nil {
+			return sessionv3Runtime.WorkflowTarget{}, err
 		}
 
 		pin, err := a.pinArtifact(ctx, ref)
@@ -658,15 +786,43 @@ func (a *Admission) pinInvocationTarget(
 	ctx context.Context,
 	target workflowAPI.TargetPlan,
 ) (sessionv3Runtime.ArtifactPin, error) {
-	ref, found := workflowTargetArtifactRef(target)
-	if !found {
-		return sessionv3Runtime.ArtifactPin{}, fmt.Errorf(
-			"%w: workflow target %q",
-			ErrBindingUnavailable,
-			target.Name,
-		)
+	ref, err := requireWorkflowTargetArtifactRef(
+		target,
+		"Workflow invocation target",
+	)
+	if err != nil {
+		return sessionv3Runtime.ArtifactPin{}, err
 	}
 	return a.pinArtifact(ctx, ref)
+}
+
+func requireWorkflowTargetArtifactRef(
+	value workflowAPI.TargetPlan,
+	targetLabel string,
+) (artifactModel.ArtifactRef, error) {
+	if ref, found := workflowTargetArtifactRef(value); found {
+		return ref, nil
+	}
+
+	if value.Resolution != nil &&
+		value.Resolution.Status == composition.ResolutionAvailable &&
+		value.Resolution.Target != nil &&
+		value.Resolution.Target.Form == composition.TargetFormDirect {
+		return artifactModel.ArtifactRef{}, fmt.Errorf(
+			"%w: %s %q resolves to direct capability provider %q without an owning Workflow adapter",
+			ErrBindingUnavailable,
+			targetLabel,
+			value.Name,
+			value.Resolution.Target.ProviderIdentity,
+		)
+	}
+
+	return artifactModel.ArtifactRef{}, fmt.Errorf(
+		"%w: %s %q has no resolved source-backed Artifact",
+		ErrBindingUnavailable,
+		targetLabel,
+		value.Name,
+	)
 }
 
 func workflowTargetArtifactRef(
@@ -675,12 +831,24 @@ func workflowTargetArtifactRef(
 	if !value.UsesComposition ||
 		value.Resolution == nil ||
 		value.Resolution.Status != composition.ResolutionAvailable ||
-		value.Resolution.Target == nil ||
-		value.Resolution.Target.Form != composition.TargetFormArtifact ||
-		value.Resolution.Target.Artifact == nil {
+		value.Resolution.ResolvedArtifactRef == nil {
 		return artifactModel.ArtifactRef{}, false
 	}
-	return *value.Resolution.Target.Artifact, true
+	return *value.Resolution.ResolvedArtifactRef, true
+}
+
+func requireWorkflowTargetCapabilities(
+	source workflowv1.Target,
+) error {
+	if source.Interface == nil ||
+		len(source.Interface.Capabilities) == 0 {
+		return nil
+	}
+	return fmt.Errorf(
+		"%w: target %q declares capability requirements but no setup-owned capability evaluator is configured",
+		ErrBindingUnavailable,
+		source.Ref,
+	)
 }
 
 func finalizeWorkflowTarget(
@@ -688,14 +856,6 @@ func finalizeWorkflowTarget(
 	source workflowv1.Target,
 	target sessionv3Runtime.WorkflowTarget,
 ) (sessionv3Runtime.WorkflowTarget, error) {
-	if source.Interface != nil &&
-		len(source.Interface.Capabilities) != 0 {
-		return sessionv3Runtime.WorkflowTarget{}, fmt.Errorf(
-			"%w: target capability requirements are unavailable",
-			ErrBindingUnavailable,
-		)
-	}
-
 	contract, err := compileWorkflowCallableInterface(
 		document,
 		source.Interface,

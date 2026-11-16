@@ -121,10 +121,12 @@ Domains do not:
 - Accept Workflow context through native Tool arguments, provider metadata, MCP metadata, Skill sidecars, or native context sidecars.
 
 `CanonicalValue` can represent Workflow data boundaries. It must not become a
-second Model or Agent request grammar. A Workflow Model or Agent target needs
-a Workflow-owned typed adapter that uses the existing Model or Agent domain
-contract. Until that adapter exists, admission rejects the target before
-Workflow execution starts.
+second Model or Agent request grammar. Workflow Model and Agent targets use
+Workflow-owned typed adapters over the existing Model and Agent domain
+contracts. The current adapters accept explicit `messages`, `instructions`,
+and `defaults` context forms and reject unsupported transport before Workflow
+execution starts. They do not convert arbitrary Workflow JSON into a Model or
+Agent request.
 
 ### 3.2 Agent responsibilities
 
@@ -140,11 +142,11 @@ An Agent can contribute:
 - Model system prompt behavior.
 - Agent-specific capability requirements.
 
-Workflow source can declare an Agent target, but current admission rejects it
-until a Workflow-owned typed Agent invocation adapter exists. That future
-adapter must use existing Agent and setup-owned invocation APIs. Workflow input
-must never become fallback chat text or a generic Agent-domain request
-envelope.
+Workflow source can declare an Agent target. Admission uses the Workflow-owned
+typed Agent invocation adapter and existing Agent and setup-owned invocation
+APIs. It rejects unavailable current Agent or Model capability state and
+unsupported transport before execution starts. Workflow input must never become
+fallback chat text or a generic Agent-domain request envelope.
 
 ### 3.3 Invocation responsibilities
 
@@ -641,9 +643,10 @@ Supported target kinds are:
 | `activity` | Registered typed Activity binding.   |
 | `workflow` | Nested Workflow declaration.         |
 
-Agent and Model target declarations are valid source language, but they are not
-currently admitted for execution. Admission returns a typed unavailable-adapter
-failure before a Workflow Execution is created.
+Agent and Model target declarations use typed Workflow adapters. Admission
+returns a typed pre-dispatch failure when an adapter is unavailable, the
+selected Artifact is disabled or stale, required domain readiness is absent,
+or the declaration requests unsupported transport.
 
 An MCP Tool target declares a server:
 
@@ -836,17 +839,17 @@ Workflow owns:
 
 Generic domain APIs preserve their own native contracts.
 
-| Target family       |                           Workflow context |                                Input ports |                     Non-stream output port |                       Streamed output port |
-| ------------------- | -----------------------------------------: | -----------------------------------------: | -----------------------------------------: | -----------------------------------------: |
-| Model               | Unavailable pending typed Workflow adapter | Unavailable pending typed Workflow adapter | Unavailable pending typed Workflow adapter | Unavailable pending typed Workflow adapter |
-| Agent               | Unavailable pending typed Workflow adapter | Unavailable pending typed Workflow adapter | Unavailable pending typed Workflow adapter | Unavailable pending typed Workflow adapter |
-| Nested Workflow     | Supported through child ProgramFrame scope |                                  Supported |                                  Supported |                                  Supported |
-| Port-aware Service  | Supported when binding declares capability | Supported when binding declares capability |                                  Supported | Supported when binding declares capability |
-| Port-aware Activity | Supported when binding declares capability | Supported when binding declares capability |                                  Supported | Supported when binding declares capability |
-| Go Tool             |                                Unavailable |                                Unavailable |       Supported after confirmed settlement |                                Unavailable |
-| MCP Tool            |                                Unavailable |                                Unavailable |       Supported after confirmed settlement |                                Unavailable |
-| Skill Tool          |                                Unavailable |                                Unavailable |       Supported after confirmed settlement |                                Unavailable |
-| Provider SDK Tool   |                            Model-plan only |                            Model-plan only |                           Provider-managed |                           Provider-managed |
+| Target family       |                                         Workflow context |                                Input ports |               Non-stream output port |                       Streamed output port |
+| ------------------- | -------------------------------------------------------: | -----------------------------------------: | -----------------------------------: | -----------------------------------------: |
+| Model               | Explicit `messages`, `instructions`, and `defaults` only |                                Unavailable |                            Supported |                                  Supported |
+| Agent               | Explicit `messages`, `instructions`, and `defaults` only |                                Unavailable |                            Supported |                                  Supported |
+| Nested Workflow     |               Supported through child ProgramFrame scope |                                  Supported |                            Supported |                                  Supported |
+| Port-aware Service  |               Supported when binding declares capability | Supported when binding declares capability |                            Supported | Supported when binding declares capability |
+| Port-aware Activity |               Supported when binding declares capability | Supported when binding declares capability |                            Supported | Supported when binding declares capability |
+| Go Tool             |                                              Unavailable |                                Unavailable | Supported after confirmed settlement |                                Unavailable |
+| MCP Tool            |                                              Unavailable |                                Unavailable | Supported after confirmed settlement |                                Unavailable |
+| Skill Tool          |                                              Unavailable |                                Unavailable | Supported after confirmed settlement |                                Unavailable |
+| Provider SDK Tool   |                                          Model-plan only |                            Model-plan only |                     Provider-managed |                           Provider-managed |
 
 The native target contract remains authoritative:
 
@@ -2066,8 +2069,14 @@ The backend is then ready for frontend replacement of Session v2.
       cover current Workflow entity-management consumers.
 - [x] Workflow Plugins and managed Workflow publication have no current
       consumer and are outside the Workflow Artifact completion scope.
-- [ ] Phase 0 owns the remaining Workflow planning, bootstrap, and
-      duplicate-validation cleanup work.
+- [x] Workflow planning separates callable targets from requirements, exposes
+      source-backed target references directly, and preserves direct
+      capability provider identity and evidence.
+- [x] Application Artifact setup supplies the same immutable declaration
+      selection to generic Store admission and LLM composition, and constructs
+      the read-only Workflow service.
+- [x] Workflow planning reuses composition-validated entries without
+      repeating Workflow static validation.
 
 ### 22.4 Ports, channels, and messaging
 
@@ -2083,7 +2092,7 @@ The backend is then ready for frontend replacement of Session v2.
 - [x] Port ownership, channel authorization, ordering, schema enforcement, and durable replay facts exist at target boundaries.
 - [x] Attached and independent child Executions support durable live port messaging.
 - [x] Nested Workflow root ports participate in parent-child access checks.
-- [ ] Published nested Workflow port checks need complete source-to-target channel-schema compatibility validation. `workflow_published_ports.go` verifies published access and target channel existence. The completion work adds exact caller port schema to target published channel schema validation.
+- [x] Published nested Workflow port checks compare caller and callable schemas with target published channel schemas before child dispatch.
 
 ### 22.5 Structured behavior
 
@@ -2097,9 +2106,12 @@ The backend is then ready for frontend replacement of Session v2.
 - [x] Join WorkItems persist child aggregation boundaries.
 - [x] Structured control flow reserves step budget for ordinary, Fork, Join, and controlling WorkItems.
 - [x] Structured control flow uses durable ProgramFrame-held resource leases.
-- [ ] Closest-owner state mutation needs completion across child blocks. `WorkflowScopeContext` currently carries `OuterState`, while `WorkflowInterpreter.set` uses `program.Root.State`. The completion work carries nearest state-owner schema and identity through child scope, Repeat, Machine, catch, finally, and compensation blocks.
-- [ ] Parallel and Foreach need the declared explicit parent-state merge model. The current declaration types and schema preserve isolated child state but have no typed merge declaration and no parent StateUpdate merge boundary.
-- [ ] Durable terminal step outcomes need complete `failed` and `uncertain` records. Current `WorkflowStepOutcomeStatus` persists `succeeded`, `skipped`, and `cancelled`; the completion work adds failure and uncertainty facts for visible step outcome semantics.
+- [x] Closest-owner state mutation carries owner identity and schema through
+      structured, terminal, machine, reconciliation, and compensation blocks.
+- [x] Parallel and Foreach use typed merge declarations and durable StateUpdate
+      merge boundaries after child settlement.
+- [x] Failed and uncertain step outcomes persist typed error, receipt, effect,
+      and target facts and are visible through Workflow projections and CEL.
 
 ### 22.6 Effects, reconciliation, compensation, and cleanup
 
@@ -2156,56 +2168,6 @@ The backend is then ready for frontend replacement of Session v2.
 - [x] Admission verifies current Model or Agent target availability, supported call mode, supported instruction context, and output-port transport before Workflow execution starts.
 
 ## 23. Remaining implementation phases
-
-### Phase 0: Complete Workflow artifact planning and bootstrap boundary
-
-This is an Artifact and application-bootstrap phase. It does not add Workflow
-runtime execution behavior, Session Runtime behavior, target-domain behavior,
-tests, frontend work, or migration work.
-
-Deliverables:
-
-- Split `Inventory.Targets` into `Inventory.CallableTargets` and
-  `Inventory.Requirements`.
-- Remove `TargetPlan.Requirement`. A requirement must not become a callable
-  runtime target, a target-set member, or a `WorkflowProgram.Target`.
-- Expose `ResolvedArtifactRef` directly for every source-backed target or
-  requirement resolution.
-- Preserve direct-capability provider identity and evidence without creating a
-  fabricated Artifact reference.
-- Keep recursive `Plan.Capabilities` as a diagnostic composition projection.
-  Runtime setup must consume callable-target and requirement inventory facts,
-  not reconstruct target lookup from composition occurrences.
-- Make `workflow.Service.ResolvePlan` an available-Artifact read. It must not
-  reject a disabled Workflow Artifact. Runtime setup checks local enablement
-  when it creates an execution pin.
-- Preserve the distinction between Artifact-backed requirements and
-  Service or Activity binding requirements.
-- Keep ordinary generic Artifact, catalog, Definition, Resource, and
-  enablement APIs as the current Workflow entity-management surface.
-- Do not add Workflow-specific list, get, export, enablement, Plugin, managed
-  package, source-driver, or implicit-refresh APIs without a concrete consumer.
-- Wire the application registration selection into `llmartifactory.Open`:
-  interpretations, locator factories, direct-capability providers, and
-  Artifact-capability projectors must be the same immutable selection used for
-  generic Store admission.
-- Construct Workflow family services from the shared LLM composition resolver.
-  Bootstrap must not perform normal Workflow planning or Workflow execution.
-- Remove duplicate Workflow admitted-value reconstruction and static validation
-  after a trusted phase has already produced typed facts. Preserve generic
-  Artifact-to-Definition digest, identity, availability, and concurrency checks.
-- Make this document the authority for Workflow Artifact completion. The
-  runtime document defines only downstream plan consumption requirements.
-
-Required source coverage:
-
-- `internal/llmartifactory-go/workflow/`
-- `internal/llmartifactory-go/core/composition/`
-- `internal/llmartifactory-go/core/declaration/interpretation/`
-- `internal/artifactsetup/open.go`
-- `internal/artifactsetup/registration/`
-- `devdocs/requirements/workflow_model.md`
-- `devdocs/requirements/workflow_runtime.md`
 
 ### Phase 1: Complete the V3 normal-session model superset
 
@@ -2279,7 +2241,8 @@ Required source coverage:
 - [x] Parallel and Foreach support typed `merge` declarations that create persisted deterministic StateUpdate WorkItems after child settlement.
 - [x] Failed and uncertain step outcomes persist typed error, receipt, effect, and target facts and are exposed through Workflow projections and CEL `steps`.
 - [x] Nested Workflow published-port admission compares caller and callable schemas with the target published channel schema.
-- [ ] Structured retry remains incomplete for accepted Scope, Choose, Parallel, Foreach, Repeat, Machine, Saga, Start, Handoff, and child-frame boundaries.
+- [x] Accepted Workflow retry declarations use durable retry-boundary
+      ProgramFrames with persisted child attempts and Runtime-owned timer waits.
 
 ### Phase 3: Complete structured retry and published-port boundary behavior
 
@@ -2326,9 +2289,14 @@ Required source coverage:
 - [x] Tool, MCP Tool, and Skill Tool runtime binders do not repeat Workflow static transport validation.
 - [x] The unsupported generic Workflow Model and Agent invocation bridge is removed.
 - [x] Model and Agent targets use Workflow-owned adapters over existing V3 Model and Agent setup APIs without domain contract changes.
-- [ ] Adapter capability remains intentionally limited to explicit messages, instructions, output ports, streamed output ports, and Agent handoff.
-- [ ] Workflow compiler still contains source-shaped lowering traversal. It must remain limited to typed lowering and must not add declaration grammar validation.
-- [ ] Runtime validation needs separation between durable integrity checks and declaration grammar checks.
+- [x] Model and Agent adapter capability is deliberately limited to explicit
+      messages, instructions, defaults, output ports, streamed output ports,
+      and Agent handoff. Unsupported forms fail admission.
+- [x] Workflow compiler lowers admitted typed Workflow documents and planning
+      facts without resolving Artifact composition or source relationships.
+- [ ] Runtime validation separation remains partly open. Admission now avoids
+      duplicate pre-binding WorkflowProgram validation, but compiler conversion
+      guards still need a complete source-to-runtime audit.
 
 ### Phase 4: Complete the Workflow v1 source-to-runtime audit
 

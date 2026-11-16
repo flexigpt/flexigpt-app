@@ -266,6 +266,9 @@ type ResolvedEntry struct {
 	scopeRootID       rootModel.RootID
 	DeclarationOrigin *artifactModel.Artifact `json:"-"`
 
+	admittedEntry    declaration.Entry
+	hasAdmittedEntry bool
+
 	Artifact      *artifactModel.Artifact     `json:"-"`
 	Definition    *definitionModel.Definition `json:"-"`
 	Target        *CapabilityTarget           `json:"-"`
@@ -306,6 +309,20 @@ func (r *ResolvedEntry) TargetValue() (
 		return CapabilityTarget{}, false
 	}
 	return r.Target.Clone(), true
+}
+
+// AdmittedEntry returns the declaration Entry that composition loaded from
+// the current admitted Definition. It is available only for source-backed
+// entries. Direct capability targets have no declaration body.
+//
+// The returned Entry has already passed generic Definition integrity checks
+// and family admitted semantic validation. Consumers must not repeat schema
+// or static family validation solely to read typed planning facts.
+func (r *ResolvedEntry) AdmittedEntry() (declaration.Entry, bool) {
+	if r == nil || !r.hasAdmittedEntry {
+		return declaration.Entry{}, false
+	}
+	return r.admittedEntry.Clone(), true
 }
 
 func (r *ResolvedEntry) Relationship(

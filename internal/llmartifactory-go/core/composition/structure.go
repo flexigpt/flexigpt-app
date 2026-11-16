@@ -26,14 +26,15 @@ func (r *Resolver) resolveStructure(
 	if !found {
 		return fmt.Errorf("%w: declaration has no Root scope", storeSpec.ErrInvalid)
 	}
-	// Composition must retain family semantic
-	// checks but must not execute the already-completed family JSON Schema.
+	// "resolveArtifact" obtained entry through EntryFromDefinition. Generic
+	// Definition integrity and family admitted semantic validation already
+	// completed. Extract relationship facts without repeating that work.
 	key := schemaModel.ArtifactKey(
 		node.Definition.Kind,
 		node.Definition.SchemaID,
 		node.Definition.SchemaVersion,
 	)
-	facts, err := r.interpretations.AdmittedRelationshipsForSchema(
+	facts, err := r.interpretations.AdmittedRelationshipsForValidatedSchema(
 		key,
 		entry,
 	)

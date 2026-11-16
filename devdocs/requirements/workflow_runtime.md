@@ -1076,8 +1076,7 @@ The Wails application composes V2 and V3 independently.
 - [x] Model and Agent adapters accept explicit message input and instruction context forms without converting arbitrary Workflow JSON into provider messages.
 - [x] Agent handoff uses durable child ProgramFrame and conversation-ownership behavior.
 - [x] Workflow-owned adapters use existing Model and Agent domain APIs without requiring domain packages to understand Workflow.
-- [ ] After Workflow Artifact Phase 0 publishes its plan contract, runtime
-      setup must consume `Inventory.CallableTargets` and
+- [ ] Runtime setup must consume `Inventory.CallableTargets` and
       `Inventory.Requirements` separately. It must pin only
       `ResolvedArtifactRef` values and must not recreate Artifact composition.
 - [ ] Runtime setup must route a direct capability only through an owning
