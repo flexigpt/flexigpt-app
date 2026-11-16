@@ -10,7 +10,7 @@
 	"author": "Pankaj Pipada <ppipada@gmail.com>",
 	"description": "FlexiGPT - An AI application platform",
 	"engines": {
-		"node": "24.14.0"
+		"node": "24.22.3"
 	},
 	"scripts": {
 		"typecheck:build": "tsc --project ./build/tsconfig.json",
