@@ -1150,3 +1150,10 @@
 - [x] there is a session refresh error even if content did not change.
 - [x] skill tools should mention that resource and scripts only from fodler will be run using that tool.
 - [x] message chips are still backend concept heavy. need cleaning. verify now.
+
+- [x] verify diff applicability in streaming
+
+- [x] tools seem to be attached even if i have removed them in session. also remove session overrides does nothing for agent tools.
+- [x] add text when a tool call or output is pending doesnt seem to work. this happens before a active tool call run is not done i.e composer has tool call.
+- [x] attachments that are not present have started to show that these are not there. may want to show that these are not there and do we want to continue.
+- [x] topology minor changes reallocates artifactids.
