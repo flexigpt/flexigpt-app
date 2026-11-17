@@ -1970,11 +1970,11 @@ Workflow Artifact completion includes:
 
 ## 22. Workflow Artifact implementation status
 
-| Artifact planning task                                           | Status      | Evidence or required result                                                       |
-| ---------------------------------------------------------------- | ----------- | --------------------------------------------------------------------------------- |
-| Decode and validate Workflow v1 declarations                     | Implemented | `internal/llmartifactory-go/workflow/contract/v1/`                                |
-| Build callable-target and requirement inventory                  | Implemented | `internal/llmartifactory-go/workflow/inventory.go`                                |
-| Preserve direct capability evidence without Artifact fabrication | Partial     | Current target resolution preserves direct targets; closure support is incomplete |
-| Publish a deterministic complete static Artifact closure         | Open        | Add closure nodes, edges, nested Workflow facts, and consistency checks           |
-| Include nested Workflow plan nodes in the closure                | Open        | Setup currently performs recursive nested plan resolution                         |
-| Keep runtime interpretation outside Artifact planning            | Partial     | Package boundary is correct; full closure behavior remains incomplete             |
+| Artifact planning task                                           | Status      | Evidence or required result                                                                                 |
+| ---------------------------------------------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------- |
+| Decode and validate Workflow v1 declarations                     | Implemented | `internal/llmartifactory-go/workflow/contract/v1/`                                                          |
+| Build callable-target and requirement inventory                  | Implemented | `internal/llmartifactory-go/workflow/inventory.go`                                                          |
+| Preserve direct capability evidence without Artifact fabrication | Implemented | `internal/llmartifactory-go/workflow/closure.go` emits direct evidence without synthetic Artifact nodes     |
+| Publish a deterministic complete static Artifact closure         | Implemented | `internal/llmartifactory-go/workflow/closure.go` publishes sorted nodes, edges, paths, and refresh checks   |
+| Include nested Workflow plan nodes in the closure                | Implemented | `ArtifactClosureNode.Workflow` contains admitted nested Workflow document, inventory, and composition facts |
+| Keep runtime interpretation outside Artifact planning            | Implemented | `internal/llmartifactory-go/workflow/` imports Artifact and declaration planning contracts only             |

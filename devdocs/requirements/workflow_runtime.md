@@ -734,7 +734,7 @@ Status values:
 | ------------------------------------------------------------------- | ----------- | ------------------------------------------------------------- |
 | Separate callable targets from requirements                         | Implemented | `workflow.Plan.Inventory`                                     |
 | Consume planning-owned callable targets and requirements separately | Implemented | `workflowruntime/admission.go`                                |
-| Publish complete static Artifact closure with immutable pins        | Open        | Current public `Plan` does not visibly expose this closure    |
+| Publish complete static Artifact closure with immutable pins        | Implemented | `workflow.Plan.Closure` and `workflow/closure.go`             |
 | Stop recursive nested Workflow plan resolution during setup         | Open        | Current admission recursively calls nested Workflow admission |
 | Rename Workflow admission to execution preparation                  | Open        | Current public API still uses `WorkflowAdmission`             |
 | Convert admitted typed source without repeated static validation    | Partial     | Compiler conversion exists but repeats validation guards      |

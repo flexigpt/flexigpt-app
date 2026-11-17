@@ -19,16 +19,31 @@ type Service struct {
 	resolver *composition.Resolver
 }
 
+const workflowPlanStabilityPasses = 3
+
 type Plan struct {
 	Workflow artifactModel.ArtifactRef `json:"workflow"`
 	Revision uint64                    `json:"revision"`
-	Digest   cryptoutil.Digest         `json:"digest"`
+
+	// DefinitionDigest is the current admitted root Workflow Definition
+	// digest. It is a source fact, not a runtime Artifact pin.
+	DefinitionDigest cryptoutil.Digest `json:"definitionDigest"`
+
+	// Digest remains available for existing planning consumers. It is always
+	// identical to DefinitionDigest.
+	Digest cryptoutil.Digest `json:"digest"`
 
 	// Document is the canonical declaration. Dispatch-only apiVersion is not
 	// included in an admitted Definition.
 	Document workflowv1.WorkflowDocument `json:"document"`
 
+	// Closure is the deterministic complete static source-backed Artifact
+	// closure. It contains no setup or runtime types.
+	Closure ArtifactClosure `json:"closure"`
+
 	// Capabilities contains recursively resolved declaration relationships.
+	// It remains diagnostic composition information. Runtime setup must use
+	// Inventory rather than rebuilding dispatch lookup from this value.
 	Capabilities composition.CapabilityPlan `json:"capabilities"`
 
 	// CompositionComplete covers only relationships represented in
@@ -63,15 +78,42 @@ func (s *Service) ResolvePlan(
 	if s == nil || s.resolver == nil {
 		return Plan{}, storeSpec.ErrClosed
 	}
+
+	var previous cryptoutil.Digest
+	for attempt := range workflowPlanStabilityPasses {
+		snapshot, err := s.resolvePlanSnapshot(ctx, ref)
+		if err != nil {
+			return Plan{}, err
+		}
+		fingerprint, err := planStabilityFingerprint(snapshot)
+		if err != nil {
+			return Plan{}, err
+		}
+		if attempt != 0 && fingerprint == previous {
+			return snapshot.Clone()
+		}
+		previous = fingerprint
+	}
+
+	return Plan{}, &PlanRefreshError{
+		Reason: "Workflow Artifact closure did not stabilize during plan construction",
+	}
+}
+
+func (s *Service) resolvePlanSnapshot(
+	ctx context.Context,
+	ref artifactModel.ArtifactRef,
+) (Plan, error) {
 	resolved, err := s.resolver.ResolveWorkflow(ctx, ref)
 	if err != nil {
 		return Plan{}, err
 	}
 	if resolved == nil ||
 		resolved.Type != declaration.TypeWorkflow ||
-		resolved.Definition == nil {
+		resolved.Definition == nil ||
+		resolved.Artifact == nil {
 		return Plan{}, fmt.Errorf(
-			"%w: Artifact did not resolve as a Workflow",
+			"%w: Artifact did not resolve as a source-backed Workflow",
 			storeSpec.ErrReferenceUnresolved,
 		)
 	}
@@ -83,43 +125,67 @@ func (s *Service) ResolvePlan(
 			storeSpec.ErrReferenceUnresolved,
 		)
 	}
-	if resolved.Artifact == nil {
-		return Plan{}, fmt.Errorf(
-			"%w: selected Workflow has no source-backed Artifact",
-			storeSpec.ErrReferenceUnresolved,
-		)
-	}
 
-	entry, found := resolved.AdmittedEntry()
-	if !found {
-		return Plan{}, fmt.Errorf(
-			"%w: Workflow plan has no admitted declaration entry",
-			storeSpec.ErrReferenceUnresolved,
-		)
-	}
-	document, err := workflowv1.DecodeResolvedWorkflowDefinition(
-		*resolved.Definition,
-		entry,
-	)
+	closure, err := buildArtifactClosure(resolved)
 	if err != nil {
 		return Plan{}, err
 	}
-	capabilities, err := composition.CapabilityPlanForResolvedEntry(resolved)
-	if err != nil {
-		return Plan{}, err
+	root, found := closure.rootNode()
+	if !found || root.Workflow == nil {
+		return Plan{}, &PlanConflictError{
+			Artifact: workflowRef,
+			Reason:   "Workflow closure root has no typed admitted Workflow facts",
+		}
 	}
-	inventory, err := buildWorkflowInventory(document, capabilities)
-	if err != nil {
-		return Plan{}, err
+	if root.Artifact != workflowRef {
+		return Plan{}, &PlanConflictError{
+			Artifact: workflowRef,
+			Reason:   "Workflow closure root differs from selected Workflow",
+		}
+	}
+	if root.Revision != resolved.Artifact.Revision ||
+		root.DefinitionDigest != resolved.Definition.Digest {
+		return Plan{}, &PlanRefreshError{
+			Artifact: workflowRef,
+			Reason:   "Workflow root changed during closure construction",
+		}
 	}
 
 	return Plan{
 		Workflow:            workflowRef,
-		Revision:            resolved.Artifact.Revision,
-		Digest:              resolved.Definition.Digest,
-		Document:            document,
-		Capabilities:        capabilities,
-		CompositionComplete: capabilities.Complete,
-		Inventory:           inventory,
+		Revision:            root.Revision,
+		DefinitionDigest:    root.DefinitionDigest,
+		Digest:              root.DefinitionDigest,
+		Document:            root.Workflow.Document,
+		Closure:             closure,
+		Capabilities:        root.Workflow.Capabilities,
+		CompositionComplete: root.Workflow.CompositionComplete,
+		Inventory:           root.Workflow.Inventory,
 	}, nil
+}
+
+func planStabilityFingerprint(
+	plan Plan,
+) (cryptoutil.Digest, error) {
+	return cryptoutil.CanonicalDigest(struct {
+		Workflow            artifactModel.ArtifactRef   `json:"workflow"`
+		Revision            uint64                      `json:"revision"`
+		DefinitionDigest    cryptoutil.Digest           `json:"definitionDigest"`
+		Digest              cryptoutil.Digest           `json:"digest"`
+		Document            workflowv1.WorkflowDocument `json:"document"`
+		Closure             ArtifactClosure             `json:"closure"`
+		Capabilities        composition.CapabilityPlan  `json:"capabilities"`
+		CompositionComplete bool                        `json:"compositionComplete"`
+		Inventory           Inventory                   `json:"inventory"`
+	}{
+		Workflow:            plan.Workflow,
+		Revision:            plan.Revision,
+		DefinitionDigest:    plan.DefinitionDigest,
+		Digest:              plan.Digest,
+		Document:            plan.Document,
+		Closure:             plan.Closure,
+		Capabilities:        plan.Capabilities,
+		CompositionComplete: plan.CompositionComplete,
+		Inventory:           plan.Inventory,
+	})
 }
