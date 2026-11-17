@@ -25,7 +25,11 @@ Workflow Runtime v3 consists of:
 - The Workflow ProgramFrame interpreter in Session Runtime v3.
 - Setup-owned target adapters and domain binders.
 
-Workflow Artifact admission and Workflow Artifact planning occur before Session Runtime v3 receives a runtime Program snapshot.
+Workflow Artifact planning and setup-owned execution preparation complete before
+Session Runtime v3 receives a runtime Program snapshot. For Workflow work,
+Session Runtime receives only a typed `ProgramSnapshot` and immutable runtime
+pins. It does not parse Workflow source, resolve an Artifact plan, retain an
+Artifact Store handle, or invoke Workflow execution preparation.
 
     Workflow Artifact contract
         ->
@@ -262,6 +266,12 @@ The runtime owns:
 - Checkpointing.
 - Projection state.
 
+Every LLM WorkItem retains its effective invocation configuration and
+capability facts. Tool WorkItems created from that LLM result retain the
+immutable origin facts required by their target binders. A binder must not
+replace those facts with current Session defaults when it evaluates or executes
+the generated Tool WorkItem.
+
 ## Admit replay-safe attachments before persistence
 
 Attachment admission is setup-owned.
@@ -307,8 +317,13 @@ Workflow execution preparation must not:
 - Create WorkItems.
 - Start timers.
 - Persist Session state.
+- Be invoked by Session Runtime.
 
 The runtime accepts only a typed `ProgramSnapshot`.
+
+The application setup boundary invokes execution preparation before it submits
+a Workflow start or trigger-registration command. Session Runtime persists and
+interprets the prepared snapshot only.
 
 ## Execute Workflow control flow in ProgramFrames
 
@@ -351,6 +366,26 @@ A runtime transition can contain:
 - Reconciliation settlement.
 - Compensation settlement.
 - Terminal ProgramFrame outcome.
+
+### Persist callable operation facts
+
+Execution preparation lowers each callable declaration to typed runtime intent.
+Before target dispatch, Session Runtime persists:
+
+- Prepared input and explicit context.
+- Selected target identity.
+- Resolved target-set membership.
+- Effect key and retry identity.
+- Deadline and port plans.
+- Immutable Artifact pins and semantic binding facts.
+
+A resolver-backed target set starts with a typed resolver WorkItem. The runtime
+persists normalized membership before target selection. Retries, waits,
+recovery, and resumption reuse the persisted membership and selected target.
+
+A successful `start` call persists its completion handle and start receipt in
+the parent step outcome. A handoff persists its conversation ownership facts
+before its child ProgramFrame starts.
 
 ## Preserve state ownership and Workflow outcomes
 
@@ -439,6 +474,11 @@ The runtime must not parse a generic Workflow JSON envelope to discover:
 
 The setup converter maps supported Workflow forms into typed runtime invocation fields. The runtime then creates child Agent-loop or single-model ProgramFrames.
 
+When a Model or Agent call accepts a final-output or streamed-output port, the
+lowered child ProgramFrame contains the accepted port plans before child work
+starts. A valid port mapping must not disappear between call lowering and child
+frame creation.
+
 Arbitrary Workflow JSON must never become fallback Model or Agent chat text.
 
 ## Enforce ports, channels, and target transport
@@ -455,6 +495,10 @@ The runtime owns:
 - Stream ordering.
 - Durable replay facts.
 
+Each Workflow WorkItem and child ProgramFrame retains its planning-owned
+declaration path separately from its runtime path. Channel permissions and
+port authorization use the declaration path.
+
 Setup owns target transport capability.
 
 A target transport check must validate:
@@ -467,18 +511,38 @@ A target transport check must validate:
 - Channel authorization.
 - Current target capability.
 
-Tool-family rules:
+Target transport matrix:
 
-| Target family     | Workflow context | Input ports     | Final output port                    | Streamed output port |
-| ----------------- | ---------------- | --------------- | ------------------------------------ | -------------------- |
-| Go Tool           | Unsupported      | Unsupported     | Supported after confirmed settlement | Unsupported          |
-| MCP Tool          | Unsupported      | Unsupported     | Supported after confirmed settlement | Unsupported          |
-| Skill Tool        | Unsupported      | Unsupported     | Supported after confirmed settlement | Unsupported          |
-| Provider SDK Tool | Model-plan only  | Model-plan only | Provider-managed                     | Provider-managed     |
+| Target family       | Workflow context                                         | Input ports                                | Final output port                    | Streamed output port |
+| ------------------- | -------------------------------------------------------- | ------------------------------------------ | ------------------------------------ | -------------------- |
+| Model               | Explicit `messages`, `instructions`, and `defaults` only | Unavailable                                | Supported                            | Supported            |
+| Agent               | Explicit `messages`, `instructions`, and `defaults` only | Unavailable                                | Supported                            | Supported            |
+| Nested Workflow     | Child ProgramFrame scope                                 | Supported                                  | Supported                            | Supported            |
+| Port-aware Service  | Supported when the registered binding declares it        | Supported when the registered binding does | Supported                            | Supported            |
+| Port-aware Activity | Supported when the registered binding declares it        | Supported when the registered binding does | Supported                            | Supported            |
+| Go Tool             | Unavailable                                              | Unavailable                                | Supported after confirmed settlement | Unavailable          |
+| MCP Tool            | Unavailable                                              | Unavailable                                | Supported after confirmed settlement | Unavailable          |
+| Skill Tool          | Unavailable                                              | Unavailable                                | Supported after confirmed settlement | Unavailable          |
+| Provider SDK Tool   | Typed Model-plan only                                    | Typed Model-plan only                      | Provider-managed                     | Provider-managed     |
 
-Service and Activity rules depend on registered binding capability.
+Native target contracts remain authoritative:
 
-Model and Agent rules depend on their typed setup adapter capability.
+- Go Tool arguments remain Go Tool function arguments.
+- MCP Tool arguments remain MCP `tools/call` arguments.
+- Skill Tool arguments remain Skill Tool arguments.
+- Provider Tool choices remain inside the Model request plan.
+
+Workflow metadata is not inserted into generic Tool context fields, Tool
+argument envelopes, Model request envelopes, Agent request envelopes, native
+context sidecars, MCP metadata, MCP extensions, Skill sidecars, provider
+metadata, or Artifact-domain imports.
+
+A final call output remains separate from a streamed port. A streamed port
+contains ordered stream records only. If terminal stream signalling is needed,
+it uses a distinct durable stream record.
+
+A provider-managed Tool target is lowered only through a typed Model child
+plan. It never becomes a local Tool WorkItem or a synthetic local result.
 
 ## Persist waits, events, channels, and triggers
 
@@ -524,6 +588,12 @@ The runtime has one scheduler for:
 - Trigger schedules.
 
 Workflow setup must not create another scheduler.
+
+Trigger registration is explicit and independent from direct Workflow start.
+A direct start creates one Execution only. It does not activate event or
+schedule registrations. Trigger registration persists an input-unbound program
+template and is the only operation that activates or changes trigger lifecycle
+state.
 
 ## Preserve effect safety during retry and recovery
 
@@ -691,20 +761,42 @@ The wrapper does not own:
 - Domain binding.
 - Persistence semantics.
 
+## Functional completion ledger
+
+This ledger defines implementation order for Workflow and Session Runtime
+functional completion.
+
+| Functional capability                                                                                   | Status      | Current evidence or required result                                                           |
+| ------------------------------------------------------------------------------------------------------- | ----------- | --------------------------------------------------------------------------------------------- |
+| Durable Session, Execution, ProgramFrame, WorkItem, Attempt, Wait, effect, and trigger state            | Implemented | `sessionv3/` and `sessionstorev3/` persist the durable execution model                        |
+| Ordered work, state updates, scopes, branching, collection work, repeat, machines, and child boundaries | Implemented | `workflow_program.go`, `workflow_structured.go`, and fork/join runtime paths                  |
+| Timers, events, human work, channel waits, and child-completion waits                                   | Implemented | coordination, wait, timer, and trigger runtime paths                                          |
+| Planning-owned declaration path in runtime descriptors                                                  | Open        | compiled Program, WorkItems, and child frames retain only runtime path identities             |
+| Channel permission and port authorization semantics                                                     | Partial     | runtime compares permissions to runtime paths instead of planning-owned declaration paths     |
+| Model and Agent Workflow calls with final and streamed ports                                            | Partial     | typed invocation exists; accepted child port plans are not propagated                         |
+| Direct capability targets                                                                               | Open        | planning retains direct evidence; execution preparation accepts only source-backed targets    |
+| Callable capability requirements                                                                        | Open        | setup has no evaluator that converts declared requirements to current domain capability facts |
+| Provider-managed Tool calls from Workflow                                                               | Open        | execution preparation rejects the call instead of lowering a typed Model child plan           |
+| Service and Activity context, ports, and stream delivery                                                | Partial     | bindings exist; complete transport capability preparation is absent                           |
+| `start` and handoff durable results                                                                     | Partial     | child ownership exists; `start` receipts are not retained in step outcomes                    |
+| Trigger lifecycle separation                                                                            | Partial     | event and schedule handling exists; direct Workflow start also registers triggers             |
+| Effective invocation configuration for Tool WorkItems emitted by LLM work                               | Open        | generated Tool WorkItems do not retain their origin LLM invocation configuration              |
+| Effects, retries, reconciliation, compensation, and saga execution                                      | Implemented | durable effect, retry, reconciliation, and compensation runtime paths                         |
+
 ## Validate at the owning boundary
 
-| Validation class                                     | Owner                                    |
-| ---------------------------------------------------- | ---------------------------------------- |
-| Workflow source grammar and static semantic validity | Workflow Artifact contract               |
-| Static Artifact relationship closure                 | Workflow Artifact planning               |
-| Runtime source-to-program conversion                 | Workflow setup                           |
-| Invocation input validation                          | Workflow setup                           |
-| Current Artifact pin and enablement                  | Workflow setup or target-specific binder |
-| Direct capability routing                            | Owning setup adapter                     |
-| Domain readiness and native request validity         | Owning domain adapter                    |
-| Durable Session and execution integrity              | Session Runtime v3                       |
-| Session document and tombstone persistence           | Session Store v3                         |
-| Wails request transport                              | Wrapper and frontend transport           |
+| Validation class                                                | Owner                                    |
+| --------------------------------------------------------------- | ---------------------------------------- |
+| Workflow source grammar and static semantic validity            | Workflow Artifact contract               |
+| Static Artifact relationship closure                            | Workflow Artifact planning               |
+| Workflow execution preparation and source-to-program conversion | Workflow setup                           |
+| Invocation input validation                                     | Workflow setup                           |
+| Current Artifact pin and enablement                             | Workflow setup or target-specific binder |
+| Direct capability routing                                       | Owning setup adapter                     |
+| Domain readiness and native request validity                    | Owning domain adapter                    |
+| Durable Session and execution integrity                         | Session Runtime v3                       |
+| Session document and tombstone persistence                      | Session Store v3                         |
+| Wails request transport                                         | Wrapper and frontend transport           |
 
 The runtime validates durable runtime objects. It does not revalidate Workflow source grammar.
 
@@ -730,39 +822,44 @@ Status values:
 
 ### Prepare Workflow execution from a complete static plan
 
-| Subtask                                                             | Status      | Evidence or required result                                   |
-| ------------------------------------------------------------------- | ----------- | ------------------------------------------------------------- |
-| Separate callable targets from requirements                         | Implemented | `workflow.Plan.Inventory`                                     |
-| Consume planning-owned callable targets and requirements separately | Implemented | `workflowruntime/admission.go`                                |
-| Publish complete static Artifact closure with immutable pins        | Implemented | `workflow.Plan.Closure` and `workflow/closure.go`             |
-| Stop recursive nested Workflow plan resolution during setup         | Open        | Current admission recursively calls nested Workflow admission |
-| Rename Workflow admission to execution preparation                  | Open        | Current public API still uses `WorkflowAdmission`             |
-| Convert admitted typed source without repeated static validation    | Partial     | Compiler conversion exists but repeats validation guards      |
+| Subtask                                                             | Status      | Evidence or required result                                                         |
+| ------------------------------------------------------------------- | ----------- | ----------------------------------------------------------------------------------- |
+| Separate callable targets from requirements                         | Implemented | `workflow.Plan.Inventory`                                                           |
+| Consume planning-owned callable targets and requirements separately | Implemented | `workflowruntime/admission.go`                                                      |
+| Publish complete static Artifact closure with immutable pins        | Implemented | `workflow.Plan.Closure` and `workflow/closure.go`                                   |
+| Stop recursive nested Workflow plan resolution during setup         | Implemented | `workflowruntime/admission.go` consumes closure `WorkflowPlanNode` facts            |
+| Keep execution preparation outside Session Runtime commands         | Open        | `sessionv3.Runtime` invokes `WorkflowAdmission` for starts and trigger registration |
+| Remove Workflow Artifact selections from core Workflow commands     | Open        | Core Workflow commands retain selection and preparation-facing fields               |
+| Rename Workflow admission to execution preparation                  | Open        | Current public API still uses `WorkflowAdmission`                                   |
+| Lower one admitted static plan with canonical declaration paths     | Partial     | Inventory paths are not retained by compiled Program and dispatch descriptors       |
 
 ### Bind target domains without Workflow leakage
 
-| Subtask                                                               | Status      | Evidence or required result                           |
-| --------------------------------------------------------------------- | ----------- | ----------------------------------------------------- |
-| Bind Model and Agent through existing setup APIs                      | Implemented | Model and Agent invocation adapter                    |
-| Bind Go Tools, MCP Tools, and Skill Tools through native arguments    | Implemented | V3 Tool, MCP, and Skill setup executors               |
-| Keep Provider SDK Tools provider-managed                              | Implemented | Provider Tool bindings remain Model-plan choices      |
-| Bind Service and Activity through registered adapters                 | Implemented | Workflow binding registry                             |
-| Validate Service and Activity port capability before execution starts | Partial     | Current check occurs during WorkItem binding          |
-| Route direct capabilities through owning adapters                     | Open        | Current direct capability path fails                  |
-| Evaluate callable interface capability requirements                   | Open        | Current code rejects declared capability requirements |
-| Move concrete URL and diff behavior out of generic Workflow setup     | Open        | Built-in bindings remain in `workflowruntime`         |
+| Subtask                                                                      | Status      | Evidence or required result                                                 |
+| ---------------------------------------------------------------------------- | ----------- | --------------------------------------------------------------------------- |
+| Bind Model and Agent through existing setup APIs                             | Implemented | Model and Agent invocation adapter                                          |
+| Bind Go Tools, MCP Tools, and Skill Tools through native arguments           | Implemented | V3 Tool, MCP, and Skill setup executors                                     |
+| Keep Provider SDK Tools provider-managed                                     | Implemented | Provider Tool bindings remain Model-plan choices                            |
+| Bind Service and Activity through registered adapters                        | Implemented | Workflow binding registry                                                   |
+| Prepare Service and Activity context and port transport before work creation | Partial     | binding capability is discovered only after a WorkItem exists               |
+| Preserve Model and Agent output and stream port plans                        | Open        | `invokeWorkflowLLMTarget` omits validated ports from its child-frame intent |
+| Route direct capabilities through owning adapters                            | Open        | Artifact-only target helpers reject planning-projected direct targets       |
+| Evaluate callable interface capability requirements                          | Open        | `requireWorkflowTargetCapabilities` rejects every non-empty requirement     |
+| Lower provider-managed Workflow Tools through typed Model child plans        | Open        | admission currently rejects the target before Model-plan lowering           |
+| Move concrete URL and diff behavior out of generic Workflow setup            | Open        | Concrete bindings remain in `workflowruntime/builtin_bindings.go`           |
 
 ### Execute Workflow reliability behavior
 
-| Subtask                                                                   | Status      | Evidence or required result                 |
-| ------------------------------------------------------------------------- | ----------- | ------------------------------------------- |
-| Persist state owner identity and schema                                   | Implemented | Workflow state-owner runtime code           |
-| Persist Parallel and Foreach parent-state merges                          | Implemented | Durable StateUpdate merge WorkItems         |
-| Persist failed and uncertain step outcomes                                | Implemented | Workflow outcome runtime code               |
-| Persist retry boundaries and backoff waits                                | Implemented | Retry ProgramFrame implementation           |
-| Preserve effects, reconciliation, and compensation                        | Implemented | Session Runtime v3 effect and Workflow code |
-| Verify Service and Activity retry adaptation for every registered binding | Unverified  | Binding-level tests are required            |
-| Verify cancellation races for every mutating target family                | Unverified  | Cross-domain tests are required             |
+| Subtask                                                                   | Status      | Evidence or required result                                       |
+| ------------------------------------------------------------------------- | ----------- | ----------------------------------------------------------------- |
+| Persist state owner identity and schema                                   | Implemented | Workflow state-owner runtime code                                 |
+| Persist Parallel and Foreach parent-state merges                          | Implemented | Durable StateUpdate merge WorkItems                               |
+| Persist failed and uncertain step outcomes                                | Implemented | Workflow outcome runtime code                                     |
+| Make Workflow logical evaluation time Runtime-owned                       | Open        | Workflow initial state currently reads the process clock directly |
+| Persist retry boundaries and backoff waits                                | Implemented | Retry ProgramFrame implementation                                 |
+| Preserve effects, reconciliation, and compensation                        | Implemented | Session Runtime v3 effect and Workflow code                       |
+| Verify Service and Activity retry adaptation for every registered binding | Unverified  | Binding-level tests are required                                  |
+| Verify cancellation races for every mutating target family                | Unverified  | Cross-domain tests are required                                   |
 
 ### Complete normal conversation parity
 
@@ -774,15 +871,18 @@ Status values:
 | Map every V2 command and read to V3                                   | Partial     | Wrapper has broad coverage, but no complete parity ledger exists |
 | Migrate frontend traffic and stored Sessions                          | Open        | Migration and frontend evidence was not supplied                 |
 
-### Correct runtime validation and duplicate logic
+### Remove repeated admission and setup layers
 
-| Subtask                                                             | Status  | Evidence or required result                         |
-| ------------------------------------------------------------------- | ------- | --------------------------------------------------- |
-| Validate every Wait request and status                              | Open    | Correct `Wait.Validate`                             |
-| Remove duplicate Model dispatch-plan validation                     | Open    | Consolidate plan validation                         |
-| Normalize MCP Tool exposure before plan validation                  | Open    | Treat empty exposure as `all` consistently          |
-| Give each target family one dispatch-time pin verification owner    | Partial | Direct Tool and MCP verification overlap            |
-| Remove source-language validation duplication from setup conversion | Open    | Retain only conversion and runtime integrity checks |
+| Removal item                                                | Status  | Required result                                                                                    |
+| ----------------------------------------------------------- | ------- | -------------------------------------------------------------------------------------------------- |
+| Remove static declaration rechecks after Workflow admission | Open    | Setup consumes admitted document, Inventory, and closure facts without recreating source semantics |
+| Remove repeated source-tree walks during lowering           | Open    | One lowering traversal emits runtime descriptors and preserves canonical declaration paths         |
+| Remove the runtime-owned Workflow preparation port          | Open    | Setup submits prepared snapshots; Session Runtime persists and interprets them                     |
+| Collapse duplicate Model dispatch-plan processing           | Open    | One normalization and durable-plan construction path owns Model, MCP, port, and context facts      |
+| Normalize MCP Tool exposure once                            | Open    | Lowering stores `all`, `none`, or `selected`; no later layer interprets an empty value             |
+| Assign one dispatch-time pin owner per target family        | Partial | Domain binder owns current target freshness after setup preparation                                |
+| Remove generic Workflow concrete bindings                   | Open    | Attachment and text domains own their bindings; Workflow setup only registers them                 |
+| Remove runtime reconstruction of declaration permissions    | Open    | WorkItem and child-frame descriptors carry the canonical declaration path from Inventory           |
 
 ### Verify deployment composition
 

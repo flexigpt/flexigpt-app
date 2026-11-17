@@ -1,6 +1,6 @@
-// Package workflowruntime compiles Artifact-backed Workflow declarations into
-// runtime-neutral Session v3 WorkflowProgram snapshots. It does not execute
-// Workflow behavior.
+// Package workflowruntime compiles planning-owned Workflow Artifact closures
+// into runtime-neutral Session v3 WorkflowProgram snapshots. It does not
+// execute Workflow behavior.
 package workflowruntime
 
 import (
@@ -13,6 +13,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	workflowAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workflow"
 	workflowv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workflow/contract/v1"
@@ -256,12 +257,11 @@ func (a *Admission) AdmitWorkflow(
 		RootID:     rootModel.RootID(request.Workflow.RootID),
 		ArtifactID: artifactModel.ArtifactID(request.Workflow.ArtifactID),
 	}
-	return a.admit(
+	return a.admitRoot(
 		ctx,
 		ref,
 		request.Workflow,
 		request.Input,
-		make(map[artifactModel.ArtifactRef]struct{}),
 		true,
 	)
 }
@@ -283,12 +283,11 @@ func (a *Admission) AdmitWorkflowTriggers(
 		RootID:     rootModel.RootID(request.Workflow.RootID),
 		ArtifactID: artifactModel.ArtifactID(request.Workflow.ArtifactID),
 	}
-	result, err := a.admit(
+	result, err := a.admitRoot(
 		ctx,
 		ref,
 		request.Workflow,
 		nil,
-		make(map[artifactModel.ArtifactRef]struct{}),
 		false,
 	)
 	if err != nil {
@@ -328,22 +327,128 @@ func (a *Admission) VerifyArtifactPin(
 	return nil
 }
 
-func (a *Admission) admit(
+type workflowAdmissionArtifact struct {
+	revision         uint64
+	definitionDigest cryptoutil.Digest
+}
+
+// workflowAdmissionPlan is one setup-owned read projection of a
+// planning-owned Workflow closure node. Its Workflow facts are already
+// admitted. Setup must not parse or validate source again.
+type workflowAdmissionPlan struct {
+	artifact         artifactModel.ArtifactRef
+	revision         uint64
+	definitionDigest cryptoutil.Digest
+	facts            workflowAPI.WorkflowPlanNode
+}
+
+// workflowAdmissionClosure is an immutable request-local lookup index over a
+// trusted Workflow plan closure. Setup reads it but does not revalidate source
+// grammar, recompute composition, or resolve nested Workflow plans.
+type workflowAdmissionClosure struct {
+	artifacts map[artifactModel.ArtifactRef]workflowAdmissionArtifact
+	workflows map[artifactModel.ArtifactRef]workflowAdmissionPlan
+}
+
+// workflowAdmissionClosureFromPlan indexes planning-owned closure facts.
+//
+// "workflow.ResolvePlan" already validates source, consistency, closure
+// completeness, ordering, nested Workflow facts, and direct-capability
+// evidence. Setup keeps only the structural checks required to avoid silently
+// selecting a missing or conflicting closure node.
+func workflowAdmissionClosureFromPlan(
+	plan workflowAPI.Plan,
+) (*workflowAdmissionClosure, workflowAdmissionPlan, error) {
+	closure := &workflowAdmissionClosure{
+		artifacts: make(
+			map[artifactModel.ArtifactRef]workflowAdmissionArtifact,
+			len(plan.Closure.Nodes),
+		),
+		workflows: make(
+			map[artifactModel.ArtifactRef]workflowAdmissionPlan,
+		),
+	}
+	var (
+		root      workflowAdmissionPlan
+		rootFound bool
+	)
+
+	for index := range plan.Closure.Nodes {
+		node := plan.Closure.Nodes[index]
+		if _, duplicate := closure.artifacts[node.Artifact]; duplicate {
+			return nil, workflowAdmissionPlan{}, fmt.Errorf(
+				"workflow Artifact closure repeats Artifact %q",
+				node.Artifact.ArtifactID,
+			)
+		}
+		closure.artifacts[node.Artifact] = workflowAdmissionArtifact{
+			revision:         node.Revision,
+			definitionDigest: node.DefinitionDigest,
+		}
+		if node.Workflow == nil {
+			continue
+		}
+
+		facts := *node.Workflow
+		current := workflowAdmissionPlan{
+			artifact:         node.Artifact,
+			revision:         node.Revision,
+			definitionDigest: node.DefinitionDigest,
+			facts:            facts,
+		}
+		closure.workflows[node.Artifact] = current
+		if node.ID == plan.Closure.Root {
+			root = current
+			rootFound = true
+		}
+	}
+
+	if !rootFound {
+		return nil, workflowAdmissionPlan{}, errors.New(
+			"workflow artifact closure root has no typed Workflow facts",
+		)
+	}
+	if plan.Workflow != root.artifact ||
+		plan.Revision != root.revision ||
+		plan.DefinitionDigest != root.definitionDigest {
+		return nil, workflowAdmissionPlan{}, errors.New(
+			"workflow plan root differs from its static closure root",
+		)
+	}
+
+	return closure, root, nil
+}
+
+func (c *workflowAdmissionClosure) artifact(
+	ref artifactModel.ArtifactRef,
+) (workflowAdmissionArtifact, bool) {
+	if c == nil {
+		return workflowAdmissionArtifact{}, false
+	}
+	value, found := c.artifacts[ref]
+	return value, found
+}
+
+func (c *workflowAdmissionClosure) workflow(
+	ref artifactModel.ArtifactRef,
+) (workflowAdmissionPlan, bool) {
+	if c == nil {
+		return workflowAdmissionPlan{}, false
+	}
+	value, found := c.workflows[ref]
+	return value, found
+}
+
+// admitRoot resolves one root Workflow plan, then compiles it from its
+// planning-owned closure. Nested Workflows use typed closure facts and never
+// call ResolvePlan recursively.
+func (a *Admission) admitRoot(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 	selection sessionv3Runtime.ArtifactSelection,
 	input sessionv3Runtime.CanonicalValue,
-	active map[artifactModel.ArtifactRef]struct{},
 	inputBound bool,
 ) (sessionv3Runtime.WorkflowAdmissionResult, error) {
-	if _, found := active[ref]; found {
-		return sessionv3Runtime.WorkflowAdmissionResult{}, errors.New(
-			"nested Workflow cycle",
-		)
-	}
-	active[ref] = struct{}{}
-	defer delete(active, ref)
-
 	plan, err := a.workflows.ResolvePlan(ctx, ref)
 	if err != nil {
 		return sessionv3Runtime.WorkflowAdmissionResult{}, err
@@ -354,49 +459,77 @@ func (a *Admission) admit(
 			ErrBindingUnavailable,
 		)
 	}
+	closure, root, err := workflowAdmissionClosureFromPlan(plan)
+	if err != nil {
+		return sessionv3Runtime.WorkflowAdmissionResult{}, err
+	}
+
+	return a.admitPlanned(
+		ctx,
+		root,
+		selection,
+		input,
+		closure,
+		inputBound,
+	)
+}
+
+func (a *Admission) admitPlanned(
+	ctx context.Context,
+	plan workflowAdmissionPlan,
+	selection sessionv3Runtime.ArtifactSelection,
+	input sessionv3Runtime.CanonicalValue,
+	closure *workflowAdmissionClosure,
+	inputBound bool,
+) (sessionv3Runtime.WorkflowAdmissionResult, error) {
+	if selection.RootID != string(plan.artifact.RootID) ||
+		selection.ArtifactID != string(plan.artifact.ArtifactID) {
+		return sessionv3Runtime.WorkflowAdmissionResult{}, errors.New(
+			"selected Workflow differs from the static Artifact closure",
+		)
+	}
 	if selection.ExpectedRevision != 0 &&
-		selection.ExpectedRevision != plan.Revision {
+		selection.ExpectedRevision != plan.revision {
 		return sessionv3Runtime.WorkflowAdmissionResult{}, errors.New(
 			"selected Workflow revision changed",
 		)
 	}
 	if selection.ExpectedDigest != "" &&
-		selection.ExpectedDigest != string(plan.Digest) {
+		selection.ExpectedDigest != string(plan.definitionDigest) {
 		return sessionv3Runtime.WorkflowAdmissionResult{}, errors.New(
 			"selected Workflow definition changed",
 		)
 	}
 
-	pin, err := a.pinArtifact(ctx, plan.Workflow)
+	pin, err := a.pinClosureArtifact(ctx, closure, plan.artifact)
 	if err != nil {
 		return sessionv3Runtime.WorkflowAdmissionResult{}, err
 	}
-	if pin.Revision != plan.Revision ||
-		pin.Digest != string(plan.Digest) {
-		return sessionv3Runtime.WorkflowAdmissionResult{}, errors.New(
-			"workflow Artifact changed during admission",
-		)
-	}
-	if err := a.verifyRequirements(ctx, plan); err != nil {
+	if err := a.verifyRequirements(ctx, plan, closure); err != nil {
 		return sessionv3Runtime.WorkflowAdmissionResult{}, err
 	}
 
 	var program sessionv3Runtime.WorkflowProgram
 	if inputBound {
-		program, err = compileWorkflowProgram(plan.Document, input)
+		program, err = compileWorkflowProgram(plan.facts.Document, input)
 	} else {
-		program, err = compileWorkflowProgramTemplate(plan.Document)
+		program, err = compileWorkflowProgramTemplate(plan.facts.Document)
 	}
 	if err != nil {
 		return sessionv3Runtime.WorkflowAdmissionResult{}, err
 	}
-	if err := a.bindCallableTargets(ctx, plan, &program, active); err != nil {
+	if err := a.bindCallableTargets(
+		ctx,
+		plan,
+		&program,
+		closure,
+	); err != nil {
 		return sessionv3Runtime.WorkflowAdmissionResult{}, err
 	}
-	if err := a.verifyWorkflowInvocationTransport(plan.Inventory); err != nil {
+	if err := a.verifyWorkflowInvocationTransport(plan.facts.Inventory); err != nil {
 		return sessionv3Runtime.WorkflowAdmissionResult{}, err
 	}
-	if err := rejectUnsupportedWorkflowToolTransport(plan.Inventory); err != nil {
+	if err := rejectUnsupportedWorkflowToolTransport(plan.facts.Inventory); err != nil {
 		return sessionv3Runtime.WorkflowAdmissionResult{}, err
 	}
 
@@ -422,15 +555,15 @@ func (a *Admission) admit(
 
 func (a *Admission) bindCallableTargets(
 	ctx context.Context,
-	plan workflowAPI.Plan,
+	plan workflowAdmissionPlan,
 	program *sessionv3Runtime.WorkflowProgram,
-	active map[artifactModel.ArtifactRef]struct{},
+	closure *workflowAdmissionClosure,
 ) error {
 	if program == nil {
 		return errors.New("workflow program is unavailable")
 	}
 
-	for _, targetPlan := range plan.Inventory.CallableTargets {
+	for _, targetPlan := range plan.facts.Inventory.CallableTargets {
 		if _, duplicate := program.Targets[targetPlan.Name]; duplicate {
 			return fmt.Errorf(
 				"workflow target %q is declared more than once",
@@ -440,9 +573,9 @@ func (a *Admission) bindCallableTargets(
 
 		bound, err := a.bindTarget(
 			ctx,
-			plan.Document,
+			plan.facts.Document,
 			targetPlan,
-			active,
+			closure,
 		)
 		if err != nil {
 			return err
@@ -457,10 +590,11 @@ func (a *Admission) bindCallableTargets(
 // sets and do not create runtime dispatch behavior.
 func (a *Admission) verifyRequirements(
 	ctx context.Context,
-	plan workflowAPI.Plan,
+	plan workflowAdmissionPlan,
+	closure *workflowAdmissionClosure,
 ) error {
-	for _, requirement := range plan.Inventory.Requirements {
-		if err := a.verifyRequirement(ctx, requirement); err != nil {
+	for _, requirement := range plan.facts.Inventory.Requirements {
+		if err := a.verifyRequirement(ctx, requirement, closure); err != nil {
 			return fmt.Errorf(
 				"workflow requirement %q: %w",
 				requirement.Name,
@@ -474,6 +608,7 @@ func (a *Admission) verifyRequirements(
 func (a *Admission) verifyRequirement(
 	ctx context.Context,
 	targetPlan workflowAPI.TargetPlan,
+	closure *workflowAdmissionClosure,
 ) error {
 	target := targetPlan.Target
 	if err := requireWorkflowTargetCapabilities(target); err != nil {
@@ -509,7 +644,7 @@ func (a *Admission) verifyRequirement(
 		if err != nil {
 			return err
 		}
-		_, err = a.pinArtifact(ctx, ref)
+		_, err = a.pinClosureArtifact(ctx, closure, ref)
 		return err
 
 	case workflowv1.TargetWorkflow:
@@ -520,7 +655,7 @@ func (a *Admission) verifyRequirement(
 		if err != nil {
 			return err
 		}
-		_, err = a.pinArtifact(ctx, ref)
+		_, err = a.pinClosureArtifact(ctx, closure, ref)
 		return err
 
 	case workflowv1.TargetAgent:
@@ -531,7 +666,7 @@ func (a *Admission) verifyRequirement(
 				target.Ref,
 			)
 		}
-		pin, err := a.pinInvocationTarget(ctx, targetPlan)
+		pin, err := a.pinInvocationTarget(ctx, targetPlan, closure)
 		if err != nil {
 			return err
 		}
@@ -553,7 +688,7 @@ func (a *Admission) verifyRequirement(
 				target.Ref,
 			)
 		}
-		pin, err := a.pinInvocationTarget(ctx, targetPlan)
+		pin, err := a.pinInvocationTarget(ctx, targetPlan, closure)
 		if err != nil {
 			return err
 		}
@@ -580,7 +715,7 @@ func (a *Admission) bindTarget(
 	ctx context.Context,
 	document workflowv1.WorkflowDocument,
 	targetPlan workflowAPI.TargetPlan,
-	active map[artifactModel.ArtifactRef]struct{},
+	closure *workflowAdmissionClosure,
 ) (sessionv3Runtime.WorkflowTarget, error) {
 	target := targetPlan.Target
 	if err := requireWorkflowTargetCapabilities(target); err != nil {
@@ -630,7 +765,7 @@ func (a *Admission) bindTarget(
 		if err != nil {
 			return sessionv3Runtime.WorkflowTarget{}, err
 		}
-		pin, err := a.pinArtifact(ctx, ref)
+		pin, err := a.pinClosureArtifact(ctx, closure, ref)
 		if err != nil {
 			return sessionv3Runtime.WorkflowTarget{}, err
 		}
@@ -687,22 +822,20 @@ func (a *Admission) bindTarget(
 		if err != nil {
 			return sessionv3Runtime.WorkflowTarget{}, err
 		}
-
-		pin, err := a.pinArtifact(ctx, ref)
-		if err != nil {
-			return sessionv3Runtime.WorkflowTarget{}, err
+		nestedPlan, found := closure.workflow(ref)
+		if !found {
+			return sessionv3Runtime.WorkflowTarget{}, fmt.Errorf(
+				"%w: nested Workflow %q is absent from the static Artifact closure",
+				ErrBindingUnavailable,
+				target.Ref,
+			)
 		}
-		nested, err := a.admit(
+		nested, err := a.admitPlanned(
 			ctx,
-			ref,
-			sessionv3Runtime.ArtifactSelection{
-				RootID:           pin.RootID,
-				ArtifactID:       pin.ArtifactID,
-				ExpectedRevision: pin.Revision,
-				ExpectedDigest:   pin.Digest,
-			},
+			nestedPlan,
+			workflowSelectionForAdmissionPlan(nestedPlan),
 			nil,
-			active,
+			closure,
 			false,
 		)
 		if err != nil {
@@ -725,7 +858,7 @@ func (a *Admission) bindTarget(
 				target.Ref,
 			)
 		}
-		pin, err := a.pinInvocationTarget(ctx, targetPlan)
+		pin, err := a.pinInvocationTarget(ctx, targetPlan, closure)
 		if err != nil {
 			return sessionv3Runtime.WorkflowTarget{}, err
 		}
@@ -753,7 +886,7 @@ func (a *Admission) bindTarget(
 				target.Ref,
 			)
 		}
-		pin, err := a.pinInvocationTarget(ctx, targetPlan)
+		pin, err := a.pinInvocationTarget(ctx, targetPlan, closure)
 		if err != nil {
 			return sessionv3Runtime.WorkflowTarget{}, err
 		}
@@ -785,6 +918,7 @@ func (a *Admission) bindTarget(
 func (a *Admission) pinInvocationTarget(
 	ctx context.Context,
 	target workflowAPI.TargetPlan,
+	closure *workflowAdmissionClosure,
 ) (sessionv3Runtime.ArtifactPin, error) {
 	ref, err := requireWorkflowTargetArtifactRef(
 		target,
@@ -793,7 +927,18 @@ func (a *Admission) pinInvocationTarget(
 	if err != nil {
 		return sessionv3Runtime.ArtifactPin{}, err
 	}
-	return a.pinArtifact(ctx, ref)
+	return a.pinClosureArtifact(ctx, closure, ref)
+}
+
+func workflowSelectionForAdmissionPlan(
+	plan workflowAdmissionPlan,
+) sessionv3Runtime.ArtifactSelection {
+	return sessionv3Runtime.ArtifactSelection{
+		RootID:           string(plan.artifact.RootID),
+		ArtifactID:       string(plan.artifact.ArtifactID),
+		ExpectedRevision: plan.revision,
+		ExpectedDigest:   string(plan.definitionDigest),
+	}
 }
 
 func requireWorkflowTargetArtifactRef(
@@ -909,6 +1054,33 @@ func finalizeWorkflowTarget(
 		return sessionv3Runtime.WorkflowTarget{}, err
 	}
 	return target, nil
+}
+
+func (a *Admission) pinClosureArtifact(
+	ctx context.Context,
+	closure *workflowAdmissionClosure,
+	ref artifactModel.ArtifactRef,
+) (sessionv3Runtime.ArtifactPin, error) {
+	expected, found := closure.artifact(ref)
+	if !found {
+		return sessionv3Runtime.ArtifactPin{}, fmt.Errorf(
+			"%w: Artifact %q is absent from the static Workflow closure",
+			ErrBindingUnavailable,
+			ref.ArtifactID,
+		)
+	}
+
+	pin, err := a.pinArtifact(ctx, ref)
+	if err != nil {
+		return sessionv3Runtime.ArtifactPin{}, err
+	}
+	if pin.Revision != expected.revision ||
+		pin.Digest != string(expected.definitionDigest) {
+		return sessionv3Runtime.ArtifactPin{}, errors.New(
+			"workflow artifact closure changed since planning",
+		)
+	}
+	return pin, nil
 }
 
 func (a *Admission) pinArtifact(

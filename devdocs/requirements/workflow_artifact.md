@@ -92,6 +92,14 @@ Runtime setup consumes this plan and converts typed Workflow language facts to
 runtime types. Runtime setup does not ask Workflow Artifact planning to
 interpret the Workflow for execution.
 
+Artifact Store is a passive source-fact provider. It admits and returns
+definitions, relationships, identity facts, and static planning facts. It does
+not prepare, schedule, bind, dispatch, recover, or otherwise participate in
+Workflow execution.
+
+Setup can read generic Artifact facts when it needs a current pin. The store
+does not receive execution-specific requests or expose execution-specific APIs.
+
 ### 3.3 Agent responsibilities
 
 An Agent owns reusable reasoning and interaction configuration.
@@ -162,6 +170,11 @@ Runtime setup must consume the separate callable-target and requirement
 collections. It must not rebuild target lookup by walking
 `CapabilityPlan.Occurrences`.
 
+`Inventory` source paths are the planning-owned canonical declaration paths for
+blocks, calls, ports, retries, and effects. The root block is `root`; a root
+step is `root/steps/<step-id>`. The Artifact plan does not define runtime
+frame identities or runtime delivery behavior.
+
 Workflow plan resolution is valid for an available Workflow Artifact regardless
 of local enablement. Runtime setup checks root and selected-target enablement
 when it creates an execution pin. Plan resolution does not establish provider,
@@ -189,17 +202,22 @@ flowchart TD
     J --> K[Derived index and FTS]
 ```
 
-| Layer                             | Primary package area                                                    | Responsibilities                                                                                                                             |
-| --------------------------------- | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| Declaration language              | `internal/llmartifactory-go/workflow/contract/v1/`                      | Source grammar, source schema, static validation, JSON Schema validity, CEL scope validity, target and requirement declaration validity      |
-| Workflow planning                 | `internal/llmartifactory-go/workflow/`                                  | Read-only Artifact-backed relationship resolution, callable-target and requirement inventory, direct Artifact references, and planning facts |
-| Runtime admission and compilation | `internal/agentruntimesetup/workflowruntime/`                           | Current execution Artifact pins, local enablement, target adapter selection, typed WorkflowProgram lowering, and runtime transport admission |
-| Durable orchestration             | `internal/agentruntime-go/sessionv3/`                                   | ProgramFrames, WorkItems, Attempts, Waits, timers, effects, recovery, cancellation, durable control flow                                     |
-| Domain binding                    | `internal/agentruntimesetup/sessionv3runtime/`, domain runtime packages | Domain-native Model, Agent, Tool, MCP, Skill, Workspace, attachment, Service, Activity, and provider adaptation                              |
-| Persistence                       | `internal/sessionstorev3/`                                              | Authoritative Session v3 documents, tombstones, derived index, derived FTS                                                                   |
-| Desktop composition               | `cmd/agentgo/`                                                          | Wails transport attachment, runtime composition, application binding registration                                                            |
+| Layer                          | Primary package area                                                    | Responsibilities                                                                                                                             |
+| ------------------------------ | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Declaration language           | `internal/llmartifactory-go/workflow/contract/v1/`                      | Source grammar, source schema, static validation, JSON Schema validity, CEL scope validity, target and requirement declaration validity      |
+| Workflow planning              | `internal/llmartifactory-go/workflow/`                                  | Read-only Artifact-backed relationship resolution, callable-target and requirement inventory, direct Artifact references, and planning facts |
+| Workflow execution preparation | `internal/agentruntimesetup/workflowruntime/`                           | Current Artifact pins, local enablement, target adapter selection, typed WorkflowProgram lowering, and target transport admission            |
+| Durable orchestration          | `internal/agentruntime-go/sessionv3/`                                   | ProgramFrames, WorkItems, Attempts, Waits, timers, effects, recovery, cancellation, durable control flow                                     |
+| Domain binding                 | `internal/agentruntimesetup/sessionv3runtime/`, domain runtime packages | Domain-native Model, Agent, Tool, MCP, Skill, Workspace, attachment, Service, Activity, and provider adaptation                              |
+| Persistence                    | `internal/sessionstorev3/`                                              | Authoritative Session v3 documents, tombstones, derived index, derived FTS                                                                   |
+| Desktop composition            | `cmd/agentgo/`                                                          | Wails transport attachment, runtime composition, application binding registration                                                            |
 
 Session Runtime v3 has no Artifact Store or setup import. It does not parse source, resolve Artifacts, configure providers, read Workspace files, discover MCP capabilities, render Skills, invoke native Tools directly, or materialize native attachments.
+
+Session Runtime receives a prepared Workflow Program snapshot and immutable
+runtime pins. It does not receive a Workflow source document, Workflow source
+selection, static Artifact closure, Artifact Store handle, or execution
+preparation port.
 
 ### 4.1 Validation ownership
 
@@ -222,6 +240,10 @@ scheduler.
 Runtime-neutral Workflow types are deliberate boundary copies. Runtime cannot
 import Artifact or declaration packages. These copies must contain runtime
 semantics only and must not recreate source-language parsing behavior.
+
+After admission, setup and runtime trust static plan facts. Setup adds current
+domain binding facts. Runtime adds durable execution facts. Neither layer
+reconstructs declaration semantics from source-shaped runtime data.
 
 LLM declaration-family registration is also split by ownership:
 
@@ -668,19 +690,11 @@ A call-level interface can narrow a target interface. It cannot widen the target
 
 A call evaluates input and context once.
 
-The runtime persists:
-
-- Prepared input.
-- Prepared context.
-- Selected concrete target.
-- Target-set membership.
-- Effect key.
-- Retry identity.
-- Deadline.
-- Port plans.
-- Artifact and binding facts.
-
-These facts remain stable through retries, waits, recovery, and resumption.
+A call declaration identifies input, context, allowed target set, effect,
+retry, deadline, and port intent. Planning exposes their static forms through
+the admitted document and Inventory. Execution preparation captures current
+target and binding facts. Durable call handling is specified in
+`workflow_runtime.md`.
 
 ### 9.4 Call modes
 
@@ -756,13 +770,9 @@ A resolver-backed target set has:
 - A callable interface.
 - Optional constraints.
 
-The runtime creates a typed resolver WorkItem at the first call boundary.
-
-The resolver WorkItem persists normalized membership before target selection.
-
-The selected target identity becomes part of the durable step outcome.
-
-Retries, waits, recovery, and resumed operation use the persisted membership and selected target identity.
+Planning records a resolver-backed target set as deferred selection work. It
+does not evaluate membership, select a target, or create runtime work.
+Durable resolver execution is specified in `workflow_runtime.md`.
 
 ### 9.6 Provider-managed Tool Artifacts
 
@@ -777,57 +787,24 @@ It does not become:
 - A fabricated local success.
 - A local retry target.
 
-A Workflow call to a provider-managed Tool Artifact requires a typed Model plan that owns provider Tool choice. Admission resolves this before unrelated external work starts.
+Artifact planning records the provider-managed target relationship and callable
+interface. It does not choose a Model plan, choose a provider Tool, or create
+local Tool work.
 
-## 10. Target transport ownership
+## 10. Declaration transport contract
 
-Workflow owns:
+Workflow source declares:
 
-- Ports.
-- Channels.
-- Cursor state.
-- Parent-child delivery.
-- Ordering.
-- Retention.
-- Durable replay semantics.
+- Explicit call input and context forms.
+- Callable interface ports and schemas.
+- Channel binding and requested access.
+- Published Workflow ports.
+- Stream intent.
 
-Generic domain APIs preserve their own native contracts.
-
-| Target family       |                                         Workflow context |                                Input ports |               Non-stream output port |                       Streamed output port |
-| ------------------- | -------------------------------------------------------: | -----------------------------------------: | -----------------------------------: | -----------------------------------------: |
-| Model               | Explicit `messages`, `instructions`, and `defaults` only |                                Unavailable |                            Supported |                                  Supported |
-| Agent               | Explicit `messages`, `instructions`, and `defaults` only |                                Unavailable |                            Supported |                                  Supported |
-| Nested Workflow     |               Supported through child ProgramFrame scope |                                  Supported |                            Supported |                                  Supported |
-| Port-aware Service  |               Supported when binding declares capability | Supported when binding declares capability |                            Supported | Supported when binding declares capability |
-| Port-aware Activity |               Supported when binding declares capability | Supported when binding declares capability |                            Supported | Supported when binding declares capability |
-| Go Tool             |                                              Unavailable |                                Unavailable | Supported after confirmed settlement |                                Unavailable |
-| MCP Tool            |                                              Unavailable |                                Unavailable | Supported after confirmed settlement |                                Unavailable |
-| Skill Tool          |                                              Unavailable |                                Unavailable | Supported after confirmed settlement |                                Unavailable |
-| Provider SDK Tool   |                                          Model-plan only |                            Model-plan only |                     Provider-managed |                           Provider-managed |
-
-The native target contract remains authoritative:
-
-- Go Tool function arguments remain Go Tool function arguments.
-- MCP `tools/call` arguments remain MCP `tools/call` arguments.
-- Skill Tool arguments remain Skill Tool arguments.
-- Provider request plans remain provider request plans.
-
-Workflow metadata is not injected through:
-
-- Generic Tool context fields.
-- Tool argument envelopes.
-- Model request envelopes.
-- Agent request envelopes.
-- Go `context.Context` sidecars.
-- MCP metadata.
-- MCP extensions.
-- Skill Runtime sidecars.
-- Provider metadata.
-- Artifact-domain imports.
-
-Setup can adapt a confirmed final native Tool result into a normal Workflow output port after settlement.
-
-A declaration that requests unsupported Tool-family context, input-port, or stream-port transport fails during admission before target dispatch.
+Contract admission validates static declaration compatibility. Planning exposes
+immutable transport facts in Inventory. Current target capability, native
+request adaptation, port staging, port delivery, stream ordering, and target
+settlement are specified in `workflow_runtime.md`.
 
 ## 11. Context, ports, and channels
 
@@ -888,9 +865,9 @@ Input ports transfer authorized retained channel values or explicit mapped value
 
 Output ports transfer final target values.
 
-Streamed ports transfer ordered incremental values.
-
-A final call output remains separate from a streamed port.
+A port declaration distinguishes input, final-output, and streamed-output
+contracts. Runtime staging, cursor handling, delivery, retention, and stream
+semantics are specified in `workflow_runtime.md`.
 
 ### 11.3 Channels
 
@@ -1870,7 +1847,7 @@ Generic Artifact admission
 Read-only Workflow Artifact plan
         |
         v
-Runtime setup pinning, binding, and lowering
+Setup-owned Workflow execution preparation, pinning, binding, and lowering
         |
         v
 Typed runtime-neutral WorkflowProgram
@@ -1966,7 +1943,9 @@ Workflow Artifact completion includes:
 - Deterministic source inventory construction.
 - Complete static source-backed Artifact closure construction.
 - Explicit direct-capability evidence.
+- One canonical declaration-path model in contract admission and planning.
 - No runtime interpretation or runtime-private data.
+- No Artifact Store execution role.
 
 ## 22. Workflow Artifact implementation status
 
@@ -1977,4 +1956,5 @@ Workflow Artifact completion includes:
 | Preserve direct capability evidence without Artifact fabrication | Implemented | `internal/llmartifactory-go/workflow/closure.go` emits direct evidence without synthetic Artifact nodes     |
 | Publish a deterministic complete static Artifact closure         | Implemented | `internal/llmartifactory-go/workflow/closure.go` publishes sorted nodes, edges, paths, and refresh checks   |
 | Include nested Workflow plan nodes in the closure                | Implemented | `ArtifactClosureNode.Workflow` contains admitted nested Workflow document, inventory, and composition facts |
+| Publish one canonical declaration-path model                     | Partial     | Inventory uses `root/...`; admission and runtime currently use other path forms                             |
 | Keep runtime interpretation outside Artifact planning            | Implemented | `internal/llmartifactory-go/workflow/` imports Artifact and declaration planning contracts only             |
