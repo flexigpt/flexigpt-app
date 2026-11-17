@@ -2,36 +2,24 @@
 
 ## 1. Purpose
 
-Workflow v1 is a typed declaration language for durable process execution.
+Workflow v1 is a typed declaration language for process orchestration.
 
-```text
-Agent       = reusable reasoning and interaction configuration
+Agent = reusable reasoning and interaction configuration
+Workflow = typed process declaration
+Invocation = one execution of a Workflow
 
-Workflow    = typed durable process declaration
+An Agent owns reusable reasoning and interaction behavior.
+A Workflow owns declaration-level process behavior, target-selection rules, and portable orchestration semantics.
 
-Invocation  = one durable execution of a Workflow
-```
-
-An Agent owns reusable reasoning and interaction behavior. A Workflow owns process behavior, coordination, lifecycle, reliability, business control flow, and durable execution semantics.
-
-A Workflow declares orchestration semantics. It does not own target-domain
-execution semantics or durable runtime mechanics. Session Runtime v3 owns
-durable execution state, and each target domain owns its native configuration,
-readiness, credentials, request model, and execution behavior.
+A Workflow declaration does not own runtime interpretation, runtime state,
+provider configuration, target binding, persistence, recovery, timers, or frontend transport.
+Those concerns are specified in `workflow_runtime.md`.
 
 Session Runtime v3 is the durable execution host for both normal conversation work and Workflow work.
 
-```text
-Session Runtime v3
-    +
-Workflow Runtime v3
-    =
-typed durable backend that includes normal Session v2 behavior
-    +
-full Workflow v1 behavior
-```
+Session Runtime v3 + Workflow Runtime v3 = typed durable backend that includes normal Session v2 behavior + full Workflow v1 behavior
 
-Completion of the backend phases in this document and the runtime document produces a Session Runtime v3 backend that is ready for frontend replacement of Session v2.
+Workflow Artifact completion is tracked only through Artifact planning work items in this document. Runtime completion, frontend migration, and Session v2 replacement status are tracked only in `workflow_runtime.md`.
 
 ## 2. Version contract
 
@@ -43,17 +31,9 @@ type: workflow
 ```
 
 `apiVersion: v1` identifies the declaration language.
-
 The declaration language version is separate from the durable ProgramFrame payload version.
-
-The current Workflow ProgramFrame payload is:
-
-```text
-artifact.workflow.v1@1
-```
-
+The current Workflow ProgramFrame payload is: `artifact.workflow.v1@1`.
 The payload remains `artifact.workflow.v1@1` during development. Workflow v1 remains `apiVersion: v1`.
-
 A Workflow source document is stored as an Artifact definition. The standalone source field `apiVersion` is admission metadata and is not stored in the canonical definition body.
 
 ## 3. Responsibility boundaries
@@ -98,37 +78,21 @@ A Workflow does not own:
 - Wails transport behavior.
 - Browser state.
 
-### 3.4 Workflow target-adapter boundary
+### 3.2 Workflow Artifact plan boundary
 
-Workflow runtime setup owns orchestration-to-domain adapters for callable targets. The Workflow declaration and Workflow artifact layers do not own
-target adapters.
+Workflow Artifact planning owns static source facts. It returns an admitted
+Workflow document, callable targets, requirements, source inventory, direct
+capability evidence, and a complete static Artifact dependency closure.
 
-Workflow setup adapters:
+The closure contains only source-backed Artifact identity facts and static
+relationships. It contains no runtime program, binding, timer, provider
+request, credential, client, callback, or native handle.
 
-- Depend on existing typed Model, Agent, Tool, Skill, MCP, Workspace, Service, and Activity APIs.
-- Convert Workflow-owned typed declarations and evaluated Workflow values into existing domain request types.
-- Supply typed semantic binding facts for durable persistence before external dispatch.
-- Keep native domain calls, provider clients, credentials, native paths, and domain-private handles outside Session documents.
+Runtime setup consumes this plan and converts typed Workflow language facts to
+runtime types. Runtime setup does not ask Workflow Artifact planning to
+interpret the Workflow for execution.
 
-An adapter selects and binds a domain operation after runtime setup has pinned
-the selected Artifact, checked local enablement where applicable, and verified
-current domain readiness. It does not redefine native domain behavior.
-
-Domains do not:
-
-- Import Workflow Runtime or Session Runtime types.
-- Add Workflow-only request contracts.
-- Accept Workflow context through native Tool arguments, provider metadata, MCP metadata, Skill sidecars, or native context sidecars.
-
-`CanonicalValue` can represent Workflow data boundaries. It must not become a
-second Model or Agent request grammar. Workflow Model and Agent targets use
-Workflow-owned typed adapters over the existing Model and Agent domain
-contracts. The current adapters accept explicit `messages`, `instructions`,
-and `defaults` context forms and reject unsupported transport before Workflow
-execution starts. They do not convert arbitrary Workflow JSON into a Model or
-Agent request.
-
-### 3.2 Agent responsibilities
+### 3.3 Agent responsibilities
 
 An Agent owns reusable reasoning and interaction configuration.
 
@@ -148,34 +112,24 @@ APIs. It rejects unavailable current Agent or Model capability state and
 unsupported transport before execution starts. Workflow input must never become
 fallback chat text or a generic Agent-domain request envelope.
 
-### 3.3 Invocation responsibilities
-
-An Invocation is one durable Workflow execution.
-
-An Invocation owns:
-
-- Invocation input.
-- The selected Workflow definition pin.
-- ProgramFrames.
-- WorkItems.
-- Attempts.
-- Waits.
-- Timers.
-- Trigger occurrences.
-- Event and channel records.
-- Effect facts.
-- Reconciliation facts.
-- Compensation facts.
-- Resource claims.
-- Budgets.
-- Execution outcome.
-
-The existing Session v3 document is the only durable root for an Invocation.
-
-### 3.5 Workflow Artifact API
+### 3.4 Workflow Artifact API
 
 Workflow is a source-backed Artifact family. Its current Artifact-facing API is
 read-only plan resolution through `workflow.Service.ResolvePlan`.
+
+The Artifact-facing plan contract must provide:
+
+- The admitted Workflow declaration.
+- The root Workflow Artifact identity.
+- The complete static Artifact dependency closure.
+- Callable targets.
+- Requirements.
+- Source inventory facts.
+- Direct-capability evidence where no Artifact exists.
+
+Current target readiness, runtime Artifact pin conversion, domain binding,
+runtime execution, persistence, recovery, and Wails behavior are outside this
+Artifact API.
 
 Workflow declarations are admitted through ordinary generic Source refresh and
 application-selected canonical declaration decoders. Built-in and Workspace
@@ -1994,364 +1948,33 @@ Typed structures own:
 - Resource claims.
 - Control-flow state.
 
-## 21. Functional completion
+## 21. Workflow Artifact completion criteria
 
-Workflow Runtime v3 functional completion requires every valid Workflow v1 field to satisfy one result:
+Workflow Artifact completion requires every valid Workflow v1 source field to
+satisfy one result:
 
-1. The field compiles into typed runtime behavior with durable recovery semantics.
-2. The field is invalid by Workflow v1 language semantics.
-3. The field requires an unavailable Artifact pin, binding, credential, policy, or external domain capability and fails before unrelated external work begins.
+- The field is represented in the typed declaration model and static plan.
+- The field is rejected by Workflow v1 language validation.
+- The field is represented as an explicit setup or runtime handoff requirement.
 
-Functional completion includes:
+Workflow Artifact completion includes:
 
-- Typed compilation.
-- Durable persistence.
-- Durable recovery.
-- Cancellation behavior.
-- Reliable external work behavior.
-- Typed projection and command wiring.
-- Normal Session v2 backend parity in Session Runtime v3.
+- Typed declaration decoding.
+- Canonical definition construction.
+- Static CEL scope validation.
+- Static target and requirement planning.
+- Deterministic source inventory construction.
+- Complete static source-backed Artifact closure construction.
+- Explicit direct-capability evidence.
+- No runtime interpretation or runtime-private data.
 
-The backend is then ready for frontend replacement of Session v2.
+## 22. Workflow Artifact implementation status
 
-## 22. Source-backed implementation status
-
-### 22.1 Evidence coverage
-
-| Area                                                       | Source evidence                                                                                                                                                                 |
-| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Workflow source grammar and semantic validation            | `internal/llmartifactory-go/workflow/contract/v1/`                                                                                                                              |
-| Artifact-backed Workflow planning                          | `internal/llmartifactory-go/workflow/plan.go`                                                                                                                                   |
-| Admission and typed compilation                            | `internal/agentruntimesetup/workflowruntime/`                                                                                                                                   |
-| Workflow interpreter and durable orchestration             | `internal/agentruntime-go/sessionv3/`                                                                                                                                           |
-| Model, Tool, MCP, Skill, attachment, and execution binding | `internal/agentruntimesetup/sessionv3runtime/`, `internal/agentruntimesetup/toolruntime/`, `internal/agentruntimesetup/mcpruntime/`, `internal/agentruntimesetup/skillruntime/` |
-| Session v3 persistence                                     | `internal/sessionstorev3/`                                                                                                                                                      |
-| Desktop composition                                        | `cmd/agentgo/app.go`, `cmd/agentgo/wrapper_sessionv3_bootstrap.go`, `cmd/agentgo/wrapper_sessionv3_runtime.go`                                                                  |
-
-### 22.2 Durable foundation
-
-- [x] Session v3 is the durable root for Executions, ProgramFrames, WorkItems, Attempts, Waits, effects, trigger registrations, trigger occurrences, channels, and control-flow state.
-- [x] Session Store v3 is the authoritative V3 persistence store.
-- [x] Derived index and FTS data rebuild from the Session document.
-- [x] Tombstones are durable deletion barriers.
-- [x] Command idempotency records persist in the Session document.
-- [x] Tombstones retain accepted deletion command records.
-- [x] Restore restores tombstones before live Session recreation.
-- [x] Runtime close cancels tracked timers, dispatch contexts, and owned asynchronous work.
-- [x] Restore finishes before retry, wait, execution-deadline, cleanup-deadline, resource, and trigger timers are armed.
-
-### 22.3 Callable targets and plans
-
-- [x] Tool Artifact targets use typed Tool WorkItems.
-- [x] MCP Tool targets use current MCP discovery and persisted binding facts.
-- [x] Service targets use registered typed Service bindings.
-- [x] Activity targets use registered typed Activity bindings.
-- [x] Nested Workflow targets use child Workflow ProgramFrames.
-- [x] Agent targets use a Workflow-owned typed adapter over existing Agent and Model setup APIs and create isolated child Agent-loop ProgramFrames.
-- [x] Model targets use a Workflow-owned typed adapter over the existing Model setup API and create isolated child single-model ProgramFrames.
-- [x] Static target sets enforce member identity.
-- [x] Resolver-backed target sets use typed resolver WorkItems and persist membership.
-- [x] Selected target identity persists with the logical Workflow step.
-- [x] Completion waits preserve confirmed Tool error and skipped outcomes as typed terminal failure.
-- [x] Provider SDK Tool Artifacts remain provider-managed Model choices.
-- [x] Callable interface limits propagate to direct WorkItems and child ProgramFrame boundaries.
-- [x] Receipt schemas are enforced for direct WorkItems and child ProgramFrame boundaries.
-- [x] Typed Model and Agent dispatch plans persist artifact pins, Workspace, Model, Agent, instruction, Text, Tool, Skill, MCP, attachment, message, channel, context, and port facts.
-- [x] Tool and MCP Tool target effect safety is conservative unless a current setup-domain binding supplies the authoritative effect fact.
-- [x] Workflow does not convert input ports or arbitrary Workflow context into synthetic Model or Agent chat messages.
-- [x] Typed Service and Activity dispatch plans persist binding identity, binding version, input, context, port facts, and effect facts.
-
-### 22.3a Workflow Artifact API status
-
-- [x] Workflow source admission, Definition reconstruction, Artifact-backed
-      planning, and planning inventory are present.
-- [x] Generic Artifact, catalog, Definition, Resource, and enablement APIs
-      cover current Workflow entity-management consumers.
-- [x] Workflow Plugins and managed Workflow publication have no current
-      consumer and are outside the Workflow Artifact completion scope.
-- [x] Workflow planning separates callable targets from requirements, exposes
-      source-backed target references directly, and preserves direct
-      capability provider identity and evidence.
-- [x] Application Artifact setup supplies the same immutable declaration
-      selection to generic Store admission and LLM composition, and constructs
-      the read-only Workflow service.
-- [x] Workflow planning reuses composition-validated entries without
-      repeating Workflow static validation.
-
-### 22.4 Ports, channels, and messaging
-
-- [x] Local channel emit, retained records, cursors, consume facts, observation behavior, and emit deduplication are durable runtime concepts.
-- [x] Completion handles support WorkItems, ProgramFrames, and Executions.
-- [x] Parent-child completion waits preserve terminal outcome semantics.
-- [x] Input port plans are staged for Model, Agent, nested Workflow, and explicitly port-aware Service or Activity bindings.
-- [x] Non-stream output ports are delivered from confirmed final output for all callable target families.
-- [x] Streamed port plans are delivered through Model, Agent, nested Workflow, and explicitly streaming Service or Activity bindings.
-- [x] Go Tool, MCP Tool, and Skill Tool input-port declarations fail during admission.
-- [x] Go Tool, MCP Tool, and Skill Tool streamed-port declarations fail during admission.
-- [x] Tool final output routes through normal non-stream output ports after confirmed settlement.
-- [x] Port ownership, channel authorization, ordering, schema enforcement, and durable replay facts exist at target boundaries.
-- [x] Attached and independent child Executions support durable live port messaging.
-- [x] Nested Workflow root ports participate in parent-child access checks.
-- [x] Published nested Workflow port checks compare caller and callable schemas with target published channel schemas before child dispatch.
-
-### 22.5 Structured behavior
-
-- [x] Transform, Scope, Choose, Return, Fail, Break, Continue, Set, Parallel, Foreach, Repeat, Machine, Wait, Emit, Saga, and Cancel have typed compiler and interpreter routes.
-- [x] Parallel supports `all`, `first-completed`, `first-success`, `quorum`, `cancel`, `wait`, `fail-fast`, and `collect`.
-- [x] Parallel excludes condition-skipped branches from `all` completion and settles an empty selected `all` set deterministically.
-- [x] Foreach captures source order, validates items, preserves ordered outcomes, isolates item execution, and supports completion policy.
-- [x] Repeat supports count, while, until, timeout, carried state, local state, exhaustion, break, continue, and until-cancelled lifecycle behavior.
-- [x] Machine initial state, entry, exit, immediate transitions, event transitions, timer transitions, transition blocks, final output, serialized handling, cancellation, and recovery are durable runtime behavior.
-- [x] Fork WorkItems persist child scheduling boundaries.
-- [x] Join WorkItems persist child aggregation boundaries.
-- [x] Structured control flow reserves step budget for ordinary, Fork, Join, and controlling WorkItems.
-- [x] Structured control flow uses durable ProgramFrame-held resource leases.
-- [x] Closest-owner state mutation carries owner identity and schema through
-      structured, terminal, machine, reconciliation, and compensation blocks.
-- [x] Parallel and Foreach use typed merge declarations and durable StateUpdate
-      merge boundaries after child settlement.
-- [x] Failed and uncertain step outcomes persist typed error, receipt, effect,
-      and target facts and are visible through Workflow projections and CEL.
-
-### 22.6 Effects, reconciliation, compensation, and cleanup
-
-- [x] Read, idempotent, keyed, and non-idempotent effect contracts are typed.
-- [x] Stable keyed idempotency keys persist in WorkItems and Attempts.
-- [x] Effect state persists in WorkItems, Attempts, receipts, and errors.
-- [x] Uncertain non-idempotent work does not automatically replay.
-- [x] Read, idempotent, and keyed work can resume only through their replay-safe effect contract.
-- [x] Reconciliation WorkItem intent and typed reconciliation result states exist.
-- [x] Saga scope identity and confirmed compensatable effect ledger facts exist.
-- [x] Compensation WorkItem intent and cleanup state exist.
-- [x] Reconciliation child-block execution covers effect-bearing Tool, Service, and Activity WorkItems.
-- [x] Applied reconciliation output validates against original target and call contracts.
-- [x] Confirmed non-application retry behavior exists for declared retry policies.
-- [x] Unknown reconciliation outcomes route to typed recovery review.
-- [x] Reverse dependency-aware compensation scheduling exists.
-- [x] Compensation concurrency limits exist.
-- [x] Compensation `continue` and `stop` policies exist.
-- [x] Primary outcome projection includes typed compensation causes.
-- [x] Cleanup timer expiry and bounded cleanup cancellation exist.
-- [x] Structured cancellation preserves dispatched mutation uncertainty and routes catch, finally, reconciliation, and compensation through cleanup work.
-- [x] Recovery starts declared reconciliation before generic recovery review for uncertain Workflow WorkItems.
-
-### 22.7 Coordination, triggers, resources, and limits
-
-- [x] Event waits, channel waits, timer waits, completion waits, and human waits are typed WorkItem behavior.
-- [x] Signals use source and identity deduplication.
-- [x] Trigger registrations persist in Session documents.
-- [x] Event trigger occurrences persist accepted occurrence identity, mapped input, instance key, selected Execution, queue position, and failure facts.
-- [x] Schedule triggers support intervals and five-field cron schedules with IANA time zones.
-- [x] Trigger overlap and missed-occurrence policies are typed.
-- [x] Subscription retention, capacity, and byte limits are enforced.
-- [x] Channel retention and byte limits are enforced.
-- [x] Human response actor authorization is enforced.
-- [x] Trigger registration without initial explicit Workflow start exists.
-- [x] Trigger occurrence failure projection and operational management commands exist.
-- [x] Resource definitions compile to typed resource definitions.
-- [x] Resource claims compile to typed WorkItem claim plans.
-- [x] Concurrency, rate, and keyed serialization claims are enforced.
-- [x] Root Workflow limits compile to typed Execution budgets.
-- [x] Step limits compile to typed nested budgets.
-- [x] Child Execution budgets and cleanup duration are typed and durable.
-- [x] Model token, message, event, cost, and step accounting are enforced or fail before dispatch when a required setup-owned meter is unavailable.
-- [x] Budget exhaustion propagates typed limit and timeout errors through WorkItems, Attempts, ProgramFrames, and Execution outcomes.
-
-### 22.8 Current model-binding closure
-
-- [x] Workflow Model targets admit through a typed Workflow adapter and execute as isolated child single-model ProgramFrames.
-- [x] Workflow Agent targets admit through a typed Workflow adapter and execute as isolated child Agent-loop ProgramFrames.
-- [x] Valid explicit message and instruction Workflow invocation forms create child ProgramFrames, durable Model dispatch plans, and provider calls through the existing V3 LLM binder.
-- [x] Workflow input never becomes fallback chat text.
-- [x] Generic `messages` and `instructions` JSON envelopes remain disabled. They were a Workflow-local duplicate of Model and Agent invocation behavior.
-- [x] The generic `LLMInvocationPlan` bridge is removed. The Workflow adapter lowers explicit messages to Session Activities and explicit instructions to existing Session instruction values.
-- [x] Admission verifies current Model or Agent target availability, supported call mode, supported instruction context, and output-port transport before Workflow execution starts.
-
-## 23. Remaining implementation phases
-
-### Phase 1: Complete the V3 normal-session model superset
-
-This phase completes the typed normal conversation configuration model that Workflow Model and Agent calls share.
-
-Deliverables:
-
-- Add a V3 typed configuration model that covers:
-  - Model request defaults and clears.
-  - Agent selection.
-  - Workspace selection and capability overrides.
-  - Inline and Artifact-backed instruction selection.
-  - Artifact and direct Tool selections.
-  - Skill selection and active Skill selection.
-  - MCP server, Tool, resource, resource-template, prompt, and policy selection.
-  - History and metadata controls.
-  - Per-conversation-execution limits.
-- Add typed per-message and per-continuation invocation overrides.
-- Persist immutable operation-level resolved configuration facts.
-- Keep normal conversation ProgramFrames long-lived while preserving V2 run-level behavior at each message boundary.
-- Expose typed V3 user-message Skill template preparation and instruction Skill preview operations.
-- Preserve typed Model dispatch planning and provider-private binding boundaries.
-
-Required source coverage:
-
-- `internal/agentruntime-go/sessionv3/`
-- `internal/agentruntimesetup/sessionv3runtime/`
-- `internal/agentruntimesetup/modelruntime/`
-- `internal/agentruntimesetup/skillruntime/`
-- `internal/agentruntime-go/session/`
-- `internal/agentruntimesetup/sessionruntime/`
-- `internal/sessionstorev3/`
-- `cmd/agentgo/`
-
-#### Phase 1 implementation status
-
-- [x] V3 user-message Skill template preparation and instruction Skill preview use typed Runtime, setup-domain, and Wails routes.
-- [x] V3 persists resolved existing-surface defaults on normal message activities and carries them through Agent-loop and single-model LLM WorkItems into setup binding and durable dispatch plans.
-- [x] V3 supports typed Model request defaults and clears, Artifact-backed instruction selections, and Workspace Context, Skill, and MCP capability overrides in persisted normal invocation defaults.
-- [x] V3 persists conversation-level and invocation-level normal execution budgets through normal ProgramFrame creation and child budget narrowing.
-- [x] V3 exposes a consolidated frontend-ready Session snapshot derived only from the authoritative Session document.
-- [ ] The full V2-equivalent normal Session configuration model, per-message overrides, per-continuation overrides, execution budgets, and immutable operation configuration facts remain incomplete.
-- [ ] The full V2 command, projection, and frontend snapshot parity ledger remains incomplete.
-
-### Phase 2: Complete Workflow state, outcome, structured merge, and invocation semantics
-
-This phase completes the Workflow v1 language behavior that currently has durable model gaps.
-
-Deliverables:
-
-- Carry nearest state-owner identity and state schema through child scope context.
-- Make `set` update the nearest state-owning scope in Scope, Choose, Parallel branch, Foreach item, Repeat body, Machine entry and transition blocks, catch blocks, finally blocks, reconciliation blocks, and compensation blocks.
-- Add typed parent-state merge declarations for Parallel and Foreach.
-- Compile merge declarations into durable StateUpdate WorkItems after required child outcomes settle.
-- Preserve child state isolation until the explicit merge boundary.
-- Extend step outcome records with failed and uncertain outcome state, typed error facts, target facts, receipt facts, and effect facts.
-- Expose those durable outcome facts consistently through `steps`.
-- Preserve the rule that arbitrary Workflow JSON never becomes fallback chat text.
-
-Required source coverage:
-
-- `internal/llmartifactory-go/workflow/contract/v1/`
-- `internal/llmartifactory-go/workflow/`
-- `internal/agentruntimesetup/workflowruntime/`
-- `internal/agentruntime-go/sessionv3/`
-- `internal/agentruntimesetup/sessionv3runtime/`
-
-#### Phase 2 implementation status
-
-- [x] Child Workflow scope context now carries nearest state-owner identity and schema, and inherited `set` uses that owner through structured, terminal, machine, reconciliation, and compensation child blocks.
-- [x] Parallel and Foreach support typed `merge` declarations that create persisted deterministic StateUpdate WorkItems after child settlement.
-- [x] Failed and uncertain step outcomes persist typed error, receipt, effect, and target facts and are exposed through Workflow projections and CEL `steps`.
-- [x] Nested Workflow published-port admission compares caller and callable schemas with the target published channel schema.
-- [x] Accepted Workflow retry declarations use durable retry-boundary
-      ProgramFrames with persisted child attempts and Runtime-owned timer waits.
-
-### Phase 3: Complete structured retry and published-port boundary behavior
-
-This phase makes accepted Workflow declarations complete through retry and parent-child boundaries.
-
-Deliverables:
-
-- Add durable retry boundaries for every Workflow step form that accepts `retry`.
-- Preserve logical operation identity, idempotency key, deadline, resource claims, step budget reservation, child settlement facts, and effect state through structured retry.
-- Implement retry behavior for Scope, Choose, Parallel, Foreach, Repeat, Machine, Saga, Start, Handoff, and child ProgramFrame boundaries where v1 permits retry.
-- Align declaration validation, compiler admission, interpreter behavior, recovery behavior, and cancellation behavior.
-- Compare caller port schema with published nested Workflow channel schema.
-- Validate published input and output channel direction, stream capability, retention facts, ownership, and schema compatibility before child dispatch.
-- Preserve exact typed port behavior through attached and independent child Executions.
-
-Required source coverage:
-
-- `internal/llmartifactory-go/workflow/contract/v1/`
-- `internal/agentruntimesetup/workflowruntime/`
-- `internal/agentruntime-go/sessionv3/`
-- `internal/agentruntimesetup/sessionv3runtime/`
-- `internal/sessionstorev3/`
-
-#### Phase 3 implementation status
-
-- [x] Every accepted Workflow `retry` declaration now uses a durable retry-boundary ProgramFrame with persisted child attempts and Runtime-owned timer waits.
-- [x] Retry boundaries retain resolved target-set membership, use effect-contract replay safety, preserve keyed operation keys, and stop replay after uncertainty or unsafe confirmed effects.
-- [x] Non-stream Workflow output ports deliver only after confirmed WorkItem or completed child-frame settlement.
-- [x] Resumed Service and Activity waits preserve the original external binding wrapper and durable dispatch facts.
-- [ ] The source-to-runtime audit must still verify all retry interactions with every externally supplied Service and Activity binding.
-      Artifact completion note:
-
-#### Architecture cleanup status
-
-- [x] Workflow binder delegates deterministic WorkItems to the base V3 binder instead of executing a second deterministic route.
-- [x] Workflow setup no longer owns a duplicate trigger scheduler.
-- [x] Declaration and runtime port boundaries share one JSON Schema primitive-type compatibility helper.
-- [x] Workflow planning emits typed target, call-site, context-use, port-use, retry, effect, and nested-block inventory facts.
-- [x] Workflow target admission consumes planning-owned target resolution facts instead of rebuilding target lookup from composition occurrences.
-- [x] Workflow Tool, MCP Tool, Service, and Activity transport admission uses planning-owned call-site, context-use, port-use, target, and target-set facts.
-- [x] Native URL normalization and unified-diff implementation behavior is outside `workflowruntime/appbinding`; that package is limited to Workflow binding registration and result adaptation.
-- [x] Tool-family transport support has one owner: Workflow admission over typed planning facts.
-- [x] Tool, MCP Tool, and Skill Tool execution binders do not receive generic Workflow context.
-- [x] Tool, MCP Tool, and Skill Tool runtime binders do not repeat Workflow static transport validation.
-- [x] The unsupported generic Workflow Model and Agent invocation bridge is removed.
-- [x] Model and Agent targets use Workflow-owned adapters over existing V3 Model and Agent setup APIs without domain contract changes.
-- [x] Model and Agent adapter capability is deliberately limited to explicit
-      messages, instructions, defaults, output ports, streamed output ports,
-      and Agent handoff. Unsupported forms fail admission.
-- [x] Workflow compiler lowers admitted typed Workflow documents and planning
-      facts without resolving Artifact composition or source relationships.
-- [ ] Runtime validation separation remains partly open. Admission now avoids
-      duplicate pre-binding WorkflowProgram validation, but compiler conversion
-      guards still need a complete source-to-runtime audit.
-
-### Phase 4: Complete the Workflow v1 source-to-runtime audit
-
-This phase closes every valid source-field path.
-
-Deliverables:
-
-- Build a source-field ledger from:
-  - `types.go`
-  - `validation.go`
-  - `workflow-v1.schema.json`
-- Map every valid field to:
-  - Typed compiler output.
-  - Durable runtime state.
-  - Binder behavior.
-  - Persistence behavior.
-  - Recovery behavior.
-  - Cancellation behavior.
-  - Projection behavior.
-- Resolve every reachable compiler and interpreter fallback branch.
-- Remove all permanent unsupported paths reachable from valid Workflow v1 source.
-- Keep language-invalidity rules in declaration validation.
-- Keep unavailable binding, Artifact, credential, policy, and domain capability failures at admission or binding before unrelated external work begins.
-- Confirm all Workflow source paths preserve typed error, receipt, effect, budget, resource, port, trigger, and cleanup semantics.
-
-Required source coverage:
-
-- `internal/llmartifactory-go/workflow/`
-- `internal/agentruntimesetup/workflowruntime/`
-- `internal/agentruntime-go/sessionv3/`
-- `internal/agentruntimesetup/sessionv3runtime/`
-- `internal/sessionstorev3/`
-
-### Phase 5: Adoption, verification, frontend migration, migration tooling, and cleanup
-
-This is the aggregate completion phase.
-
-Deliverables:
-
-- Add verification coverage for normal Session parity, Workflow source fields, nested published ports, dynamic target-set transport, machine ordering, schedule recovery, saga cleanup, compensation concurrency, and cancellation races.
-- Update runtime and model documentation.
-- Move frontend transport from Session v2 to Session v3 commands and projections.
-- Add offline Session v2 to Session v3 migration tooling.
-- Make Session v2 and Session Store v2 deprecation decisions.
-- Remove retired runtime paths after migration completion.
-- Complete aggregate cleanup.
-
-Required source coverage:
-
-- `frontend/`
-- `cmd/agentgo/`
-- `internal/agentruntime-go/session/`
-- `internal/agentruntime-go/sessionv3/`
-- `internal/agentruntimesetup/sessionruntime/`
-- `internal/agentruntimesetup/sessionv3runtime/`
-- `internal/sessionstore/`
-- `internal/sessionstorev3/`
-- `devdocs/requirements/`
+| Artifact planning task                                           | Status      | Evidence or required result                                                       |
+| ---------------------------------------------------------------- | ----------- | --------------------------------------------------------------------------------- |
+| Decode and validate Workflow v1 declarations                     | Implemented | `internal/llmartifactory-go/workflow/contract/v1/`                                |
+| Build callable-target and requirement inventory                  | Implemented | `internal/llmartifactory-go/workflow/inventory.go`                                |
+| Preserve direct capability evidence without Artifact fabrication | Partial     | Current target resolution preserves direct targets; closure support is incomplete |
+| Publish a deterministic complete static Artifact closure         | Open        | Add closure nodes, edges, nested Workflow facts, and consistency checks           |
+| Include nested Workflow plan nodes in the closure                | Open        | Setup currently performs recursive nested plan resolution                         |
+| Keep runtime interpretation outside Artifact planning            | Partial     | Package boundary is correct; full closure behavior remains incomplete             |
