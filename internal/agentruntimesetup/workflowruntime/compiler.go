@@ -9,6 +9,7 @@ import (
 
 	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
+	workflowAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workflow"
 	workflowv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workflow/contract/v1"
 )
 
@@ -37,19 +38,32 @@ func (*UnsupportedOperationError) Unwrap() error {
 
 func compileWorkflowProgram(
 	document workflowv1.WorkflowDocument,
+	inventory workflowAPI.Inventory,
 	input sessionv3Runtime.CanonicalValue,
 ) (sessionv3Runtime.WorkflowProgram, error) {
-	return compileWorkflowProgramWithInput(document, input, true)
+	return compileWorkflowProgramWithInput(
+		document,
+		inventory,
+		input,
+		true,
+	)
 }
 
 func compileWorkflowProgramTemplate(
 	document workflowv1.WorkflowDocument,
+	inventory workflowAPI.Inventory,
 ) (sessionv3Runtime.WorkflowProgram, error) {
-	return compileWorkflowProgramWithInput(document, nil, false)
+	return compileWorkflowProgramWithInput(
+		document,
+		inventory,
+		nil,
+		false,
+	)
 }
 
 func compileWorkflowProgramWithInput(
 	document workflowv1.WorkflowDocument,
+	inventory workflowAPI.Inventory,
 	input sessionv3Runtime.CanonicalValue,
 	inputBound bool,
 ) (sessionv3Runtime.WorkflowProgram, error) {
@@ -111,10 +125,17 @@ func compileWorkflowProgramWithInput(
 	if limits != nil {
 		output.Limits = *limits
 	}
+	if err := attachWorkflowDeclarationPaths(
+		&output,
+		inventory,
+	); err != nil {
+		return sessionv3Runtime.WorkflowProgram{}, err
+	}
 
-	// Admission validates the complete program after it has bound callable
-	// targets. Validate only at that boundary so this lowering step does not
-	// repeat runtime checks against an incomplete Targets map.
+	// Source validity belongs to Workflow contract admission. The lowerer
+	// constructs runtime-neutral descriptors from admitted facts and does not
+	// re-run declaration grammar, CEL scope, relationship, or interface
+	// validation.
 	return output, nil
 }
 

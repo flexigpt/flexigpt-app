@@ -62,6 +62,12 @@ func (b *Binder) prepareLLMPlan(
 		plan.addInstruction(instruction)
 	}
 
+	normalizedMCP, err := normalizeMCPSelections(defaults.MCP)
+	if err != nil {
+		return llmExecutionPlan{}, err
+	}
+	defaults.MCP = normalizedMCP
+
 	if defaults.Agent != nil {
 		if err := b.applyAgentPlan(ctx, &plan, *defaults.Agent); err != nil {
 			return llmExecutionPlan{}, err
@@ -83,7 +89,6 @@ func (b *Binder) prepareLLMPlan(
 	}
 	plan.defaults.Model = cloneLLMArtifactSelection(plan.model)
 
-	var err error
 	var pins []sessionv3Runtime.ArtifactPin
 
 	plan.defaults.InstructionArtifacts, pins, err = b.pinSelections(
@@ -149,6 +154,11 @@ func (b *Binder) prepareLLMPlan(
 		if err := plan.addArtifact(pin); err != nil {
 			return llmExecutionPlan{}, err
 		}
+	}
+
+	plan.defaults.MCP, err = normalizeMCPSelections(plan.defaults.MCP)
+	if err != nil {
+		return llmExecutionPlan{}, err
 	}
 
 	if err := b.applyInstructionArtifacts(ctx, &plan); err != nil {

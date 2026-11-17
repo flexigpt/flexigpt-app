@@ -241,41 +241,31 @@ func NewAdmission(
 	}, nil
 }
 
-func (a *Admission) AdmitWorkflow(
+// PreparationRequest is the setup-owned request for one input-bound Workflow
+// ProgramSnapshot. Session Runtime never receives this selection request.
+type PreparationRequest struct {
+	Workflow sessionv3Runtime.ArtifactSelection
+	Input    sessionv3Runtime.CanonicalValue
+}
+
+// TriggerPreparationRequest is the setup-owned request for one input-unbound
+// trigger ProgramSnapshot.
+type TriggerPreparationRequest struct {
+	Workflow sessionv3Runtime.ArtifactSelection
+}
+
+// PrepareWorkflow resolves the static plan, acquires current pins, validates
+// invocation input, prepares current target bindings, and lowers one immutable
+// ProgramSnapshot. It does not mutate Session state.
+func (a *Admission) PrepareWorkflow(
 	ctx context.Context,
-	request sessionv3Runtime.WorkflowAdmissionRequest,
-) (sessionv3Runtime.WorkflowAdmissionResult, error) {
+	request PreparationRequest,
+) (sessionv3Runtime.ProgramSnapshot, error) {
 	if request.Workflow.RootID == "" ||
 		request.Workflow.ArtifactID == "" ||
 		!request.Input.Valid() {
-		return sessionv3Runtime.WorkflowAdmissionResult{}, errors.New(
-			"invalid Workflow admission request",
-		)
-	}
-
-	ref := artifactModel.ArtifactRef{
-		RootID:     rootModel.RootID(request.Workflow.RootID),
-		ArtifactID: artifactModel.ArtifactID(request.Workflow.ArtifactID),
-	}
-	return a.admitRoot(
-		ctx,
-		ref,
-		request.Workflow,
-		request.Input,
-		true,
-	)
-}
-
-// AdmitWorkflowTriggers compiles an input-unbound Workflow program for
-// Session-owned trigger registration. Trigger occurrence input is bound only
-// when a durable occurrence is accepted.
-func (a *Admission) AdmitWorkflowTriggers(
-	ctx context.Context,
-	request sessionv3Runtime.WorkflowTriggerRegistrationRequest,
-) (sessionv3Runtime.WorkflowAdmissionResult, error) {
-	if request.Workflow.RootID == "" || request.Workflow.ArtifactID == "" {
-		return sessionv3Runtime.WorkflowAdmissionResult{}, errors.New(
-			"invalid workflow trigger registration request",
+		return sessionv3Runtime.ProgramSnapshot{}, errors.New(
+			"invalid Workflow preparation request",
 		)
 	}
 
@@ -287,23 +277,46 @@ func (a *Admission) AdmitWorkflowTriggers(
 		ctx,
 		ref,
 		request.Workflow,
-		nil,
-		false,
+		request.Input,
+		true,
 	)
 	if err != nil {
-		return sessionv3Runtime.WorkflowAdmissionResult{}, err
+		return sessionv3Runtime.ProgramSnapshot{}, err
 	}
+	return result.Program, nil
+}
 
-	program, err := sessionv3Runtime.DecodeCanonicalValue[sessionv3Runtime.WorkflowProgram](result.Program.Payload)
-	if err != nil {
-		return sessionv3Runtime.WorkflowAdmissionResult{}, err
-	}
-	if len(program.Triggers) == 0 {
+// PrepareWorkflowTriggers prepares an input-unbound ProgramSnapshot for
+// explicit Runtime trigger registration.
+func (a *Admission) PrepareWorkflowTriggers(
+	ctx context.Context,
+	request TriggerPreparationRequest,
+) (sessionv3Runtime.ProgramSnapshot, error) {
+	return a.prepareWorkflowTriggers(
+		ctx,
+		request.Workflow,
+	)
+}
+
+func (a *Admission) AdmitWorkflow(
+	ctx context.Context,
+	request sessionv3Runtime.WorkflowAdmissionRequest,
+) (sessionv3Runtime.WorkflowAdmissionResult, error) {
+	if request.Workflow.RootID == "" ||
+		request.Workflow.ArtifactID == "" ||
+		!request.Input.Valid() {
 		return sessionv3Runtime.WorkflowAdmissionResult{}, errors.New(
-			"workflow declares no triggers",
+			"invalid Workflow admission request",
 		)
 	}
-	return result, nil
+	program, err := a.PrepareWorkflow(
+		ctx,
+		PreparationRequest{
+			Workflow: request.Workflow,
+			Input:    request.Input,
+		},
+	)
+	return sessionv3Runtime.WorkflowAdmissionResult{Program: program}, err
 }
 
 // VerifyArtifactPin is the setup-owned current Artifact verification boundary
@@ -325,6 +338,46 @@ func (a *Admission) VerifyArtifactPin(
 		return errors.New("workflow Artifact pin changed since admission")
 	}
 	return nil
+}
+
+// prepareWorkflowTriggers compiles an input-unbound Workflow program for
+// Session-owned trigger registration. Trigger occurrence input is bound only
+// when a durable occurrence is accepted.
+func (a *Admission) prepareWorkflowTriggers(
+	ctx context.Context,
+	selection sessionv3Runtime.ArtifactSelection,
+) (sessionv3Runtime.ProgramSnapshot, error) {
+	if selection.RootID == "" || selection.ArtifactID == "" {
+		return sessionv3Runtime.ProgramSnapshot{}, errors.New(
+			"invalid workflow trigger registration request",
+		)
+	}
+
+	ref := artifactModel.ArtifactRef{
+		RootID:     rootModel.RootID(selection.RootID),
+		ArtifactID: artifactModel.ArtifactID(selection.ArtifactID),
+	}
+	result, err := a.admitRoot(
+		ctx,
+		ref,
+		selection,
+		nil,
+		false,
+	)
+	if err != nil {
+		return sessionv3Runtime.ProgramSnapshot{}, err
+	}
+
+	program, err := sessionv3Runtime.DecodeCanonicalValue[sessionv3Runtime.WorkflowProgram](result.Program.Payload)
+	if err != nil {
+		return sessionv3Runtime.ProgramSnapshot{}, err
+	}
+	if len(program.Triggers) == 0 {
+		return sessionv3Runtime.ProgramSnapshot{}, errors.New(
+			"workflow declares no triggers",
+		)
+	}
+	return result.Program, nil
 }
 
 type workflowAdmissionArtifact struct {
@@ -511,9 +564,16 @@ func (a *Admission) admitPlanned(
 
 	var program sessionv3Runtime.WorkflowProgram
 	if inputBound {
-		program, err = compileWorkflowProgram(plan.facts.Document, input)
+		program, err = compileWorkflowProgram(
+			plan.facts.Document,
+			plan.facts.Inventory,
+			input,
+		)
 	} else {
-		program, err = compileWorkflowProgramTemplate(plan.facts.Document)
+		program, err = compileWorkflowProgramTemplate(
+			plan.facts.Document,
+			plan.facts.Inventory,
+		)
 	}
 	if err != nil {
 		return sessionv3Runtime.WorkflowAdmissionResult{}, err
@@ -524,12 +584,6 @@ func (a *Admission) admitPlanned(
 		&program,
 		closure,
 	); err != nil {
-		return sessionv3Runtime.WorkflowAdmissionResult{}, err
-	}
-	if err := a.verifyWorkflowInvocationTransport(plan.facts.Inventory); err != nil {
-		return sessionv3Runtime.WorkflowAdmissionResult{}, err
-	}
-	if err := rejectUnsupportedWorkflowToolTransport(plan.facts.Inventory); err != nil {
 		return sessionv3Runtime.WorkflowAdmissionResult{}, err
 	}
 
@@ -611,9 +665,6 @@ func (a *Admission) verifyRequirement(
 	closure *workflowAdmissionClosure,
 ) error {
 	target := targetPlan.Target
-	if err := requireWorkflowTargetCapabilities(target); err != nil {
-		return err
-	}
 
 	switch target.Kind {
 	case workflowv1.TargetService:
@@ -718,9 +769,6 @@ func (a *Admission) bindTarget(
 	closure *workflowAdmissionClosure,
 ) (sessionv3Runtime.WorkflowTarget, error) {
 	target := targetPlan.Target
-	if err := requireWorkflowTargetCapabilities(target); err != nil {
-		return sessionv3Runtime.WorkflowTarget{}, err
-	}
 
 	switch target.Kind {
 	case workflowv1.TargetService:
@@ -876,6 +924,7 @@ func (a *Admission) bindTarget(
 			Effect: sessionv3Runtime.EffectContract{
 				Kind: sessionv3Runtime.EffectKindRead,
 			},
+			DeclarationPath: targetPlan.Path,
 		})
 
 	case workflowv1.TargetModel:
@@ -904,6 +953,7 @@ func (a *Admission) bindTarget(
 			Effect: sessionv3Runtime.EffectContract{
 				Kind: sessionv3Runtime.EffectKindRead,
 			},
+			DeclarationPath: targetPlan.Path,
 		},
 		)
 
@@ -982,20 +1032,6 @@ func workflowTargetArtifactRef(
 	return *value.Resolution.ResolvedArtifactRef, true
 }
 
-func requireWorkflowTargetCapabilities(
-	source workflowv1.Target,
-) error {
-	if source.Interface == nil ||
-		len(source.Interface.Capabilities) == 0 {
-		return nil
-	}
-	return fmt.Errorf(
-		"%w: target %q declares capability requirements but no setup-owned capability evaluator is configured",
-		ErrBindingUnavailable,
-		source.Ref,
-	)
-}
-
 func finalizeWorkflowTarget(
 	document workflowv1.WorkflowDocument,
 	source workflowv1.Target,
@@ -1009,6 +1045,7 @@ func finalizeWorkflowTarget(
 		return sessionv3Runtime.WorkflowTarget{}, err
 	}
 	target.Contract = contract
+	target.DeclarationPath = ""
 
 	if source.Interface != nil &&
 		source.Interface.Effect != nil &&

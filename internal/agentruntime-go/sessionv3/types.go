@@ -622,6 +622,7 @@ type ProgramFrame struct {
 	State             ProgramState       `json:"state"`
 	Status            ProgramFrameState  `json:"status"`
 	Path              string             `json:"path,omitempty"`
+	DeclarationPath   string             `json:"declarationPath,omitempty"`
 	CreatedAt         time.Time          `json:"createdAt"`
 	UpdatedAt         time.Time          `json:"updatedAt"`
 	Deadline          *time.Time         `json:"deadline,omitempty"`
@@ -925,6 +926,7 @@ type WorkItem struct {
 	OriginWorkItemID      WorkItemID              `json:"originWorkItemID,omitempty"`
 	State                 WorkItemState           `json:"state"`
 	ProgramPath           string                  `json:"programPath,omitempty"`
+	DeclarationPath       string                  `json:"declarationPath,omitempty"`
 	Dependencies          []WorkItemID            `json:"dependencies,omitempty"`
 	AttemptIDs            []AttemptID             `json:"attemptIDs,omitempty"`
 	Deadline              *time.Time              `json:"deadline,omitempty"`
@@ -1478,21 +1480,23 @@ type ProgramEvent struct {
 }
 
 type ProgramFrameIntent struct {
-	ID          ProgramFrameID             `json:"id,omitempty"`
-	ExecutionID ExecutionID                `json:"executionID,omitempty"`
-	Path        string                     `json:"path,omitempty"`
-	Program     ProgramSnapshot            `json:"program"`
-	Deadline    *time.Time                 `json:"deadline,omitempty"`
-	Budget      *ExecutionBudget           `json:"budget,omitempty"`
-	Lifetime    ChildFrameLifetime         `json:"lifetime,omitempty"`
-	Ownership   *ChildExecutionOwnership   `json:"ownership,omitempty"`
-	Ports       []PortPlan                 `json:"ports,omitempty"`
-	Handoff     *ConversationHandoffIntent `json:"handoff,omitempty"`
+	ID              ProgramFrameID             `json:"id,omitempty"`
+	ExecutionID     ExecutionID                `json:"executionID,omitempty"`
+	Path            string                     `json:"path,omitempty"`
+	DeclarationPath string                     `json:"declarationPath,omitempty"`
+	Program         ProgramSnapshot            `json:"program"`
+	Deadline        *time.Time                 `json:"deadline,omitempty"`
+	Budget          *ExecutionBudget           `json:"budget,omitempty"`
+	Lifetime        ChildFrameLifetime         `json:"lifetime,omitempty"`
+	Ownership       *ChildExecutionOwnership   `json:"ownership,omitempty"`
+	Ports           []PortPlan                 `json:"ports,omitempty"`
+	Handoff         *ConversationHandoffIntent `json:"handoff,omitempty"`
 }
 
 type WorkItemIntent struct {
 	ID                   WorkItemID              `json:"id,omitempty"`
 	ProgramPath          string                  `json:"programPath,omitempty"`
+	DeclarationPath      string                  `json:"declarationPath,omitempty"`
 	Type                 WorkItemType            `json:"type"`
 	OriginWorkItemID     WorkItemID              `json:"originWorkItemID,omitempty"`
 	Automatic            bool                    `json:"automatic"`
@@ -1648,20 +1652,6 @@ type WorkflowAdmissionResult struct {
 	Program ProgramSnapshot `json:"program"`
 }
 
-type WorkflowAdmission interface {
-	AdmitWorkflow(ctx context.Context, w WorkflowAdmissionRequest) (WorkflowAdmissionResult, error)
-}
-
-// WorkflowTriggerRegistrationAdmission compiles and pins a Workflow program
-// template for trigger registration. Unlike WorkflowAdmission, it does not
-// require invocation input and does not create an Execution.
-type WorkflowTriggerRegistrationAdmission interface {
-	AdmitWorkflowTriggers(
-		ctx context.Context,
-		request WorkflowTriggerRegistrationRequest,
-	) (WorkflowAdmissionResult, error)
-}
-
 type CheckpointView struct {
 	Reason    string    `json:"reason"`
 	Session   Session   `json:"session"`
@@ -1797,22 +1787,16 @@ type SubmitMessageCommand struct {
 }
 
 type StartWorkflowCommand struct {
-	Meta        CommandMeta       `json:"meta"`
-	SessionID   SessionID         `json:"sessionID"`
-	ExecutionID ExecutionID       `json:"executionID,omitempty"`
-	Workflow    ArtifactSelection `json:"workflow"`
-	Input       CanonicalValue    `json:"input"`
-}
-
-type WorkflowTriggerRegistrationRequest struct {
-	SessionID SessionID         `json:"sessionID"`
-	Workflow  ArtifactSelection `json:"workflow"`
+	Meta        CommandMeta     `json:"meta"`
+	SessionID   SessionID       `json:"sessionID"`
+	ExecutionID ExecutionID     `json:"executionID,omitempty"`
+	Program     ProgramSnapshot `json:"program"`
 }
 
 type RegisterWorkflowTriggersCommand struct {
-	Meta      CommandMeta       `json:"meta"`
-	SessionID SessionID         `json:"sessionID"`
-	Workflow  ArtifactSelection `json:"workflow"`
+	Meta      CommandMeta     `json:"meta"`
+	SessionID SessionID       `json:"sessionID"`
+	Program   ProgramSnapshot `json:"program"`
 }
 
 type SetTriggerRegistrationStateCommand struct {

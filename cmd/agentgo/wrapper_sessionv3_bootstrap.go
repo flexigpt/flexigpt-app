@@ -9,9 +9,11 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/invocation"
 	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 	skillRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/skill"
+	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/attachmentruntime"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/modelruntime"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/sessionv3runtime"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/skillruntime"
+	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/textruntime"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/toolruntime"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/workflowruntime"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
@@ -31,12 +33,12 @@ func registerApplicationWorkflowBindings(
 		return errors.New("application workflow binding registry is unavailable")
 	}
 	if err := registry.RegisterService(
-		workflowruntime.NormalizeURLServiceBinding(),
+		attachmentruntime.NormalizeURLServiceBinding(),
 	); err != nil {
 		return err
 	}
 	return registry.RegisterActivity(
-		workflowruntime.ApplyUnifiedDiffActivityBinding(),
+		textruntime.ApplyUnifiedDiffActivityBinding(),
 	)
 }
 
@@ -162,7 +164,6 @@ func InitComposedSessionV3Runtime(
 	composed, err := workflowruntime.NewBinder(
 		base,
 		params.WorkflowBindings,
-		params.Workflow,
 	)
 	if err != nil {
 		return err
@@ -180,7 +181,6 @@ func InitComposedSessionV3Runtime(
 			Events:      events,
 			Attachments: base,
 		},
-		params.Workflow,
 		composed,
 	)
 	if err != nil {
@@ -195,5 +195,10 @@ func InitComposedSessionV3Runtime(
 		runtime.Close()
 		return err
 	}
-	return InitSessionV3Wrapper(wrapper, runtime, store)
+	return InitSessionV3Wrapper(
+		wrapper,
+		runtime,
+		store,
+		params.Workflow,
+	)
 }

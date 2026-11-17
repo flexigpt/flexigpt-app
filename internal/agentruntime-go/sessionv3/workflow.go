@@ -1,24 +1,40 @@
 package sessionv3
 
-import (
-	"context"
-	"errors"
-)
+import "errors"
 
-func ValidateWorkflowTriggerRegistrationResult(
-	result WorkflowAdmissionResult,
+// ValidatePreparedWorkflowStart validates only the prepared runtime snapshot
+// envelope. Source grammar, static schemas, CEL scope, target relationships,
+// and interfaces were validated before this value reached Runtime v3.
+func ValidatePreparedWorkflowStart(
+	program ProgramSnapshot,
 ) error {
-	if err := ValidateWorkflowAdmissionResult(result); err != nil {
+	if err := validatePreparedWorkflowProgram(program); err != nil {
 		return err
 	}
-	program, err := workflowProgramFromSnapshot(result.Program)
+	value, err := workflowProgramFromSnapshot(program)
 	if err != nil {
 		return err
 	}
-	if len(program.Triggers) == 0 {
+	if !value.InputBound {
 		return errors.New("workflow trigger registration returned no triggers")
 	}
-	if program.InputBound {
+	return nil
+}
+
+func ValidatePreparedWorkflowTriggers(
+	program ProgramSnapshot,
+) error {
+	if err := validatePreparedWorkflowProgram(program); err != nil {
+		return err
+	}
+	value, err := workflowProgramFromSnapshot(program)
+	if err != nil {
+		return err
+	}
+	if len(value.Triggers) == 0 {
+		return errors.New("workflow trigger registration returned no triggers")
+	}
+	if value.InputBound {
 		return errors.New(
 			"workflow trigger registration returned an input-bound program",
 		)
@@ -26,49 +42,24 @@ func ValidateWorkflowTriggerRegistrationResult(
 	return nil
 }
 
-// StartWorkflow and SignalExecution are implemented in runtime.go so that
-// all Session mutations share one lock, revision, idempotency, checkpoint,
-// cancellation, and recovery path. This file retains compile-time assertions
-// for the public Workflow admission contract.
-
-var _ WorkflowAdmission = workflowAdmissionFunc(nil)
-
-type workflowAdmissionFunc func(
-	context.Context,
-	WorkflowAdmissionRequest,
-) (WorkflowAdmissionResult, error)
-
-func (f workflowAdmissionFunc) AdmitWorkflow(
-	ctx context.Context,
-	request WorkflowAdmissionRequest,
-) (WorkflowAdmissionResult, error) {
-	if f == nil {
-		return WorkflowAdmissionResult{}, errors.New(
-			"Workflow admission function is unavailable",
-		)
-	}
-	return f(ctx, request)
-}
-
-func ValidateWorkflowAdmissionResult(
-	result WorkflowAdmissionResult,
+func validatePreparedWorkflowProgram(
+	program ProgramSnapshot,
 ) error {
-	program := result.Program
 	if program.InterpreterID == "" || program.InterpreterVersion == 0 {
-		return errors.New("workflow admission returned no ProgramFrame interpreter")
+		return errors.New("prepared workflow has no ProgramFrame interpreter")
 	}
 	if program.Artifact == nil {
-		return errors.New("workflow admission returned no Workflow Artifact pin")
+		return errors.New("prepared workflow has no Workflow Artifact pin")
 	}
 	if err := validatePin(*program.Artifact); err != nil {
 		return err
 	}
 	if program.DefinitionDigest == "" ||
 		program.DefinitionDigest != program.Artifact.Digest {
-		return errors.New("workflow ProgramFrame definition digest is invalid")
+		return errors.New("prepared workflow definition digest is invalid")
 	}
 	if !program.Payload.Valid() {
-		return errors.New("workflow ProgramFrame payload is not canonical JSON")
+		return errors.New("prepared workflow payload is not canonical JSON")
 	}
 	if _, err := workflowProgramFromSnapshot(program); err != nil {
 		return err

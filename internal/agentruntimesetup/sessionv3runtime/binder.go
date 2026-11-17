@@ -47,6 +47,14 @@ type Binder struct {
 	deterministic sessionv3Runtime.DeterministicExecutor
 }
 
+type binderArtifactPinVerifier struct {
+	binder *Binder
+}
+
+func (v binderArtifactPinVerifier) VerifyArtifactPin(ctx context.Context, pin sessionv3Runtime.ArtifactPin) error {
+	return v.binder.verifyArtifactPin(ctx, pin)
+}
+
 func New(deps Dependencies) (*Binder, error) {
 	if deps.Providers == nil || deps.Models == nil {
 		return nil, errors.New("sessionv3 binder requires providers and models")
@@ -65,6 +73,9 @@ func New(deps Dependencies) (*Binder, error) {
 		return nil, errors.New("sessionv3 binder requires artifact runtime")
 	}
 
+	output := &Binder{
+		deps: deps,
+	}
 	goTools, err := toolruntime.NewV3Executor(
 		deps.Tools,
 		deps.ToolCaller,
@@ -75,6 +86,7 @@ func New(deps Dependencies) (*Binder, error) {
 	mcpTools, err := mcpruntime.NewV3Executor(
 		deps.MCPRuntime,
 		deps.MCPBridge,
+		binderArtifactPinVerifier{binder: output},
 	)
 	if err != nil {
 		return nil, err
@@ -89,13 +101,11 @@ func New(deps Dependencies) (*Binder, error) {
 
 	attachments := NewV3AttachmentAdmitter()
 
-	return &Binder{
-		deps:        deps,
-		goTools:     goTools,
-		mcpTools:    mcpTools,
-		skillTools:  skillTools,
-		attachments: attachments,
-	}, nil
+	output.goTools = goTools
+	output.mcpTools = mcpTools
+	output.skillTools = skillTools
+	output.attachments = attachments
+	return output, nil
 }
 
 func (b *Binder) BindWork(

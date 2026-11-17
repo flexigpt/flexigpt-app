@@ -502,190 +502,6 @@ func (e WorkflowEmit) Validate() error {
 	return nil
 }
 
-func validateWorkflowCoordinationProgram(program WorkflowProgram) error {
-	events := make(map[string]WorkflowEventContract, len(program.Events))
-	for _, event := range program.Events {
-		if err := event.Validate(); err != nil {
-			return err
-		}
-		if _, duplicate := events[event.Name]; duplicate {
-			return errors.New("workflow event is duplicated")
-		}
-		events[event.Name] = event
-	}
-
-	channels := make(map[string]WorkflowChannel, len(program.Channels))
-	for _, channel := range program.Channels {
-		if err := channel.Validate(); err != nil {
-			return err
-		}
-		if _, duplicate := channels[channel.Name]; duplicate {
-			return errors.New("workflow channel is duplicated")
-		}
-		channels[channel.Name] = channel
-	}
-
-	active := make(map[string]struct{}, len(program.Scope.OuterSubscriptions))
-	for _, subscription := range program.Scope.OuterSubscriptions {
-		if _, found := events[subscription.Event]; !found {
-			return errors.New("workflow inherited subscription has no event")
-		}
-		if _, duplicate := active[subscription.Name]; duplicate {
-			return errors.New("workflow inherited subscription is duplicated")
-		}
-		active[subscription.Name] = struct{}{}
-	}
-	return validateWorkflowCoordinationBlock(program.Root, events, channels, active)
-}
-
-func validateWorkflowCoordinationBlock(
-	block WorkflowBlock,
-	events map[string]WorkflowEventContract,
-	channels map[string]WorkflowChannel,
-	inherited map[string]struct{},
-) error {
-	active := cloneWorkflowStringSet(inherited)
-	for _, subscription := range block.Listen {
-		if _, found := events[subscription.Event]; !found {
-			return fmt.Errorf("workflow subscription %q has no event", subscription.Name)
-		}
-		if _, duplicate := active[subscription.Name]; duplicate {
-			return fmt.Errorf("workflow subscription %q shadows an active subscription", subscription.Name)
-		}
-		active[subscription.Name] = struct{}{}
-	}
-
-	for _, step := range block.Steps {
-		if step.Wait != nil {
-			switch {
-			case step.Wait.Event != nil:
-				if _, found := active[step.Wait.Event.Subscription]; !found {
-					return fmt.Errorf(
-						"workflow event wait references inactive subscription %q",
-						step.Wait.Event.Subscription,
-					)
-				}
-			case step.Wait.Channel != nil:
-				if _, found := channels[step.Wait.Channel.Channel]; !found {
-					return fmt.Errorf("workflow channel wait references unknown channel %q", step.Wait.Channel.Channel)
-				}
-			}
-		}
-		if step.Emit != nil {
-			switch {
-			case step.Emit.Destination.Channel != "":
-				if _, found := channels[step.Emit.Destination.Channel]; !found {
-					return fmt.Errorf("workflow emit references unknown channel %q", step.Emit.Destination.Channel)
-				}
-			case step.Emit.Destination.Event != "":
-				if _, found := events[step.Emit.Destination.Event]; !found {
-					return fmt.Errorf("workflow emit references unknown event %q", step.Emit.Destination.Event)
-				}
-			}
-		}
-
-		for _, child := range workflowStepBlocks(step) {
-			if err := validateWorkflowCoordinationBlock(child, events, channels, active); err != nil {
-				return err
-			}
-		}
-		if step.Machine != nil {
-			machineActive := cloneWorkflowStringSet(active)
-			for _, subscription := range step.Machine.Listen {
-				if _, found := events[subscription.Event]; !found {
-					return fmt.Errorf(
-						"workflow machine subscription %q has no event",
-						subscription.Name,
-					)
-				}
-				if _, duplicate := machineActive[subscription.Name]; duplicate {
-					return fmt.Errorf(
-						"workflow machine subscription %q shadows an active subscription",
-						subscription.Name,
-					)
-				}
-				machineActive[subscription.Name] = struct{}{}
-			}
-			for _, machineState := range step.Machine.States {
-				for _, transition := range machineState.Transitions {
-					if transition.Event == "" {
-						continue
-					}
-					if _, found := machineActive[transition.Event]; !found {
-						return fmt.Errorf(
-							"workflow machine transition references inactive subscription %q",
-							transition.Event,
-						)
-					}
-				}
-			}
-		}
-	}
-	for index := range block.Catch {
-		if err := validateWorkflowCoordinationBlock(
-			block.Catch[index].Do,
-			events,
-			channels,
-			active,
-		); err != nil {
-			return err
-		}
-	}
-	if block.Finally != nil {
-		if err := validateWorkflowCoordinationBlock(
-			*block.Finally,
-			events,
-			channels,
-			active,
-		); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func workflowStepBlocks(step WorkflowStep) []WorkflowBlock {
-	output := make([]WorkflowBlock, 0)
-	if step.Scope != nil {
-		output = append(output, *step.Scope)
-	}
-	if step.Choose != nil {
-		for _, candidate := range step.Choose.Cases {
-			output = append(output, candidate.Do)
-		}
-		if step.Choose.Default != nil {
-			output = append(output, *step.Choose.Default)
-		}
-	}
-	if step.Parallel != nil {
-		for _, branch := range step.Parallel.Branches {
-			output = append(output, branch.Do)
-		}
-	}
-	if step.Foreach != nil {
-		output = append(output, step.Foreach.Do)
-	}
-	if step.Repeat != nil {
-		output = append(output, step.Repeat.Do)
-	}
-	if step.Machine != nil {
-		for _, state := range step.Machine.States {
-			if state.Entry != nil {
-				output = append(output, *state.Entry)
-			}
-			if state.Exit != nil {
-				output = append(output, *state.Exit)
-			}
-			for _, transition := range state.Transitions {
-				if transition.Do != nil {
-					output = append(output, *transition.Do)
-				}
-			}
-		}
-	}
-	return output
-}
-
 func (i *WorkflowInterpreter) activateWorkflowSubscriptions(
 	program WorkflowProgram,
 	state *WorkflowState,
@@ -815,7 +631,10 @@ func (i *WorkflowInterpreter) wait(
 		if !found {
 			return workflowFailure(state, "workflow_wait_invalid", "workflow channel is unavailable")
 		}
-		if !workflowChannelAllows(channel.Readers, path) {
+		if !workflowChannelAllows(
+			channel.Readers,
+			state.PendingDeclarationPath,
+		) {
 			return workflowFailure(state, "workflow_wait_denied", "workflow channel read is not allowed")
 		}
 		cursor := uint64(0)
@@ -957,7 +776,10 @@ func (i *WorkflowInterpreter) emit(
 		if !found {
 			return workflowFailure(state, "workflow_emit_invalid", "workflow channel is unavailable")
 		}
-		if !workflowChannelAllows(channel.Writers, path) {
+		if !workflowChannelAllows(
+			channel.Writers,
+			state.PendingDeclarationPath,
+		) {
 			return workflowFailure(state, "workflow_emit_denied", "workflow channel write is not allowed")
 		}
 		payload.DataSchema = channel.Schema.Clone()
@@ -1248,16 +1070,6 @@ func cloneWorkflowSubscriptionStates(
 			Accepted:          append([]WorkflowSubscriptionEvent(nil), values[index].Accepted...),
 			Bytes:             values[index].Bytes,
 		}
-	}
-	return output
-}
-
-func cloneWorkflowStringSet(
-	input map[string]struct{},
-) map[string]struct{} {
-	output := make(map[string]struct{}, len(input))
-	for value := range input {
-		output[value] = struct{}{}
 	}
 	return output
 }

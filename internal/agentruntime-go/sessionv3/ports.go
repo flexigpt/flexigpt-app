@@ -35,17 +35,18 @@ type WorkflowPortBinding struct {
 }
 
 type PortPlan struct {
-	Name          string                `json:"name"`
-	Direction     WorkflowPortDirection `json:"direction"`
-	Stream        bool                  `json:"stream,omitempty"`
-	Schema        CanonicalValue        `json:"schema"`
-	ChannelSchema CanonicalValue        `json:"channelSchema"`
-	Channel       string                `json:"channel"`
-	Access        WorkflowPortAccess    `json:"access"`
-	MaxMessages   int                   `json:"maxMessages,omitempty"`
-	MaxBytes      int                   `json:"maxBytes,omitempty"`
-	OwnerFrameID  ProgramFrameID        `json:"ownerFrameID,omitempty"`
-	ParentFrameID ProgramFrameID        `json:"parentFrameID,omitempty"`
+	Name            string                `json:"name"`
+	Direction       WorkflowPortDirection `json:"direction"`
+	Stream          bool                  `json:"stream,omitempty"`
+	Schema          CanonicalValue        `json:"schema"`
+	ChannelSchema   CanonicalValue        `json:"channelSchema"`
+	Channel         string                `json:"channel"`
+	Access          WorkflowPortAccess    `json:"access"`
+	MaxMessages     int                   `json:"maxMessages,omitempty"`
+	MaxBytes        int                   `json:"maxBytes,omitempty"`
+	OwnerFrameID    ProgramFrameID        `json:"ownerFrameID,omitempty"`
+	ParentFrameID   ProgramFrameID        `json:"parentFrameID,omitempty"`
+	DeclarationPath string                `json:"declarationPath,omitempty"`
 }
 
 type PortInput struct {
@@ -208,6 +209,7 @@ func clonePortPlans(values []PortPlan) []PortPlan {
 		output[index] = values[index]
 		output[index].Schema = values[index].Schema.Clone()
 		output[index].ChannelSchema = values[index].ChannelSchema.Clone()
+		output[index].DeclarationPath = values[index].DeclarationPath
 	}
 	return output
 }
@@ -228,20 +230,6 @@ func clonePortInputs(values []PortInput) []PortInput {
 		}
 	}
 	return output
-}
-
-func validateUniqueWorkflowPorts(values []WorkflowPort) error {
-	seen := make(map[string]struct{}, len(values))
-	for _, value := range values {
-		if err := value.Validate(); err != nil {
-			return err
-		}
-		if _, found := seen[value.Name]; found {
-			return errors.New("workflow port is duplicated")
-		}
-		seen[value.Name] = struct{}{}
-	}
-	return nil
 }
 
 func validateUniqueWorkflowPortBindings(

@@ -7,21 +7,18 @@ import (
 	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 )
 
-// ConfigureSessionV3Runtime installs the current typed Workflow interpreter,
-// admission boundary, and Workflow binder into Session Runtime v3.
+// ConfigureSessionV3Runtime installs the typed Workflow interpreter and
+// Workflow binder. Execution preparation is invoked by setup before Runtime
+// receives a ProgramSnapshot.
 //
-// The caller supplies an already-constructed domain binder as base. This
-// function does not create Artifact services, mutate Session state, or start
-// the Runtime. Bootstrap remains responsible for calling sessionv3.NewRuntime
-// with the returned dependency value.
+// This function does not install a Workflow preparation port in Runtime v3.
 func ConfigureSessionV3Runtime(
 	dependencies sessionv3Runtime.RuntimeDependencies,
-	admission *Admission,
 	binder *Binder,
 ) (sessionv3Runtime.RuntimeDependencies, error) {
-	if admission == nil || binder == nil {
+	if binder == nil {
 		return sessionv3Runtime.RuntimeDependencies{}, errors.New(
-			"workflow Runtime v3 admission and binder are required",
+			"workflow Runtime v3 binder is required",
 		)
 	}
 
@@ -50,7 +47,6 @@ func ConfigureSessionV3Runtime(
 	}
 
 	dependencies.Binder = binder
-	dependencies.Workflow = admission
 	dependencies.Interpreters = append(
 		dependencies.Interpreters,
 		interpreter,

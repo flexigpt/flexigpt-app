@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -273,7 +274,7 @@ func (v *validator) block(block Block, scope expressionScope, limits *Limits) er
 		scope.reserved[id] = true
 	}
 	for _, step := range block.Steps {
-		stepScope := scope.child(step.ID)
+		stepScope := scope.child("steps").child(step.ID)
 		v.paths[stepScope.path] = true
 		v.steps++
 		if v.steps > 16384 {
@@ -292,12 +293,20 @@ func (v *validator) block(block Block, scope expressionScope, limits *Limits) er
 		settled.steps[id] = true
 	}
 	for index, handler := range block.Catch {
-		if err := v.block(handler.Do, settled.with("error").child(fmt.Sprintf("catch-%d", index)), limits); err != nil {
+		if err := v.block(
+			handler.Do,
+			settled.with("error").child("catch").child(strconv.Itoa(index)),
+			limits,
+		); err != nil {
 			return err
 		}
 	}
 	if block.Finally != nil {
-		if err := v.block(*block.Finally, settled.with("outcome").child("finally"), limits); err != nil {
+		if err := v.block(
+			*block.Finally,
+			settled.with("outcome").child("finally"),
+			limits,
+		); err != nil {
 			return err
 		}
 	}
@@ -376,12 +385,20 @@ func (v *validator) step(step Step, scope expressionScope, parent *Limits) error
 			return invalid("compensation requires an enclosing saga")
 		}
 		if effect.Reconcile != nil {
-			if err := v.block(*effect.Reconcile, scope.with("operation").child("reconcile"), limits); err != nil {
+			if err := v.block(
+				*effect.Reconcile,
+				scope.with("operation").child("effect").child("reconcile"),
+				limits,
+			); err != nil {
 				return err
 			}
 		}
 		if effect.Compensate != nil {
-			if err := v.block(*effect.Compensate, scope.with("completed").child("compensate"), limits); err != nil {
+			if err := v.block(
+				*effect.Compensate,
+				scope.with("completed").child("effect").child("compensate"),
+				limits,
+			); err != nil {
 				return err
 			}
 		}
@@ -410,18 +427,26 @@ func (v *validator) step(step Step, scope expressionScope, parent *Limits) error
 			}
 		}
 	case step.Scope != nil:
-		return v.block(*step.Scope, scope, limits)
+		return v.block(*step.Scope, scope.child("scope"), limits)
 	case step.Choose != nil:
 		for index, branch := range step.Choose.Cases {
 			if err := scope.validate(branch.When, "bool"); err != nil {
 				return err
 			}
-			if err := v.block(branch.Do, scope.child(fmt.Sprintf("case-%d", index)), limits); err != nil {
+			if err := v.block(
+				branch.Do,
+				scope.child("choose").child("cases").child(strconv.Itoa(index)).child("do"),
+				limits,
+			); err != nil {
 				return err
 			}
 		}
 		if step.Choose.Default != nil {
-			return v.block(*step.Choose.Default, scope.child("default"), limits)
+			return v.block(
+				*step.Choose.Default,
+				scope.child("choose").child("default"),
+				limits,
+			)
 		}
 	case step.Parallel != nil:
 		value := step.Parallel
@@ -436,7 +461,11 @@ func (v *validator) step(step Step, scope expressionScope, parent *Limits) error
 			if err := scope.validate(branch.When, "bool"); err != nil {
 				return err
 			}
-			if err := v.block(branch.Do, scope.child(name), limits); err != nil {
+			if err := v.block(
+				branch.Do,
+				scope.child("parallel").child("branches").child(name).child("do"),
+				limits,
+			); err != nil {
 				return err
 			}
 		}
@@ -488,7 +517,11 @@ func (v *validator) step(step Step, scope expressionScope, parent *Limits) error
 				return err
 			}
 		}
-		return v.block(value.Do, scope.with("item").with("index").child("do"), limits)
+		return v.block(
+			value.Do,
+			scope.with("item").with("index").child("foreach").child("do"),
+			limits,
+		)
 	case step.Repeat != nil:
 		value := step.Repeat
 		controls := 0
@@ -521,7 +554,11 @@ func (v *validator) step(step Step, scope expressionScope, parent *Limits) error
 		if err := carried.with("result").validate(value.Until, "bool"); err != nil {
 			return err
 		}
-		return v.block(value.Do, carried.child("do"), limits)
+		return v.block(
+			value.Do,
+			carried.child("repeat").child("do"),
+			limits,
+		)
 	case step.Machine != nil:
 		return v.machine(*step.Machine, scope, limits)
 	case step.Wait != nil:
@@ -551,7 +588,11 @@ func (v *validator) step(step Step, scope expressionScope, parent *Limits) error
 	case step.Saga != nil:
 		sagaScope := scope.clone()
 		sagaScope.saga = true
-		return v.block(step.Saga.Do, sagaScope.child("do"), limits)
+		return v.block(
+			step.Saga.Do,
+			sagaScope.child("saga").child("do"),
+			limits,
+		)
 	case step.Cancel != nil:
 		if err := scope.validate(step.Cancel.Handle, ""); err != nil {
 			return err
@@ -610,7 +651,7 @@ func (v *validator) machine(machine Machine, scope expressionScope, limits *Limi
 	}
 	for _, name := range sortedKeys(machine.States) {
 		state := machine.States[name]
-		local := scope.child(name)
+		local := scope.child("machine").child("states").child(name)
 		if state.Entry != nil {
 			if err := v.block(*state.Entry, local.child("entry"), limits); err != nil {
 				return err
@@ -657,7 +698,7 @@ func (v *validator) machine(machine Machine, scope expressionScope, limits *Limi
 			if transition.Do != nil {
 				if err := v.block(
 					*transition.Do,
-					eventScope.child(fmt.Sprintf("transition-%d", index)),
+					eventScope.child("transitions").child(strconv.Itoa(index)).child("do"),
 					limits,
 				); err != nil {
 					return err

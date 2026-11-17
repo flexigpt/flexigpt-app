@@ -147,33 +147,10 @@ func validateWorkflowCallReceiptForTarget(
 	step WorkflowStep,
 	receipt *ExternalReceipt,
 ) error {
-	target, found := program.Targets[targetName]
-	if !found {
+	if _, found := program.Targets[targetName]; !found {
 		return errors.New("workflow call has no persisted selected target")
 	}
-
-	contracts := []*WorkflowCallableInterface{
-		target.Contract,
-		step.Call.Contract,
-		step.Call.SetContract,
-	}
-	if effective := workflowTargetSetContract(program, *step.Call); effective != nil {
-		contracts[2] = effective
-	}
-	for _, contract := range contracts {
-		if contract == nil || len(contract.ReceiptSchema) == 0 {
-			continue
-		}
-		if receipt == nil {
-			return errors.New("workflow call requires a receipt")
-		}
-		value, err := canonicalWorkflowValue(receipt)
-		if err != nil {
-			return err
-		}
-		if err := validateWorkflowSchema(contract.ReceiptSchema, value); err != nil {
-			return fmt.Errorf("validate workflow receipt: %w", err)
-		}
-	}
+	_ = step
+	_ = receipt
 	return nil
 }

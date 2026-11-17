@@ -30,6 +30,7 @@ import (
 type V3Executor struct {
 	runtime *mcpConnection.MCPRuntimeManager
 	bridge  *invocation.ToolBridge
+	pins    ArtifactPinVerifier
 }
 
 type v3MCPExecution struct {
@@ -47,16 +48,27 @@ type v3MCPWait struct {
 	TargetFingerprint string
 }
 
+// ArtifactPinVerifier is owned by the MCP target domain. It supplies generic
+// current source facts only. Workflow wrappers do not perform this read.
+type ArtifactPinVerifier interface {
+	VerifyArtifactPin(
+		ctx context.Context,
+		pin sessionv3Runtime.ArtifactPin,
+	) error
+}
+
 func NewV3Executor(
 	runtime *mcpConnection.MCPRuntimeManager,
 	bridge *invocation.ToolBridge,
+	pins ArtifactPinVerifier,
 ) (*V3Executor, error) {
-	if runtime == nil || bridge == nil {
+	if runtime == nil || bridge == nil || pins == nil {
 		return nil, errors.New("session v3 MCP runtime dependencies are incomplete")
 	}
 	return &V3Executor{
 		runtime: runtime,
 		bridge:  bridge,
+		pins:    pins,
 	}, nil
 }
 
@@ -254,6 +266,12 @@ func (e *V3Executor) BindWorkflowTool(
 		strings.TrimSpace(payload.MCP.Server.Digest) == "" {
 		return sessionv3Runtime.ToolCall{}, errors.New(
 			"workflow MCP server artifact pin is incomplete",
+		)
+	}
+	if err := e.pins.VerifyArtifactPin(ctx, payload.MCP.Server); err != nil {
+		return sessionv3Runtime.ToolCall{}, fmt.Errorf(
+			"workflow MCP server freshness: %w",
+			err,
 		)
 	}
 
@@ -1108,10 +1126,6 @@ func v3MCPSelectedTools(
 	selection sessionv3Runtime.MCPServerSelection,
 ) ([]mcpServer.MCPToolCapability, error) {
 	exposure := selection.ToolExposure
-	if exposure == "" {
-		exposure = sessionv3Runtime.MCPToolExposureAll
-	}
-
 	switch exposure {
 	case sessionv3Runtime.MCPToolExposureNone:
 		return nil, nil

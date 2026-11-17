@@ -351,7 +351,11 @@ func (b *inventoryBuilder) addPublishedPorts(
 		b.inventory.PortUses = append(
 			b.inventory.PortUses,
 			PortUse{
-				Path:    "ports/" + name,
+				Path: workflowv1.JoinDeclarationPath(
+					workflowv1.RootDeclarationPath,
+					"ports",
+					name,
+				),
 				Kind:    PortUseKindPublished,
 				Name:    name,
 				Channel: binding.Channel,
@@ -419,7 +423,10 @@ func (b *inventoryBuilder) addStep(
 	blockPath string,
 	step workflowv1.Step,
 ) error {
-	stepPath := blockPath + "/steps/" + step.ID
+	stepPath := workflowv1.DeclarationStepPath(
+		blockPath,
+		step.ID,
+	)
 	if step.Retry != nil {
 		retry, err := jsonutil.CloneJSON(*step.Retry)
 		if err != nil {

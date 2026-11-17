@@ -921,14 +921,10 @@ func appendClosurePath(
 	parent string,
 	segments ...string,
 ) string {
-	child := strings.Join(segments, "/")
-	if parent == "" || parent == "root" {
-		return child
+	if parent == "" {
+		parent = workflowv1.RootDeclarationPath
 	}
-	if child == "" {
-		return parent
-	}
-	return parent + "/" + child
+	return workflowv1.JoinDeclarationPath(parent, segments...)
 }
 
 func artifactClosureNodeID(

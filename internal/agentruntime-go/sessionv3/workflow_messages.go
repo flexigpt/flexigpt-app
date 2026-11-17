@@ -26,9 +26,14 @@ func captureWorkflowMessages(
 		return errors.New("workflow state is unavailable")
 	}
 
-	path := state.PendingPath
+	path := state.PendingDeclarationPath
 	if path == "" && state.Index < len(program.Root.Steps) {
-		path = "step/" + program.Root.Steps[state.Index].ID
+		path = program.Root.Steps[state.Index].DeclarationPath
+	}
+	if path == "" {
+		return errors.New(
+			"workflow message capture has no declaration path",
+		)
 	}
 
 	output := make(map[string][]WorkflowChannelMessageSnapshot)

@@ -40,6 +40,7 @@ func rootExpressionScope() expressionScope {
 			"ports":    true,
 		},
 		subscriptions: map[string]Subscription{},
+		path:          RootDeclarationPath,
 	}
 }
 

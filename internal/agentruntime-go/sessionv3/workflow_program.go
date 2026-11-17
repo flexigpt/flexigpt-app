@@ -103,12 +103,13 @@ type WorkflowProgram struct {
 }
 
 type WorkflowBlock struct {
-	State   *WorkflowStateSpec     `json:"state,omitempty"`
-	Listen  []WorkflowSubscription `json:"listen,omitempty"`
-	Steps   []WorkflowStep         `json:"steps"`
-	Output  WorkflowValue          `json:"output"`
-	Catch   []WorkflowCatchHandler `json:"catch,omitempty"`
-	Finally *WorkflowBlock         `json:"finally,omitempty"`
+	DeclarationPath string                 `json:"declarationPath"`
+	State           *WorkflowStateSpec     `json:"state,omitempty"`
+	Listen          []WorkflowSubscription `json:"listen,omitempty"`
+	Steps           []WorkflowStep         `json:"steps"`
+	Output          WorkflowValue          `json:"output"`
+	Catch           []WorkflowCatchHandler `json:"catch,omitempty"`
+	Finally         *WorkflowBlock         `json:"finally,omitempty"`
 }
 
 type WorkflowStateSpec struct {
@@ -117,14 +118,15 @@ type WorkflowStateSpec struct {
 }
 
 type WorkflowStep struct {
-	ID           string                  `json:"id"`
-	Timeout      WorkflowDuration        `json:"timeout,omitempty"`
-	When         *WorkflowValue          `json:"when,omitempty"`
-	Retry        *RetryPolicy            `json:"retry,omitempty"`
-	Effect       *WorkflowStepEffect     `json:"effect,omitempty"`
-	OutputSchema CanonicalValue          `json:"outputSchema,omitempty"`
-	Claims       []WorkflowResourceClaim `json:"claims,omitempty"`
-	Limits       *ExecutionBudget        `json:"limits,omitempty"`
+	ID              string                  `json:"id"`
+	DeclarationPath string                  `json:"declarationPath"`
+	Timeout         WorkflowDuration        `json:"timeout,omitempty"`
+	When            *WorkflowValue          `json:"when,omitempty"`
+	Retry           *RetryPolicy            `json:"retry,omitempty"`
+	Effect          *WorkflowStepEffect     `json:"effect,omitempty"`
+	OutputSchema    CanonicalValue          `json:"outputSchema,omitempty"`
+	Claims          []WorkflowResourceClaim `json:"claims,omitempty"`
+	Limits          *ExecutionBudget        `json:"limits,omitempty"`
 
 	Call      *WorkflowCall      `json:"call,omitempty"`
 	Transform *WorkflowTransform `json:"transform,omitempty"`
@@ -151,6 +153,7 @@ type WorkflowCall struct {
 	AllowedTargetSet       string                     `json:"allowedTargetSet,omitempty"`
 	Input                  WorkflowValue              `json:"input"`
 	Context                WorkflowValue              `json:"context"`
+	DeclarationPath        string                     `json:"declarationPath"`
 	Ports                  []WorkflowPortBinding      `json:"ports,omitempty"`
 	Contract               *WorkflowCallableInterface `json:"contract,omitempty"`
 	SetContract            *WorkflowCallableInterface `json:"setContract,omitempty"`
@@ -222,11 +225,12 @@ type WorkflowTarget struct {
 	ActivityID     string `json:"activityID,omitempty"`
 	BindingVersion string `json:"bindingVersion,omitempty"`
 
-	NestedProgram *ProgramSnapshot           `json:"nestedProgram,omitempty"`
-	ToolName      string                     `json:"toolName,omitempty"`
-	Contract      *WorkflowCallableInterface `json:"contract,omitempty"`
-	Effect        EffectContract             `json:"effect"`
-	KeyedCapable  bool                       `json:"keyedCapable,omitempty"`
+	NestedProgram   *ProgramSnapshot           `json:"nestedProgram,omitempty"`
+	ToolName        string                     `json:"toolName,omitempty"`
+	Contract        *WorkflowCallableInterface `json:"contract,omitempty"`
+	Effect          EffectContract             `json:"effect"`
+	KeyedCapable    bool                       `json:"keyedCapable,omitempty"`
+	DeclarationPath string                     `json:"declarationPath,omitempty"`
 }
 
 type WorkflowMCP struct {
@@ -245,13 +249,14 @@ const (
 )
 
 type WorkflowStepOutcome struct {
-	ID      string                    `json:"id"`
-	Status  WorkflowStepOutcomeStatus `json:"status"`
-	Output  CanonicalValue            `json:"output,omitempty"`
-	Target  string                    `json:"target,omitempty"`
-	Receipt *ExternalReceipt          `json:"receipt,omitempty"`
-	Error   *SanitizedError           `json:"error,omitempty"`
-	Effect  EffectState               `json:"effectState,omitempty"`
+	ID              string                    `json:"id"`
+	Status          WorkflowStepOutcomeStatus `json:"status"`
+	Output          CanonicalValue            `json:"output,omitempty"`
+	Target          string                    `json:"target,omitempty"`
+	Receipt         *ExternalReceipt          `json:"receipt,omitempty"`
+	Error           *SanitizedError           `json:"error,omitempty"`
+	Effect          EffectState               `json:"effectState,omitempty"`
+	DeclarationPath string                    `json:"declarationPath,omitempty"`
 }
 
 // WorkflowTargetSetResolution is persisted while a resolver WorkItem is
@@ -270,26 +275,27 @@ type WorkflowTargetSetResolution struct {
 type WorkflowState struct {
 	Version uint32 `json:"version"`
 
-	Index               int                          `json:"index"`
-	PendingPath         string                       `json:"pendingPath,omitempty"`
-	PendingTarget       string                       `json:"pendingTarget,omitempty"`
-	Pending             *WorkflowPending             `json:"pending,omitempty"`
-	Exit                WorkflowExitKind             `json:"exit,omitempty"`
-	ExitValue           CanonicalValue               `json:"exitValue,omitempty"`
-	LogicalTime         time.Time                    `json:"logicalTime,omitzero"`
-	Deadline            *time.Time                   `json:"deadline,omitempty"`
-	State               CanonicalValue               `json:"state"`
-	Messages            CanonicalValue               `json:"messages,omitempty"`
-	Outcomes            []WorkflowStepOutcome        `json:"outcomes"`
-	Subscriptions       []WorkflowSubscriptionState  `json:"subscriptions,omitempty"`
-	CancelChildPaths    []string                     `json:"cancelChildPaths,omitempty"`
-	CancelWorkItemIDs   []WorkItemID                 `json:"cancelWorkItemIDs,omitempty"`
-	ReleaseFrameClaims  bool                         `json:"releaseFrameClaims,omitempty"`
-	CancellationPending bool                         `json:"cancellationPending,omitempty"`
-	Terminal            *WorkflowTerminalState       `json:"terminal,omitempty"`
-	Saga                *WorkflowSagaScope           `json:"saga,omitempty"`
-	TargetSets          []WorkflowTargetSetState     `json:"targetSets,omitempty"`
-	TargetSetResolution *WorkflowTargetSetResolution `json:"targetSetResolution,omitempty"`
+	Index                  int                          `json:"index"`
+	PendingPath            string                       `json:"pendingPath,omitempty"`
+	PendingDeclarationPath string                       `json:"pendingDeclarationPath,omitempty"`
+	PendingTarget          string                       `json:"pendingTarget,omitempty"`
+	Pending                *WorkflowPending             `json:"pending,omitempty"`
+	Exit                   WorkflowExitKind             `json:"exit,omitempty"`
+	ExitValue              CanonicalValue               `json:"exitValue,omitempty"`
+	LogicalTime            time.Time                    `json:"logicalTime,omitzero"`
+	Deadline               *time.Time                   `json:"deadline,omitempty"`
+	State                  CanonicalValue               `json:"state"`
+	Messages               CanonicalValue               `json:"messages,omitempty"`
+	Outcomes               []WorkflowStepOutcome        `json:"outcomes"`
+	Subscriptions          []WorkflowSubscriptionState  `json:"subscriptions,omitempty"`
+	CancelChildPaths       []string                     `json:"cancelChildPaths,omitempty"`
+	CancelWorkItemIDs      []WorkItemID                 `json:"cancelWorkItemIDs,omitempty"`
+	ReleaseFrameClaims     bool                         `json:"releaseFrameClaims,omitempty"`
+	CancellationPending    bool                         `json:"cancellationPending,omitempty"`
+	Terminal               *WorkflowTerminalState       `json:"terminal,omitempty"`
+	Saga                   *WorkflowSagaScope           `json:"saga,omitempty"`
+	TargetSets             []WorkflowTargetSetState     `json:"targetSets,omitempty"`
+	TargetSetResolution    *WorkflowTargetSetResolution `json:"targetSetResolution,omitempty"`
 }
 
 // WorkflowResourceClaim is a declaration-level resource claim template. Key
@@ -468,9 +474,6 @@ func (i *WorkflowInterpreter) InitialState(
 ) (ProgramState, error) {
 	program, err := workflowProgramFromSnapshot(snapshot)
 	if err != nil {
-		return ProgramState{}, err
-	}
-	if err := program.ValidateInput(); err != nil {
 		return ProgramState{}, err
 	}
 
@@ -886,7 +889,15 @@ func (i *WorkflowInterpreter) drive(
 
 		step := program.Root.Steps[state.Index]
 		path := "step/" + step.ID
+		if strings.TrimSpace(step.DeclarationPath) == "" {
+			return workflowFailure(
+				state,
+				"workflow_declaration_path_missing",
+				"workflow step has no prepared declaration path",
+			)
+		}
 		state.PendingPath = path
+		state.PendingDeclarationPath = step.DeclarationPath
 
 		if step.When != nil {
 			allowed, err := i.condition(
@@ -914,6 +925,7 @@ func (i *WorkflowInterpreter) drive(
 				}
 				state.Index++
 				state.PendingPath = ""
+				state.PendingDeclarationPath = ""
 				state.PendingTarget = ""
 				state.Deadline = nil
 				continue
@@ -1791,11 +1803,12 @@ func (i *WorkflowInterpreter) settleWork(
 	}
 	selectedTarget := state.PendingTarget
 	outcome := WorkflowStepOutcome{
-		ID:     step.ID,
-		Status: WorkflowStepOutcomeSucceeded,
-		Output: value,
-		Target: selectedTarget,
-		Effect: item.EffectState,
+		ID:              step.ID,
+		Status:          WorkflowStepOutcomeSucceeded,
+		Output:          value,
+		Target:          selectedTarget,
+		Effect:          item.EffectState,
+		DeclarationPath: state.PendingDeclarationPath,
 	}
 	if item.Output != nil {
 		outcome.Receipt = cloneReconciliationReceipt(item.Output.Receipt)
@@ -2089,9 +2102,6 @@ func (p WorkflowProgram) Validate() error {
 	if err := p.Scope.Validate(); err != nil {
 		return err
 	}
-	if p.InputBound && len(p.Input) == 0 {
-		return errors.New("bound Workflow Program input is missing")
-	}
 	if len(p.InputSchema) == 0 ||
 		len(p.OutputSchema) == 0 ||
 		!p.InputSchema.Valid() ||
@@ -2099,51 +2109,19 @@ func (p WorkflowProgram) Validate() error {
 		!p.Input.Valid() {
 		return errors.New("workflow Program schemas or input are invalid")
 	}
-	if err := p.Root.Validate(); err != nil {
-		return err
+	if p.InputBound && len(p.Input) == 0 {
+		return errors.New("bound Workflow Program input is missing")
 	}
-	if err := validateWorkflowCoordinationProgram(p); err != nil {
-		return err
-	}
-	if err := validateUniqueWorkflowPorts(p.Ports); err != nil {
-		return err
-	}
-	if err := validateWorkflowTriggers(p.Triggers); err != nil {
-		return err
+	if strings.TrimSpace(p.Root.DeclarationPath) == "" {
+		return errors.New("workflow root has no declaration path")
 	}
 	for name, target := range p.Targets {
-		if strings.TrimSpace(name) == "" {
+		if strings.TrimSpace(name) == "" ||
+			strings.TrimSpace(target.DeclarationPath) == "" {
 			return errors.New("Workflow Program target name is empty")
 		}
-		if err := target.Validate(); err != nil {
-			return fmt.Errorf("Workflow target %q: %w", name, err)
-		}
 	}
-	if err := p.Limits.Validate(); err != nil {
-		return err
-	}
-	for name, targetSet := range p.TargetSets {
-		if err := validateID("workflow target set name", name); err != nil {
-			return err
-		}
-		if err := targetSet.Validate(); err != nil {
-			return fmt.Errorf(
-				"workflow target set %q: %w",
-				name,
-				err,
-			)
-		}
-		for _, member := range targetSet.Members {
-			if _, found := p.Targets[member]; !found {
-				return fmt.Errorf(
-					"workflow target set %q contains unknown target %q",
-					name,
-					member,
-				)
-			}
-		}
-	}
-	return nil
+	return p.Limits.Validate()
 }
 
 func (p WorkflowProgram) ValidateInput() error {
@@ -2722,6 +2700,7 @@ func workflowWork(
 	intent WorkItemIntent,
 ) (ProgramTransition, error) {
 	state.PendingPath = path
+	intent.DeclarationPath = state.PendingDeclarationPath
 	intent.Deadline = earlierDeadline(intent.Deadline, state.Deadline)
 	return workflowTransition(
 		state,

@@ -212,20 +212,6 @@ func (m WorkflowTriggerMissed) Validate() error {
 	return nil
 }
 
-func validateWorkflowTriggers(values []WorkflowTrigger) error {
-	seen := make(map[string]struct{}, len(values))
-	for _, value := range values {
-		if err := value.Validate(); err != nil {
-			return err
-		}
-		if _, duplicate := seen[value.Name]; duplicate {
-			return errors.New("workflow trigger name is duplicated")
-		}
-		seen[value.Name] = struct{}{}
-	}
-	return nil
-}
-
 func workflowTriggerForName(
 	program WorkflowProgram,
 	name string,

@@ -13,6 +13,9 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 )
 
+// This is an adapter capability name, not Workflow source grammar.
+const workflowInvocationContextInstructions = "instructions"
+
 // ModelAgentInvocationAdapter is Workflow setup composition over existing
 // Model and Agent APIs. It does not add a Workflow-specific Model or Agent
 // domain request contract.

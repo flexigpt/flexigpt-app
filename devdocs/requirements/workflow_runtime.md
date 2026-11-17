@@ -822,31 +822,31 @@ Status values:
 
 ### Prepare Workflow execution from a complete static plan
 
-| Subtask                                                             | Status      | Evidence or required result                                                         |
-| ------------------------------------------------------------------- | ----------- | ----------------------------------------------------------------------------------- |
-| Separate callable targets from requirements                         | Implemented | `workflow.Plan.Inventory`                                                           |
-| Consume planning-owned callable targets and requirements separately | Implemented | `workflowruntime/admission.go`                                                      |
-| Publish complete static Artifact closure with immutable pins        | Implemented | `workflow.Plan.Closure` and `workflow/closure.go`                                   |
-| Stop recursive nested Workflow plan resolution during setup         | Implemented | `workflowruntime/admission.go` consumes closure `WorkflowPlanNode` facts            |
-| Keep execution preparation outside Session Runtime commands         | Open        | `sessionv3.Runtime` invokes `WorkflowAdmission` for starts and trigger registration |
-| Remove Workflow Artifact selections from core Workflow commands     | Open        | Core Workflow commands retain selection and preparation-facing fields               |
-| Rename Workflow admission to execution preparation                  | Open        | Current public API still uses `WorkflowAdmission`                                   |
-| Lower one admitted static plan with canonical declaration paths     | Partial     | Inventory paths are not retained by compiled Program and dispatch descriptors       |
+| Subtask                                                             | Status      | Evidence or required result                                                                                                        |
+| ------------------------------------------------------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Separate callable targets from requirements                         | Implemented | `workflow.Plan.Inventory`                                                                                                          |
+| Consume planning-owned callable targets and requirements separately | Implemented | `workflowruntime/admission.go`                                                                                                     |
+| Publish complete static Artifact closure with immutable pins        | Implemented | `workflow.Plan.Closure` and `workflow/closure.go`                                                                                  |
+| Stop recursive nested Workflow plan resolution during setup         | Implemented | `workflowruntime/admission.go` consumes closure `WorkflowPlanNode` facts                                                           |
+| Keep execution preparation outside Session Runtime commands         | Implemented | Wrapper invokes `workflowruntime.Admission.PrepareWorkflow` or `PrepareWorkflowTriggers` before Runtime receives `ProgramSnapshot` |
+| Remove Workflow Artifact selections from core Workflow commands     | Implemented | Core `StartWorkflowCommand` and `RegisterWorkflowTriggersCommand` accept prepared `ProgramSnapshot` only                           |
+| Rename Workflow admission to execution preparation                  | Partial     | `PreparationRequest` and preparation methods are authoritative; the compatibility type name remains `Admission`                    |
+| Lower one admitted static plan with canonical declaration paths     | Implemented | `workflowruntime/declaration_paths.go` copies Inventory paths into lowered runtime descriptors                                     |
 
 ### Bind target domains without Workflow leakage
 
-| Subtask                                                                      | Status      | Evidence or required result                                                 |
-| ---------------------------------------------------------------------------- | ----------- | --------------------------------------------------------------------------- |
-| Bind Model and Agent through existing setup APIs                             | Implemented | Model and Agent invocation adapter                                          |
-| Bind Go Tools, MCP Tools, and Skill Tools through native arguments           | Implemented | V3 Tool, MCP, and Skill setup executors                                     |
-| Keep Provider SDK Tools provider-managed                                     | Implemented | Provider Tool bindings remain Model-plan choices                            |
-| Bind Service and Activity through registered adapters                        | Implemented | Workflow binding registry                                                   |
-| Prepare Service and Activity context and port transport before work creation | Partial     | binding capability is discovered only after a WorkItem exists               |
-| Preserve Model and Agent output and stream port plans                        | Open        | `invokeWorkflowLLMTarget` omits validated ports from its child-frame intent |
-| Route direct capabilities through owning adapters                            | Open        | Artifact-only target helpers reject planning-projected direct targets       |
-| Evaluate callable interface capability requirements                          | Open        | `requireWorkflowTargetCapabilities` rejects every non-empty requirement     |
-| Lower provider-managed Workflow Tools through typed Model child plans        | Open        | admission currently rejects the target before Model-plan lowering           |
-| Move concrete URL and diff behavior out of generic Workflow setup            | Open        | Concrete bindings remain in `workflowruntime/builtin_bindings.go`           |
+| Subtask                                                                      | Status      | Evidence or required result                                                                              |
+| ---------------------------------------------------------------------------- | ----------- | -------------------------------------------------------------------------------------------------------- |
+| Bind Model and Agent through existing setup APIs                             | Implemented | Model and Agent invocation adapter                                                                       |
+| Bind Go Tools, MCP Tools, and Skill Tools through native arguments           | Implemented | V3 Tool, MCP, and Skill setup executors                                                                  |
+| Keep Provider SDK Tools provider-managed                                     | Implemented | Provider Tool bindings remain Model-plan choices                                                         |
+| Bind Service and Activity through registered adapters                        | Implemented | Workflow binding registry                                                                                |
+| Prepare Service and Activity context and port transport before work creation | Partial     | binding capability is discovered only after a WorkItem exists                                            |
+| Preserve Model and Agent output and stream port plans                        | Open        | `invokeWorkflowLLMTarget` omits validated ports from its child-frame intent                              |
+| Route direct capabilities through owning adapters                            | Open, held  | Separate functional work. Cleanup does not fabricate Artifacts or add generic Workflow fallback routing. |
+| Evaluate callable interface capability requirements                          | Open, held  | Separate functional work. Cleanup removes generic rechecks but does not invent an evaluator.             |
+| Lower provider-managed Workflow Tools through typed Model child plans        | Open        | admission currently rejects the target before Model-plan lowering                                        |
+| Move concrete URL and diff behavior out of generic Workflow setup            | Implemented | `attachmentruntime` and `textruntime` own behavior; Workflow composition only registers bindings         |
 
 ### Execute Workflow reliability behavior
 
@@ -873,16 +873,16 @@ Status values:
 
 ### Remove repeated admission and setup layers
 
-| Removal item                                                | Status  | Required result                                                                                    |
-| ----------------------------------------------------------- | ------- | -------------------------------------------------------------------------------------------------- |
-| Remove static declaration rechecks after Workflow admission | Open    | Setup consumes admitted document, Inventory, and closure facts without recreating source semantics |
-| Remove repeated source-tree walks during lowering           | Open    | One lowering traversal emits runtime descriptors and preserves canonical declaration paths         |
-| Remove the runtime-owned Workflow preparation port          | Open    | Setup submits prepared snapshots; Session Runtime persists and interprets them                     |
-| Collapse duplicate Model dispatch-plan processing           | Open    | One normalization and durable-plan construction path owns Model, MCP, port, and context facts      |
-| Normalize MCP Tool exposure once                            | Open    | Lowering stores `all`, `none`, or `selected`; no later layer interprets an empty value             |
-| Assign one dispatch-time pin owner per target family        | Partial | Domain binder owns current target freshness after setup preparation                                |
-| Remove generic Workflow concrete bindings                   | Open    | Attachment and text domains own their bindings; Workflow setup only registers them                 |
-| Remove runtime reconstruction of declaration permissions    | Open    | WorkItem and child-frame descriptors carry the canonical declaration path from Inventory           |
+| Removal item                                                | Status      | Required result                                                                                                                        |
+| ----------------------------------------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Remove static declaration rechecks after Workflow admission | Implemented | Setup no longer calls generic invocation or Tool transport recheck passes; Runtime snapshot validation is durable integrity only       |
+| Remove repeated source-tree walks during lowering           | Implemented | Compiler lowers admitted source once; Inventory decorates the lowered runtime tree without another source traversal                    |
+| Remove the runtime-owned Workflow preparation port          | Implemented | Setup submits prepared snapshots; Session Runtime persists and interprets them                                                         |
+| Collapse duplicate Model dispatch-plan processing           | Partial     | One setup entry point now owns normalized LLM planning; full origin-configuration propagation remains held as separate functional work |
+| Normalize MCP Tool exposure once                            | Implemented | `normalizeMCPSelections` persists only `all`, `none`, or `selected` before dispatch-plan construction                                  |
+| Assign one dispatch-time pin owner per target family        | Implemented | Go Tool freshness remains in Tool Runtime; MCP freshness is verified by MCP Runtime; generic Workflow wrappers no longer read pins     |
+| Remove generic Workflow concrete bindings                   | Implemented | URL normalization moved to Attachment Runtime and unified diff moved to Text Runtime; Workflow composition only registers them         |
+| Remove runtime reconstruction of declaration permissions    | Implemented | Canonical declaration paths are persisted on ProgramFrames, WorkItems, PortPlans, targets, and step outcomes                           |
 
 ### Verify deployment composition
 

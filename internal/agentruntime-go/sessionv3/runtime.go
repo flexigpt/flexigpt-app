@@ -28,7 +28,6 @@ type RuntimeDependencies struct {
 	Checkpoints  CheckpointSink
 	Recovery     RecoverySource
 	Events       EventPublisher
-	Workflow     WorkflowAdmission
 	Attachments  AttachmentAdmission
 	Interpreters []ProgramInterpreter
 	Now          func() time.Time
@@ -44,7 +43,6 @@ type Runtime struct {
 	privateBindings      map[WorkItemID]BoundWork
 	privateWaits         map[WaitID]any
 	cancels              map[WorkItemID]context.CancelFunc
-	workflowAdmissions   map[CommandID]string
 	retryTimers          map[WorkItemID]context.CancelFunc
 	checkpointPending    map[SessionID]bool
 	executionTimers      map[ExecutionID]context.CancelFunc
@@ -80,23 +78,22 @@ func NewRuntime(dependencies RuntimeDependencies) (*Runtime, error) {
 	lifecycleCtx, lifecycleCancel := context.WithCancel(context.Background())
 
 	r := &Runtime{
-		deps:               dependencies,
-		sessions:           map[SessionID]*Session{},
-		retired:            map[SessionID]SessionTombstone{},
-		interpreters:       map[string]ProgramInterpreter{},
-		privateBindings:    map[WorkItemID]BoundWork{},
-		privateWaits:       map[WaitID]any{},
-		cancels:            map[WorkItemID]context.CancelFunc{},
-		workflowAdmissions: map[CommandID]string{},
-		retryTimers:        map[WorkItemID]context.CancelFunc{},
-		checkpointPending:  map[SessionID]bool{},
-		executionTimers:    map[ExecutionID]context.CancelFunc{},
-		cleanupTimers:      map[ExecutionID]context.CancelFunc{},
-		resourceTimers:     map[WorkItemID]context.CancelFunc{},
-		lifecycleCtx:       lifecycleCtx,
-		lifecycleCancel:    lifecycleCancel,
-		waitTimers:         map[WaitID]context.CancelFunc{},
-		triggerTimers:      map[string]context.CancelFunc{},
+		deps:              dependencies,
+		sessions:          map[SessionID]*Session{},
+		retired:           map[SessionID]SessionTombstone{},
+		interpreters:      map[string]ProgramInterpreter{},
+		privateBindings:   map[WorkItemID]BoundWork{},
+		privateWaits:      map[WaitID]any{},
+		cancels:           map[WorkItemID]context.CancelFunc{},
+		retryTimers:       map[WorkItemID]context.CancelFunc{},
+		checkpointPending: map[SessionID]bool{},
+		executionTimers:   map[ExecutionID]context.CancelFunc{},
+		cleanupTimers:     map[ExecutionID]context.CancelFunc{},
+		resourceTimers:    map[WorkItemID]context.CancelFunc{},
+		lifecycleCtx:      lifecycleCtx,
+		lifecycleCancel:   lifecycleCancel,
+		waitTimers:        map[WaitID]context.CancelFunc{},
+		triggerTimers:     map[string]context.CancelFunc{},
 	}
 	for _, interpreter := range dependencies.Interpreters {
 		if interpreter == nil || interpreter.ID() == "" || interpreter.Version() == 0 {
@@ -532,11 +529,11 @@ func (r *Runtime) SubmitMessage(ctx context.Context, command SubmitMessageComman
 }
 
 func (r *Runtime) StartWorkflow(ctx context.Context, command StartWorkflowCommand) (*CommandReceipt, error) {
-	if r.deps.Workflow == nil {
-		return nil, errors.New("workflow admission is unavailable")
-	}
-	if command.Meta.ID == "" || !command.Input.Valid() {
+	if command.Meta.ID == "" {
 		return nil, errors.New("invalid Workflow start command")
+	}
+	if err := ValidatePreparedWorkflowStart(command.Program); err != nil {
+		return nil, err
 	}
 	r.mu.Lock()
 	if r.closed {
@@ -557,69 +554,13 @@ func (r *Runtime) StartWorkflow(ctx context.Context, command StartWorkflowComman
 		r.mu.Unlock()
 		return receipt, nil
 	}
-
-	fingerprint, err := fingerprintCommand(command)
-	if err != nil {
-		r.mu.Unlock()
-		return nil, err
-	}
-	if existing, found := r.workflowAdmissions[command.Meta.ID]; found {
-		r.mu.Unlock()
-		if existing != fingerprint {
-			return nil, ErrCommandConflict
-		}
-		return nil, ErrCommandInProgress
-	}
-	r.workflowAdmissions[command.Meta.ID] = fingerprint
-
-	revision := session.Revision
 	executionID := command.ExecutionID
 	if executionID == "" {
 		executionID = ExecutionID(r.newID())
 	}
-	r.mu.Unlock()
-	admission, err := r.deps.Workflow.AdmitWorkflow(
-		ctx,
-		WorkflowAdmissionRequest{
-			SessionID:   command.SessionID,
-			ExecutionID: executionID,
-			Workflow:    command.Workflow,
-			Input:       command.Input.Clone(),
-		},
-	)
-	r.mu.Lock()
-	defer func() {
-		delete(r.workflowAdmissions, command.Meta.ID)
+
+	if err := ValidatePreparedWorkflowStart(command.Program); err != nil {
 		r.mu.Unlock()
-	}()
-
-	if r.closed {
-		return nil, ErrRuntimeClosed
-	}
-	session = r.sessions[command.SessionID]
-	if session == nil {
-		return nil, ErrSessionNotFound
-	}
-	if receipt, found, receiptErr := r.commandReceiptLocked(
-		session,
-		command.Meta,
-		command,
-	); receiptErr != nil || found {
-		return receipt, receiptErr
-	}
-	if session.Revision != revision {
-		return r.rejectLocked(
-			session,
-			command.Meta,
-			command,
-			"Session changed while Workflow admission was prepared; retry",
-		), nil
-	}
-	if err != nil {
-		return r.rejectLocked(session, command.Meta, command, err.Error()), nil
-	}
-
-	if err := ValidateWorkflowAdmissionResult(admission); err != nil {
 		return r.rejectLocked(
 			session,
 			command.Meta,
@@ -627,8 +568,9 @@ func (r *Runtime) StartWorkflow(ctx context.Context, command StartWorkflowComman
 			err.Error(),
 		), nil
 	}
-	interpreter := r.interpreterLocked(admission.Program)
+	interpreter := r.interpreterLocked(command.Program)
 	if interpreter == nil {
+		r.mu.Unlock()
 		return r.rejectLocked(
 			session,
 			command.Meta,
@@ -636,11 +578,13 @@ func (r *Runtime) StartWorkflow(ctx context.Context, command StartWorkflowComman
 			"Workflow interpreter is unavailable",
 		), nil
 	}
-	if err := interpreter.ValidateSnapshot(admission.Program); err != nil {
+	if err := interpreter.ValidateSnapshot(command.Program); err != nil {
+		r.mu.Unlock()
 		return r.rejectLocked(session, command.Meta, command, err.Error()), nil
 	}
-	workflowProgram, err := workflowProgramFromSnapshot(admission.Program)
+	workflowProgram, err := workflowProgramFromSnapshot(command.Program)
 	if err != nil {
+		r.mu.Unlock()
 		return r.rejectLocked(session, command.Meta, command, err.Error()), nil
 	}
 	budget, deadline, err := initialExecutionBudget(
@@ -648,21 +592,25 @@ func (r *Runtime) StartWorkflow(ctx context.Context, command StartWorkflowComman
 		r.now(),
 	)
 	if err != nil {
+		r.mu.Unlock()
 		return r.rejectLocked(session, command.Meta, command, err.Error()), nil
 	}
 	resources, err := initialExecutionResources(workflowProgram.Resources)
 	if err != nil {
+		r.mu.Unlock()
 		return r.rejectLocked(session, command.Meta, command, err.Error()), nil
 	}
 	for _, existing := range session.Executions {
 		if existing.ID == executionID {
+			r.mu.Unlock()
 			return r.rejectLocked(session, command.Meta, command, "Execution ID already exists"), nil
 		}
 	}
 	previous := cloneSession(*session)
 	now := r.now()
-	state, err := interpreter.InitialState(admission.Program)
+	state, err := interpreter.InitialState(command.Program)
 	if err != nil {
+		r.mu.Unlock()
 		return nil, err
 	}
 	execution := Execution{
@@ -680,15 +628,16 @@ func (r *Runtime) StartWorkflow(ctx context.Context, command StartWorkflowComman
 		Cleanup:         CleanupState{},
 		ProgramFrames: []ProgramFrame{
 			{
-				ID:        ProgramFrameID(r.newID()),
-				Depth:     1,
-				Program:   admission.Program,
-				State:     state,
-				Status:    ProgramFrameStateRunning,
-				Path:      "workflow",
-				CreatedAt: now,
-				UpdatedAt: now,
-				Deadline:  cloneTime(deadline),
+				ID:              ProgramFrameID(r.newID()),
+				Depth:           1,
+				Program:         command.Program,
+				State:           state,
+				Status:          ProgramFrameStateRunning,
+				Path:            "workflow",
+				DeclarationPath: workflowProgram.Root.DeclarationPath,
+				CreatedAt:       now,
+				UpdatedAt:       now,
+				Deadline:        cloneTime(deadline),
 			},
 		},
 		WorkItems:      []WorkItem{},
@@ -719,12 +668,14 @@ func (r *Runtime) StartWorkflow(ctx context.Context, command StartWorkflowComman
 		ProgramEvent{Kind: ProgramEventStarted},
 	); err != nil {
 		*session = previous
+		r.mu.Unlock()
 		return nil, err
 	}
 	active = mutableSessionExecution(session, executionID)
 	r.refreshExecutionStateLocked(active)
-	if err := r.registerWorkflowTriggersLocked(session, admission.Program); err != nil {
+	if err := r.registerWorkflowTriggersLocked(session, command.Program); err != nil {
 		*session = previous
+		r.mu.Unlock()
 		return nil, err
 	}
 	r.touchSessionLocked(session)
@@ -739,6 +690,7 @@ func (r *Runtime) StartWorkflow(ctx context.Context, command StartWorkflowComman
 	r.rememberCommandLocked(session, command.Meta, command, receipt)
 	if err := r.persistLocked(ctx, "workflowStarted", session); err != nil {
 		*session = previous
+		r.mu.Unlock()
 		return nil, err
 	}
 	r.armExecutionDeadlineLocked(
@@ -750,14 +702,10 @@ func (r *Runtime) StartWorkflow(ctx context.Context, command StartWorkflowComman
 	ready := r.readyWorkForSessionLocked(session)
 	r.armSessionTriggersLocked(ctx, session)
 	r.publishLocked(ctx, session, active.ID, RuntimeEventExecutionChanged)
-	r.launchReadyWork(ctx, session.ID, ready)
+	r.mu.Unlock()
+	r.launchReadyWork(ctx, command.SessionID, ready)
 	return &receipt, nil
 }
-
-const (
-	checkpointReasonWorkflowTriggersRegistered = "workflowTriggersRegistered"
-	checkpointReasonWorkflowTriggerRejected    = "workflowTriggerRegistrationRejected"
-)
 
 // RegisterWorkflowTriggers admits an input-unbound Workflow template and
 // persists its trigger registrations without creating an initial Execution.
@@ -769,153 +717,59 @@ func (r *Runtime) RegisterWorkflowTriggers(
 	if command.Meta.ID == "" {
 		return nil, errors.New("command ID is required")
 	}
-	if r.deps.Workflow == nil {
-		return nil, errors.New("workflow trigger registration admission is unavailable")
-	}
-	admission, supported := r.deps.Workflow.(WorkflowTriggerRegistrationAdmission)
-	if !supported {
-		return nil, errors.New("workflow trigger registration admission is unavailable")
-	}
-
-	r.mu.Lock()
-	if r.closed {
-		r.mu.Unlock()
-		return nil, ErrRuntimeClosed
-	}
-	session := r.sessions[command.SessionID]
-	if session == nil {
-		r.mu.Unlock()
-		return nil, ErrSessionNotFound
-	}
-	if receipt, found, err := r.commandReceiptLocked(session, command.Meta, command); err != nil || found {
-		r.mu.Unlock()
-		return receipt, err
-	}
-	if message := expectedSessionRevision(session, command.Meta); message != "" {
-		receipt := r.rejectLocked(session, command.Meta, command, message)
-		r.mu.Unlock()
-		return receipt, nil
-	}
-
-	fingerprint, err := fingerprintCommand(command)
-	if err != nil {
-		r.mu.Unlock()
+	if err := ValidatePreparedWorkflowTriggers(command.Program); err != nil {
 		return nil, err
 	}
-	if current, found := r.workflowAdmissions[command.Meta.ID]; found {
-		r.mu.Unlock()
-		if current != fingerprint {
-			return nil, ErrCommandConflict
-		}
-		return nil, ErrCommandInProgress
-	}
-	r.workflowAdmissions[command.Meta.ID] = fingerprint
-	revision := session.Revision
-	r.mu.Unlock()
 
-	result, admissionErr := admission.AdmitWorkflowTriggers(
+	receipt, err := r.changeSession(
 		ctx,
-		WorkflowTriggerRegistrationRequest{
-			SessionID: command.SessionID,
-			Workflow:  command.Workflow,
+		command.Meta,
+		command.SessionID,
+		command,
+		func(session *Session) (*CommandReceipt, error) {
+			interpreter := r.interpreterLocked(command.Program)
+			if interpreter == nil {
+				return &CommandReceipt{
+					CommandID: command.Meta.ID,
+					SessionID: session.ID,
+					Message:   "workflow trigger interpreter is unavailable",
+				}, nil
+			}
+			if err := interpreter.ValidateSnapshot(command.Program); err != nil {
+				return &CommandReceipt{
+					CommandID: command.Meta.ID,
+					SessionID: session.ID,
+					Message:   err.Error(),
+				}, nil
+			}
+			if err := r.registerWorkflowTriggersLocked(
+				session,
+				command.Program,
+			); err != nil {
+				return nil, err
+			}
+
+			r.touchSessionLocked(session)
+			return &CommandReceipt{
+				CommandID:       command.Meta.ID,
+				Accepted:        true,
+				SessionID:       session.ID,
+				SessionRevision: session.Revision,
+			}, nil
 		},
 	)
-
-	r.mu.Lock()
-	defer func() {
-		delete(r.workflowAdmissions, command.Meta.ID)
-		r.mu.Unlock()
-	}()
-
-	if r.closed {
-		return nil, ErrRuntimeClosed
-	}
-	session = r.sessions[command.SessionID]
-	if session == nil {
-		return nil, ErrSessionNotFound
-	}
-	if receipt, found, err := r.commandReceiptLocked(session, command.Meta, command); err != nil || found {
+	if err != nil || receipt == nil || !receipt.Accepted {
 		return receipt, err
 	}
-	if session.Revision != revision {
-		return r.rejectTriggerRegistrationLocked(
-			ctx,
-			session,
-			command.Meta,
-			command,
-			"session changed while workflow trigger registration was prepared; retry",
-		)
-	}
-	if admissionErr != nil {
-		return r.rejectTriggerRegistrationLocked(
-			ctx,
-			session,
-			command.Meta,
-			command,
-			admissionErr.Error(),
-		)
-	}
-	if err := ValidateWorkflowTriggerRegistrationResult(result); err != nil {
-		return r.rejectTriggerRegistrationLocked(
-			ctx,
-			session,
-			command.Meta,
-			command,
-			err.Error(),
-		)
-	}
 
-	interpreter := r.interpreterLocked(result.Program)
-	if interpreter == nil {
-		return r.rejectTriggerRegistrationLocked(
-			ctx,
-			session,
-			command.Meta,
-			command,
-			"workflow trigger interpreter is unavailable",
-		)
+	r.mu.Lock()
+	if !r.closed {
+		if session := r.sessions[command.SessionID]; session != nil {
+			r.armSessionTriggersLocked(context.WithoutCancel(ctx), session)
+		}
 	}
-	if err := interpreter.ValidateSnapshot(result.Program); err != nil {
-		return r.rejectTriggerRegistrationLocked(
-			ctx,
-			session,
-			command.Meta,
-			command,
-			err.Error(),
-		)
-	}
-
-	previous := cloneSession(*session)
-	if err := r.registerWorkflowTriggersLocked(session, result.Program); err != nil {
-		*session = previous
-		return r.rejectTriggerRegistrationLocked(
-			ctx,
-			session,
-			command.Meta,
-			command,
-			err.Error(),
-		)
-	}
-
-	r.touchSessionLocked(session)
-	receipt := CommandReceipt{
-		CommandID:       command.Meta.ID,
-		Accepted:        true,
-		SessionID:       session.ID,
-		SessionRevision: session.Revision,
-	}
-	r.rememberCommandLocked(session, command.Meta, command, receipt)
-	if err := r.persistLocked(
-		ctx,
-		checkpointReasonWorkflowTriggersRegistered,
-		session,
-	); err != nil {
-		*session = previous
-		return nil, err
-	}
-	r.armSessionTriggersLocked(ctx, session)
-	r.publishLocked(ctx, session, "", RuntimeEventSessionChanged)
-	return &receipt, nil
+	r.mu.Unlock()
+	return receipt, nil
 }
 
 func (r *Runtime) SetTriggerRegistrationState(
@@ -1564,34 +1418,6 @@ func (r *Runtime) Workflow(ctx context.Context, id SessionID) (WorkflowProjectio
 		return WorkflowProjection{}, err
 	}
 	return BuildWorkflowProjection(session), nil
-}
-
-func (r *Runtime) rejectTriggerRegistrationLocked(
-	ctx context.Context,
-	session *Session,
-	meta CommandMeta,
-	payload RegisterWorkflowTriggersCommand,
-	message string,
-) (*CommandReceipt, error) {
-	previous := cloneSession(*session)
-	r.touchSessionLocked(session)
-	receipt := CommandReceipt{
-		CommandID:       meta.ID,
-		SessionID:       session.ID,
-		SessionRevision: session.Revision,
-		Message:         message,
-	}
-	r.rememberCommandLocked(session, meta, payload, receipt)
-	if err := r.persistLocked(
-		ctx,
-		checkpointReasonWorkflowTriggerRejected,
-		session,
-	); err != nil {
-		*session = previous
-		return nil, err
-	}
-	r.publishLocked(ctx, session, "", RuntimeEventSessionChanged)
-	return &receipt, nil
 }
 
 func (r *Runtime) admitMessageAttachments(

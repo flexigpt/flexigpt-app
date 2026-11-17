@@ -2,7 +2,6 @@ package sessionv3
 
 import (
 	"errors"
-	"fmt"
 )
 
 func workflowSettledFailure(
@@ -34,7 +33,10 @@ func workflowSettledFailure(
 	}
 
 	copyValue := *failure
-	copyValue.StepPath = item.ProgramPath
+	copyValue.StepPath = firstNonEmpty(
+		item.DeclarationPath,
+		item.ProgramPath,
+	)
 	copyValue.Details = failure.Details.Clone()
 	failure = &copyValue
 	failure.Effect = item.EffectState
@@ -55,31 +57,8 @@ func workflowSettledFailure(
 			Causes:   []SanitizedError{*failure},
 		}
 	}
-
-	for _, contract := range []*WorkflowCallableInterface{
-		target.Contract,
-		step.Call.Contract,
-		step.Call.SetContract,
-	} {
-		if contract == nil || len(contract.ErrorSchema) == 0 {
-			continue
-		}
-		value, encodeErr := canonicalWorkflowValue(failure)
-		if encodeErr != nil {
-			err = encodeErr
-		} else {
-			err = validateWorkflowSchema(contract.ErrorSchema, value)
-		}
-		if err != nil {
-			return &SanitizedError{
-				Code:     "workflow_error_schema_invalid",
-				Category: ErrorCategoryValidation,
-				Message:  fmt.Sprintf("validate workflow error: %v", err),
-				StepPath: item.ProgramPath,
-				Causes:   []SanitizedError{*failure},
-			}
-		}
-	}
+	_ = target
+	_ = step
 	return failure
 }
 
