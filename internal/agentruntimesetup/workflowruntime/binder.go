@@ -458,19 +458,16 @@ func requireExternalPortCapabilities(
 ) error {
 	needsContext := len(request.Context) != 0
 	needsInputPorts := len(request.Ports) != 0
-	needsFinalOutput, needsOutputStream := false, false
+	needsOutputStream := false
 	for _, plan := range item.Ports {
 		if plan.Direction != sessionv3Runtime.WorkflowPortDirectionOutput {
 			continue
 		}
 		if plan.Stream {
 			needsOutputStream = true
-		} else {
-			needsFinalOutput = true
 		}
 	}
-	if !needsContext && !needsInputPorts && !needsFinalOutput &&
-		!needsOutputStream {
+	if !needsContext && !needsInputPorts && !needsOutputStream {
 		return nil
 	}
 
@@ -489,10 +486,6 @@ func requireExternalPortCapabilities(
 	case needsInputPorts && !support.InputPorts:
 		return errors.New(
 			"external binding does not support workflow input ports",
-		)
-	case needsFinalOutput && !support.FinalOutputPorts:
-		return errors.New(
-			"external binding does not support workflow final output ports",
 		)
 	case needsOutputStream && !support.OutputStream:
 		return errors.New(

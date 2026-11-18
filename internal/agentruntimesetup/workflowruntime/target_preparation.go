@@ -283,6 +283,173 @@ func workflowRequirementFact(
 	return output
 }
 
+func (a *Admission) prepareBoundTarget(
+	ctx context.Context,
+	targetPlan workflowAPI.TargetPlan,
+	target sessionv3Runtime.WorkflowTarget,
+	requirements []sessionv3Runtime.WorkflowCapabilityRequirement,
+) (sessionv3Runtime.WorkflowTarget, error) {
+	if target.Direct != nil {
+		if err := sessionv3Runtime.ValidateWorkflowCapabilityFacts(
+			requirements,
+			target.Direct.Capabilities,
+		); err != nil {
+			return sessionv3Runtime.WorkflowTarget{}, err
+		}
+		target.Transport = target.Direct.Transport
+		target.CapabilityFacts = cloneDirectCapabilityFacts(
+			target.Direct.Capabilities,
+		)
+		return target, nil
+	}
+
+	request := WorkflowCapabilityFactRequest{
+		TargetName:   targetPlan.Name,
+		TargetKind:   target.Kind,
+		Requirements: requirements,
+	}
+
+	var (
+		facts    []sessionv3Runtime.WorkflowCapabilityFact
+		provider any
+	)
+
+	switch target.Kind {
+	case sessionv3Runtime.WorkflowTargetModel:
+		if a.invocations == nil || target.Artifact == nil {
+			return sessionv3Runtime.WorkflowTarget{}, fmt.Errorf(
+				"%w: model target %q has no invocation adapter",
+				ErrBindingUnavailable,
+				targetPlan.Name,
+			)
+		}
+		pin := *target.Artifact
+		request.Artifact = &pin
+		target.Transport = invocationTransport(
+			a.invocations.ModelInvocationCapabilities(),
+		)
+		provider = a.invocations
+
+	case sessionv3Runtime.WorkflowTargetAgent:
+		if a.invocations == nil || target.Artifact == nil {
+			return sessionv3Runtime.WorkflowTarget{}, fmt.Errorf(
+				"%w: agent target %q has no invocation adapter",
+				ErrBindingUnavailable,
+				targetPlan.Name,
+			)
+		}
+		pin := *target.Artifact
+		request.Artifact = &pin
+		target.Transport = invocationTransport(
+			a.invocations.AgentInvocationCapabilities(),
+		)
+		provider = a.invocations
+
+	case sessionv3Runtime.WorkflowTargetTool,
+		sessionv3Runtime.WorkflowTargetMCPTool:
+		target.Transport = workflowToolTransport()
+		if target.Artifact != nil {
+			pin := *target.Artifact
+			request.Artifact = &pin
+		}
+		if target.MCP != nil {
+			pin := target.MCP.Server
+			request.Artifact = &pin
+		}
+		provider = a.tools
+
+	case sessionv3Runtime.WorkflowTargetProviderTool:
+		if target.ProviderTool == nil || a.invocations == nil {
+			return sessionv3Runtime.WorkflowTarget{}, fmt.Errorf(
+				"%w: provider-managed Tool target %q has no Model owner",
+				ErrBindingUnavailable,
+				targetPlan.Name,
+			)
+		}
+		pin := target.ProviderTool.OwnerModel
+		request.Artifact = &pin
+		target.Transport = invocationTransport(
+			a.invocations.ModelInvocationCapabilities(),
+		)
+		provider = a.invocations
+
+	case sessionv3Runtime.WorkflowTargetService:
+		binding, found := a.bindings.Service(target.ServiceID)
+		if !found || binding.Version() != target.BindingVersion {
+			return sessionv3Runtime.WorkflowTarget{}, fmt.Errorf(
+				"%w: service %q version %q",
+				ErrBindingUnavailable,
+				target.ServiceID,
+				target.BindingVersion,
+			)
+		}
+		target.Transport = externalBindingTransport(binding)
+		provider = binding
+
+	case sessionv3Runtime.WorkflowTargetActivity:
+		binding, found := a.bindings.Activity(target.ActivityID)
+		if !found || binding.Version() != target.BindingVersion {
+			return sessionv3Runtime.WorkflowTarget{}, fmt.Errorf(
+				"%w: activity %q version %q",
+				ErrBindingUnavailable,
+				target.ActivityID,
+				target.BindingVersion,
+			)
+		}
+		target.Transport = externalBindingTransport(binding)
+		provider = binding
+
+	case sessionv3Runtime.WorkflowTargetWorkflow:
+		if len(requirements) != 0 {
+			return sessionv3Runtime.WorkflowTarget{}, fmt.Errorf(
+				"%w: nested Workflow target %q has callable capability requirements without an owning capability adapter",
+				ErrBindingUnavailable,
+				targetPlan.Name,
+			)
+		}
+		target.Transport = sessionv3Runtime.WorkflowTargetTransport{
+			Modes: []sessionv3Runtime.WorkflowCallMode{
+				sessionv3Runtime.WorkflowCallModeInvoke,
+				sessionv3Runtime.WorkflowCallModeStart,
+			},
+			ContextForms:      []string{"*"},
+			InputPorts:        true,
+			FinalOutputPorts:  true,
+			StreamOutputPorts: true,
+		}
+
+	default:
+		return sessionv3Runtime.WorkflowTarget{}, fmt.Errorf(
+			"%w: unsupported target kind %q",
+			ErrBindingUnavailable,
+			target.Kind,
+		)
+	}
+
+	if err := target.Transport.Validate(); err != nil {
+		return sessionv3Runtime.WorkflowTarget{}, err
+	}
+	facts, err := resolveWorkflowCapabilityFacts(ctx, provider, request)
+	if err != nil {
+		return sessionv3Runtime.WorkflowTarget{}, err
+	}
+	target.CapabilityFacts = cloneDirectCapabilityFacts(facts)
+	return target, nil
+}
+
+func workflowToolTransport() sessionv3Runtime.WorkflowTargetTransport {
+	return sessionv3Runtime.WorkflowTargetTransport{
+		Modes: []sessionv3Runtime.WorkflowCallMode{
+			sessionv3Runtime.WorkflowCallModeInvoke,
+			sessionv3Runtime.WorkflowCallModeStart,
+		},
+		ContextForms:      nil,
+		InputPorts:        false,
+		FinalOutputPorts:  true,
+		StreamOutputPorts: false,
+	}
+}
+
 func cloneDirectCapabilityPlan(
 	value *sessionv3Runtime.DirectCapabilityPlan,
 ) *sessionv3Runtime.DirectCapabilityPlan {
@@ -310,6 +477,120 @@ func cloneWorkflowCapabilityFacts(
 		return nil
 	}
 	output := make([]sessionv3Runtime.WorkflowCapabilityFact, len(values))
+	for index := range values {
+		output[index] = values[index]
+		output[index].Details = values[index].Details.Clone()
+	}
+	return output
+}
+
+// invocationTransport converts current Model or Agent adapter transport facts
+// into the runtime-neutral target descriptor persisted in WorkflowProgram.
+//
+// The adapter remains the owner of Model and Agent native request behavior.
+func invocationTransport(
+	value WorkflowInvocationTargetCapabilities,
+) sessionv3Runtime.WorkflowTargetTransport {
+	return sessionv3Runtime.WorkflowTargetTransport{
+		Modes: append(
+			[]sessionv3Runtime.WorkflowCallMode(nil),
+			value.Modes...,
+		),
+		ContextForms: append(
+			[]string(nil),
+			value.ContextForms...,
+		),
+		InputPorts:        value.InputPorts,
+		FinalOutputPorts:  value.OutputPorts,
+		StreamOutputPorts: value.StreamOutputPorts,
+	}
+}
+
+// externalBindingTransport exposes only transport explicitly declared by a
+// registered Service or Activity binding. Final-output delivery remains
+// Runtime-owned, but the binding must explicitly opt in to that callable
+// interface capability.
+func externalBindingTransport(
+	value WorkBinding,
+) sessionv3Runtime.WorkflowTargetTransport {
+	output := sessionv3Runtime.WorkflowTargetTransport{
+		Modes: []sessionv3Runtime.WorkflowCallMode{
+			sessionv3Runtime.WorkflowCallModeInvoke,
+			sessionv3Runtime.WorkflowCallModeStart,
+		},
+	}
+
+	capability, found := value.(WorkBindingPortCapability)
+	if !found {
+		return output
+	}
+
+	facts := capability.WorkflowPortCapabilities()
+	output.InputPorts = facts.InputPorts
+	output.FinalOutputPorts = facts.FinalOutputPorts
+	output.StreamOutputPorts = facts.OutputStream
+	if facts.Context {
+		output.ContextForms = []string{"*"}
+	}
+
+	return output
+}
+
+// resolveWorkflowCapabilityFacts invokes only an owning target-domain
+// capability provider. A requirement is never silently treated as satisfied.
+// This keeps root Workflow requirements and callable requirements operational
+// without making Workflow interpret domain-specific capability names.
+func resolveWorkflowCapabilityFacts(
+	ctx context.Context,
+	provider any,
+	request WorkflowCapabilityFactRequest,
+) ([]sessionv3Runtime.WorkflowCapabilityFact, error) {
+	if len(request.Requirements) == 0 {
+		return nil, nil
+	}
+
+	resolver, found := provider.(interface {
+		ResolveWorkflowCapabilityFacts(
+			ctx context.Context,
+			req WorkflowCapabilityFactRequest,
+		) ([]sessionv3Runtime.WorkflowCapabilityFact, error)
+	})
+	if !found || resolver == nil {
+		return nil, fmt.Errorf(
+			"%w: target %q has callable capability requirements but its owning domain exposes no capability-fact resolver",
+			ErrBindingUnavailable,
+			request.TargetName,
+		)
+	}
+
+	facts, err := resolver.ResolveWorkflowCapabilityFacts(
+		ctx,
+		request,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if err := sessionv3Runtime.ValidateWorkflowCapabilityFacts(
+		request.Requirements,
+		facts,
+	); err != nil {
+		return nil, err
+	}
+
+	return clonePreparedCapabilityFacts(facts), nil
+}
+
+func clonePreparedCapabilityFacts(
+	values []sessionv3Runtime.WorkflowCapabilityFact,
+) []sessionv3Runtime.WorkflowCapabilityFact {
+	if len(values) == 0 {
+		return nil
+	}
+
+	output := make(
+		[]sessionv3Runtime.WorkflowCapabilityFact,
+		len(values),
+	)
 	for index := range values {
 		output[index] = values[index]
 		output[index].Details = values[index].Details.Clone()

@@ -303,12 +303,28 @@ func (b *Binder) ValidatePortPlans(
 		return nil
 	}
 
+	if direct := sessionv3Runtime.DirectCapabilityPlanForWorkItem(
+		request.WorkItem,
+	); direct != nil {
+		return validatePortTransport(
+			request.WorkItem.Ports,
+			direct.Transport,
+		)
+	}
+
 	switch request.WorkItem.Type {
-	case sessionv3Runtime.WorkItemTypeLLM,
-		sessionv3Runtime.WorkItemTypeService,
-		sessionv3Runtime.WorkItemTypeActivity,
-		sessionv3Runtime.WorkItemTypeTool:
-		return nil
+	case sessionv3Runtime.WorkItemTypeLLM:
+		return validateLLMPortTransport(request.WorkItem)
+
+	case sessionv3Runtime.WorkItemTypeTool:
+		return validateToolPortTransport(request.WorkItem)
+
+	case sessionv3Runtime.WorkItemTypeService,
+		sessionv3Runtime.WorkItemTypeActivity:
+		return errors.New(
+			"service and activity transport must be validated by the workflow binding layer",
+		)
+
 	default:
 		return errors.New(
 			"port adaptation is unavailable for this work item",

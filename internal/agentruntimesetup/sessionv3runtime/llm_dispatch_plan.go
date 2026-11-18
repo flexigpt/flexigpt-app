@@ -142,7 +142,6 @@ func (b *Binder) durableLLMDispatchPlan(
 
 	if err := enrichDurableLLMDispatchPlan(
 		&output,
-		request,
 		plan,
 		model,
 	); err != nil {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"sync"
 
 	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
@@ -73,11 +74,13 @@ type directBoundWait struct {
 type DirectTargetRegistry struct {
 	mu       sync.RWMutex
 	adapters map[string]DirectTargetAdapter
+	order    []string
 }
 
 func NewDirectTargetRegistry() *DirectTargetRegistry {
 	return &DirectTargetRegistry{
 		adapters: map[string]DirectTargetAdapter{},
+		order:    []string{},
 	}
 }
 
@@ -101,6 +104,8 @@ func (r *DirectTargetRegistry) Register(
 		)
 	}
 	r.adapters[adapter.ID()] = adapter
+	r.order = append(r.order, adapter.ID())
+	sort.Strings(r.order)
 	return nil
 }
 
@@ -115,7 +120,10 @@ func (r *DirectTargetRegistry) PrepareWorkflowDirectTarget(
 		return sessionv3Runtime.DirectCapabilityPlan{}, err
 	}
 
-	adapter := r.adapterForTarget(request.Target)
+	adapter, err := r.adapterForTarget(request.Target)
+	if err != nil {
+		return sessionv3Runtime.DirectCapabilityPlan{}, err
+	}
 	if adapter == nil {
 		return sessionv3Runtime.DirectCapabilityPlan{}, fmt.Errorf(
 			"%w: direct %s capability provider %q",
@@ -291,19 +299,28 @@ func (r *DirectTargetRegistry) ResolveWorkflowDirectWait(
 
 func (r *DirectTargetRegistry) adapterForTarget(
 	target sessionv3Runtime.DirectCapabilityTarget,
-) DirectTargetAdapter {
+) (DirectTargetAdapter, error) {
 	if r == nil {
-		return nil
+		return nil, nil
 	}
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	for _, adapter := range r.adapters {
+	var selected DirectTargetAdapter
+	for _, id := range r.order {
+		adapter := r.adapters[id]
 		if adapter.SupportsWorkflowDirectTarget(target) {
-			return adapter
+			if selected != nil {
+				return nil, fmt.Errorf(
+					"%w: direct capability provider %q has multiple owning adapters",
+					ErrBindingUnavailable,
+					target.ProviderIdentity,
+				)
+			}
+			selected = adapter
 		}
 	}
-	return nil
+	return selected, nil
 }
 
 func (r *DirectTargetRegistry) adapterByID(

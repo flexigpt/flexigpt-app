@@ -1322,6 +1322,8 @@ func (i *WorkflowInterpreter) call(
 			input,
 			contextValue,
 			call,
+			ports,
+			callBudget,
 		)
 	}
 	state.PendingTarget = targetName
@@ -2644,17 +2646,34 @@ func (t WorkflowTarget) Validate() error {
 		err = t.ProviderTool.Validate()
 
 	case WorkflowTargetService:
-		if (strings.TrimSpace(t.ServiceID) == "") ==
-			(t.Direct == nil) ||
-			strings.TrimSpace(t.BindingVersion) == "" {
+		if strings.TrimSpace(t.BindingVersion) == "" ||
+			(strings.TrimSpace(t.ServiceID) == "" &&
+				t.Direct == nil) {
 			return errors.New("Workflow Service target is invalid")
+		}
+		if t.Direct != nil &&
+			!directCapabilityTargetKindMatches(
+				t.Direct.Target,
+				WorkflowTargetService,
+			) {
+			return errors.New("Workflow direct Service target is invalid")
+		}
+		if t.Direct != nil {
+			err = t.Direct.Validate()
 		}
 
 	case WorkflowTargetActivity:
-		if (strings.TrimSpace(t.ActivityID) == "") ==
-			(t.Direct == nil) ||
-			strings.TrimSpace(t.BindingVersion) == "" {
+		if strings.TrimSpace(t.BindingVersion) == "" ||
+			(strings.TrimSpace(t.ActivityID) == "" &&
+				t.Direct == nil) {
 			return errors.New("Workflow Activity target is invalid")
+		}
+		if t.Direct != nil &&
+			!directCapabilityTargetKindMatches(
+				t.Direct.Target,
+				WorkflowTargetActivity,
+			) {
+			return errors.New("Workflow direct Activity target is invalid")
 		}
 		if t.Direct != nil {
 			err = t.Direct.Validate()
@@ -2668,15 +2687,13 @@ func (t WorkflowTarget) Validate() error {
 
 	case WorkflowTargetAgent,
 		WorkflowTargetModel:
-		if t.Artifact == nil && t.Direct == nil {
-			return errors.New("Workflow Artifact target is invalid")
-		}
+
 		if t.Artifact != nil && t.Direct != nil {
-			return errors.New("Workflow target has Artifact and direct facts")
+			return errors.New("workflow target has artifact and direct facts")
 		}
 		if t.Direct != nil {
 			if !directCapabilityTargetKindMatches(t.Direct.Target, t.Kind) {
-				return errors.New("Workflow direct Model or Agent target is invalid")
+				return errors.New("workflow direct Model or Agent target is invalid")
 			}
 			err = t.Direct.Validate()
 		} else {

@@ -9,7 +9,6 @@ import (
 
 func enrichDurableLLMDispatchPlan(
 	output *sessionv3Runtime.ModelDispatchPlan,
-	request sessionv3Runtime.WorkDispatchRequest,
 	plan llmExecutionPlan,
 	model sessionv3Runtime.ArtifactPin,
 ) error {
@@ -34,19 +33,8 @@ func enrichDurableLLMDispatchPlan(
 		)
 	}
 
-	payload := request.WorkItem.Input.LLM
-	if payload != nil {
-		activities, activityErr := llmInputActivitySequence(
-			request.Session,
-			payload,
-			plan.defaults.History,
-		)
-		if activityErr != nil {
-			return activityErr
-		}
-		for _, activity := range activities {
-			appendDurableActivityMessageDispatchPlan(output, activity)
-		}
+	for _, activity := range plan.activities {
+		appendDurableActivityMessageDispatchPlan(output, activity)
 	}
 
 	if output.Workspace != nil {

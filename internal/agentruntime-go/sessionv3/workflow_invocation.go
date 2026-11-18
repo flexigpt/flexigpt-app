@@ -290,6 +290,8 @@ func (i *WorkflowInterpreter) handoffWorkflowAgentTarget(
 	input CanonicalValue,
 	contextValue CanonicalValue,
 	call WorkflowCall,
+	ports []PortPlan,
+	budget *ExecutionBudget,
 ) (ProgramTransition, error) {
 	if target.Kind != WorkflowTargetAgent || target.Artifact == nil {
 		return workflowFailure(
@@ -351,7 +353,7 @@ func (i *WorkflowInterpreter) handoffWorkflowAgentTarget(
 			TargetAgent:         targetAgent,
 			RestoreOnCompletion: call.OnCompletion != "retain",
 		},
-		nil,
-		nil,
+		ports,
+		budget,
 	)
 }

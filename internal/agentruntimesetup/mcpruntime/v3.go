@@ -209,6 +209,7 @@ func (e *V3Executor) Choices(
 				Arguments:   schema,
 			}
 			call := sessionv3Runtime.ToolCall{
+				ID:       "prepared-choice:" + choice.ID,
 				Name:     choice.Name,
 				ChoiceID: choice.ID,
 				DisplayName: firstNonBlank(

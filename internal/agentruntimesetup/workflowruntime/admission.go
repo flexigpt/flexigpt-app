@@ -276,7 +276,8 @@ type PreparationRequest struct {
 // TriggerPreparationRequest is the setup-owned request for one input-unbound
 // trigger ProgramSnapshot.
 type TriggerPreparationRequest struct {
-	Workflow sessionv3Runtime.ArtifactSelection
+	Workflow           sessionv3Runtime.ArtifactSelection
+	InvocationDefaults *sessionv3Runtime.SessionDefaults
 }
 
 // PrepareWorkflow resolves the static plan, acquires current pins, validates
@@ -553,6 +554,7 @@ func (a *Admission) admitRoot(
 		closure,
 		inputBound,
 		defaults,
+		nil,
 	)
 }
 
@@ -564,6 +566,7 @@ func (a *Admission) admitPlanned(
 	closure *workflowAdmissionClosure,
 	inputBound bool,
 	defaults *sessionv3Runtime.SessionDefaults,
+	inheritedOwnerModel *sessionv3Runtime.ArtifactPin,
 ) (sessionv3Runtime.WorkflowAdmissionResult, error) {
 	if selection.RootID != string(plan.artifact.RootID) ||
 		selection.ArtifactID != string(plan.artifact.ArtifactID) {
@@ -588,9 +591,6 @@ func (a *Admission) admitPlanned(
 	if err != nil {
 		return sessionv3Runtime.WorkflowAdmissionResult{}, err
 	}
-	if err := a.verifyRequirements(ctx, plan, closure); err != nil {
-		return sessionv3Runtime.WorkflowAdmissionResult{}, err
-	}
 
 	var program sessionv3Runtime.WorkflowProgram
 	if inputBound {
@@ -608,7 +608,13 @@ func (a *Admission) admitPlanned(
 	if err != nil {
 		return sessionv3Runtime.WorkflowAdmissionResult{}, err
 	}
-	ownerModel, err := a.workflowOwnerModel(ctx, defaults)
+	ownerModel := inheritedOwnerModel
+	if ownerModel != nil {
+		copyValue := *ownerModel
+		ownerModel = &copyValue
+	} else {
+		ownerModel, err = a.workflowOwnerModel(ctx, defaults)
+	}
 	if err != nil {
 		return sessionv3Runtime.WorkflowAdmissionResult{}, err
 	}
@@ -693,6 +699,16 @@ func (a *Admission) bindCallableTargets(
 		if err != nil {
 			return err
 		}
+		bound, err = a.prepareBoundTarget(
+			ctx,
+			targetPlan,
+			bound,
+			requirements,
+		)
+		if err != nil {
+			return err
+		}
+		bound.DeclarationPath = targetPlan.Path
 		program.Targets[targetPlan.Name] = bound
 	}
 	return nil
@@ -724,132 +740,18 @@ func (a *Admission) prepareRequirements(
 		if err != nil {
 			return nil, fmt.Errorf("workflow requirement %q: %w", requirement.Name, err)
 		}
+		target, err = a.prepareBoundTarget(
+			ctx,
+			requirement,
+			target,
+			capabilities,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("workflow requirement %q: %w", requirement.Name, err)
+		}
 		output = append(output, workflowRequirementFact(requirement.Name, target))
 	}
 	return output, nil
-}
-
-// verifyRequirements checks admission prerequisites without placing them in
-// WorkflowProgram.Targets. Requirements cannot be selected by calls or target
-// sets and do not create runtime dispatch behavior.
-func (a *Admission) verifyRequirements(
-	ctx context.Context,
-	plan workflowAdmissionPlan,
-	closure *workflowAdmissionClosure,
-) error {
-	for _, requirement := range plan.facts.Inventory.Requirements {
-		if err := a.verifyRequirement(ctx, requirement, closure); err != nil {
-			return fmt.Errorf(
-				"workflow requirement %q: %w",
-				requirement.Name,
-				err,
-			)
-		}
-	}
-	return nil
-}
-
-func (a *Admission) verifyRequirement(
-	ctx context.Context,
-	targetPlan workflowAPI.TargetPlan,
-	closure *workflowAdmissionClosure,
-) error {
-	target := targetPlan.Target
-
-	switch target.Kind {
-	case workflowv1.TargetService:
-		if _, found := a.bindings.Service(target.Ref); !found {
-			return fmt.Errorf(
-				"%w: service requirement %q",
-				ErrBindingUnavailable,
-				target.Ref,
-			)
-		}
-		return nil
-
-	case workflowv1.TargetActivity:
-		if _, found := a.bindings.Activity(target.Ref); !found {
-			return fmt.Errorf(
-				"%w: activity requirement %q",
-				ErrBindingUnavailable,
-				target.Ref,
-			)
-		}
-		return nil
-
-	case workflowv1.TargetTool:
-		ref, err := requireWorkflowTargetArtifactRef(
-			targetPlan,
-			"Tool requirement",
-		)
-		if err != nil {
-			return err
-		}
-		_, err = a.pinClosureArtifact(ctx, closure, ref)
-		return err
-
-	case workflowv1.TargetWorkflow:
-		ref, err := requireWorkflowTargetArtifactRef(
-			targetPlan,
-			"Workflow requirement",
-		)
-		if err != nil {
-			return err
-		}
-		_, err = a.pinClosureArtifact(ctx, closure, ref)
-		return err
-
-	case workflowv1.TargetAgent:
-		if a.invocations == nil {
-			return fmt.Errorf(
-				"%w: workflow Agent requirement %q requires a typed invocation adapter",
-				ErrBindingUnavailable,
-				target.Ref,
-			)
-		}
-		pin, err := a.pinInvocationTarget(ctx, targetPlan, closure)
-		if err != nil {
-			return err
-		}
-		if err := a.invocations.AdmitWorkflowAgentTarget(ctx, pin); err != nil {
-			return fmt.Errorf(
-				"%w: workflow Agent requirement %q: %w",
-				ErrBindingUnavailable,
-				target.Ref,
-				err,
-			)
-		}
-		return nil
-
-	case workflowv1.TargetModel:
-		if a.invocations == nil {
-			return fmt.Errorf(
-				"%w: workflow Model requirement %q requires a typed invocation adapter",
-				ErrBindingUnavailable,
-				target.Ref,
-			)
-		}
-		pin, err := a.pinInvocationTarget(ctx, targetPlan, closure)
-		if err != nil {
-			return err
-		}
-		if err := a.invocations.AdmitWorkflowModelTarget(ctx, pin); err != nil {
-			return fmt.Errorf(
-				"%w: workflow Model requirement %q: %w",
-				ErrBindingUnavailable,
-				target.Ref,
-				err,
-			)
-		}
-		return nil
-
-	default:
-		return fmt.Errorf(
-			"%w: unsupported Workflow requirement kind %q",
-			ErrBindingUnavailable,
-			target.Kind,
-		)
-	}
 }
 
 func (a *Admission) bindTarget(
@@ -1014,6 +916,7 @@ func (a *Admission) bindTarget(
 			closure,
 			false,
 			nil,
+			ownerModel,
 		)
 		if err != nil {
 			return sessionv3Runtime.WorkflowTarget{}, err

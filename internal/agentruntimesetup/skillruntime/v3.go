@@ -716,6 +716,7 @@ func v3SkillChoices(
 			Arguments:   arguments,
 		}
 		call := sessionv3Runtime.ToolCall{
+			ID:          "prepared-choice:" + choice.ID,
 			Name:        definition.name,
 			ChoiceID:    choice.ID,
 			DisplayName: v3SkillToolDisplayName(definition.name),

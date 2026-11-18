@@ -546,6 +546,7 @@ func v3ChoiceForResolvedTool(
 			Arguments:   arguments,
 		}
 		call := sessionv3Runtime.ToolCall{
+			ID:          "prepared-choice:" + choiceID,
 			Name:        name,
 			ChoiceID:    choiceID,
 			DisplayName: resolved.Tool.DisplayName,
@@ -586,6 +587,7 @@ func v3ChoiceForResolvedTool(
 			Arguments:   arguments,
 		}
 		call := sessionv3Runtime.ToolCall{
+			ID:          "prepared-choice:" + choiceID,
 			Name:        name,
 			ChoiceID:    choiceID,
 			DisplayName: resolved.Tool.DisplayName,
