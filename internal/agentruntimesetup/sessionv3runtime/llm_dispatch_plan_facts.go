@@ -51,6 +51,9 @@ func enrichDurableLLMDispatchPlan(
 		modelTarget := sessionv3Runtime.ModelDispatchTarget{Artifact: model}
 		output.Agent.Model = &modelTarget
 		output.Agent.Workspace = cloneWorkspaceDispatchPlan(output.Workspace)
+		output.Agent.IncludeModelSystemPrompt = cloneBool(
+			plan.agentModelIncludeSystemPrompt,
+		)
 		output.Agent.Instructions = cloneInstructionDispatchPlans(
 			output.Instructions,
 		)
@@ -209,6 +212,14 @@ func cloneWorkspaceDispatchPlan(
 func cloneString(
 	value *string,
 ) *string {
+	if value == nil {
+		return nil
+	}
+	output := *value
+	return &output
+}
+
+func cloneBool(value *bool) *bool {
 	if value == nil {
 		return nil
 	}

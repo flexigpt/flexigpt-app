@@ -7,17 +7,39 @@ import (
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 	llmtoolsSpec "github.com/flexigpt/llmtools-go/spec"
 
-	sessionRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/session"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
+
+// ToolOutputSemantics is the shared provider-neutral durable representation
+// of native Go and Skill Tool output. Session V2 and V3 can project it into
+// their own orchestration records without independently adapting rich output.
+type ToolOutputSemantics struct {
+	Text       string
+	Contents   []inferenceSpec.ToolOutputItemUnion
+	Structured json.RawMessage
+}
+
+func AdaptToolOutputs(
+	outputs []llmtoolsSpec.ToolOutputUnion,
+) (ToolOutputSemantics, error) {
+	structured, err := CanonicalToolOutputs(outputs)
+	if err != nil {
+		return ToolOutputSemantics{}, err
+	}
+	return ToolOutputSemantics{
+		Text:       ToolOutputsText(outputs),
+		Contents:   OutputItemsFromLLMToolOutputs(outputs),
+		Structured: structured,
+	}, nil
+}
 
 // OutputItemsFromLLMToolOutputs adapts Tool Runtime output into the
 // provider-neutral inference Tool-output representation stored by Session.
 func OutputItemsFromLLMToolOutputs(
 	outputs []llmtoolsSpec.ToolOutputUnion,
-) []sessionRuntime.InferenceToolOutputItem {
+) []inferenceSpec.ToolOutputItemUnion {
 	result := make(
-		[]sessionRuntime.InferenceToolOutputItem,
+		[]inferenceSpec.ToolOutputItemUnion,
 		0,
 		len(outputs),
 	)

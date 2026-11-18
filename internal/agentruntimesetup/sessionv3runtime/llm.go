@@ -13,6 +13,7 @@ import (
 	inferenceRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inference"
 	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/modelruntime"
+	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/skillruntime"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
@@ -58,7 +59,19 @@ func (b *Binder) bindLLM(
 		plan.defaults.ModelOverrides,
 		payload.Temperature,
 	)
-	requestPatch, patchErr := v3ModelRequestPatch(requestDefaults)
+	modelDefaults, explicitSystemPrompt, clearModelSystemPrompt := splitV3ModelSystemPromptOverride(requestDefaults)
+	if plan.agentModelIncludeSystemPrompt != nil &&
+		!*plan.agentModelIncludeSystemPrompt {
+		clearModelSystemPrompt = true
+	}
+	if clearModelSystemPrompt {
+		modelDefaults.Clear = appendV3ModelDefaultClear(
+			modelDefaults.Clear,
+			sessionv3Runtime.ModelDefaultFieldSystemPrompt,
+		)
+	}
+
+	requestPatch, patchErr := v3ModelRequestPatch(modelDefaults)
 	if patchErr != nil {
 		return sessionv3Runtime.BindResult{}, patchErr
 	}
@@ -93,6 +106,7 @@ func (b *Binder) bindLLM(
 	if prompt := plan.systemPrompt(); strings.TrimSpace(prompt) != "" {
 		resolved.ModelParam.SystemPrompt = appendPrompt(resolved.ModelParam.SystemPrompt, prompt)
 	}
+
 	inputs, err := b.buildInputs(
 		req,
 		plan.defaults,
@@ -102,7 +116,43 @@ func (b *Binder) bindLLM(
 	if err != nil {
 		return sessionv3Runtime.BindResult{}, err
 	}
-	choices, bindings, err := b.toolChoices(ctx, req, plan.defaults)
+
+	skillHydration := skillruntime.V3LLMSkillHydration{}
+	if len(plan.defaults.Skills) != 0 {
+		if b.skillTools == nil {
+			return sessionv3Runtime.BindResult{}, errors.New(
+				"session v3 Skill runtime is unavailable",
+			)
+		}
+		skillHydration, err = b.skillTools.HydrateLLM(
+			ctx,
+			req.Execution.ID,
+			plan.defaults.Skills,
+			plan.defaults.ActiveSkills,
+		)
+		if err != nil {
+			return sessionv3Runtime.BindResult{}, err
+		}
+		if strings.TrimSpace(skillHydration.Prompt) != "" {
+			resolved.ModelParam.SystemPrompt = appendPrompt(
+				resolved.ModelParam.SystemPrompt,
+				skillHydration.Prompt,
+			)
+		}
+	}
+	if explicitSystemPrompt != nil && strings.TrimSpace(*explicitSystemPrompt) != "" {
+		resolved.ModelParam.SystemPrompt = appendPrompt(
+			resolved.ModelParam.SystemPrompt,
+			*explicitSystemPrompt,
+		)
+	}
+
+	choices, bindings, err := b.toolChoices(
+		ctx,
+		req,
+		plan.defaults,
+		skillHydration.Choices,
+	)
 	if err != nil {
 		return sessionv3Runtime.BindResult{}, err
 	}
@@ -230,7 +280,7 @@ func (b *Binder) executeLLM(
 			},
 		}, nil
 	}
-	var usage *sessionv3Runtime.InferenceUsage
+	var usage *inferenceSpec.Usage
 	if out.Usage != nil {
 		value := *out.Usage
 		usage = &value
@@ -378,6 +428,8 @@ func (b *Binder) decodeProviderOutputs(
 
 		next := bound
 		next.ID = callID
+		next.Type = call.Type
+		next.Source = sessionv3Runtime.ToolCallSourceModel
 		next.ProviderCallID = firstText(call.CallID, call.ID)
 		next.Arguments = arguments
 		calls = append(calls, next)
@@ -396,11 +448,13 @@ func unresolvedProviderToolCall(
 		ProviderCallID: firstText(call.CallID, call.ID),
 		Name:           call.Name,
 		ChoiceID:       call.ChoiceID,
+		Type:           call.Type,
 		Arguments:      arguments,
 		Binding: sessionv3Runtime.ToolBinding{
 			Kind:       sessionv3Runtime.ToolBindingKindUnresolved,
 			Unresolved: &sessionv3Runtime.UnresolvedToolBinding{Reason: reason},
 		},
+		Source: sessionv3Runtime.ToolCallSourceModel,
 	}
 }
 
@@ -439,6 +493,47 @@ func appendPrompt(base, extra string) string {
 		return base
 	}
 	return base + "\n\n" + extra
+}
+
+func splitV3ModelSystemPromptOverride(
+	input sessionv3Runtime.ModelDefaultsOverride,
+) (
+	modelOverrides sessionv3Runtime.ModelDefaultsOverride,
+	explicitSystemPrompt *string,
+	clearModelSystemPrompt bool,
+) {
+	modelOverrides = jsonutil.CloneJSONInValue(input)
+	modelOverrides.SystemPrompt = nil
+	modelOverrides.Clear = make(
+		[]sessionv3Runtime.ModelDefaultField,
+		0,
+		len(input.Clear),
+	)
+	for _, field := range input.Clear {
+		if field == sessionv3Runtime.ModelDefaultFieldSystemPrompt {
+			clearModelSystemPrompt = true
+			continue
+		}
+		modelOverrides.Clear = append(modelOverrides.Clear, field)
+	}
+	if len(modelOverrides.Clear) == 0 {
+		modelOverrides.Clear = nil
+	}
+	if input.SystemPrompt != nil {
+		value := *input.SystemPrompt
+		explicitSystemPrompt = &value
+	}
+	return modelOverrides, explicitSystemPrompt, clearModelSystemPrompt
+}
+
+func appendV3ModelDefaultClear(
+	values []sessionv3Runtime.ModelDefaultField,
+	field sessionv3Runtime.ModelDefaultField,
+) []sessionv3Runtime.ModelDefaultField {
+	if slices.Contains(values, field) {
+		return values
+	}
+	return append(values, field)
 }
 
 func v3ModelRequestPatch(

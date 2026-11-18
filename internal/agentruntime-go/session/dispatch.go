@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/backgroundutil"
+	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
 
 var errStaleDispatch = errors.New("runtime dispatch became stale")
@@ -2235,7 +2236,7 @@ func cloneOperationError(
 	return &copyValue
 }
 
-func cloneInferenceUsage(value *InferenceUsage) *InferenceUsage {
+func cloneInferenceUsage(value *inferenceSpec.Usage) *inferenceSpec.Usage {
 	if value == nil {
 		return nil
 	}

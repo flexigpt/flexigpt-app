@@ -19,13 +19,14 @@ import (
 )
 
 type llmExecutionPlan struct {
-	model              *sessionv3Runtime.ArtifactSelection
-	defaults           sessionv3Runtime.SessionDefaults
-	systemInstructions []sessionv3Runtime.Instruction
-	texts              []sessionv3Runtime.TextDispatchPlan
-	context            []string
-	artifacts          []sessionv3Runtime.ArtifactPin
-	activities         []sessionv3Runtime.Activity
+	model                         *sessionv3Runtime.ArtifactSelection
+	defaults                      sessionv3Runtime.SessionDefaults
+	systemInstructions            []sessionv3Runtime.Instruction
+	texts                         []sessionv3Runtime.TextDispatchPlan
+	context                       []string
+	artifacts                     []sessionv3Runtime.ArtifactPin
+	activities                    []sessionv3Runtime.Activity
+	agentModelIncludeSystemPrompt *bool
 }
 
 func (b *Binder) prepareLLMPlan(
@@ -143,6 +144,22 @@ func (b *Binder) prepareLLMPlan(
 			return llmExecutionPlan{}, err
 		}
 	}
+	if len(plan.defaults.Skills) != 0 {
+		if b.skillTools == nil {
+			return llmExecutionPlan{}, errors.New(
+				"session v3 Skill runtime is unavailable",
+			)
+		}
+		active, activeErr := b.skillTools.EffectiveActiveSelections(
+			request.Execution,
+			plan.defaults.Skills,
+			plan.defaults.ActiveSkills,
+		)
+		if activeErr != nil {
+			return llmExecutionPlan{}, activeErr
+		}
+		plan.defaults.ActiveSkills = active
+	}
 
 	plan.defaults.MCP, pins, err = b.pinMCPSelections(
 		ctx,
@@ -259,6 +276,10 @@ func (b *Binder) applyAgentPlan(
 				continue
 			}
 			plan.model = &value
+			if occurrence.IncludeSystemPrompt != nil {
+				include := *occurrence.IncludeSystemPrompt
+				plan.agentModelIncludeSystemPrompt = &include
+			}
 			if err := plan.addArtifact(modelPin); err != nil {
 				return err
 			}

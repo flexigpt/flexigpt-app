@@ -26,9 +26,6 @@ type (
 	Revision            uint64
 )
 
-// InferenceUsage is the provider-neutral usage record for one LLM WorkItem.
-type InferenceUsage = inferenceSpec.Usage
-
 type Session struct {
 	ID                    SessionID                    `json:"id"`
 	Revision              Revision                     `json:"revision"`
@@ -332,15 +329,17 @@ type AttachmentAdmission interface {
 // normal Session edit-and-resend and continuation behavior. It never fabricates
 // Tool success because it is built only from a durable completed WorkItem.
 type ToolResultActivity struct {
-	WorkItemID     WorkItemID     `json:"workItemID"`
-	CallID         string         `json:"callID"`
-	ProviderCallID string         `json:"providerCallID,omitempty"`
-	ChoiceID       string         `json:"choiceID,omitempty"`
-	Name           string         `json:"name"`
-	Kind           ToolOutputKind `json:"kind"`
-	Text           string         `json:"text,omitempty"`
-	Structured     CanonicalValue `json:"structured,omitempty"`
-	Error          string         `json:"error,omitempty"`
+	WorkItemID     WorkItemID                          `json:"workItemID"`
+	CallID         string                              `json:"callID"`
+	ProviderCallID string                              `json:"providerCallID,omitempty"`
+	ChoiceID       string                              `json:"choiceID,omitempty"`
+	Name           string                              `json:"name"`
+	Type           inferenceSpec.ToolType              `json:"type,omitempty"`
+	Kind           ToolOutputKind                      `json:"kind"`
+	Text           string                              `json:"text,omitempty"`
+	Contents       []inferenceSpec.ToolOutputItemUnion `json:"contents,omitempty"`
+	Structured     CanonicalValue                      `json:"structured,omitempty"`
+	Error          string                              `json:"error,omitempty"`
 }
 
 type AppContextContent struct {
@@ -1026,17 +1025,18 @@ type MCPToolTarget struct {
 }
 
 type ToolCall struct {
-	ID             string         `json:"id"`
-	ProviderCallID string         `json:"providerCallID,omitempty"`
-	Name           string         `json:"name"`
-	ChoiceID       string         `json:"choiceID,omitempty"`
-	DisplayName    string         `json:"displayName,omitempty"`
-	Description    string         `json:"description,omitempty"`
-	Source         ToolCallSource `json:"source,omitempty"`
-	AppInstanceID  AppInstanceID  `json:"appInstanceID,omitempty"`
-	Arguments      CanonicalValue `json:"arguments,omitempty"`
-	Binding        ToolBinding    `json:"binding"`
-	Automatic      bool           `json:"automatic"`
+	ID             string                 `json:"id"`
+	ProviderCallID string                 `json:"providerCallID,omitempty"`
+	Name           string                 `json:"name"`
+	ChoiceID       string                 `json:"choiceID,omitempty"`
+	Type           inferenceSpec.ToolType `json:"type,omitempty"`
+	DisplayName    string                 `json:"displayName,omitempty"`
+	Description    string                 `json:"description,omitempty"`
+	Source         ToolCallSource         `json:"source,omitempty"`
+	AppInstanceID  AppInstanceID          `json:"appInstanceID,omitempty"`
+	Arguments      CanonicalValue         `json:"arguments,omitempty"`
+	Binding        ToolBinding            `json:"binding"`
+	Automatic      bool                   `json:"automatic"`
 }
 
 type ToolBindingKind string
@@ -1312,12 +1312,12 @@ type LLMStreamState struct {
 }
 
 type LLMOutput struct {
-	Text            string           `json:"text,omitempty"`
-	Thinking        string           `json:"thinking,omitempty"`
-	ToolCalls       []ToolCall       `json:"toolCalls,omitempty"`
-	Usage           *InferenceUsage  `json:"usage,omitempty"`
-	ProtocolOutputs []CanonicalValue `json:"protocolOutputs,omitempty"`
-	DebugDetails    CanonicalValue   `json:"debugDetails,omitempty"`
+	Text            string               `json:"text,omitempty"`
+	Thinking        string               `json:"thinking,omitempty"`
+	ToolCalls       []ToolCall           `json:"toolCalls,omitempty"`
+	Usage           *inferenceSpec.Usage `json:"usage,omitempty"`
+	ProtocolOutputs []CanonicalValue     `json:"protocolOutputs,omitempty"`
+	DebugDetails    CanonicalValue       `json:"debugDetails,omitempty"`
 }
 
 type ToolOutputKind string
@@ -1328,11 +1328,21 @@ const (
 	ToolOutputKindSkipped ToolOutputKind = "skipped"
 )
 
+// SkillSelectionState is the durable semantic selection used to recreate a
+// private Skill Runtime session. It has no runtime session ID, registry,
+// client, callback, or native handle.
+type SkillSelectionState struct {
+	Enabled []ArtifactPin `json:"enabled,omitempty"`
+	Active  []ArtifactPin `json:"active,omitempty"`
+}
+
 type ToolOutput struct {
-	Kind       ToolOutputKind `json:"kind"`
-	Text       string         `json:"text,omitempty"`
-	Structured CanonicalValue `json:"structured,omitempty"`
-	Error      string         `json:"error,omitempty"`
+	Kind       ToolOutputKind                      `json:"kind"`
+	Text       string                              `json:"text,omitempty"`
+	Contents   []inferenceSpec.ToolOutputItemUnion `json:"contents,omitempty"`
+	Structured CanonicalValue                      `json:"structured,omitempty"`
+	Error      string                              `json:"error,omitempty"`
+	SkillState *SkillSelectionState                `json:"skillState,omitempty"`
 }
 
 type ExternalReceipt struct {

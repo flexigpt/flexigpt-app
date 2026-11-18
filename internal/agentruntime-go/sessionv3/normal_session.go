@@ -7,6 +7,8 @@ import (
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 func (r *Runtime) UpdateContinuationInput(
@@ -1006,8 +1008,10 @@ func carriedNormalToolResults(
 			ProviderCallID: item.Input.Tool.Call.ProviderCallID,
 			ChoiceID:       item.Input.Tool.Call.ChoiceID,
 			Name:           item.Input.Tool.Call.Name,
+			Type:           item.Input.Tool.Call.Type,
 			Kind:           item.Output.Tool.Kind,
 			Text:           item.Output.Tool.Text,
+			Contents:       jsonutil.CloneJSONInValue(item.Output.Tool.Contents),
 			Structured:     item.Output.Tool.Structured.Clone(),
 			Error:          item.Output.Tool.Error,
 		})

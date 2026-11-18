@@ -358,6 +358,43 @@ func validatePin(value ArtifactPin) error {
 	return nil
 }
 
+func (s SkillSelectionState) Validate() error {
+	if len(s.Enabled) == 0 {
+		return errors.New("skill selection state has no enabled Skills")
+	}
+
+	enabled := make(map[string]ArtifactPin, len(s.Enabled))
+	for _, pin := range s.Enabled {
+		if err := validatePin(pin); err != nil {
+			return err
+		}
+		key := pin.RootID + "\x00" + pin.ArtifactID
+		if current, duplicate := enabled[key]; duplicate {
+			if current != pin {
+				return errors.New("skill selection state has conflicting enabled Skill pins")
+			}
+			return errors.New("skill selection state has duplicate enabled Skills")
+		}
+		enabled[key] = pin
+	}
+
+	seenActive := make(map[string]struct{}, len(s.Active))
+	for _, pin := range s.Active {
+		if err := validatePin(pin); err != nil {
+			return err
+		}
+		key := pin.RootID + "\x00" + pin.ArtifactID
+		if _, duplicate := seenActive[key]; duplicate {
+			return errors.New("skill selection state has duplicate active Skills")
+		}
+		seenActive[key] = struct{}{}
+		if enabledPin, found := enabled[key]; !found || enabledPin != pin {
+			return errors.New("active Skill is not part of the enabled Skill selection")
+		}
+	}
+	return nil
+}
+
 func (a Activity) Validate() error {
 	if err := validateID("activity ID", string(a.ID)); err != nil {
 		return err
@@ -1401,6 +1438,11 @@ func (o WorkItemOutput) Validate(kind WorkItemType) error {
 	if kind == WorkItemTypeTool && o.Tool == nil {
 		return errors.New("tool WorkItem output is missing")
 	}
+	if o.Tool != nil {
+		if err := o.Tool.Validate(); err != nil {
+			return err
+		}
+	}
 	if kind == WorkItemTypeEmit && o.Emit == nil {
 		return errors.New("emit WorkItem output is missing")
 	}
@@ -1434,6 +1476,23 @@ func (o WorkItemOutput) Validate(kind WorkItemType) error {
 			if err := call.Validate(); err != nil {
 				return err
 			}
+		}
+	}
+	return nil
+}
+
+func (o ToolOutput) Validate() error {
+	switch o.Kind {
+	case ToolOutputKindSuccess, ToolOutputKindError, ToolOutputKindSkipped:
+	default:
+		return errors.New("tool output kind is invalid")
+	}
+	if !o.Structured.Valid() {
+		return errors.New("tool output structured result is invalid")
+	}
+	if o.SkillState != nil {
+		if err := o.SkillState.Validate(); err != nil {
+			return err
 		}
 	}
 	return nil

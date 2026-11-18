@@ -38,14 +38,15 @@ type ModelDispatchPlan struct {
 }
 
 type AgentDispatchPlan struct {
-	Artifact     ArtifactPin               `json:"artifact"`
-	Model        *ModelDispatchTarget      `json:"model,omitempty"`
-	Workspace    *WorkspaceDispatchPlan    `json:"workspace,omitempty"`
-	Instructions []InstructionDispatchPlan `json:"instructions,omitempty"`
-	Texts        []TextDispatchPlan        `json:"texts,omitempty"`
-	Tools        []ToolDispatchPlan        `json:"tools,omitempty"`
-	Skills       []SkillDispatchPlan       `json:"skills,omitempty"`
-	MCP          []MCPDispatchPlan         `json:"mcp,omitempty"`
+	Artifact                 ArtifactPin               `json:"artifact"`
+	IncludeModelSystemPrompt *bool                     `json:"includeModelSystemPrompt,omitempty"`
+	Model                    *ModelDispatchTarget      `json:"model,omitempty"`
+	Workspace                *WorkspaceDispatchPlan    `json:"workspace,omitempty"`
+	Instructions             []InstructionDispatchPlan `json:"instructions,omitempty"`
+	Texts                    []TextDispatchPlan        `json:"texts,omitempty"`
+	Tools                    []ToolDispatchPlan        `json:"tools,omitempty"`
+	Skills                   []SkillDispatchPlan       `json:"skills,omitempty"`
+	MCP                      []MCPDispatchPlan         `json:"mcp,omitempty"`
 }
 
 type WorkspaceDispatchPlan struct {

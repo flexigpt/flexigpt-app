@@ -206,7 +206,7 @@ func projectToolResults(
 }
 
 func semanticToolResultContentsText(
-	contents []sessionRuntime.InferenceToolOutputItem,
+	contents []inferenceSpec.ToolOutputItemUnion,
 ) string {
 	parts := make([]string, 0, len(contents))
 	for _, content := range contents {

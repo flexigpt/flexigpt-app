@@ -39,7 +39,8 @@ func (b *Binder) durableLLMDispatchPlan(
 			)
 		}
 		output.Agent = &sessionv3Runtime.AgentDispatchPlan{
-			Artifact: agent,
+			Artifact:                 agent,
+			IncludeModelSystemPrompt: cloneBool(plan.agentModelIncludeSystemPrompt),
 		}
 	}
 	if plan.defaults.Workspace != nil {

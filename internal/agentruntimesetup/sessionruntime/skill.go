@@ -384,34 +384,16 @@ func (c *coordinator) hydrateSkillSession(
 		)
 	}
 
-	active, err := c.skillRuntime.ListAgentSkills(
+	hydrated, err := c.skillRuntime.HydrateSkillSession(
 		ctx,
-		&agentskillsRuntime.SkillListFilter{
-			AllowSkills: skills.definitions,
-			SessionID: agentskillsRuntimeSpec.SessionID(
-				sessionID,
-			),
-			Activity: agentskillsRuntimeSpec.SkillActivity("active"),
-		},
+		agentskillsRuntimeSpec.SessionID(sessionID),
+		skills.definitions,
 	)
 	if err != nil {
 		return "", nil, preparedBindings{}, err
 	}
 
-	includeAll := len(active) != 0
-	prompt, err := c.skillRuntime.SkillsPrompt(
-		ctx,
-		&agentskillsRuntime.SkillFilter{
-			AllowSkills: skills.definitions,
-			SessionID: agentskillsRuntimeSpec.SessionID(
-				sessionID,
-			),
-			Activity: agentskillsRuntimeSpec.SkillActivityAny,
-		},
-	)
-	if err != nil {
-		return "", nil, preparedBindings{}, err
-	}
+	includeAll := len(hydrated.ActiveSkills) != 0
 
 	choices, bindings, err := skillToolChoices(
 		includeAll,
@@ -426,7 +408,7 @@ func (c *coordinator) hydrateSkillSession(
 			includeAll,
 			c.skillRuntime.SupportsRunScript(),
 		),
-		prompt,
+		hydrated.Prompt,
 	), choices, bindings, nil
 }
 

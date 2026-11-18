@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
 
@@ -36,8 +37,11 @@ func (b *Binder) buildInputs(
 	}
 	inputs := make([]inferenceSpec.InputUnion, 0, len(activities))
 	for _, activity := range activities[:len(activities)-1] {
-		inputs = append(inputs, activityToInput(activity))
-		inputs = append(inputs, activityToolResultInputs(activity)...)
+		value, inputErr := durableActivityInputs(req.Session, execution, activity)
+		if inputErr != nil {
+			return nil, inputErr
+		}
+		inputs = append(inputs, value...)
 	}
 	for index, value := range injectedContext {
 		value = strings.TrimSpace(value)
@@ -51,8 +55,11 @@ func (b *Binder) buildInputs(
 		))
 	}
 	current := activities[len(activities)-1]
-	inputs = append(inputs, activityToInput(current))
-	inputs = append(inputs, activityToolResultInputs(current)...)
+	currentInputs, inputErr := durableActivityInputs(req.Session, execution, current)
+	if inputErr != nil {
+		return nil, inputErr
+	}
+	inputs = append(inputs, currentInputs...)
 	for _, id := range payload.ContinuationWorkItemIDs {
 		item := findWorkItem(execution, id)
 		if item == nil || item.Output == nil || item.Output.Tool == nil {
@@ -156,6 +163,127 @@ func findWorkItem(execution sessionv3Runtime.Execution, id sessionv3Runtime.Work
 	return nil
 }
 
+func findSessionWorkItem(
+	session sessionv3Runtime.Session,
+	execution sessionv3Runtime.Execution,
+	id sessionv3Runtime.WorkItemID,
+) *sessionv3Runtime.WorkItem {
+	if item := findWorkItem(execution, id); item != nil {
+		return item
+	}
+	for _, candidate := range session.Executions {
+		if candidate.ID == execution.ID {
+			continue
+		}
+		if item := findWorkItem(candidate, id); item != nil {
+			return item
+		}
+	}
+	return nil
+}
+
+func durableActivityInputs(
+	session sessionv3Runtime.Session,
+	execution sessionv3Runtime.Execution,
+	activity sessionv3Runtime.Activity,
+) ([]inferenceSpec.InputUnion, error) {
+	if activity.Message != nil &&
+		activity.Message.Role == sessionv3Runtime.MessageRoleAssistant &&
+		activity.WorkItemID != "" {
+		item := findSessionWorkItem(session, execution, activity.WorkItemID)
+		if item != nil &&
+			item.Type == sessionv3Runtime.WorkItemTypeLLM &&
+			item.Output != nil &&
+			item.Output.LLM != nil &&
+			len(item.Output.LLM.ProtocolOutputs) != 0 {
+			return providerOutputsAsInputs(item.Output.LLM.ProtocolOutputs)
+		}
+	}
+
+	output := make([]inferenceSpec.InputUnion, 0, 1)
+	output = append(output, activityToInput(activity))
+	output = append(output, activityToolResultInputs(activity)...)
+	return output, nil
+}
+
+func providerOutputsAsInputs(
+	values []sessionv3Runtime.CanonicalValue,
+) ([]inferenceSpec.InputUnion, error) {
+	output := make([]inferenceSpec.InputUnion, 0, len(values))
+	for index := range values {
+		value, err := sessionv3Runtime.DecodeCanonicalValue[inferenceSpec.OutputUnion](
+			values[index],
+		)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"decode durable provider output %d: %w",
+				index,
+				err,
+			)
+		}
+		if input := providerOutputAsInput(value, index); input != nil {
+			output = append(output, *input)
+		}
+	}
+	return output, nil
+}
+
+func providerOutputAsInput(
+	value inferenceSpec.OutputUnion,
+	fallbackIndex int,
+) *inferenceSpec.InputUnion {
+	switch value.Kind {
+	case inferenceSpec.OutputKindOutputMessage:
+		return &inferenceSpec.InputUnion{
+			Kind:          inferenceSpec.InputKindOutputMessage,
+			OutputMessage: value.OutputMessage,
+		}
+	case inferenceSpec.OutputKindReasoningMessage:
+		return &inferenceSpec.InputUnion{
+			Kind:             inferenceSpec.InputKindReasoningMessage,
+			ReasoningMessage: value.ReasoningMessage,
+		}
+	case inferenceSpec.OutputKindFunctionToolCall:
+		return &inferenceSpec.InputUnion{
+			Kind:             inferenceSpec.InputKindFunctionToolCall,
+			FunctionToolCall: value.FunctionToolCall,
+		}
+	case inferenceSpec.OutputKindCustomToolCall:
+		return &inferenceSpec.InputUnion{
+			Kind:           inferenceSpec.InputKindCustomToolCall,
+			CustomToolCall: value.CustomToolCall,
+		}
+	case inferenceSpec.OutputKindWebSearchToolCall:
+		return &inferenceSpec.InputUnion{
+			Kind:              inferenceSpec.InputKindWebSearchToolCall,
+			WebSearchToolCall: value.WebSearchToolCall,
+		}
+	case inferenceSpec.OutputKindWebSearchToolOutput:
+		return &inferenceSpec.InputUnion{
+			Kind:                inferenceSpec.InputKindWebSearchToolOutput,
+			WebSearchToolOutput: value.WebSearchToolOutput,
+		}
+	default:
+		return &inferenceSpec.InputUnion{
+			Kind: inferenceSpec.InputKindOutputMessage,
+			OutputMessage: &inferenceSpec.InputOutputContent{
+				ID:     fmt.Sprintf("runtime-unavailable-output:%d", fallbackIndex),
+				Role:   inferenceSpec.RoleAssistant,
+				Status: inferenceSpec.StatusCompleted,
+				Contents: []inferenceSpec.InputOutputContentItemUnion{{
+					Kind: inferenceSpec.ContentItemKindText,
+					TextItem: &inferenceSpec.ContentItemText{
+						Text: fmt.Sprintf(
+							"[Provider output kind %q is not available in replay.]",
+							value.Kind,
+						),
+					},
+				}},
+			},
+		}
+	}
+}
+
 func activityToInput(a sessionv3Runtime.Activity) inferenceSpec.InputUnion {
 	text := ""
 	if a.Message != nil {
@@ -228,32 +356,23 @@ func activityToolResultInputs(
 		len(activity.Message.ToolResults),
 	)
 	for _, result := range activity.Message.ToolResults {
-		text := strings.TrimSpace(result.Text)
-		if text == "" {
-			text = strings.TrimSpace(result.Error)
-		}
-		if text == "" {
-			text = "Tool completed."
-		}
-		output = append(output, inferenceSpec.InputUnion{
-			Kind: inferenceSpec.InputKindFunctionToolOutput,
-			FunctionToolOutput: &inferenceSpec.ToolOutput{
-				Type:     inferenceSpec.ToolTypeFunction,
-				ID:       string(result.WorkItemID),
-				CallID:   firstText(result.ProviderCallID, result.CallID),
-				ChoiceID: result.ChoiceID,
-				Name:     result.Name,
-				Role:     inferenceSpec.RoleTool,
-				Status:   inferenceSpec.StatusCompleted,
-				IsError:  result.Kind != sessionv3Runtime.ToolOutputKindSuccess,
-				Contents: []inferenceSpec.ToolOutputItemUnion{{
-					Kind: inferenceSpec.ContentItemKindText,
-					TextItem: &inferenceSpec.ContentItemText{
-						Text: text,
-					},
-				}},
+		output = append(output, toolOutputInput(
+			result.WorkItemID,
+			sessionv3Runtime.ToolCall{
+				ID:             result.CallID,
+				ProviderCallID: result.ProviderCallID,
+				ChoiceID:       result.ChoiceID,
+				Name:           result.Name,
+				Type:           result.Type,
 			},
-		})
+			sessionv3Runtime.ToolOutput{
+				Kind:       result.Kind,
+				Text:       result.Text,
+				Contents:   cloneToolOutputContents(result.Contents),
+				Structured: result.Structured.Clone(),
+				Error:      result.Error,
+			},
+		))
 	}
 	return output
 }
@@ -371,31 +490,70 @@ func attachmentToContentItem(a sessionv3Runtime.Attachment) (inferenceSpec.Input
 }
 
 func toolResultToInput(item sessionv3Runtime.WorkItem) inferenceSpec.InputUnion {
-	text := ""
-	if item.Output != nil && item.Output.Tool != nil {
-		text = item.Output.Tool.Text
-	}
-	if strings.TrimSpace(text) == "" {
-		text = "Tool completed."
-	}
-	call := item.Input.Tool.Call
-	return inferenceSpec.InputUnion{
-		Kind: inferenceSpec.InputKindFunctionToolOutput,
-		FunctionToolOutput: &inferenceSpec.ToolOutput{
-			Type:     inferenceSpec.ToolTypeFunction,
-			ID:       string(item.ID),
-			CallID:   firstText(call.ProviderCallID, call.ID),
-			ChoiceID: call.ChoiceID,
-			Name:     call.Name,
-			Role:     inferenceSpec.RoleTool,
-			Status:   inferenceSpec.StatusCompleted,
-			IsError:  item.Output.Tool.Kind != sessionv3Runtime.ToolOutputKindSuccess,
-			Contents: []inferenceSpec.ToolOutputItemUnion{
-				{
-					Kind:     inferenceSpec.ContentItemKindText,
-					TextItem: &inferenceSpec.ContentItemText{Text: text},
-				},
+	return toolOutputInput(
+		item.ID,
+		item.Input.Tool.Call,
+		*item.Output.Tool,
+	)
+}
+
+func toolOutputInput(
+	resultID sessionv3Runtime.WorkItemID,
+	call sessionv3Runtime.ToolCall,
+	result sessionv3Runtime.ToolOutput,
+) inferenceSpec.InputUnion {
+	contents := cloneToolOutputContents(result.Contents)
+	if len(contents) == 0 {
+		contents = []inferenceSpec.ToolOutputItemUnion{{
+			Kind: inferenceSpec.ContentItemKindText,
+			TextItem: &inferenceSpec.ContentItemText{
+				Text: toolOutputText(result),
 			},
-		},
+		}}
 	}
+
+	toolType := call.Type
+	if toolType == "" {
+		toolType = inferenceSpec.ToolTypeFunction
+	}
+	output := &inferenceSpec.ToolOutput{
+		Type:     toolType,
+		ID:       string(resultID),
+		CallID:   firstText(call.ProviderCallID, call.ID),
+		ChoiceID: call.ChoiceID,
+		Name:     call.Name,
+		Role:     inferenceSpec.RoleTool,
+		Status:   inferenceSpec.StatusCompleted,
+		IsError:  result.Kind != sessionv3Runtime.ToolOutputKindSuccess,
+		Contents: contents,
+	}
+	if toolType == inferenceSpec.ToolTypeCustom {
+		return inferenceSpec.InputUnion{
+			Kind:             inferenceSpec.InputKindCustomToolOutput,
+			CustomToolOutput: output,
+		}
+	}
+	return inferenceSpec.InputUnion{
+		Kind:               inferenceSpec.InputKindFunctionToolOutput,
+		FunctionToolOutput: output,
+	}
+}
+
+func cloneToolOutputContents(
+	values []inferenceSpec.ToolOutputItemUnion,
+) []inferenceSpec.ToolOutputItemUnion {
+	return jsonutil.CloneJSONInValue(values)
+}
+
+func toolOutputText(result sessionv3Runtime.ToolOutput) string {
+	if strings.TrimSpace(result.Text) != "" {
+		return result.Text
+	}
+	if strings.TrimSpace(result.Error) != "" {
+		return result.Error
+	}
+	if len(result.Structured) != 0 {
+		return string(result.Structured)
+	}
+	return "Tool completed."
 }

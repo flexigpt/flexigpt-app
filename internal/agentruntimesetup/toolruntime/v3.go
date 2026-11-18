@@ -323,7 +323,18 @@ func (e *V3Executor) ExecuteGo(
 		json.RawMessage(arguments.Clone()),
 		durationMilliseconds(binding.TimeoutMS),
 	)
-	text, structured, conversionErr := V3ToolOutputs(outputs)
+	adapted, conversionErr := AdaptToolOutputs(outputs)
+	if conversionErr != nil {
+		return sessionv3Runtime.WorkExecutionResult{
+			Error: &sessionv3Runtime.SanitizedError{
+				Code:    "go_tool_output_invalid",
+				Message: conversionErr.Error(),
+			},
+		}, nil
+	}
+	structured, conversionErr := sessionv3Runtime.CanonicalValueFrom(
+		adapted.Structured,
+	)
 	if conversionErr != nil {
 		return sessionv3Runtime.WorkExecutionResult{
 			Error: &sessionv3Runtime.SanitizedError{
@@ -333,15 +344,16 @@ func (e *V3Executor) ExecuteGo(
 		}, nil
 	}
 	if invokeErr != nil {
-		if strings.TrimSpace(text) == "" {
-			text = invokeErr.Error()
+		if strings.TrimSpace(adapted.Text) == "" {
+			adapted.Text = invokeErr.Error()
 		}
 		return sessionv3Runtime.WorkExecutionResult{
 			Output: &sessionv3Runtime.WorkItemOutput{
 				Value: structured,
 				Tool: &sessionv3Runtime.ToolOutput{
 					Kind:       sessionv3Runtime.ToolOutputKindError,
-					Text:       text,
+					Text:       adapted.Text,
+					Contents:   adapted.Contents,
 					Structured: structured,
 					Error:      invokeErr.Error(),
 				},
@@ -364,7 +376,8 @@ func (e *V3Executor) ExecuteGo(
 			Value: structured,
 			Tool: &sessionv3Runtime.ToolOutput{
 				Kind:       sessionv3Runtime.ToolOutputKindSuccess,
-				Text:       text,
+				Text:       adapted.Text,
+				Contents:   adapted.Contents,
 				Structured: structured,
 			},
 			Receipt: &sessionv3Runtime.ExternalReceipt{
@@ -382,16 +395,15 @@ func (e *V3Executor) ExecuteGo(
 func V3ToolOutputs(
 	outputs []llmtoolsSpec.ToolOutputUnion,
 ) (t string, s sessionv3Runtime.CanonicalValue, err error) {
-	raw, err := CanonicalToolOutputs(outputs)
+	adapted, err := AdaptToolOutputs(outputs)
 	if err != nil {
 		return "", nil, err
 	}
-
-	value, err := sessionv3Runtime.CanonicalValueFrom(raw)
+	value, err := sessionv3Runtime.CanonicalValueFrom(adapted.Structured)
 	if err != nil {
 		return "", nil, err
 	}
-	return ToolOutputsText(outputs), value, nil
+	return adapted.Text, value, nil
 }
 
 func (e *V3Executor) resolvePinnedTool(
@@ -549,6 +561,7 @@ func v3ChoiceForResolvedTool(
 			ID:          "prepared-choice:" + choiceID,
 			Name:        name,
 			ChoiceID:    choiceID,
+			Type:        choice.Type,
 			DisplayName: resolved.Tool.DisplayName,
 			Description: resolved.Tool.Description,
 			Binding: sessionv3Runtime.ToolBinding{
@@ -590,6 +603,7 @@ func v3ChoiceForResolvedTool(
 			ID:          "prepared-choice:" + choiceID,
 			Name:        name,
 			ChoiceID:    choiceID,
+			Type:        choice.Type,
 			DisplayName: resolved.Tool.DisplayName,
 			Description: resolved.Tool.Description,
 			Binding: sessionv3Runtime.ToolBinding{

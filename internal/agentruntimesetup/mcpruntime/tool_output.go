@@ -2,21 +2,61 @@ package mcpruntime
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"strings"
 
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/mcp/server"
-	sessionRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/session"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
+// MCPToolOutputSemantics is the common provider-neutral representation of an
+// MCP response. Session V2 and V3 retain their own orchestration state but
+// share this domain conversion for text, structured output, images, and files.
+type MCPToolOutputSemantics struct {
+	Text       string
+	Contents   []inferenceSpec.ToolOutputItemUnion
+	Structured json.RawMessage
+}
+
+func AdaptMCPToolOutput(
+	contents []mcpServer.MCPContent,
+	structuredContent any,
+) (MCPToolOutputSemantics, error) {
+	raw, err := jsonutil.EncodeToJSONRaw(struct {
+		Content           []mcpServer.MCPContent `json:"content"`
+		StructuredContent any                    `json:"structuredContent,omitempty"`
+	}{
+		Content:           contents,
+		StructuredContent: structuredContent,
+	})
+	if err != nil {
+		return MCPToolOutputSemantics{}, err
+	}
+	canonical, err := jsonutil.Canonicalize(raw)
+	if err != nil {
+		return MCPToolOutputSemantics{}, err
+	}
+
+	text := MCPContentsText(contents)
+	if strings.TrimSpace(text) == "" {
+		text = string(canonical)
+	}
+	return MCPToolOutputSemantics{
+		Text:       text,
+		Contents:   ToolOutputItemsFromMCPContents(contents),
+		Structured: json.RawMessage(canonical),
+	}, nil
+}
+
 // ToolOutputItemsFromMCPContents keeps MCP-specific content adaptation in the
-// MCP runtime boundary while exposing only inference-go content to Session.
+// MCP runtime boundary while exposing only provider-neutral inference content.
 func ToolOutputItemsFromMCPContents(
 	contents []mcpServer.MCPContent,
-) []sessionRuntime.InferenceToolOutputItem {
+) []inferenceSpec.ToolOutputItemUnion {
 	result := make(
-		[]sessionRuntime.InferenceToolOutputItem,
+		[]inferenceSpec.ToolOutputItemUnion,
 		0,
 		len(contents),
 	)
@@ -97,6 +137,37 @@ func ToolOutputItemsFromMCPContents(
 		return nil
 	}
 	return result
+}
+
+func MCPContentsText(contents []mcpServer.MCPContent) string {
+	parts := make([]string, 0, len(contents))
+	for _, content := range contents {
+		switch content.Type {
+		case mcpServer.MCPContentTypeText:
+			if strings.TrimSpace(content.Text) != "" {
+				parts = append(parts, content.Text)
+			}
+		case mcpServer.MCPContentTypeResource:
+			if content.Resource == nil {
+				continue
+			}
+			if strings.TrimSpace(content.Resource.Text) != "" {
+				parts = append(parts, content.Resource.Text)
+			} else if strings.TrimSpace(content.Resource.URI) != "" {
+				parts = append(parts, "[MCP resource omitted: "+content.Resource.URI+"]")
+			}
+		case mcpServer.MCPContentTypeResourceLink:
+			if value := strings.TrimSpace(content.Name + " " + content.URI); value != "" {
+				parts = append(parts, value)
+			}
+		case mcpServer.MCPContentTypeImage:
+			parts = append(parts, "[MCP image content]")
+		case mcpServer.MCPContentTypeAudio:
+			parts = append(parts, "[MCP audio content]")
+		default:
+		}
+	}
+	return strings.Join(parts, "\n\n")
 }
 
 func firstToolOutputName(values ...string) string {

@@ -22,15 +22,6 @@ type (
 	Revision      uint64
 )
 
-// These are aliases, not Session-owned duplicate protocol types. Session owns
-// execution state around them; inference-go owns their provider-neutral wire
-// representation.
-type (
-	InferenceToolType       = inferenceSpec.ToolType
-	InferenceToolOutputItem = inferenceSpec.ToolOutputItemUnion
-	InferenceUsage          = inferenceSpec.Usage
-)
-
 type MessageRole string
 
 const (
@@ -261,21 +252,21 @@ type ToolBinding struct {
 }
 
 type ToolResult struct {
-	ID             ToolResultID              `json:"id"`
-	AttemptID      ToolAttemptID             `json:"attemptID,omitempty"`
-	CallID         ToolCallID                `json:"callID"`
-	ProviderCallID string                    `json:"providerCallID,omitempty"`
-	Name           string                    `json:"name"`
-	ChoiceID       string                    `json:"choiceID,omitempty"`
-	Type           InferenceToolType         `json:"type,omitempty"`
-	Kind           ToolResultKind            `json:"kind"`
-	Text           string                    `json:"text,omitempty"`
-	Contents       []InferenceToolOutputItem `json:"contents,omitempty"`
-	Structured     json.RawMessage           `json:"structured,omitempty"`
-	App            json.RawMessage           `json:"app,omitempty"`
-	Error          string                    `json:"error,omitempty"`
-	AppInstanceID  AppInstanceID             `json:"appInstanceID,omitempty"`
-	CreatedAt      time.Time                 `json:"createdAt"`
+	ID             ToolResultID                        `json:"id"`
+	AttemptID      ToolAttemptID                       `json:"attemptID,omitempty"`
+	CallID         ToolCallID                          `json:"callID"`
+	ProviderCallID string                              `json:"providerCallID,omitempty"`
+	Name           string                              `json:"name"`
+	ChoiceID       string                              `json:"choiceID,omitempty"`
+	Type           inferenceSpec.ToolType              `json:"type,omitempty"`
+	Kind           ToolResultKind                      `json:"kind"`
+	Text           string                              `json:"text,omitempty"`
+	Contents       []inferenceSpec.ToolOutputItemUnion `json:"contents,omitempty"`
+	Structured     json.RawMessage                     `json:"structured,omitempty"`
+	App            json.RawMessage                     `json:"app,omitempty"`
+	Error          string                              `json:"error,omitempty"`
+	AppInstanceID  AppInstanceID                       `json:"appInstanceID,omitempty"`
+	CreatedAt      time.Time                           `json:"createdAt"`
 }
 
 type ToolAttempt struct {
@@ -290,28 +281,28 @@ type ToolAttempt struct {
 }
 
 type ToolCall struct {
-	ID                    ToolCallID        `json:"id"`
-	OriginOperationID     OperationID       `json:"originOperationID"`
-	ProviderCallID        string            `json:"providerCallID,omitempty"`
-	Name                  string            `json:"name"`
-	ChoiceID              string            `json:"choiceID,omitempty"`
-	DisplayName           string            `json:"displayName,omitempty"`
-	Description           string            `json:"description,omitempty"`
-	Type                  InferenceToolType `json:"type,omitempty"`
-	Arguments             json.RawMessage   `json:"arguments,omitempty"`
-	Binding               ToolBinding       `json:"binding"`
-	Required              bool              `json:"required"`
-	ProviderManaged       bool              `json:"providerManaged,omitempty"`
-	Automatic             bool              `json:"automatic,omitempty"`
-	Source                ToolCallSource    `json:"source,omitempty"`
-	AppInstanceID         AppInstanceID     `json:"appInstanceID,omitempty"`
-	State                 ToolCallState     `json:"state"`
-	Attempts              []ToolAttempt     `json:"attempts,omitempty"`
-	Results               []ToolResult      `json:"results,omitempty"`
-	SelectedResultID      ToolResultID      `json:"selectedResultID,omitempty"`
-	WaitID                WaitID            `json:"waitID,omitempty"`
-	LastFailure           string            `json:"lastFailure,omitempty"`
-	ConsumedByOperationID OperationID       `json:"consumedByOperationID,omitempty"`
+	ID                    ToolCallID             `json:"id"`
+	OriginOperationID     OperationID            `json:"originOperationID"`
+	ProviderCallID        string                 `json:"providerCallID,omitempty"`
+	Name                  string                 `json:"name"`
+	ChoiceID              string                 `json:"choiceID,omitempty"`
+	DisplayName           string                 `json:"displayName,omitempty"`
+	Description           string                 `json:"description,omitempty"`
+	Type                  inferenceSpec.ToolType `json:"type,omitempty"`
+	Arguments             json.RawMessage        `json:"arguments,omitempty"`
+	Binding               ToolBinding            `json:"binding"`
+	Required              bool                   `json:"required"`
+	ProviderManaged       bool                   `json:"providerManaged,omitempty"`
+	Automatic             bool                   `json:"automatic,omitempty"`
+	Source                ToolCallSource         `json:"source,omitempty"`
+	AppInstanceID         AppInstanceID          `json:"appInstanceID,omitempty"`
+	State                 ToolCallState          `json:"state"`
+	Attempts              []ToolAttempt          `json:"attempts,omitempty"`
+	Results               []ToolResult           `json:"results,omitempty"`
+	SelectedResultID      ToolResultID           `json:"selectedResultID,omitempty"`
+	WaitID                WaitID                 `json:"waitID,omitempty"`
+	LastFailure           string                 `json:"lastFailure,omitempty"`
+	ConsumedByOperationID OperationID            `json:"consumedByOperationID,omitempty"`
 
 	// Authorization is executor-private. It is deliberately excluded from
 	// public snapshots and semantic checkpoint serialization.
@@ -319,20 +310,20 @@ type ToolCall struct {
 }
 
 type ToolCallProposal struct {
-	ID              ToolCallID        `json:"id,omitempty"`
-	ProviderCallID  string            `json:"providerCallID,omitempty"`
-	Name            string            `json:"name"`
-	ChoiceID        string            `json:"choiceID,omitempty"`
-	DisplayName     string            `json:"displayName,omitempty"`
-	Description     string            `json:"description,omitempty"`
-	Type            InferenceToolType `json:"type,omitempty"`
-	Arguments       json.RawMessage   `json:"arguments,omitempty"`
-	Binding         ToolBinding       `json:"binding"`
-	Required        bool              `json:"required"`
-	ProviderManaged bool              `json:"providerManaged,omitempty"`
-	Automatic       bool              `json:"automatic,omitempty"`
-	Source          ToolCallSource    `json:"source,omitempty"`
-	Error           string            `json:"error,omitempty"`
+	ID              ToolCallID             `json:"id,omitempty"`
+	ProviderCallID  string                 `json:"providerCallID,omitempty"`
+	Name            string                 `json:"name"`
+	ChoiceID        string                 `json:"choiceID,omitempty"`
+	DisplayName     string                 `json:"displayName,omitempty"`
+	Description     string                 `json:"description,omitempty"`
+	Type            inferenceSpec.ToolType `json:"type,omitempty"`
+	Arguments       json.RawMessage        `json:"arguments,omitempty"`
+	Binding         ToolBinding            `json:"binding"`
+	Required        bool                   `json:"required"`
+	ProviderManaged bool                   `json:"providerManaged,omitempty"`
+	Automatic       bool                   `json:"automatic,omitempty"`
+	Source          ToolCallSource         `json:"source,omitempty"`
+	Error           string                 `json:"error,omitempty"`
 }
 
 type WaitingRequest struct {
@@ -427,7 +418,7 @@ type ModelOperation struct {
 	// Usage is the provider-reported token usage for this one model
 	// operation. It is intentionally separate from Run.Usage, which tracks
 	// runtime operation/attempt counts.
-	Usage *InferenceUsage `json:"usage,omitempty"`
+	Usage *inferenceSpec.Usage `json:"usage,omitempty"`
 
 	// DebugDetails is the debugger-produced HTTP/provider trace for this one
 	// model operation. It is an opaque JSON value so Session does not depend on

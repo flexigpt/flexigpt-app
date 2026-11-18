@@ -203,17 +203,13 @@ func (e *SessionToolExecutor) ExecuteTool(
 		)
 	}
 
-	structured, err := canonicalMCPJSON(struct {
-		Content           []mcpServer.MCPContent `json:"content"`
-		StructuredContent any                    `json:"structuredContent,omitempty"`
-	}{
-		Content:           response.Content,
-		StructuredContent: response.StructuredContent,
-	})
+	adapted, err := AdaptMCPToolOutput(
+		response.Content,
+		response.StructuredContent,
+	)
 	if err != nil {
 		return sessionRuntime.ToolExecutionResult{}, err
 	}
-
 	app, err := canonicalMCPJSON(response.App)
 	if err != nil {
 		return sessionRuntime.ToolExecutionResult{}, err
@@ -222,9 +218,9 @@ func (e *SessionToolExecutor) ExecuteTool(
 	result := sessionRuntime.ToolExecutionResult{
 		HasResult:  true,
 		Kind:       sessionRuntime.ToolResultKindSuccess,
-		Text:       string(structured),
-		Contents:   ToolOutputItemsFromMCPContents(response.Content),
-		Structured: structured,
+		Text:       adapted.Text,
+		Contents:   adapted.Contents,
+		Structured: adapted.Structured,
 		App:        app,
 	}
 	if response.App != nil {
@@ -242,7 +238,7 @@ func (e *SessionToolExecutor) ExecuteTool(
 	if response.IsError {
 		result.Kind = sessionRuntime.ToolResultKindError
 		result.Error = firstNonBlank(
-			string(structured),
+			adapted.Text,
 			"MCP Tool returned an error result",
 		)
 	}

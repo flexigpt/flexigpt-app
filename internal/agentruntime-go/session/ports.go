@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"time"
+
+	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
 
 type Clock interface {
@@ -37,7 +39,7 @@ type ModelExecutionResult struct {
 
 	// Usage is provider-reported usage for this exact model call. It is not
 	// an aggregate of Run usage counters.
-	Usage *InferenceUsage `json:"usage,omitempty"`
+	Usage *inferenceSpec.Usage `json:"usage,omitempty"`
 
 	// DebugDetails is the JSON-safe snapshot returned by inference-go's
 	// FetchCompletionResponse.DebugDetails for this exact model call.
@@ -173,13 +175,13 @@ type ToolExecutionRequest struct {
 }
 
 type ToolExecutionResult struct {
-	HasResult  bool                      `json:"hasResult"`
-	Kind       ToolResultKind            `json:"kind"`
-	Text       string                    `json:"text,omitempty"`
-	Contents   []InferenceToolOutputItem `json:"contents,omitempty"`
-	Structured json.RawMessage           `json:"structured,omitempty"`
-	App        json.RawMessage           `json:"app,omitempty"`
-	Error      string                    `json:"error,omitempty"`
+	HasResult  bool                                `json:"hasResult"`
+	Kind       ToolResultKind                      `json:"kind"`
+	Text       string                              `json:"text,omitempty"`
+	Contents   []inferenceSpec.ToolOutputItemUnion `json:"contents,omitempty"`
+	Structured json.RawMessage                     `json:"structured,omitempty"`
+	App        json.RawMessage                     `json:"app,omitempty"`
+	Error      string                              `json:"error,omitempty"`
 
 	AppRoute                *AppRoute           `json:"-"`
 	SkillSessionActive      []ArtifactReference `json:"skillSessionActive,omitempty"`

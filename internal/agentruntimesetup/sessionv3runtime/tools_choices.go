@@ -14,11 +14,10 @@ func (b *Binder) toolChoices(
 	ctx context.Context,
 	req sessionv3Runtime.WorkDispatchRequest,
 	defaults sessionv3Runtime.SessionDefaults,
+	skillChoices []toolruntime.V3PreparedChoice,
 ) ([]inferenceSpec.ToolChoice, map[string]sessionv3Runtime.ToolCall, error) {
 	choices := []inferenceSpec.ToolChoice{}
 	bindings := map[string]sessionv3Runtime.ToolCall{}
-	effectiveRequest := req
-	effectiveRequest.Session.Defaults = defaults
 
 	register := func(value preparedChoice) error {
 		if value.Choice.ID == "" || value.Choice.Name == "" {
@@ -38,14 +37,10 @@ func (b *Binder) toolChoices(
 	}
 
 	if len(defaults.Skills) != 0 {
-		if b.skillTools == nil {
+		if len(skillChoices) == 0 {
 			return nil, nil, errors.New(
-				"session v3 Skill runtime is unavailable",
+				"enabled Skills produced no lifecycle Tool choices",
 			)
-		}
-		skillChoices, err := b.skillTools.Choices(ctx, effectiveRequest)
-		if err != nil {
-			return nil, nil, err
 		}
 		for _, c := range preparedChoicesFromDomain(skillChoices) {
 			if err := register(c); err != nil {

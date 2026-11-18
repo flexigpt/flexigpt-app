@@ -212,6 +212,8 @@ func (e *V3Executor) Choices(
 				ID:       "prepared-choice:" + choice.ID,
 				Name:     choice.Name,
 				ChoiceID: choice.ID,
+				Type:     inferenceSpec.ToolTypeFunction,
+				Source:   sessionv3Runtime.ToolCallSourceModel,
 				DisplayName: firstNonBlank(
 					tool.DisplayName,
 					tool.ToolName,
@@ -328,6 +330,7 @@ func (e *V3Executor) BindWorkflowTool(
 	}
 	serverPin := payload.MCP.Server
 	call.Name = selected.ProviderToolName
+	call.Type = inferenceSpec.ToolTypeFunction
 	call.ChoiceID = selected.ChoiceID
 	call.DisplayName = firstNonBlank(
 		selected.DisplayName,
@@ -413,6 +416,7 @@ func (e *V3Executor) PrepareAppTool(
 	return sessionv3Runtime.ToolCall{
 		Name:          selected.ProviderToolName,
 		ChoiceID:      selected.ChoiceID,
+		Type:          inferenceSpec.ToolTypeFunction,
 		DisplayName:   firstNonBlank(selected.DisplayName, selected.ToolName, "MCP Tool"),
 		Description:   strings.TrimSpace(selected.Description),
 		Source:        sessionv3Runtime.ToolCallSourceApp,
@@ -709,33 +713,25 @@ func (e *V3Executor) Execute(
 		}, true, nil
 	}
 
-	content, err := canonicalV3MCPValue(response.Content)
+	adapted, err := AdaptMCPToolOutput(
+		response.Content,
+		response.StructuredContent,
+	)
 	if err != nil {
 		return sessionv3Runtime.WorkExecutionResult{}, true, err
 	}
-	structured, err := canonicalV3MCPValue(struct {
-		Content           []mcpServer.MCPContent          `json:"content"`
-		StructuredContent any                             `json:"structuredContent,omitempty"`
-		App               *mcpServer.MCPToolAppRenderInfo `json:"app,omitempty"`
-	}{
-		Content:           response.Content,
-		StructuredContent: response.StructuredContent,
-		App:               response.App,
-	})
+	structured, err := sessionv3Runtime.CanonicalValueFrom(
+		adapted.Structured,
+	)
 	if err != nil {
 		return sessionv3Runtime.WorkExecutionResult{}, true, err
-	}
-
-	text := v3MCPContentsText(response.Content)
-	if strings.TrimSpace(text) == "" {
-		text = string(content)
 	}
 	kind := sessionv3Runtime.ToolOutputKindSuccess
 	errorText := ""
 	if response.IsError {
 		kind = sessionv3Runtime.ToolOutputKindError
 		errorText = firstNonBlank(
-			text,
+			adapted.Text,
 			"MCP Tool returned an error result",
 		)
 	}
@@ -756,7 +752,8 @@ func (e *V3Executor) Execute(
 			Value: structured,
 			Tool: &sessionv3Runtime.ToolOutput{
 				Kind:       kind,
-				Text:       text,
+				Text:       adapted.Text,
+				Contents:   adapted.Contents,
 				Structured: structured,
 				Error:      errorText,
 			},

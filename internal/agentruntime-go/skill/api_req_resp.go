@@ -83,6 +83,14 @@ type CreateSkillSessionResponse struct {
 	Body *CreateSkillSessionResponseBody
 }
 
+// SkillSessionHydration is the semantic Skill Runtime result used by a Model
+// adapter before a provider invocation. The caller owns the private session
+// identity. This value contains only the active Skill definitions and prompt.
+type SkillSessionHydration struct {
+	ActiveSkills []provider.SkillDef
+	Prompt       string
+}
+
 type CloseSkillSessionRequest struct {
 	SessionID agentskillsRuntimeSpec.SessionID `path:"sessionID" required:"true"`
 }

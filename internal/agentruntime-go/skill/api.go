@@ -115,6 +115,58 @@ func (s *Service) GetSkillsPrompt(
 	}, nil
 }
 
+// HydrateSkillSession reads the active Skill state and SkillsPrompt for one
+// already-created private runtime session. It does not expose or persist the
+// session ID. Model adapters call it immediately before provider invocation.
+func (s *Service) HydrateSkillSession(
+	ctx context.Context,
+	sessionID agentskillsRuntimeSpec.SessionID,
+	allowed []provider.SkillDef,
+) (SkillSessionHydration, error) {
+	if strings.TrimSpace(string(sessionID)) == "" {
+		return SkillSessionHydration{}, fmt.Errorf(
+			"%w: sessionID required",
+			ErrInvalidRequest,
+		)
+	}
+	if len(allowed) == 0 {
+		return SkillSessionHydration{}, fmt.Errorf(
+			"%w: allowed Skills required",
+			ErrInvalidRequest,
+		)
+	}
+
+	active, err := s.ListAgentSkills(
+		ctx,
+		&agentskillsRuntime.SkillListFilter{
+			AllowSkills: append([]provider.SkillDef(nil), allowed...),
+			SessionID:   sessionID,
+			Activity:    agentskillsRuntimeSpec.SkillActivity("active"),
+		},
+	)
+	if err != nil {
+		return SkillSessionHydration{}, err
+	}
+
+	prompt, err := s.SkillsPrompt(
+		ctx,
+		&agentskillsRuntime.SkillFilter{
+			AllowSkills: append([]provider.SkillDef(nil), allowed...),
+			SessionID:   sessionID,
+			Activity:    agentskillsRuntimeSpec.SkillActivityAny,
+		},
+	)
+	if err != nil {
+		return SkillSessionHydration{}, err
+	}
+
+	output := SkillSessionHydration{Prompt: prompt}
+	for _, record := range active {
+		output.ActiveSkills = append(output.ActiveSkills, record.Def)
+	}
+	return output, nil
+}
+
 func (s *Service) ListSkills(
 	ctx context.Context,
 	req *ListSkillsRequest,

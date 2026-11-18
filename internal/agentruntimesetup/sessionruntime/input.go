@@ -289,7 +289,7 @@ func toolResultInput(
 }
 
 func providerToolOutputType(
-	value sessionRuntime.InferenceToolType,
+	value inferenceSpec.ToolType,
 ) inferenceSpec.ToolType {
 	if value == inferenceSpec.ToolTypeCustom {
 		return inferenceSpec.ToolTypeCustom
@@ -575,7 +575,7 @@ func toolResultText(result sessionRuntime.ToolResult) string {
 }
 
 func toolResultContentsText(
-	contents []sessionRuntime.InferenceToolOutputItem,
+	contents []inferenceSpec.ToolOutputItemUnion,
 ) string {
 	parts := make([]string, 0, len(contents))
 	for _, content := range contents {

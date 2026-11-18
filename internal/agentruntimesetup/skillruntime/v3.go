@@ -3,7 +3,6 @@ package skillruntime
 import (
 	"context"
 	"errors"
-	"fmt"
 	"maps"
 	"strings"
 	"sync"
@@ -13,15 +12,12 @@ import (
 	"github.com/flexigpt/agentskills-go/provider"
 	agentskillsRuntime "github.com/flexigpt/agentskills-go/runtime"
 	agentskillsRuntimeSpec "github.com/flexigpt/agentskills-go/runtime/spec"
-	inferenceSpec "github.com/flexigpt/inference-go/spec"
-	llmtoolsSpec "github.com/flexigpt/llmtools-go/spec"
 
 	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 	skillRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/skill"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/toolruntime"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 const (
@@ -43,8 +39,10 @@ type V3Executor struct {
 }
 
 type v3SkillSession struct {
-	id          string
-	definitions []provider.SkillDef
+	id           string
+	definitions  []provider.SkillDef
+	state        sessionv3Runtime.SkillSelectionState
+	byDefinition map[provider.SkillDef]sessionv3Runtime.ArtifactPin
 }
 
 func NewV3Executor(
@@ -69,33 +67,24 @@ func (e *V3Executor) Choices(
 	ctx context.Context,
 	request sessionv3Runtime.WorkDispatchRequest,
 ) ([]toolruntime.V3PreparedChoice, error) {
-	if len(request.Session.Defaults.Skills) == 0 {
-		return nil, nil
-	}
-
-	includeAll := len(request.Session.Defaults.ActiveSkills) != 0
-	session := e.executionSession(request.Execution.ID)
-	if session.id != "" {
-		active, err := e.runtime.ListAgentSkills(
-			ctx,
-			&agentskillsRuntime.SkillListFilter{
-				AllowSkills: session.definitions,
-				SessionID: agentskillsRuntimeSpec.SessionID(
-					session.id,
-				),
-				Activity: agentskillsRuntimeSpec.SkillActivity("active"),
-			},
-		)
-		if err != nil {
-			return nil, err
-		}
-		includeAll = len(active) != 0
-	}
-
-	return v3SkillChoices(
-		includeAll,
-		e.runtime.SupportsRunScript(),
+	active, err := e.EffectiveActiveSelections(
+		request.Execution,
+		request.Session.Defaults.Skills,
+		request.Session.Defaults.ActiveSkills,
 	)
+	if err != nil {
+		return nil, err
+	}
+	hydrated, err := e.HydrateLLM(
+		ctx,
+		request.Execution.ID,
+		request.Session.Defaults.Skills,
+		active,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return hydrated.Choices, nil
 }
 
 // Instruction resolves and renders an instruction-mode Skill through the
@@ -189,35 +178,18 @@ func (e *V3Executor) Bind(
 			"skill tool was requested without enabled Skills",
 		)
 	}
-	if _, _, err := e.resolveSelections(
+	resolved, err := e.resolveV3Selections(
 		ctx,
 		skills,
 		active,
-	); err != nil {
-		return sessionv3Runtime.SemanticBinding{}, err
-	}
-
-	artifacts := make(
-		[]sessionv3Runtime.ArtifactPin,
-		0,
-		len(skills),
 	)
-	for _, selection := range skills {
-		if selection.ExpectedRevision == 0 ||
-			strings.TrimSpace(selection.ExpectedDigest) == "" {
-			continue
-		}
-		artifacts = append(artifacts, sessionv3Runtime.ArtifactPin{
-			RootID:     selection.RootID,
-			ArtifactID: selection.ArtifactID,
-			Revision:   selection.ExpectedRevision,
-			Digest:     selection.ExpectedDigest,
-		})
+	if err != nil {
+		return sessionv3Runtime.SemanticBinding{}, err
 	}
 
 	return sessionv3Runtime.SemanticBinding{
 		Version:           "session-v3-skill/v1",
-		Artifacts:         artifacts,
+		Artifacts:         append([]sessionv3Runtime.ArtifactPin(nil), resolved.state.Enabled...),
 		TargetFingerprint: "skill:" + payload.Call.Name,
 		BoundAt:           time.Now().UTC(),
 	}, nil
@@ -243,7 +215,27 @@ func (e *V3Executor) Execute(
 		}, true, nil
 	}
 
-	sessionID, err := e.ensureSession(ctx, request)
+	skills, activeSelections, err := v3SkillSelectionsForTool(
+		request,
+		payload,
+	)
+	if err != nil {
+		return sessionv3Runtime.WorkExecutionResult{}, true, err
+	}
+	resolved, err := e.resolveV3Selections(ctx, skills, activeSelections)
+	if err != nil {
+		return sessionv3Runtime.WorkExecutionResult{
+			Error: &sessionv3Runtime.SanitizedError{
+				Code:    "skill_session_failed",
+				Message: err.Error(),
+			},
+		}, true, nil
+	}
+	runtimeSession, err := e.ensureResolvedSkillSession(
+		ctx,
+		request.Execution.ID,
+		resolved,
+	)
 	if err != nil {
 		return sessionv3Runtime.WorkExecutionResult{
 			Error: &sessionv3Runtime.SanitizedError{
@@ -270,7 +262,7 @@ func (e *V3Executor) Execute(
 		ctx,
 		&skillRuntime.InvokeSkillToolRequest{
 			Body: &skillRuntime.InvokeSkillToolRequestBody{
-				SessionID: agentskillsRuntimeSpec.SessionID(sessionID),
+				SessionID: agentskillsRuntimeSpec.SessionID(runtimeSession.id),
 				ToolName:  payload.Call.Name,
 				Args:      string(arguments),
 			},
@@ -293,9 +285,30 @@ func (e *V3Executor) Execute(
 		}, true, nil
 	}
 
-	text, structured, err := toolruntime.V3ToolOutputs(response.Body.Outputs)
+	adapted, err := toolruntime.AdaptToolOutputs(response.Body.Outputs)
 	if err != nil {
 		return sessionv3Runtime.WorkExecutionResult{}, true, err
+	}
+	structured, err := sessionv3Runtime.CanonicalValueFrom(
+		adapted.Structured,
+	)
+	if err != nil {
+		return sessionv3Runtime.WorkExecutionResult{}, true, err
+	}
+	activeState, stateErr := e.activeSkillSelectionState(
+		ctx,
+		request.Execution.ID,
+		runtimeSession,
+	)
+	if stateErr != nil {
+		return sessionv3Runtime.WorkExecutionResult{
+			Error: &sessionv3Runtime.SanitizedError{
+				Code:     "skill_state_unavailable",
+				Category: sessionv3Runtime.ErrorCategoryUncertainty,
+				Message:  stateErr.Error(),
+			},
+			Confirmed: false,
+		}, true, nil
 	}
 
 	kind := sessionv3Runtime.ToolOutputKindSuccess
@@ -310,8 +323,8 @@ func (e *V3Executor) Execute(
 			Code:    "skill_tool_error",
 			Message: message,
 		}
-		if strings.TrimSpace(text) == "" {
-			text = message
+		if strings.TrimSpace(adapted.Text) == "" {
+			adapted.Text = message
 		}
 	}
 
@@ -320,13 +333,15 @@ func (e *V3Executor) Execute(
 			Value: structured,
 			Tool: &sessionv3Runtime.ToolOutput{
 				Kind:       kind,
-				Text:       text,
+				Text:       adapted.Text,
+				Contents:   adapted.Contents,
 				Structured: structured,
 				Error:      firstV3SkillText(response.Body.ErrorMessage),
+				SkillState: &activeState,
 			},
 			Receipt: &sessionv3Runtime.ExternalReceipt{
 				System:      "skill",
-				Reference:   sessionID + ":" + payload.Call.Name,
+				Reference:   "skill:" + payload.Call.Name + ":" + payload.Call.ID,
 				ConfirmedAt: time.Now().UTC(),
 			},
 		},
@@ -477,168 +492,6 @@ func cloneV3SkillArguments(
 	return output
 }
 
-func (e *V3Executor) ensureSession(
-	ctx context.Context,
-	request sessionv3Runtime.WorkDispatchRequest,
-) (string, error) {
-	if existing := e.executionSession(request.Execution.ID); existing.id != "" {
-		return existing.id, nil
-	}
-	payload := request.WorkItem.Input.Tool
-	skills, activeSkills, originErr := v3SkillSelectionsForTool(
-		request,
-		payload,
-	)
-	if originErr != nil {
-		return "", originErr
-	}
-	if len(skills) == 0 {
-		return "", errors.New("skill tool was requested without enabled Skills")
-	}
-
-	definitions, active, err := e.resolveSelections(
-		ctx,
-		skills,
-		activeSkills,
-	)
-	if err != nil {
-		return "", err
-	}
-
-	created, err := e.runtime.CreateSkillSession(
-		ctx,
-		&skillRuntime.CreateSkillSessionRequest{
-			Body: &skillRuntime.CreateSkillSessionRequestBody{
-				AllowedSkills: definitions,
-				ActiveSkills:  active,
-			},
-		},
-	)
-	if err != nil {
-		return "", err
-	}
-	if created == nil ||
-		created.Body == nil ||
-		created.Body.SessionID == "" {
-		return "", errors.New("skill Runtime returned no Session identity")
-	}
-
-	next := v3SkillSession{
-		id:          string(created.Body.SessionID),
-		definitions: append([]provider.SkillDef(nil), definitions...),
-	}
-
-	e.mu.Lock()
-	existing, found := e.sessions[request.Execution.ID]
-	if !found {
-		e.sessions[request.Execution.ID] = next
-	}
-	e.mu.Unlock()
-
-	if found {
-		_ = e.runtime.CloseSession(
-			context.WithoutCancel(ctx),
-			created.Body.SessionID,
-		)
-		return existing.id, nil
-	}
-	return next.id, nil
-}
-
-func (e *V3Executor) resolveSelections(
-	ctx context.Context,
-	selections []sessionv3Runtime.ArtifactSelection,
-	activeSelections []sessionv3Runtime.ArtifactSelection,
-) (defs, active []provider.SkillDef, err error) {
-	refs := make(
-		[]artifactModel.ArtifactRef,
-		0,
-		len(selections),
-	)
-	selectionByKey := make(
-		map[string]sessionv3Runtime.ArtifactSelection,
-		len(selections),
-	)
-
-	for _, selection := range selections {
-		ref := artifactModel.ArtifactRef{
-			RootID:     rootModel.RootID(selection.RootID),
-			ArtifactID: artifactModel.ArtifactID(selection.ArtifactID),
-		}
-		if err := ref.Validate(); err != nil {
-			return nil, nil, err
-		}
-		key := v3SkillArtifactKey(selection.RootID, selection.ArtifactID)
-		if _, duplicate := selectionByKey[key]; duplicate {
-			return nil, nil, fmt.Errorf(
-				"duplicate selected Skill %s/%s",
-				selection.RootID,
-				selection.ArtifactID,
-			)
-		}
-		selectionByKey[key] = selection
-		refs = append(refs, ref)
-	}
-
-	resolved, err := e.resolver.ResolveSkills(ctx, refs)
-	if err != nil {
-		return nil, nil, err
-	}
-	if len(resolved.Values) != len(refs) {
-		return nil, nil, errors.New(
-			"skill resolver returned an unexpected selected Skill count",
-		)
-	}
-
-	definitions := make([]provider.SkillDef, 0, len(resolved.Values))
-	definitionByKey := make(
-		map[string]provider.SkillDef,
-		len(resolved.Values),
-	)
-	for _, value := range resolved.Values {
-		key := v3SkillArtifactKey(
-			string(value.Artifact.RootID),
-			string(value.Artifact.ArtifactID),
-		)
-		selection, found := selectionByKey[key]
-		if !found {
-			return nil, nil, errors.New(
-				"skill resolver returned an Artifact that was not requested",
-			)
-		}
-		if selection.ExpectedRevision != 0 &&
-			selection.ExpectedRevision != value.Revision {
-			return nil, nil, errors.New("selected Skill revision changed")
-		}
-		if selection.ExpectedDigest != "" &&
-			selection.ExpectedDigest != value.DefinitionDigest {
-			return nil, nil, errors.New("selected Skill Definition changed")
-		}
-		if !value.Enabled {
-			return nil, nil, fmt.Errorf(
-				"selected Skill %q is disabled",
-				value.Artifact.ArtifactID,
-			)
-		}
-
-		definitions = append(definitions, value.Definition)
-		definitionByKey[key] = value.Definition
-	}
-
-	active = make([]provider.SkillDef, 0, len(activeSelections))
-	for _, selection := range activeSelections {
-		key := v3SkillArtifactKey(selection.RootID, selection.ArtifactID)
-		definition, found := definitionByKey[key]
-		if !found {
-			return nil, nil, errors.New(
-				"active Skill is not part of the enabled Skill selection",
-			)
-		}
-		active = append(active, definition)
-	}
-	return definitions, active, nil
-}
-
 func (e *V3Executor) executionSession(
 	executionID sessionv3Runtime.ExecutionID,
 ) v3SkillSession {
@@ -649,85 +502,34 @@ func (e *V3Executor) executionSession(
 	e.mu.Lock()
 	value := e.sessions[executionID]
 	e.mu.Unlock()
-	value.definitions = append([]provider.SkillDef(nil), value.definitions...)
-	return value
+	return cloneV3SkillSession(value)
 }
 
 func v3SkillChoices(
 	includeAll bool,
 	includeRunScript bool,
 ) ([]toolruntime.V3PreparedChoice, error) {
-	definitions := []struct {
-		name string
-		tool llmtoolsSpec.Tool
-	}{
-		{
-			name: v3SkillToolLoadName,
-			tool: agentskillsRuntimeSpec.SkillsLoadTool(),
-		},
+	choices, err := buildSkillToolChoices(includeAll, includeRunScript)
+	if err != nil {
+		return nil, err
 	}
-	if includeAll {
-		definitions = append(
-			definitions,
-			struct {
-				name string
-				tool llmtoolsSpec.Tool
-			}{
-				name: v3SkillToolUnloadName,
-				tool: agentskillsRuntimeSpec.SkillsUnloadTool(),
-			},
-			struct {
-				name string
-				tool llmtoolsSpec.Tool
-			}{
-				name: v3SkillToolReadResourceName,
-				tool: agentskillsRuntimeSpec.SkillsReadResourceTool(),
-			},
-		)
-		if includeRunScript {
-			definitions = append(definitions, struct {
-				name string
-				tool llmtoolsSpec.Tool
-			}{
-				name: v3SkillToolRunScriptName,
-				tool: agentskillsRuntimeSpec.SkillsRunScriptTool(),
-			})
-		}
-	}
-
-	output := make([]toolruntime.V3PreparedChoice, 0, len(definitions))
-	for _, definition := range definitions {
-		raw, err := jsonutil.DecodeJSONStringRaw(
-			jsonutil.JSONRawString(definition.tool.ArgSchema),
-		)
-		if err != nil {
-			return nil, err
-		}
-		arguments, err := toolruntime.InputSchema(raw)
-		if err != nil {
-			return nil, err
-		}
-
-		choice := inferenceSpec.ToolChoice{
-			Type:        inferenceSpec.ToolTypeFunction,
-			ID:          "builtin." + definition.name,
-			Name:        definition.name,
-			Description: definition.tool.Description,
-			Arguments:   arguments,
-		}
+	output := make([]toolruntime.V3PreparedChoice, 0, len(choices))
+	for _, choice := range choices {
 		call := sessionv3Runtime.ToolCall{
 			ID:          "prepared-choice:" + choice.ID,
-			Name:        definition.name,
+			Name:        choice.Name,
 			ChoiceID:    choice.ID,
-			DisplayName: v3SkillToolDisplayName(definition.name),
-			Description: definition.tool.Description,
-			Automatic: definition.name == v3SkillToolLoadName ||
-				definition.name == v3SkillToolUnloadName ||
-				definition.name == v3SkillToolReadResourceName,
+			Type:        choice.Type,
+			DisplayName: v3SkillToolDisplayName(choice.Name),
+			Description: choice.Description,
+			Source:      sessionv3Runtime.ToolCallSourceModel,
+			Automatic: choice.Name == v3SkillToolLoadName ||
+				choice.Name == v3SkillToolUnloadName ||
+				choice.Name == v3SkillToolReadResourceName,
 			Binding: sessionv3Runtime.ToolBinding{
 				Kind: sessionv3Runtime.ToolBindingKindSkill,
 				Skill: &sessionv3Runtime.SkillToolBinding{
-					Name: definition.name,
+					Name: choice.Name,
 				},
 			},
 		}
@@ -775,7 +577,15 @@ func v3SkillSelectionsForTool(
 	active []sessionv3Runtime.ArtifactSelection,
 	err error,
 ) {
-	if payload == nil || payload.Origin == nil {
+	if payload == nil {
+		return nil, nil, errors.New("skill tool payload is unavailable")
+	}
+	if payload.Origin == nil {
+		if payload.Call.Source == sessionv3Runtime.ToolCallSourceModel {
+			return nil, nil, errors.New(
+				"generated Skill Tool has no immutable LLM invocation origin",
+			)
+		}
 		return request.Session.Defaults.Skills,
 			request.Session.Defaults.ActiveSkills,
 			nil

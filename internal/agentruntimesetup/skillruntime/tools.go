@@ -56,6 +56,22 @@ func buildSkillToolChoices(
 	return output, nil
 }
 
+// SkillRulesPrompt centralizes the runtime policy prompt that accompanies the
+// lifecycle Tool set. Session V2 and V3 can retain their own orchestration
+// while using the same Skill-domain rule selection.
+func SkillRulesPrompt(
+	includeAll bool,
+	includeRunScript bool,
+) string {
+	if !includeAll {
+		return agentskillsRuntimeSpec.SkillsRulesPromptLoadOnly
+	}
+	if !includeRunScript {
+		return agentskillsRuntimeSpec.SkillsRulesPromptWithoutRunScript
+	}
+	return agentskillsRuntimeSpec.SkillsRulesPromptAll
+}
+
 func decodeToolArgSchema(
 	raw jsonutil.JSONRawString,
 ) (map[string]any, error) {
