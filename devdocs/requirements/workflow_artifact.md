@@ -79,12 +79,18 @@ A Workflow does not own:
 ### 3.2 Workflow Artifact plan boundary
 
 Workflow Artifact planning owns static source facts. It returns an admitted
-Workflow document, callable targets, requirements, source inventory, direct
-capability evidence, and a complete static Artifact dependency closure.
+Workflow document, callable targets, requirements, source inventory, and a
+complete static Artifact dependency closure.
 
 The closure contains only source-backed Artifact identity facts and static
 relationships. It contains no execution-private program, binding, timer,
 provider request, credential, client, callback, or native handle.
+
+Workflow does not support direct capabilities for Model, Agent, Tool, MCP,
+Skill, Service, or Activity. A direct composition result for one of those
+families is unsupported Workflow input. Planning must report that result as an
+issue. It must not publish a usable direct target, fabricate an Artifact, or
+create a synthetic pin.
 
 Consumers can use the plan as a read-only source-fact projection. Consumer
 lowering and execution behavior are not specified in this document.
@@ -129,11 +135,12 @@ The Artifact-facing plan contract must provide:
 - Callable targets.
 - Requirements.
 - Source inventory facts.
-- Direct-capability evidence where no Artifact exists.
 
 Current target readiness, runtime Artifact pin conversion, domain binding,
 runtime execution, persistence, recovery, and Wails behavior are outside this
 Artifact API.
+
+Inline Workflow text remains ordinary declaration data. It is not a direct capability.
 
 Workflow declarations are admitted through ordinary generic Source refresh and
 application-selected canonical declaration decoders. Built-in and Workspace
@@ -147,7 +154,6 @@ The completed plan contract returns:
   call can select;
 - `Inventory.Requirements`, containing only admission prerequisites;
 - source-backed `ResolvedArtifactRef` values for resolved Artifact targets;
-- direct-capability identity and evidence for direct targets;
 - call, context, port, retry, effect, and block planning facts;
 - detailed relationship status and issue facts.
 
@@ -155,6 +161,9 @@ Generic Artifact, catalog, Definition, Resource, and enablement APIs provide
 the current entity-management operations. No Workflow-specific list, get,
 source export, enablement, Plugin, or managed package API is required until a
 concrete consumer requires one.
+
+Service and Activity remain typed registered binding prerequisites. They are
+not Artifacts and are not direct composition capabilities.
 
 An Artifact-backed requirement receives ordinary composition resolution. A
 Service or Activity requirement remains a typed setup-binding prerequisite and
@@ -176,9 +185,10 @@ when it creates an execution pin. Plan resolution does not establish provider,
 credential, policy, Tool, MCP, Skill, Workspace, Service, or Activity
 readiness.
 
-A direct capability remains direct. Workflow planning must not fabricate an
-Artifact, Source, Definition, revision, local-state record, or lifecycle
-record for it.
+A direct composition result for a Workflow-relevant target family is rejected
+as unsupported. Workflow planning must not fabricate an Artifact, Source,
+Definition, revision, local-state record, lifecycle record, or direct-target
+runtime representation for it.
 
 ## 4. Architecture
 
@@ -191,12 +201,12 @@ flowchart TD
     E --> F[External consumer boundary]
 ```
 
-| Layer                      | Primary package area                               | Responsibilities                                                                                                                             |
-| -------------------------- | -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| Declaration language       | `internal/llmartifactory-go/workflow/contract/v1/` | Source grammar, source schema, static validation, JSON Schema validity, CEL scope validity, target and requirement declaration validity      |
-| Workflow planning          | `internal/llmartifactory-go/workflow/`             | Read-only Artifact-backed relationship resolution, callable-target and requirement inventory, direct Artifact references, and planning facts |
-| Artifact Store             | Generic Artifact Store packages                    | Passive Definition storage, identity, relationships, admitted source facts, and read-only retrieval                                          |
-| External consumer boundary | Outside this document                              | Consumer behavior is intentionally not specified here                                                                                        |
+| Layer                      | Primary package area                               | Responsibilities                                                                                                                           |
+| -------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Declaration language       | `internal/llmartifactory-go/workflow/contract/v1/` | Source grammar, source schema, static validation, JSON Schema validity, CEL scope validity, target and requirement declaration validity    |
+| Workflow planning          | `internal/llmartifactory-go/workflow/`             | Read-only Artifact-backed relationship resolution, callable-target and requirement inventory, source-backed references, and planning facts |
+| Artifact Store             | Generic Artifact Store packages                    | Passive Definition storage, identity, relationships, admitted source facts, and read-only retrieval                                        |
+| External consumer boundary | Outside this document                              | Consumer behavior is intentionally not specified here                                                                                      |
 
 The Artifact Store has no execution role. It does not parse consumer intent,
 prepare bindings, schedule work, or retain consumer-private state.
@@ -208,12 +218,12 @@ document makes no assertion about a consumer's runtime representation.
 
 This document defines only Artifact-side interpretation and read-only planning ownership.
 
-| Artifact concern                                                            | Owner                 | Artifact-facing result                                             |
-| --------------------------------------------------------------------------- | --------------------- | ------------------------------------------------------------------ |
-| Artifact envelope, Definition identity, and persistence identity            | Artifact Store        | Admitted immutable source facts                                    |
-| Workflow grammar, source schema, static CEL scope, and source relationships | Workflow contract v1  | Typed admitted Workflow declaration                                |
-| Artifact-backed target and requirement resolution                           | Workflow planning     | Read-only plan, inventory, closure, and direct-capability evidence |
-| Consumer execution, binding, persistence, transport, and scheduling         | Outside this document | No Artifact HLD behavior is specified                              |
+| Artifact concern                                                            | Owner                 | Artifact-facing result                                            |
+| --------------------------------------------------------------------------- | --------------------- | ----------------------------------------------------------------- |
+| Artifact envelope, Definition identity, and persistence identity            | Artifact Store        | Admitted immutable source facts                                   |
+| Workflow grammar, source schema, static CEL scope, and source relationships | Workflow contract v1  | Typed admitted Workflow declaration                               |
+| Artifact-backed target and requirement resolution                           | Workflow planning     | Read-only plan, inventory, closure, and unsupported-direct issues |
+| Consumer execution, binding, persistence, transport, and scheduling         | Outside this document | No Artifact HLD behavior is specified                             |
 
 Artifact planning ends when it returns admitted source facts. Consumer-local
 representations and consumer behavior are not part of Artifact planning.
@@ -1850,19 +1860,29 @@ Workflow Artifact completion includes:
 - Static target and requirement planning.
 - Deterministic source inventory construction.
 - Complete static source-backed Artifact closure construction.
-- Explicit direct-capability evidence.
+- Explicit rejection of unsupported direct composition results.
 - One canonical declaration-path model in contract admission and planning.
 - No runtime interpretation or runtime-private data.
 - No Artifact Store execution role.
 
 ## 22. Workflow Artifact implementation status
 
-| Artifact planning task                                           | Status      | Evidence or required result                                                                                 |
-| ---------------------------------------------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------- |
-| Decode and validate Workflow v1 declarations                     | Implemented | `internal/llmartifactory-go/workflow/contract/v1/`                                                          |
-| Build callable-target and requirement inventory                  | Implemented | `internal/llmartifactory-go/workflow/inventory.go`                                                          |
-| Preserve direct capability evidence without Artifact fabrication | Implemented | `internal/llmartifactory-go/workflow/closure.go` emits direct evidence without synthetic Artifact nodes     |
-| Publish a deterministic complete static Artifact closure         | Implemented | `internal/llmartifactory-go/workflow/closure.go` publishes sorted nodes, edges, paths, and refresh checks   |
-| Include nested Workflow plan nodes in the closure                | Implemented | `ArtifactClosureNode.Workflow` contains admitted nested Workflow document, inventory, and composition facts |
-| Publish one canonical declaration-path model                     | Implemented | Contract admission, Inventory, and closure paths retain the canonical `root/...` declaration identity       |
-| Keep runtime interpretation outside Artifact planning            | Implemented | `internal/llmartifactory-go/workflow/` imports Artifact and declaration planning contracts only             |
+| Artifact planning task                                    | Status      | Evidence or required result                                                                                                                                               |
+| --------------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Decode and validate Workflow v1 declarations              | Implemented | `internal/llmartifactory-go/workflow/contract/v1/`                                                                                                                        |
+| Build callable-target and requirement inventory           | Implemented | `internal/llmartifactory-go/workflow/inventory.go`                                                                                                                        |
+| Reject direct capability composition for Workflow targets | Open        | Remove `DirectCapabilityEvidence` as Workflow plan output. Convert direct Model, Agent, Tool, MCP, Skill, Service, and Activity composition results into planning issues. |
+| Publish a deterministic complete static Artifact closure  | Implemented | `internal/llmartifactory-go/workflow/closure.go` publishes sorted nodes, edges, paths, and refresh checks                                                                 |
+| Include nested Workflow plan nodes in the closure         | Implemented | `ArtifactClosureNode.Workflow` contains admitted nested Workflow document, inventory, and composition facts                                                               |
+| Publish one canonical declaration-path model              | Implemented | Contract admission, Inventory, and closure paths retain the canonical `root/...` declaration identity                                                                     |
+| Keep runtime interpretation outside Artifact planning     | Implemented | `internal/llmartifactory-go/workflow/` imports Artifact and declaration planning contracts only                                                                           |
+
+## 23. Direct-capability and generic-callable-capability cleanup
+
+| Cleanup task                                                                     | Status | Required result                                                                                                                                                                                           |
+| -------------------------------------------------------------------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Reject direct composition results for Workflow callable targets and requirements | Open   | `workflow.Service.ResolvePlan` reports an unsupported target issue. It does not emit `DirectCapabilityEvidence` for executable target families.                                                           |
+| Remove Workflow direct-capability closure data                                   | Open   | Remove Workflow-only direct evidence fields, sorting, fingerprint input, inventory projection, and consumer assumptions. Do not remove generic composition support without a repository-wide owner audit. |
+| Preserve Service and Activity binding targets                                    | Open   | Keep `service` and `activity` as binding IDs. They remain non-Artifact targets and must not enter direct-capability handling.                                                                             |
+| Preserve inline text as declaration data                                         | Open   | Keep literal values, explicit Model and Agent messages, and explicit instructions. Do not represent inline text as a direct capability.                                                                   |
+| Remove generic callable capability runtime semantics                             | Open   | Keep the source field only for compatibility until contract admission rejects non-empty values. Do not create runtime facts, adapter registries, or generic capability evaluators.                        |
