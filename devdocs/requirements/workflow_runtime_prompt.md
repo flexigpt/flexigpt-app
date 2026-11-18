@@ -1,168 +1,143 @@
-## Prompt 1: Complete target-domain and setup support
+## Corrected remaining functional work
 
-```text
-Complete the full target-domain and setup support work in one coherent implementation change set.
+| Functional work                                                                | Why it is required                                                                                                                   | Owner                                          | Handoff  |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------- | -------- |
+| Reconstruct completed normal model and Tool rounds on later turns              | Normal local Tool continuation currently sends Tool output without the preceding assistant Tool-call representation.                 | Session orchestration and provider integration | Prompt 2 |
+| Reuse prior semantic context where it belongs in later conversation history    | Workspace, MCP, and other prepared semantic context can affect the original turn but is not reconstructed for later turns.           | Session orchestration                          | Prompt 2 |
+| Consume staged App context into the next continuation message                  | The stage path and input-rendering path exist but are disconnected.                                                                  | Session orchestration and MCP integration      | Prompt 2 |
+| Preserve or derive active Skill semantics across later turns and recovery      | Active Skills affect future prompt and Tool behavior. The semantic selection must survive without persisting a Skill Runtime handle. | Skill domain and Session orchestration         | Prompt 1 |
+| Hydrate Skill rules and prompt before model execution                          | V2 does this. V3 exposes Skill Tools but omits the Skill prompt behavior.                                                            | Skill domain integration                       | Prompt 1 |
+| Honor Agent `IncludeSystemPrompt` behavior                                     | Agent configuration currently cannot control selected Model prompt inclusion in V3.                                                  | Agent and Model integration                    | Prompt 1 |
+| Record Workflow `start` receipts                                               | The runtime already creates the receipt but does not retain it in the parent outcome.                                                | Workflow Runtime                               | Prompt 2 |
+| Keep direct Workflow start separate from trigger registration                  | Direct execution currently activates triggers despite the HLD contract.                                                              | Workflow and Session orchestration             | Prompt 2 |
+| Preserve trigger preparation defaults where target preparation needs them      | Trigger preparation drops supplied invocation defaults.                                                                              | Workflow preparation                           | Prompt 2 |
+| Rearm retry delays and correct nested retry behavior                           | Persisted retry work can remain stranded after restore; valid one-attempt nested retry declarations are rejected.                    | Runtime and Workflow orchestration             | Prompt 2 |
+| Make Workflow logical time Runtime-owned and unify due-time lifecycle behavior | Runtime-owned timing is required for durable continuation and consistent restore behavior.                                           | Runtime and Workflow orchestration             | Prompt 2 |
 
-Read and use:
+No direct Tool, direct Skill, direct Model, direct Agent, direct MCP, direct Service, direct Activity, direct Workflow, cost meter, or RunLimit compatibility work belongs in the current handoffs.
+
+## Corrected implementation handoff prompt 1
+
+Implement the V3 domain-support completion work in one large pass.
+
+Work in:
+
+- `internal/agentruntimesetup/sessionv3runtime/`
+- `internal/agentruntimesetup/{skillruntime,toolruntime,mcpruntime}/`
+- `internal/agentruntime-go/sessionv3/types.go`
+- `internal/agentruntime-go/skill/`
 - `devdocs/requirements/workflow_runtime.md`
-- `devdocs/requirements/workflow_artifact.md`
-- the Functional completion ledger
-- the Architecture ownership and duplication register
 
-This is work in progress. Do not bump any version identifier anywhere. Do not change Workflow apiVersion, ProgramFrame payload or interpreter versions, Artifact or Store schema versions, package or module versions, or public API versions.
+Required outcomes:
 
-Out of scope:
-- Tests, test execution, and new validation work.
-- Frontend or Wails integration.
-- Session v2 deletion, cleanup, migration, or stored-session conversion.
+- Complete V3 Skill behavior.
+  - Persist or deterministically reconstruct semantic enabled and active Skill selections that affect future conversation behavior.
+  - Keep Skill Runtime session IDs, registries, handles, clients, and callbacks process-private.
+  - Recreate private Skill Runtime sessions from semantic Skill selections after recovery.
+  - Hydrate Skill rules and `SkillsPrompt` before each effective V3 model invocation.
+  - Preserve immutable LLM-origin Skill selections for generated Skill Tool calls.
+  - Do not substitute current Session defaults for retained origin facts.
 
-Do not return a narrow patch, partial scaffold, or implementation plan. Complete every feasible target-domain item below in one large coherent source change. Update the applicable HLD status rows from Open or Partial to Implemented only after the complete behavior exists.
+- Honor Agent `IncludeSystemPrompt`.
+  - Consume the Agent capability fact in V3 LLM plan composition.
+  - Preserve current Session override precedence.
+  - Keep Agent and Model behavior in their owning adapters.
 
-Required behavior:
+- Preserve completed Tool semantics for later-turn reconstruction.
+  - Reuse existing durable provider-neutral structured output and completed Tool facts where possible.
+  - Preserve Tool call identity, provider call identity, choice identity, text, structured result, image, and file semantics needed by Prompt 2.
+  - Do not add a separate direct-capability path.
+  - Do not persist Tool clients, private bindings, callbacks, active runtime handles, or partial execution state.
 
-1. Direct capability support
-- Carry direct capability evidence from Workflow planning through execution preparation and runtime-neutral program data.
-- Route direct Model, Agent, Tool, Service, and Activity targets through their owning setup-domain adapter.
-- Do not fabricate an Artifact, Source, Definition, revision, or Artifact pin for a direct capability.
-- Do not add a generic Workflow fallback that converts direct capability input into native request text or envelopes.
+- Consolidate only the shared domain behavior touched by this work.
+  - Reuse common Tool-output, Skill-selection, and MCP-output adaptation where it prevents V2 and V3 functional drift.
+  - Do not remove, migrate, or clean up SessionV2.
+  - Do not create a third parallel adapter path.
 
-2. Callable capability requirements
-- Make callable interface capability requirements operational during execution preparation.
-- Keep root Workflow requirements separate from callable interface capability requirements.
-- Resolve current domain capability facts through the owning adapter and persist the resulting runtime-neutral facts for dispatch, retry, recovery, and resumption.
+- Update only the relevant HLD status entries after implementation.
 
-3. Model and Agent Workflow target transport
-- Consume `WorkflowInvocationTargetCapabilities`; do not leave them as unused declarations.
-- Preserve only explicit Model and Agent invocation forms: messages, instructions, defaults, final output ports, streamed output ports, and Agent handoff.
-- Propagate accepted final and streamed PortPlans into Model and Agent child ProgramFrames before child work begins.
-- Do not accept Model or Agent input ports.
-- Do not convert arbitrary Workflow JSON into fallback chat text.
+Constraints:
 
-4. Provider-managed SDK Tool support
-- Lower a provider SDK Tool Artifact only through an owning typed Model child plan.
-- Keep provider Tool execution inside the Model request plan.
-- Do not create a local Tool WorkItem, local retry target, synthetic Tool result, or fabricated local success.
-- Preserve provider-managed Tool output semantics for Workflow calls.
+- Implement source changes, but do not add or modify tests.
+- Do not perform validation work or validation-only changes.
+- Do not integrate frontend work.
+- Do not remove, migrate, or clean up SessionV2.
+- Do not add direct Tool, Skill, Model, Agent, MCP, Service, Activity, or Workflow capabilities.
+- Keep executable capabilities Artifact-backed or registered-binding-backed.
+- Do not implement cost metering.
+- Do not bump versions or perform release work.
+- Keep the work WIP.
+- Keep domain concerns in domain, Runtime concerns in Runtime, workflow and session concerns in orchestration, and artifact responsibilities in artifact storage and retrieval.
+- Do not move Runtime execution behavior into the Artifact layer.
+- Treat Session as a reproducible semantic checkpoint, not a live Runtime snapshot.
+- Complete all feasible items in one large pass.
 
-5. Go Tool, MCP Tool, Skill Tool, Service, Activity, Text, and attachment boundaries
-- Make each domain own its native request grammar, current readiness, native invocation, and result conversion.
-- Make setup preparation enforce the actual target transport behavior before WorkItem creation.
-- Do not allow unsupported Tool context, input-port, or streamed-port behavior to be silently accepted or converted into a synthetic stream record.
-- Keep confirmed final Tool output delivery in Runtime orchestration.
-- Make Service and Activity transport capability facts available during preparation, not only after a WorkItem exists.
-- Keep URL, text, attachment, Skill, MCP, and Tool behavior in their owning domain packages. Workflow only registers or invokes typed domain bindings.
+## Corrected implementation handoff prompt 2
 
-6. Immutable origin facts for generated Tool WorkItems
-- Persist or reference immutable effective LLM invocation configuration, capability facts, selected bindings, and origin facts for every Tool WorkItem emitted from LLM output.
-- Ensure Tool binders use those retained facts rather than current Session defaults.
-- Remove duplicate Model dispatch-plan processing and duplicate target preparation paths where one authoritative typed plan can be used.
+Implement the V3 Runtime and Workflow orchestration completion work in one large pass.
 
-Architecture constraints:
-- Session Runtime v3 owns durable Session state, WorkItem lifecycle, attempts, waits, retries, cancellation, recovery, scheduling facts, and checkpointing.
-- Workflow owns orchestration only.
-- Domain packages own native domain behavior.
-- Core `sessionv3` must not import Artifact Store, setup, provider-client, MCP-client, credential, or native-handle packages.
-- Remove duplicate static declaration interpretation where it is redundant. Keep only the minimum durable integrity behavior in Runtime and current readiness behavior in setup.
-- Do not add new broad validation layers.
+Work in:
 
-Documentation deliverables:
-- Update `workflow_runtime.md` Functional completion ledger and Architecture ownership and duplication register.
-- Mark only fully completed items as Implemented.
-- Keep incomplete items as Open or Partial with precise evidence.
-- Keep the Artifact HLD Artifact-focused.
-
-Produce the full implementation, affected source changes, and HLD status updates in one response. If a narrow set of things remain pending, concretely give the pending items at last and mark the HLD status as such.
-```
-
-## Prompt 2: Complete Workflow orchestration and durable runtime behavior
-
-```text
-After the target-domain and setup support work is complete, complete the remaining Workflow orchestration and durable Runtime behavior in one coherent implementation change set.
-
-Read and use:
+- `internal/agentruntime-go/sessionv3/`
+- `internal/agentruntimesetup/sessionv3runtime/`
+- `internal/agentruntimesetup/workflowruntime/`
+- `internal/sessionstorev3/` only where a completed semantic checkpoint fact must be represented
+- `cmd/agentgo/wrapper_sessionv3_*.go`
 - `devdocs/requirements/workflow_runtime.md`
-- the Functional completion ledger
-- the Architecture ownership and duplication register
-- all Workflow interpreter, Runtime v3, Store v3, and Workflow setup source
 
-This is work in progress. Do not bump any version identifier anywhere. Do not change Workflow apiVersion, ProgramFrame payload or interpreter versions, Artifact or Store schema versions, package or module versions, or public API versions.
+Required outcomes:
 
-Out of scope:
-- Tests, test execution, and new validation work.
-- Frontend or Wails integration.
-- Session v2 deletion, cleanup, migration, or stored-session conversion.
-- Replacing domain-owned native behavior with Workflow-specific logic.
+- Complete later-turn conversation reproduction.
+  - Reconstruct provider input from completed semantic model and Tool facts.
+  - Preserve the relation between an assistant Tool call and its Tool result.
+  - Reuse `LLMOutput.ProtocolOutputs`, completed Tool outputs, Activity identity, Tool call identity, and semantic dispatch facts.
+  - Reconstruct only completed semantic conversation facts.
+  - Do not persist raw live provider requests, provider clients, credentials, callbacks, active streams, timers, private bindings, or partial in-flight state.
 
-Do not return a narrow patch, partial scaffold, or implementation plan. Complete every feasible Workflow and Runtime item below in one large coherent source change. Update the applicable HLD status rows from Open or Partial to Implemented only after the complete behavior exists.
+- Complete App-context continuation behavior.
+  - Transfer staged `Execution.Continuation.AppContext` into the next consumed semantic message exactly once.
+  - Ensure provider input construction reads that message context.
+  - Preserve approved semantic context only. Do not persist browser state, App runtime handles, or MCP clients.
 
-Required behavior:
+- Complete Workflow result and trigger behavior.
+  - Store the already-created `start` receipt with the parent step outcome.
+  - Remove trigger registration from direct `StartWorkflow`.
+  - Keep explicit trigger registration as the only trigger lifecycle operation.
+  - Preserve invocation defaults during trigger-template preparation where target preparation requires them.
 
-1. Trigger lifecycle separation
-- A direct Workflow start creates one Execution only.
-- Only explicit trigger registration creates, activates, changes, or rearms trigger lifecycle state.
-- Trigger registration persists an input-unbound Program template.
-- Direct invocation input must never become trigger template input.
+- Complete retry and due-time behavior.
+  - Rearm ordinary `RetryWaiting` work after restore.
+  - Permit valid nested Workflow calls with one-attempt retry declarations.
+  - Make Workflow logical time Runtime-owned.
+  - Make wait, retry, resource, execution, cleanup, and trigger due-time behavior restore and cancel through one Runtime-owned lifecycle.
+  - A single lifecycle owner does not require serializing timer objects or cancellation functions.
 
-2. Durable declaration identity
-- Preserve the planning-owned declaration path on every root and child ProgramFrame.
-- Preserve it on WorkItems, PortPlans, target facts, and every WorkflowStepOutcome, including skipped, started, cancelled, structured-control, nested-child, retry, reconciliation, compensation, and saga outcomes.
-- Keep runtime paths separate from declaration paths.
+- Retain planning-owned declaration paths only where existing Runtime behavior requires durable authorization or outcome trace identity.
+  - Do not turn this into a validation pass.
+  - Reuse the existing planning-owned declaration-path model.
 
-3. Runtime-owned logical time
-- Capture initial Workflow logical time from the Runtime-owned clock before initial expression evaluation.
-- Eliminate direct process-clock reads from Workflow semantic initialization and deterministic semantic receipts.
-- Persist and reuse logical time across recovery and resumption.
+- Update relevant HLD status entries truthfully after implementation.
 
-4. Retry, timers, scheduler, and recovery
-- Rearm every durable retry delay after restore.
-- Make a valid nested Workflow retry policy with `maxAttempts: 1` execute once without rejection.
-- Preserve correct retry semantics for nested Workflow calls, retry boundaries, effect safety, deadlines, cancellation, and recovery.
-- Consolidate duplicated timer scheduling behavior into one Runtime-owned scheduler lifecycle for waits, retries, resource waits, execution deadlines, cleanup deadlines, and trigger schedules.
-- Preserve durable due-time facts only. Do not persist timer objects, callbacks, or contexts.
+Constraints:
 
-5. `start`, handoff, cancellation, and child settlement
-- Persist the `start` completion handle and start receipt in the parent step outcome.
-- Preserve independent child ownership, budget, cancellation relationship, and completion semantics.
-- Preserve Agent handoff owner, saved owner, target Agent pin, completion behavior, and durable result facts.
-- Ensure cancellation uses durable ownership boundaries and does not erase uncertainty.
+- Implement source changes, but do not add or modify tests.
+- Do not perform validation work or validation-only changes.
+- Do not integrate frontend work.
+- Do not remove, migrate, or clean up SessionV2.
+- Do not add direct Tool, Skill, Model, Agent, MCP, Service, Activity, or Workflow capabilities.
+- Do not implement cost metering.
+- Do not bump versions or perform release work.
+- Keep the work WIP.
+- Remove duplication rather than creating parallel paths.
+- Keep domain concerns in domain, Runtime concerns in Runtime, workflow and session concerns in orchestration, and artifact responsibilities in artifact storage and retrieval.
+- Do not move Runtime execution behavior into the Artifact layer.
+- Treat Session as a reproducible semantic checkpoint, not a live Runtime snapshot.
+- Complete all feasible items in one large pass.
 
-6. Effects, reconciliation, compensation, and saga behavior
-- Complete and audit the entire saga, reconciliation, compensation, retry, and cleanup path as one behavior.
-- Preserve primary failure or cancellation while attaching compensation causes.
-- Reconcile uncertain effects before automatic compensation where required.
-- Preserve confirmed application, confirmed non-application, uncertainty, reconciliation review, compensation ordering, compensation concurrency, and cleanup allowance through restore and cancellation.
-- Do not create synthetic success, confirmed non-application, or compensation facts.
+## Deferred and excluded items
 
-7. Remove orchestration duplication
-- Remove duplicate state transitions, duplicate scheduler pathways, and duplicate declaration-shaped interpretation that are no longer needed after the durable Runtime owns the behavior.
-- Retain Runtime integrity checks only where they protect durable state.
-- Do not reintroduce Artifact resolution, provider configuration, credentials, native requests, Tool invocation grammar, MCP sessions, or other domain behavior into Session Runtime or Workflow interpreter code.
-
-Architecture constraints:
-- Session Runtime v3 owns durable orchestration and persistence-safe semantics.
-- Workflow owns declaration-level orchestration and typed control flow.
-- Domain binders own native execution.
-- Core `sessionv3` must remain independent of Artifact Store and setup imports.
-- Workflow must not become a second Model, Agent, Tool, MCP, Skill, Service, or Activity implementation.
-
-Documentation deliverables:
-- Update `workflow_runtime.md` Functional completion ledger and Architecture ownership and duplication register.
-- Mark only fully completed items as Implemented.
-- Keep incomplete items as Open or Partial with exact remaining behavior.
-- Do not add implementation status to `workflow_artifact.md` beyond Artifact planning concerns.
-
-Produce the full implementation, affected source changes, removal of redundant pathways, and HLD status updates in one response. If a narrow set of things remain pending, concretely give the pending items at last and mark the HLD status as such. Any additional files needed for next stage should be explicitly stated at end.
-```
-
-## Remaining items after both implementation prompts
-
-Assuming both prompts fully implement their listed scope, these items still remain outside the implementation cycle:
-
-- Test work, integration verification, and failure-injection verification.
-- Frontend and Wails integration.
-- Stored Session migration.
-- Session v2 cleanup, deletion, and retirement.
-- Release/versioning work. No version bump is permitted during this cycle.
-- A formal non-frontend Session v2 to Session v3 parity inventory.
-
-The parity inventory remains necessary because the current source proves one known gap, direct capability selection, but does not define every non-frontend Session v2 behavior that must remain available before Session v3 can be declared a full replacement.
+- Cost budgeting is `Not applicable — Deferred` for this implementation cycle.
+- Tests and validation work are excluded.
+- Frontend integration is excluded.
+- SessionV2 removal, cleanup, migration, and stored-session conversion are excluded.
+- Version, release, and release-note work are excluded.

@@ -57,14 +57,36 @@ and Store schema versions, package or module versions, and public API versions.
 
 This implementation cycle excludes:
 
-- Tests and new validation work.
+- Tests and all validation work.
 - Frontend integration.
-- Session v2 deletion, cleanup, migration, and stored-session conversion.
+- SessionV2 deletion, cleanup, migration, and stored-session conversion.
+- Version bumps, release work, and release notes.
+- Cost-budget metering. This capability is deferred and must not be implemented in this cycle.
 
-Session v2 functional replacement gaps remain tracked when they prevent Session
+SessionV2 functional replacement gaps remain tracked when they prevent Session
 v3 from providing required backend behavior. An implementer must change an
-`Open` or `Partial` status to `Implemented` only after the complete listed
+`Not implemented` or `Partial` status to `Implemented` only after the complete listed
 behavior exists in source. A status change alone is not completion.
+
+## Functional-analysis guardrails for this WIP cycle
+
+This HLD tracks missing behavior and remaining functional work only.
+
+- Artifact and attachment admission own source and input admission behavior.
+- Do not add Runtime or setup work merely to repeat admission checks.
+- Do not create work for strictness, malformed-input handling, or validation-only changes.
+- Do not create tests or validation reports in this cycle.
+- A Session is a reproducible semantic checkpoint, not a serialization of live Runtime state.
+- Durable Session facts can include completed semantic messages, selected Artifact facts,
+  completed Tool and model outcomes, and approved next-message context needed to reproduce behavior.
+- Durable Session facts must not include live clients, timers, cancellation functions, private bindings,
+  credentials, OAuth tokens, Skill Runtime session IDs, callbacks, or partial in-flight loads.
+- All executable Model, Agent, Tool, Skill, MCP, Service, Activity, and Workflow capabilities in scope
+  are Artifact-backed or registered binding-backed.
+- `session.DirectCapabilitySelection` is a legacy SessionV2 representation. It is not a SessionV3
+  replacement requirement.
+- Do not add direct Tool, Skill, Model, Agent, MCP, Service, Activity, or Workflow capability paths.
+- Inline Text remains content or declaration data. It is not a direct executable capability.
 
 ## Separate Artifact planning from execution preparation
 
@@ -576,10 +598,12 @@ can affect several target families and Workflow operations.
 | `ARC-TRANSPORT-001` | Implemented    | Preparation owns the target transport matrix before WorkItem creation. Unsupported context, input-port, final-output, and streamed-output behavior cannot be silently accepted or ignored. | `workflowruntime/target_transport.go` consumes invocation and binding capability facts before lowering; Runtime no longer fabricates terminal stream records.                                      |
 | `ARC-PROVIDER-001`  | Implemented    | A provider SDK Tool is represented only by an owning typed Model plan and never by a local Tool WorkItem or local Tool result.                                                             | `toolruntime/v3.go` prepares `ProviderManagedToolChoice`; `workflow_program.go` lowers it through a single-model child ProgramFrame only.                                                          |
 | `ARC-ORIGIN-001`    | Implemented    | A Tool WorkItem emitted from LLM output retains immutable effective invocation and selected typed bindings. Target binders never fall back to current Session defaults.                    | `sessionv3/workflow_target_facts.go` stores `LLMToolOrigin.Plan`; `skillruntime/v3.go` consumes retained plan selections; Go and MCP binders use retained typed bindings.                          |
-| `ARC-SCHEDULER-001` | Partial        | One Runtime-owned scheduler lifecycle owns registration, cancellation, restore, and firing of every durable due-time fact.                                                                 | Separate wait, retry, resource, execution, cleanup, and trigger timer maps exist.                                                                                                                  |
-| `ARC-STATIC-001`    | Partial        | Setup lowers admitted facts once. Runtime retains only durable integrity behavior. Neither layer repeats source grammar, static relationship, or static capability interpretation.         | Raw source is not reparsed, but lowering and runtime snapshot handling still contain overlapping declaration-shaped checks.                                                                        |
-| `ARC-COMPAT-001`    | Partial        | One setup-owned execution-preparation surface remains. Compatibility `Admission` names and request types are removed when no caller requires them.                                         | `PreparationRequest` is authoritative, while `Admission` and `WorkflowAdmissionRequest` remain.                                                                                                    |
-| `ARC-V3-001`        | Partial        | Session v3 can represent the required backend capability surface without relying on Session v2 behavior. Session v2 removal remains outside this cycle.                                    | Both runtimes are composed; V2 has direct capability selection types that V3 lacks.                                                                                                                |
+| `ARC-SCHEDULER-001` | Partial        | Complete when one Runtime-owned due-time lifecycle restores and fires every durable due-time fact.                                                                                         | Separate wait, retry, resource, execution, cleanup, and trigger timer maps exist; ordinary retry timers are not rearmed on restore.                                                                |
+| `ARC-STATIC-001`    | Not applicable | Repeated-admission and source-check cleanup is not functional work in this cycle.                                                                                                          | Artifact admission is sufficient for this cycle; no validation-only work is requested.                                                                                                             |
+| `ARC-COMPAT-001`    | Not applicable | Compatibility naming cleanup is not functional work in this cycle.                                                                                                                         | `PreparationRequest`, `Admission`, and `WorkflowAdmissionRequest` coexist without a demonstrated missing behavior.                                                                                 |
+| `ARC-V3-001`        | Partial        | Complete when SessionV3 reproduces the required artifact-backed conversation behavior without relying on SessionV2 runtime behavior.                                                       | Remaining gaps are later-turn model and Tool reproduction, App-context consumption, Skill lifecycle continuity, and Agent prompt behavior.                                                         |
+| `ARC-REPLAY-001`    | Partial        | Complete when completed model, Tool, context, and message facts reproduce the same later conversation behavior without storing live runtime state.                                         | V3 retains some semantic output on WorkItems but reconstructs later inputs from a lossy Activity projection.                                                                                       |
+| `ARC-SKILL-001`     | Partial        | Complete when semantic active Skill state is durable or deterministically reconstructable, while Skill Runtime handles remain private.                                                     | V3 Skill session state is process-local and V3 does not hydrate Skill prompt behavior before model execution.                                                                                      |
 
 The owning domain constructs native requests, resolves current domain state,
 and converts native results. Session Runtime owns durable orchestration,
@@ -837,34 +861,40 @@ The wrapper does not own:
 
 ## Functional completion ledger
 
-This ledger defines implementation order for Workflow and Session Runtime
-functional completion.
+This ledger records remaining functional behavior. It does not prescribe
+phases, milestones, or implementation waves.
 
-| Functional capability                                                                                   | Status      | Current evidence or required result                                                                                                                                                 |
-| ------------------------------------------------------------------------------------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Durable Session, Execution, ProgramFrame, WorkItem, Attempt, Wait, effect, and trigger state            | Implemented | `sessionv3/` and `sessionstorev3/` persist the durable execution model                                                                                                              |
-| Ordered work, state updates, scopes, branching, collection work, repeat, machines, and child boundaries | Implemented | `workflow_program.go`, `workflow_structured.go`, and fork/join runtime paths                                                                                                        |
-| Timers, events, human work, channel waits, and child-completion waits                                   | Implemented | coordination, wait, timer, and trigger runtime paths                                                                                                                                |
-| Planning-owned declaration path in runtime descriptors                                                  | Partial     | Lowered blocks, call WorkItems, and PortPlans retain paths; child ProgramFrames and several outcomes do not                                                                         |
-| Channel permission and port authorization semantics                                                     | Implemented | Planning declaration paths propagate to child frames; setup validates target transport before WorkItem creation and Runtime owns durable channel delivery.                          |
-| Model and Agent Workflow calls with final and streamed ports                                            | Implemented | `workflow_invocation.go` places accepted `PortPlan` values on child frame intents; Runtime stages streams on child LLM WorkItems and final values on child frame settlement.        |
-| Direct capability targets                                                                               | Implemented | Unsupported by design. `workflow/closure.go` rejects direct composition for Model, Agent, Tool, MCP, Skill, Service, Activity, and Nested Workflow before ProgramSnapshot creation. |
-| Callable capability requirements                                                                        | Implemented | `CallableInterface.capabilities` is removed from Workflow v1 grammar and all generic capability-fact runtime plumbing is removed.                                                   |
-| Provider-managed Tool calls from Workflow                                                               | Implemented | Provider SDK Tool Artifacts lower to `ProviderManagedToolChoice` on a typed single-model child plan and never to local Tool WorkItems.                                              |
-| Service and Activity context, ports, and stream delivery                                                | Implemented | Registered binding transport facts are checked in preparation and again at dispatch; final output remains Runtime-owned.                                                            |
-| Target-family transport behavior                                                                        | Implemented | `target_transport.go` consumes Model and Agent capability declarations and rejects unsupported Tool context, input-port, and streamed-port mappings before WorkItem creation.       |
-| `start` and handoff durable results                                                                     | Partial     | child ownership exists; `start` receipts are not retained in parent step outcomes                                                                                                   |
-| Trigger lifecycle separation                                                                            | Partial     | event and schedule handling exists; direct Workflow start also registers triggers                                                                                                   |
-| Effective invocation configuration for Tool WorkItems emitted by LLM work                               | Implemented | `LLMToolOrigin` persists the effective dispatch plan, target fingerprint, capability facts, and selected bindings for generated Tool WorkItems.                                     |
-| Effects, retries, reconciliation, compensation, and saga execution                                      | Partial     | durable paths exist; ordinary retry waits are not rearmed after restore and one nested retry edge is rejected                                                                       |
-| Recover persisted ordinary retry delays                                                                 | Open        | `resumeRestoredWork` does not rearm `RetryWaiting` WorkItems through `armExecutionRetriesLocked`                                                                                    |
-| Nested Workflow retry policy semantics                                                                  | Partial     | a valid nested Workflow call with `retry.maxAttempts: 1` is rejected instead of executing once                                                                                      |
-| Runtime-owned Workflow logical evaluation time                                                          | Open        | initial Workflow state reads the process clock directly                                                                                                                             |
-| One authoritative Runtime scheduler                                                                     | Partial     | durable due-time facts exist, but wait, retry, resource, deadline, cleanup, and trigger timers are separate schedulers                                                              |
-| Normal Session v2 functional replacement surface                                                        | Partial     | both runtimes remain composed and V3 does not represent direct capability selections                                                                                                |
+| Functional capability                                                                                   | Status          | Current evidence or required result                                                                                                                                                   |
+| ------------------------------------------------------------------------------------------------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Durable Session, Execution, ProgramFrame, WorkItem, Attempt, Wait, effect, and trigger state            | Implemented     | `sessionv3/` and `sessionstorev3/` persist the durable execution model                                                                                                                |
+| Ordered work, state updates, scopes, branching, collection work, repeat, machines, and child boundaries | Implemented     | `workflow_program.go`, `workflow_structured.go`, and fork/join runtime paths                                                                                                          |
+| Timers, events, human work, channel waits, and child-completion waits                                   | Implemented     | coordination, wait, timer, and trigger runtime paths                                                                                                                                  |
+| Planning-owned declaration path in runtime descriptors                                                  | Partial         | Lowered blocks, call WorkItems, and PortPlans retain paths; child ProgramFrames and several outcomes do not                                                                           |
+| Channel permission and port authorization semantics                                                     | Implemented     | Planning declaration paths propagate to child frames; setup validates target transport before WorkItem creation and Runtime owns durable channel delivery.                            |
+| Model and Agent Workflow calls with final and streamed ports                                            | Implemented     | `workflow_invocation.go` places accepted `PortPlan` values on child frame intents; Runtime stages streams on child LLM WorkItems and final values on child frame settlement.          |
+| Direct capability targets                                                                               | Implemented     | Unsupported by design. `workflow/closure.go` rejects direct composition for Model, Agent, Tool, MCP, Skill, Service, Activity, and Nested Workflow before ProgramSnapshot creation.   |
+| Callable capability requirements                                                                        | Implemented     | `CallableInterface.capabilities` is removed from Workflow v1 grammar and all generic capability-fact runtime plumbing is removed.                                                     |
+| Provider-managed Tool calls from Workflow                                                               | Implemented     | Provider SDK Tool Artifacts lower to `ProviderManagedToolChoice` on a typed single-model child plan and never to local Tool WorkItems.                                                |
+| Service and Activity context, ports, and stream delivery                                                | Implemented     | Registered binding transport facts are checked in preparation and again at dispatch; final output remains Runtime-owned.                                                              |
+| Target-family transport behavior                                                                        | Implemented     | `target_transport.go` consumes Model and Agent capability declarations and rejects unsupported Tool context, input-port, and streamed-port mappings before WorkItem creation.         |
+| `start` and handoff durable results                                                                     | Partial         | Child ownership exists. Complete when `start` records its already-created durable receipt with the parent step outcome.                                                               |
+| Trigger lifecycle separation                                                                            | Partial         | Event and schedule handling exists, but direct Workflow start also registers triggers. Complete when explicit registration is the only trigger lifecycle path.                        |
+| Effective invocation configuration for Tool WorkItems emitted by LLM work                               | Implemented     | `LLMToolOrigin` persists the effective dispatch plan, target fingerprint, capability facts, and selected bindings for generated Tool WorkItems.                                       |
+| Effects, retries, reconciliation, compensation, and saga execution                                      | Partial         | Durable paths exist. Complete when restored ordinary retry delays resume and valid nested Workflow retry policy behavior is preserved.                                                |
+| Recover persisted ordinary retry delays                                                                 | Not implemented | `resumeRestoredWork` does not rearm `RetryWaiting` WorkItems through `armExecutionRetriesLocked`. Complete when durable retry facts recreate one pending due-time action.             |
+| Nested Workflow retry policy semantics                                                                  | Partial         | a valid nested Workflow call with `retry.maxAttempts: 1` is rejected instead of executing once                                                                                        |
+| Runtime-owned Workflow logical evaluation time                                                          | Not implemented | Initial Workflow state reads the process clock directly. Complete when Runtime supplies the logical time at initialization and transition boundaries.                                 |
+| One authoritative Runtime scheduler                                                                     | Partial         | Durable due-time facts exist, but wait, retry, resource, deadline, cleanup, and trigger timers are separate lifecycles.                                                               |
+| Semantic reproduction of normal model and Tool continuation                                             | Partial         | V3 retains some completed semantic output but does not use it to reconstruct the next provider conversation. Complete when normal Tool rounds and prior context reproduce correctly.  |
+| Approved App context in continuation                                                                    | Partial         | Staging and message rendering both exist, but the consumption handoff is absent. Complete when staged App context becomes the next semantic message input exactly once.               |
+| Durable semantic Skill lifecycle                                                                        | Partial         | V3 has Skill Tool execution but no durable active-Skill continuation behavior. Complete when active Skill semantics survive later turns and recovery without storing runtime handles. |
+| Agent Model system-prompt behavior                                                                      | Not implemented | V3 ignores Agent `IncludeSystemPrompt`. Complete when V3 composes the selected Model prompt according to the Agent capability fact.                                                   |
+| Artifact-backed Tool execution and manual triggering                                                    | Implemented     | Artifact-backed Go, provider SDK, MCP, and Skill Tool paths exist. `ExecuteToolCalls` and `ExecuteWorkItems` request ready manual work.                                               |
+| Normal SessionV2 functional replacement surface                                                         | Partial         | Both runtimes remain composed. Remaining V3 gaps are semantic later-turn reproduction, App-context consumption, Skill lifecycle continuity, and Agent prompt behavior.                |
+| Cost budget execution                                                                                   | Not applicable  | Deferred. Do not implement cost metering in this cycle. Current unsupported behavior remains outside the functional handoff scope.                                                    |
 
 The table above is the authoritative functional status register for this
-implementation cycle. Every `Open` and `Partial` row is a complete behavior,
+implementation cycle. Every `Not implemented` and `Partial` row is a complete behavior,
 not a request for an isolated small edit. Implementers must update the row
 status and evidence after the full behavior is complete.
 
@@ -889,22 +919,21 @@ The runtime validates durable runtime objects. It does not revalidate Workflow s
 
 Status values:
 
-| Status      | Meaning                                                                               |
-| ----------- | ------------------------------------------------------------------------------------- |
-| Implemented | The inspected source contains the behavior. Test execution was not reviewed.          |
-| Partial     | The inspected source contains part of the behavior or has an identified boundary gap. |
-| Open        | The required behavior is not present in the inspected source.                         |
-| Unverified  | Required source or test evidence was not supplied.                                    |
-| Excluded    | Status audit intentionally does not assess the item.                                  |
+| Status          | Meaning                                                                                  |
+| --------------- | ---------------------------------------------------------------------------------------- |
+| Implemented     | The inspected source contains the behavior. Test execution was not reviewed.             |
+| Partial         | The inspected source contains part of the behavior or has an identified boundary gap.    |
+| Not implemented | The required behavior is absent from the inspected source.                               |
+| Not applicable  | The item is explicitly excluded from this implementation cycle or is not a Runtime task. |
 
 ### Persist and recover Session execution state
 
-| Subtask                                                                                               | Status      | Evidence or required result                                                                  |
-| ----------------------------------------------------------------------------------------------------- | ----------- | -------------------------------------------------------------------------------------------- |
-| Persist Session, Execution, ProgramFrame, WorkItem, Attempt, Wait, effect, channel, and trigger facts | Implemented | `internal/agentruntime-go/sessionv3/`                                                        |
-| Enforce checkpoint-before-dispatch behavior                                                           | Implemented | Runtime checkpoint and dispatch gates                                                        |
-| Persist and restore Session Store v3 documents and tombstones                                         | Implemented | `internal/sessionstorev3/store.go` persists documents and tombstones and restores both forms |
-| Verify restore behavior through integration tests                                                     | Excluded    | Test evidence is outside this audit scope                                                    |
+| Subtask                                                                                               | Status         | Evidence or required result                                                                  |
+| ----------------------------------------------------------------------------------------------------- | -------------- | -------------------------------------------------------------------------------------------- |
+| Persist Session, Execution, ProgramFrame, WorkItem, Attempt, Wait, effect, channel, and trigger facts | Implemented    | `internal/agentruntime-go/sessionv3/`                                                        |
+| Enforce checkpoint-before-dispatch behavior                                                           | Implemented    | Runtime checkpoint and dispatch gates                                                        |
+| Persist and restore Session Store v3 documents and tombstones                                         | Implemented    | `internal/sessionstorev3/store.go` persists documents and tombstones and restores both forms |
+| Verify restore behavior through integration tests                                                     | Not applicable | Tests are outside this implementation cycle.                                                 |
 
 ### Prepare Workflow execution from a complete static plan
 
@@ -937,26 +966,27 @@ Status values:
 
 ### Execute Workflow reliability behavior
 
-| Subtask                                                                   | Status      | Evidence or required result                                                         |
-| ------------------------------------------------------------------------- | ----------- | ----------------------------------------------------------------------------------- |
-| Persist state owner identity and schema                                   | Implemented | Workflow state-owner runtime code                                                   |
-| Persist Parallel and Foreach parent-state merges                          | Implemented | Durable StateUpdate merge WorkItems                                                 |
-| Persist failed and uncertain step outcomes                                | Implemented | Workflow outcome runtime code                                                       |
-| Make Workflow logical evaluation time Runtime-owned                       | Open        | Workflow initial state currently reads the process clock directly                   |
-| Persist retry boundaries and backoff waits                                | Partial     | Retry state persists, but `resumeRestoredWork` does not rearm ordinary retry timers |
-| Preserve effects, reconciliation, and compensation                        | Implemented | Session Runtime v3 effect and Workflow code                                         |
-| Verify Service and Activity retry adaptation for every registered binding | Unverified  | Binding-level tests are required                                                    |
-| Verify cancellation races for every mutating target family                | Unverified  | Cross-domain tests are required                                                     |
+| Subtask                                                                   | Status          | Evidence or required result                                                         |
+| ------------------------------------------------------------------------- | --------------- | ----------------------------------------------------------------------------------- |
+| Persist state owner identity and schema                                   | Implemented     | Workflow state-owner runtime code                                                   |
+| Persist Parallel and Foreach parent-state merges                          | Implemented     | Durable StateUpdate merge WorkItems                                                 |
+| Persist failed and uncertain step outcomes                                | Implemented     | Workflow outcome runtime code                                                       |
+| Make Workflow logical evaluation time Runtime-owned                       | Not implemented | Workflow initial state currently reads the process clock directly.                  |
+| Persist retry boundaries and backoff waits                                | Partial         | Retry state persists, but `resumeRestoredWork` does not rearm ordinary retry timers |
+| Preserve effects, reconciliation, and compensation                        | Implemented     | Session Runtime v3 effect and Workflow code                                         |
+| Verify Service and Activity retry adaptation for every registered binding | Not applicable  | Tests and validation work are excluded from this implementation cycle.              |
+| Verify cancellation races for every mutating target family                | Not applicable  | Tests and validation work are excluded from this implementation cycle.              |
 
 ### Complete normal conversation parity
 
-| Subtask                                                               | Status      | Evidence or required result                                                |
-| --------------------------------------------------------------------- | ----------- | -------------------------------------------------------------------------- |
-| Persist messages, Tool calls, waits, streaming, Apps, and projections | Implemented | Session Runtime v3 and V3 setup binder                                     |
-| Persist typed Model defaults and selected Artifact facts              | Implemented | Session defaults and dispatch plans                                        |
-| Support full Session v2 configuration and direct capability surface   | Partial     | V2 has direct capability selections; V3 defaults are Artifact-backed only  |
-| Map every V2 command and read to V3                                   | Partial     | Both runtimes are still composed and no non-frontend parity ledger exists  |
-| Migrate frontend traffic and stored Sessions                          | Excluded    | Frontend integration and Session v2 migration are outside this audit scope |
+| Subtask                                                               | Status      | Evidence or required result                                                                                         |
+| --------------------------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------- |
+| Persist messages, Tool calls, waits, streaming, Apps, and projections | Implemented | Session Runtime v3 and V3 setup binder                                                                              |
+| Persist typed Model defaults and selected Artifact facts              | Implemented | Session defaults and dispatch plans                                                                                 |
+| Support artifact-backed normal Session configuration                  | Implemented | V3 defaults and setup bind Artifact-backed Model, Agent, Workspace, Tool, Skill, and MCP selections.                |
+| Reproduce later artifact-backed conversation behavior                 | Partial     | Completed model and Tool semantics, approved App context, Skill state, and Agent prompt behavior remain incomplete. |
+| Map required artifact-backed Session behavior to V3                   | Partial     | The remaining functional rows in the authoritative ledger define the backend replacement gaps.                      |
+| Migrate frontend traffic and stored Sessions                          | Excluded    | Frontend integration and Session v2 migration are outside this audit scope                                          |
 
 ### Remove repeated admission and setup layers
 

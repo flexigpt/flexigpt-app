@@ -1780,7 +1780,9 @@ Attached children share parent aggregate budget.
 
 Independent children persist an authorized child budget.
 
-Cost budgets require a setup-owned cost meter. The runtime reports a typed limit failure before dispatch when that meter is unavailable.
+Cost budgets are deferred.
+
+No cost meter, pricing model, currency model, or cost settlement behavior is to be implemented in this cycle.
 
 ## 19. Declaration validity
 
