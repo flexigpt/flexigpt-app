@@ -107,9 +107,10 @@ type WorkBinding interface {
 }
 
 type WorkBindingPortCapabilities struct {
-	Context      bool
-	InputPorts   bool
-	OutputStream bool
+	Context          bool
+	InputPorts       bool
+	FinalOutputPorts bool
+	OutputStream     bool
 }
 
 type WorkBindingPortCapability interface {
@@ -206,6 +207,7 @@ type Admission struct {
 	bindings    *BindingRegistry
 	tools       ToolTargetInspector
 	invocations WorkflowInvocationTargetAdapter
+	direct      *DirectTargetRegistry
 }
 
 func NewAdmission(
@@ -241,11 +243,34 @@ func NewAdmission(
 	}, nil
 }
 
+func NewAdmissionWithDirectTargets(
+	workflows *workflowAPI.Service,
+	artifacts artifact.API,
+	bindings *BindingRegistry,
+	tools ToolTargetInspector,
+	direct *DirectTargetRegistry,
+	invocationAdapters ...WorkflowInvocationTargetAdapter,
+) (*Admission, error) {
+	value, err := NewAdmission(
+		workflows,
+		artifacts,
+		bindings,
+		tools,
+		invocationAdapters...,
+	)
+	if err != nil {
+		return nil, err
+	}
+	value.direct = direct
+	return value, nil
+}
+
 // PreparationRequest is the setup-owned request for one input-bound Workflow
 // ProgramSnapshot. Session Runtime never receives this selection request.
 type PreparationRequest struct {
-	Workflow sessionv3Runtime.ArtifactSelection
-	Input    sessionv3Runtime.CanonicalValue
+	Workflow           sessionv3Runtime.ArtifactSelection
+	Input              sessionv3Runtime.CanonicalValue
+	InvocationDefaults *sessionv3Runtime.SessionDefaults
 }
 
 // TriggerPreparationRequest is the setup-owned request for one input-unbound
@@ -279,6 +304,7 @@ func (a *Admission) PrepareWorkflow(
 		request.Workflow,
 		request.Input,
 		true,
+		request.InvocationDefaults,
 	)
 	if err != nil {
 		return sessionv3Runtime.ProgramSnapshot{}, err
@@ -363,6 +389,7 @@ func (a *Admission) prepareWorkflowTriggers(
 		selection,
 		nil,
 		false,
+		nil,
 	)
 	if err != nil {
 		return sessionv3Runtime.ProgramSnapshot{}, err
@@ -501,6 +528,7 @@ func (a *Admission) admitRoot(
 	selection sessionv3Runtime.ArtifactSelection,
 	input sessionv3Runtime.CanonicalValue,
 	inputBound bool,
+	defaults *sessionv3Runtime.SessionDefaults,
 ) (sessionv3Runtime.WorkflowAdmissionResult, error) {
 	plan, err := a.workflows.ResolvePlan(ctx, ref)
 	if err != nil {
@@ -524,6 +552,7 @@ func (a *Admission) admitRoot(
 		input,
 		closure,
 		inputBound,
+		defaults,
 	)
 }
 
@@ -534,6 +563,7 @@ func (a *Admission) admitPlanned(
 	input sessionv3Runtime.CanonicalValue,
 	closure *workflowAdmissionClosure,
 	inputBound bool,
+	defaults *sessionv3Runtime.SessionDefaults,
 ) (sessionv3Runtime.WorkflowAdmissionResult, error) {
 	if selection.RootID != string(plan.artifact.RootID) ||
 		selection.ArtifactID != string(plan.artifact.ArtifactID) {
@@ -578,12 +608,30 @@ func (a *Admission) admitPlanned(
 	if err != nil {
 		return sessionv3Runtime.WorkflowAdmissionResult{}, err
 	}
+	ownerModel, err := a.workflowOwnerModel(ctx, defaults)
+	if err != nil {
+		return sessionv3Runtime.WorkflowAdmissionResult{}, err
+	}
+	requirements, err := a.prepareRequirements(
+		ctx,
+		plan,
+		closure,
+		ownerModel,
+	)
+	if err != nil {
+		return sessionv3Runtime.WorkflowAdmissionResult{}, err
+	}
+	program.Requirements = requirements
 	if err := a.bindCallableTargets(
 		ctx,
 		plan,
 		&program,
 		closure,
+		ownerModel,
 	); err != nil {
+		return sessionv3Runtime.WorkflowAdmissionResult{}, err
+	}
+	if err := validatePreparedTargetTransport(plan.facts.Inventory, program.Targets); err != nil {
 		return sessionv3Runtime.WorkflowAdmissionResult{}, err
 	}
 
@@ -612,6 +660,7 @@ func (a *Admission) bindCallableTargets(
 	plan workflowAdmissionPlan,
 	program *sessionv3Runtime.WorkflowProgram,
 	closure *workflowAdmissionClosure,
+	ownerModel *sessionv3Runtime.ArtifactPin,
 ) error {
 	if program == nil {
 		return errors.New("workflow program is unavailable")
@@ -625,11 +674,21 @@ func (a *Admission) bindCallableTargets(
 			)
 		}
 
+		requirements, err := workflowCallableRequirements(
+			plan.facts.Document,
+			plan.facts.Inventory,
+			targetPlan,
+		)
+		if err != nil {
+			return err
+		}
 		bound, err := a.bindTarget(
 			ctx,
 			plan.facts.Document,
 			targetPlan,
 			closure,
+			ownerModel,
+			requirements,
 		)
 		if err != nil {
 			return err
@@ -637,6 +696,37 @@ func (a *Admission) bindCallableTargets(
 		program.Targets[targetPlan.Name] = bound
 	}
 	return nil
+}
+
+// prepareRequirements retains root requirements separately from callable
+// targets. A requirement can establish readiness facts but can never be
+// selected by Workflow calls or target sets.
+func (a *Admission) prepareRequirements(
+	ctx context.Context,
+	plan workflowAdmissionPlan,
+	closure *workflowAdmissionClosure,
+	ownerModel *sessionv3Runtime.ArtifactPin,
+) ([]sessionv3Runtime.WorkflowRequirementFact, error) {
+	output := make([]sessionv3Runtime.WorkflowRequirementFact, 0, len(plan.facts.Inventory.Requirements))
+	for _, requirement := range plan.facts.Inventory.Requirements {
+		capabilities, err := workflowTargetRequirements(requirement.Target)
+		if err != nil {
+			return nil, err
+		}
+		target, err := a.bindTarget(
+			ctx,
+			plan.facts.Document,
+			requirement,
+			closure,
+			ownerModel,
+			capabilities,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("workflow requirement %q: %w", requirement.Name, err)
+		}
+		output = append(output, workflowRequirementFact(requirement.Name, target))
+	}
+	return output, nil
 }
 
 // verifyRequirements checks admission prerequisites without placing them in
@@ -767,8 +857,22 @@ func (a *Admission) bindTarget(
 	document workflowv1.WorkflowDocument,
 	targetPlan workflowAPI.TargetPlan,
 	closure *workflowAdmissionClosure,
+	ownerModel *sessionv3Runtime.ArtifactPin,
+	requirements []sessionv3Runtime.WorkflowCapabilityRequirement,
 ) (sessionv3Runtime.WorkflowTarget, error) {
 	target := targetPlan.Target
+
+	if direct, found, err := workflowDirectCapabilityTarget(targetPlan); err != nil {
+		return sessionv3Runtime.WorkflowTarget{}, err
+	} else if found {
+		return a.bindDirectTarget(
+			ctx,
+			document,
+			target,
+			direct,
+			requirements,
+		)
+	}
 
 	switch target.Kind {
 	case workflowv1.TargetService:
@@ -842,11 +946,35 @@ func (a *Admission) bindTarget(
 			return sessionv3Runtime.WorkflowTarget{}, inspectErr
 		}
 		if providerManaged {
-			return sessionv3Runtime.WorkflowTarget{}, fmt.Errorf(
-				"%w: provider-managed tool target %q requires a typed model execution plan",
-				ErrBindingUnavailable,
-				target.Ref,
-			)
+			planner, found := a.tools.(ProviderManagedWorkflowToolPlanner)
+			if !found {
+				return sessionv3Runtime.WorkflowTarget{}, fmt.Errorf(
+					"%w: provider-managed tool target %q has no typed Model planner",
+					ErrBindingUnavailable,
+					target.Ref,
+				)
+			}
+			if ownerModel == nil {
+				return sessionv3Runtime.WorkflowTarget{}, fmt.Errorf(
+					"%w: provider-managed tool target %q requires a prepared Model selection",
+					ErrBindingUnavailable,
+					target.Ref,
+				)
+			}
+			choice, prepareErr := planner.PrepareProviderManagedWorkflowTool(ctx, pin)
+			if prepareErr != nil {
+				return sessionv3Runtime.WorkflowTarget{}, prepareErr
+			}
+			return finalizeWorkflowTarget(document, target, sessionv3Runtime.WorkflowTarget{
+				Kind: sessionv3Runtime.WorkflowTargetProviderTool,
+				ProviderTool: &sessionv3Runtime.ProviderManagedToolTarget{
+					OwnerModel: *ownerModel,
+					Choice:     choice,
+				},
+				Effect: sessionv3Runtime.EffectContract{
+					Kind: sessionv3Runtime.EffectKindRead,
+				},
+			})
 		}
 
 		return finalizeWorkflowTarget(
@@ -885,6 +1013,7 @@ func (a *Admission) bindTarget(
 			nil,
 			closure,
 			false,
+			nil,
 		)
 		if err != nil {
 			return sessionv3Runtime.WorkflowTarget{}, err

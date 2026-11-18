@@ -211,15 +211,16 @@ func (i *WorkflowInterpreter) startCall(
 		return ProgramTransition{}, err
 	}
 	transition.Frames = []ProgramFrameIntent{{
-		ID:          frameID,
-		ExecutionID: executionID,
-		Path:        path + "/started",
-		Program:     childProgram,
-		Deadline:    cloneTime(frame.Deadline),
-		Budget:      cloneBudget(budget),
-		Lifetime:    intentLifetime,
-		Ownership:   &ownership,
-		Ports:       clonePortPlans(ports),
+		ID:              frameID,
+		ExecutionID:     executionID,
+		Path:            path + "/started",
+		DeclarationPath: state.PendingDeclarationPath,
+		Program:         childProgram,
+		Deadline:        cloneTime(frame.Deadline),
+		Budget:          cloneBudget(budget),
+		Lifetime:        intentLifetime,
+		Ownership:       &ownership,
+		Ports:           clonePortPlans(ports),
 	}}
 	transition.ContinueParent = true
 	return transition, nil

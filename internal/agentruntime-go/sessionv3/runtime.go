@@ -1894,6 +1894,7 @@ func (r *Runtime) advanceFrameLocked(
 				intent.Claims...,
 			),
 			ProgramPath:          intent.ProgramPath,
+			DeclarationPath:      firstText(intent.DeclarationPath, frame.DeclarationPath),
 			Deadline:             earlierDeadline(frame.Deadline, intent.Deadline),
 			Effect:               intent.Effect,
 			Retry:                cloneWorkflowRetryPolicy(intent.Retry),

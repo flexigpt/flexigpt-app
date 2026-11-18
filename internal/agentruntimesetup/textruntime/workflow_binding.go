@@ -51,6 +51,15 @@ func (applyUnifiedDiffActivityBinding) Effect() sessionv3Runtime.EffectContract 
 	}
 }
 
+func (applyUnifiedDiffActivityBinding) WorkflowPortCapabilities() workflowruntime.WorkBindingPortCapabilities {
+	return workflowruntime.WorkBindingPortCapabilities{
+		Context:          false,
+		InputPorts:       false,
+		FinalOutputPorts: true,
+		OutputStream:     false,
+	}
+}
+
 func (applyUnifiedDiffActivityBinding) Bind(
 	_ context.Context,
 	request workflowruntime.WorkBindingRequest,

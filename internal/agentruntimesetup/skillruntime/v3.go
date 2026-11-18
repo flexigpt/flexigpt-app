@@ -177,15 +177,22 @@ func (e *V3Executor) Bind(
 	if err := payload.Call.Validate(); err != nil {
 		return sessionv3Runtime.SemanticBinding{}, err
 	}
-	if len(request.Session.Defaults.Skills) == 0 {
+	skills, active, originErr := v3SkillSelectionsForTool(
+		request,
+		payload,
+	)
+	if originErr != nil {
+		return sessionv3Runtime.SemanticBinding{}, originErr
+	}
+	if len(skills) == 0 {
 		return sessionv3Runtime.SemanticBinding{}, errors.New(
 			"skill tool was requested without enabled Skills",
 		)
 	}
 	if _, _, err := e.resolveSelections(
 		ctx,
-		request.Session.Defaults.Skills,
-		request.Session.Defaults.ActiveSkills,
+		skills,
+		active,
 	); err != nil {
 		return sessionv3Runtime.SemanticBinding{}, err
 	}
@@ -193,9 +200,9 @@ func (e *V3Executor) Bind(
 	artifacts := make(
 		[]sessionv3Runtime.ArtifactPin,
 		0,
-		len(request.Session.Defaults.Skills),
+		len(skills),
 	)
-	for _, selection := range request.Session.Defaults.Skills {
+	for _, selection := range skills {
 		if selection.ExpectedRevision == 0 ||
 			strings.TrimSpace(selection.ExpectedDigest) == "" {
 			continue
@@ -477,14 +484,22 @@ func (e *V3Executor) ensureSession(
 	if existing := e.executionSession(request.Execution.ID); existing.id != "" {
 		return existing.id, nil
 	}
-	if len(request.Session.Defaults.Skills) == 0 {
+	payload := request.WorkItem.Input.Tool
+	skills, activeSkills, originErr := v3SkillSelectionsForTool(
+		request,
+		payload,
+	)
+	if originErr != nil {
+		return "", originErr
+	}
+	if len(skills) == 0 {
 		return "", errors.New("skill tool was requested without enabled Skills")
 	}
 
 	definitions, active, err := e.resolveSelections(
 		ctx,
-		request.Session.Defaults.Skills,
-		request.Session.Defaults.ActiveSkills,
+		skills,
+		activeSkills,
 	)
 	if err != nil {
 		return "", err
@@ -749,4 +764,48 @@ func firstV3SkillText(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func v3SkillSelectionsForTool(
+	request sessionv3Runtime.WorkDispatchRequest,
+	payload *sessionv3Runtime.ToolWork,
+) (
+	skills []sessionv3Runtime.ArtifactSelection,
+	active []sessionv3Runtime.ArtifactSelection,
+	err error,
+) {
+	if payload == nil || payload.Origin == nil {
+		return request.Session.Defaults.Skills,
+			request.Session.Defaults.ActiveSkills,
+			nil
+	}
+	if payload.Origin.Plan == nil {
+		return nil, nil, errors.New(
+			"generated Skill Tool has no immutable LLM invocation plan",
+		)
+	}
+
+	skills = make(
+		[]sessionv3Runtime.ArtifactSelection,
+		0,
+		len(payload.Origin.Plan.Skills),
+	)
+	active = make(
+		[]sessionv3Runtime.ArtifactSelection,
+		0,
+		len(payload.Origin.Plan.Skills),
+	)
+	for _, value := range payload.Origin.Plan.Skills {
+		selection := sessionv3Runtime.ArtifactSelection{
+			RootID:           value.Artifact.RootID,
+			ArtifactID:       value.Artifact.ArtifactID,
+			ExpectedRevision: value.Artifact.Revision,
+			ExpectedDigest:   value.Artifact.Digest,
+		}
+		skills = append(skills, selection)
+		if value.Active {
+			active = append(active, selection)
+		}
+	}
+	return skills, active, nil
 }

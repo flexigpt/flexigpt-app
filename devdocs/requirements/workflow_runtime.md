@@ -47,6 +47,25 @@ Artifact Store handle, or invoke Workflow execution preparation.
         ->
     Model, Agent, Tool, MCP, Skill, Workspace, Service, Activity
 
+## Current implementation cycle constraints
+
+This HLD and its implementation status are work in progress.
+
+No version identifier may be bumped by this implementation cycle. This includes
+Workflow `apiVersion`, ProgramFrame payload and interpreter versions, Artifact
+and Store schema versions, package or module versions, and public API versions.
+
+This implementation cycle excludes:
+
+- Tests and new validation work.
+- Frontend integration.
+- Session v2 deletion, cleanup, migration, and stored-session conversion.
+
+Session v2 functional replacement gaps remain tracked when they prevent Session
+v3 from providing required backend behavior. An implementer must change an
+`Open` or `Partial` status to `Implemented` only after the complete listed
+behavior exists in source. A status change alone is not completion.
+
 ## Separate Artifact planning from execution preparation
 
 Workflow Artifact planning owns static source facts.
@@ -544,6 +563,29 @@ it uses a distinct durable stream record.
 A provider-managed Tool target is lowered only through a typed Model child
 plan. It never becomes a local Tool WorkItem or a synthetic local result.
 
+## Architecture ownership and duplication register
+
+This register records cross-cutting ownership and duplication work. It is
+separate from the functional completion ledger because one architecture issue
+can affect several target families and Workflow operations.
+
+| ID                  | Current status | Required end state before marking `Implemented`                                                                                                                                            | Current source evidence                                                                                                                                                                  |
+| ------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ARC-CORE-001`      | Implemented    | Session Runtime v3 receives only runtime-neutral snapshots, pins, semantic bindings, and durable state. It imports no Artifact Store or setup package.                                     | `internal/agentruntime-go/sessionv3/` has no Artifact Store or setup dependency.                                                                                                         |
+| `ARC-DIRECT-001`    | Implemented    | Direct capability evidence crosses planning, preparation, binding, dispatch, retry, and recovery without a fabricated Artifact or pin. The owning domain adapter owns direct invocation.   | `workflowruntime/direct_targets.go`, `sessionv3/workflow_target_facts.go`, and `sessionv3runtime/binder.go` retain and route typed direct facts only through registered owning adapters. |
+| `ARC-TRANSPORT-001` | Implemented    | Preparation owns the target transport matrix before WorkItem creation. Unsupported context, input-port, final-output, and streamed-output behavior cannot be silently accepted or ignored. | `workflowruntime/target_transport.go` consumes invocation and binding capability facts before lowering; Runtime no longer fabricates terminal stream records.                            |
+| `ARC-PROVIDER-001`  | Implemented    | A provider SDK Tool is represented only by an owning typed Model plan and never by a local Tool WorkItem or local Tool result.                                                             | `toolruntime/v3.go` prepares `ProviderManagedToolChoice`; `workflow_program.go` lowers it through a single-model child ProgramFrame only.                                                |
+| `ARC-ORIGIN-001`    | Implemented    | A Tool WorkItem emitted from LLM output retains immutable effective invocation, capability, and origin-binding facts. Target binders never fall back to current Session defaults.          | `sessionv3/workflow_target_facts.go`, `sessionv3/program.go`, and `skillruntime/v3.go` persist and consume `LLMToolOrigin`.                                                              |
+| `ARC-SCHEDULER-001` | Partial        | One Runtime-owned scheduler lifecycle owns registration, cancellation, restore, and firing of every durable due-time fact.                                                                 | Separate wait, retry, resource, execution, cleanup, and trigger timer maps exist.                                                                                                        |
+| `ARC-STATIC-001`    | Partial        | Setup lowers admitted facts once. Runtime retains only durable integrity behavior. Neither layer repeats source grammar, static relationship, or static capability interpretation.         | Raw source is not reparsed, but lowering and runtime snapshot handling still contain overlapping declaration-shaped checks.                                                              |
+| `ARC-COMPAT-001`    | Partial        | One setup-owned execution-preparation surface remains. Compatibility `Admission` names and request types are removed when no caller requires them.                                         | `PreparationRequest` is authoritative, while `Admission` and `WorkflowAdmissionRequest` remain.                                                                                          |
+| `ARC-V3-001`        | Partial        | Session v3 can represent the required backend capability surface without relying on Session v2 behavior. Session v2 removal remains outside this cycle.                                    | Both runtimes are composed; V2 has direct capability selection types that V3 lacks.                                                                                                      |
+
+The owning domain constructs native requests, resolves current domain state,
+and converts native results. Session Runtime owns durable orchestration,
+checkpointing, retries, waits, cancellation, and settlement. Workflow remains
+an orchestration language and must not become a generic native-domain envelope.
+
 ## Persist waits, events, channels, and triggers
 
 The runtime owns durable wait state.
@@ -766,25 +808,33 @@ The wrapper does not own:
 This ledger defines implementation order for Workflow and Session Runtime
 functional completion.
 
-| Functional capability                                                                                   | Status      | Current evidence or required result                                                                                    |
-| ------------------------------------------------------------------------------------------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------- |
-| Durable Session, Execution, ProgramFrame, WorkItem, Attempt, Wait, effect, and trigger state            | Implemented | `sessionv3/` and `sessionstorev3/` persist the durable execution model                                                 |
-| Ordered work, state updates, scopes, branching, collection work, repeat, machines, and child boundaries | Implemented | `workflow_program.go`, `workflow_structured.go`, and fork/join runtime paths                                           |
-| Timers, events, human work, channel waits, and child-completion waits                                   | Implemented | coordination, wait, timer, and trigger runtime paths                                                                   |
-| Planning-owned declaration path in runtime descriptors                                                  | Partial     | Lowered blocks, call WorkItems, and PortPlans retain paths; child ProgramFrames and several outcomes do not            |
-| Channel permission and port authorization semantics                                                     | Partial     | Channel authorization uses planning-owned paths; target-family transport preparation remains incomplete                |
-| Model and Agent Workflow calls with final and streamed ports                                            | Partial     | Typed invocation exists; accepted child port plans are not propagated to child frames                                  |
-| Direct capability targets                                                                               | Open        | planning retains direct evidence; execution preparation accepts only source-backed targets                             |
-| Callable capability requirements                                                                        | Open        | setup has no evaluator that converts declared requirements to current domain capability facts                          |
-| Provider-managed Tool calls from Workflow                                                               | Open        | execution preparation rejects the call instead of lowering a typed Model child plan                                    |
-| Service and Activity context, ports, and stream delivery                                                | Partial     | bindings exist; complete transport capability preparation is absent                                                    |
-| `start` and handoff durable results                                                                     | Partial     | child ownership exists; `start` receipts are not retained in parent step outcomes                                      |
-| Trigger lifecycle separation                                                                            | Partial     | event and schedule handling exists; direct Workflow start also registers triggers                                      |
-| Effective invocation configuration for Tool WorkItems emitted by LLM work                               | Open        | generated Tool WorkItems do not retain their origin LLM invocation configuration                                       |
-| Effects, retries, reconciliation, compensation, and saga execution                                      | Partial     | durable paths exist; ordinary retry waits are not rearmed after restore and one nested retry edge is rejected          |
-| Runtime-owned Workflow logical evaluation time                                                          | Open        | initial Workflow state reads the process clock directly                                                                |
-| One authoritative Runtime scheduler                                                                     | Partial     | durable due-time facts exist, but wait, retry, resource, deadline, cleanup, and trigger timers are separate schedulers |
-| Normal Session v2 functional replacement surface                                                        | Partial     | both runtimes remain composed and V3 does not represent direct capability selections                                   |
+| Functional capability                                                                                   | Status      | Current evidence or required result                                                                                                                                                |
+| ------------------------------------------------------------------------------------------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Durable Session, Execution, ProgramFrame, WorkItem, Attempt, Wait, effect, and trigger state            | Implemented | `sessionv3/` and `sessionstorev3/` persist the durable execution model                                                                                                             |
+| Ordered work, state updates, scopes, branching, collection work, repeat, machines, and child boundaries | Implemented | `workflow_program.go`, `workflow_structured.go`, and fork/join runtime paths                                                                                                       |
+| Timers, events, human work, channel waits, and child-completion waits                                   | Implemented | coordination, wait, timer, and trigger runtime paths                                                                                                                               |
+| Planning-owned declaration path in runtime descriptors                                                  | Partial     | Lowered blocks, call WorkItems, and PortPlans retain paths; child ProgramFrames and several outcomes do not                                                                        |
+| Channel permission and port authorization semantics                                                     | Partial     | Channel authorization uses planning-owned paths; target-family transport preparation remains incomplete                                                                            |
+| Model and Agent Workflow calls with final and streamed ports                                            | Implemented | `workflow_invocation.go` places accepted `PortPlan` values on child frame intents; Runtime stages streams on child LLM WorkItems and final values on child frame settlement.       |
+| Direct capability targets                                                                               | Implemented | `workflowruntime/direct_targets.go` carries direct evidence through typed setup adapters and `sessionv3` runtime-neutral plans without Artifact fabrication.                       |
+| Callable capability requirements                                                                        | Implemented | `workflowruntime/target_preparation.go` resolves root and callable requirements separately; `WorkflowRequirementFact` and target capability facts persist in the program snapshot. |
+| Provider-managed Tool calls from Workflow                                                               | Implemented | Provider SDK Tool Artifacts lower to `ProviderManagedToolChoice` on a typed single-model child plan and never to local Tool WorkItems.                                             |
+| Service and Activity context, ports, and stream delivery                                                | Implemented | Registered binding transport facts are checked in preparation and again at dispatch; final output remains Runtime-owned.                                                           |
+| Target-family transport behavior                                                                        | Implemented | `target_transport.go` consumes Model and Agent capability declarations and rejects unsupported Tool context, input-port, and streamed-port mappings before WorkItem creation.      |
+| `start` and handoff durable results                                                                     | Partial     | child ownership exists; `start` receipts are not retained in parent step outcomes                                                                                                  |
+| Trigger lifecycle separation                                                                            | Partial     | event and schedule handling exists; direct Workflow start also registers triggers                                                                                                  |
+| Effective invocation configuration for Tool WorkItems emitted by LLM work                               | Implemented | `LLMToolOrigin` persists the effective dispatch plan, target fingerprint, capability facts, and selected bindings for generated Tool WorkItems.                                    |
+| Effects, retries, reconciliation, compensation, and saga execution                                      | Partial     | durable paths exist; ordinary retry waits are not rearmed after restore and one nested retry edge is rejected                                                                      |
+| Recover persisted ordinary retry delays                                                                 | Open        | `resumeRestoredWork` does not rearm `RetryWaiting` WorkItems through `armExecutionRetriesLocked`                                                                                   |
+| Nested Workflow retry policy semantics                                                                  | Partial     | a valid nested Workflow call with `retry.maxAttempts: 1` is rejected instead of executing once                                                                                     |
+| Runtime-owned Workflow logical evaluation time                                                          | Open        | initial Workflow state reads the process clock directly                                                                                                                            |
+| One authoritative Runtime scheduler                                                                     | Partial     | durable due-time facts exist, but wait, retry, resource, deadline, cleanup, and trigger timers are separate schedulers                                                             |
+| Normal Session v2 functional replacement surface                                                        | Partial     | both runtimes remain composed and V3 does not represent direct capability selections                                                                                               |
+
+The table above is the authoritative functional status register for this
+implementation cycle. Every `Open` and `Partial` row is a complete behavior,
+not a request for an isolated small edit. Implementers must update the row
+status and evidence after the full behavior is complete.
 
 ## Validate at the owning boundary
 
@@ -839,19 +889,19 @@ Status values:
 
 ### Bind target domains without Workflow leakage
 
-| Subtask                                                                      | Status      | Evidence or required result                                                                                    |
-| ---------------------------------------------------------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------- |
-| Bind Model and Agent through existing setup APIs                             | Implemented | Model and Agent invocation adapter                                                                             |
-| Bind Go Tools, MCP Tools, and Skill Tools through native arguments           | Implemented | V3 Tool, MCP, and Skill setup executors                                                                        |
-| Keep Provider SDK Tools provider-managed                                     | Partial     | Normal LLM plans preserve provider ownership; Workflow target preparation rejects rather than lowers them      |
-| Bind Service and Activity through registered adapters                        | Implemented | Workflow binding registry                                                                                      |
-| Prepare Service and Activity context and port transport before work creation | Partial     | binding capability is discovered only after a WorkItem exists                                                  |
-| Preserve Model and Agent output and stream port plans                        | Open        | `invokeWorkflowLLMTarget` omits validated ports from its child-frame intent                                    |
-| Prepare target-family transport behavior before WorkItem creation            | Partial     | Model and Agent capabilities are unused; Tool port plans are accepted without target-family transport behavior |
-| Route direct capabilities through owning adapters                            | Open, held  | Separate functional work. Cleanup does not fabricate Artifacts or add generic Workflow fallback routing.       |
-| Evaluate callable interface capability requirements                          | Open, held  | Separate functional work. Cleanup removes generic rechecks but does not invent an evaluator.                   |
-| Lower provider-managed Workflow Tools through typed Model child plans        | Open        | admission currently rejects the target before Model-plan lowering                                              |
-| Move concrete URL and diff behavior out of generic Workflow setup            | Implemented | `attachmentruntime` and `textruntime` own behavior; Workflow composition only registers bindings               |
+| Subtask                                                                      | Status      | Evidence or required result                                                                                             |
+| ---------------------------------------------------------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Bind Model and Agent through existing setup APIs                             | Implemented | Model and Agent invocation adapter                                                                                      |
+| Bind Go Tools, MCP Tools, and Skill Tools through native arguments           | Implemented | V3 Tool, MCP, and Skill setup executors                                                                                 |
+| Keep Provider SDK Tools provider-managed                                     | Implemented | Workflow SDK Tool targets produce a typed Model child plan and provider-managed choice only                             |
+| Bind Service and Activity through registered adapters                        | Implemented | Workflow binding registry                                                                                               |
+| Prepare Service and Activity context and port transport before work creation | Implemented | Binding capability facts are consumed by Workflow preparation and durable target descriptors                            |
+| Preserve Model and Agent output and stream port plans                        | Implemented | Child ProgramFrame intents retain accepted final and streamed output plans before child work begins                     |
+| Prepare target-family transport behavior before WorkItem creation            | Implemented | Preparation validates the target matrix and Runtime rejects any unsupported adapter port route                          |
+| Route direct capabilities through owning adapters                            | Implemented | Direct target registry dispatches only to a registered owning domain adapter and retains runtime-neutral facts          |
+| Evaluate callable interface capability requirements                          | Implemented | Requirement facts are resolved through target-domain capability providers and persist separately from root requirements |
+| Lower provider-managed Workflow Tools through typed Model child plans        | Implemented | SDK Tool choices remain inside typed Model plans and never enter local Tool dispatch                                    |
+| Move concrete URL and diff behavior out of generic Workflow setup            | Implemented | `attachmentruntime` and `textruntime` own behavior; Workflow composition only registers bindings                        |
 
 ### Execute Workflow reliability behavior
 
@@ -878,16 +928,16 @@ Status values:
 
 ### Remove repeated admission and setup layers
 
-| Removal item                                                | Status      | Required result                                                                                                                        |
-| ----------------------------------------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| Remove static declaration rechecks after Workflow admission | Implemented | Setup no longer calls generic invocation or Tool transport recheck passes; Runtime snapshot validation is durable integrity only       |
-| Remove repeated source-tree walks during lowering           | Implemented | Compiler lowers admitted source once; Inventory decorates the lowered runtime tree without another source traversal                    |
-| Remove the runtime-owned Workflow preparation port          | Implemented | Setup submits prepared snapshots; Session Runtime persists and interprets them                                                         |
-| Collapse duplicate Model dispatch-plan processing           | Partial     | One setup entry point now owns normalized LLM planning; full origin-configuration propagation remains held as separate functional work |
-| Normalize MCP Tool exposure once                            | Implemented | `normalizeMCPSelections` persists only `all`, `none`, or `selected` before dispatch-plan construction                                  |
-| Assign one dispatch-time pin owner per target family        | Implemented | Go Tool freshness remains in Tool Runtime; MCP freshness is verified by MCP Runtime; generic Workflow wrappers no longer read pins     |
-| Remove generic Workflow concrete bindings                   | Implemented | URL normalization moved to Attachment Runtime and unified diff moved to Text Runtime; Workflow composition only registers them         |
-| Remove runtime reconstruction of declaration permissions    | Partial     | Channel authorization uses declaration paths, but child ProgramFrames and several step outcomes omit their declaration path            |
+| Removal item                                                | Status      | Required result                                                                                                                                                                              |
+| ----------------------------------------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Remove static declaration rechecks after Workflow admission | Partial     | Raw source is not reparsed, but lowering and snapshot handling still repeat declaration-shaped static checks; retain only lowering, durable integrity, and current domain readiness behavior |
+| Remove repeated source-tree walks during lowering           | Implemented | Compiler lowers admitted source once; Inventory decorates the lowered runtime tree without another source traversal                                                                          |
+| Remove the runtime-owned Workflow preparation port          | Implemented | Setup submits prepared snapshots; Session Runtime persists and interprets them                                                                                                               |
+| Collapse duplicate Model dispatch-plan processing           | Implemented | `llmExecutionPlan.activities` is prepared once and reused for provider input construction and durable dispatch-plan facts; generated Tool execution reads retained origin facts.             |
+| Normalize MCP Tool exposure once                            | Implemented | `normalizeMCPSelections` persists only `all`, `none`, or `selected` before dispatch-plan construction                                                                                        |
+| Assign one dispatch-time pin owner per target family        | Implemented | Go Tool freshness remains in Tool Runtime; MCP freshness is verified by MCP Runtime; generic Workflow wrappers no longer read pins                                                           |
+| Remove generic Workflow concrete bindings                   | Implemented | URL normalization moved to Attachment Runtime and unified diff moved to Text Runtime; Workflow composition only registers them                                                               |
+| Remove runtime reconstruction of declaration permissions    | Partial     | Channel authorization uses declaration paths, but child ProgramFrames and several step outcomes omit their declaration path                                                                  |
 
 ### Verify deployment composition
 

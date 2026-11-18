@@ -87,15 +87,16 @@ type WorkflowProgram struct {
 	Input        CanonicalValue `json:"input"`
 	InputBound   bool           `json:"inputBound"`
 
-	Root       WorkflowBlock                `json:"root"`
-	Targets    map[string]WorkflowTarget    `json:"targets"`
-	TargetSets map[string]WorkflowTargetSet `json:"targetSets,omitempty"`
-	Events     []WorkflowEventContract      `json:"events,omitempty"`
-	Resources  []WorkflowResourceDefinition `json:"resources,omitempty"`
-	Channels   []WorkflowChannel            `json:"channels,omitempty"`
-	Ports      []WorkflowPort               `json:"ports,omitempty"`
-	Triggers   []WorkflowTrigger            `json:"triggers,omitempty"`
-	Limits     ExecutionBudget              `json:"limits"`
+	Root         WorkflowBlock                `json:"root"`
+	Targets      map[string]WorkflowTarget    `json:"targets"`
+	Requirements []WorkflowRequirementFact    `json:"requirements,omitempty"`
+	TargetSets   map[string]WorkflowTargetSet `json:"targetSets,omitempty"`
+	Events       []WorkflowEventContract      `json:"events,omitempty"`
+	Resources    []WorkflowResourceDefinition `json:"resources,omitempty"`
+	Channels     []WorkflowChannel            `json:"channels,omitempty"`
+	Ports        []WorkflowPort               `json:"ports,omitempty"`
+	Triggers     []WorkflowTrigger            `json:"triggers,omitempty"`
+	Limits       ExecutionBudget              `json:"limits"`
 
 	// Scope is empty for a root Workflow Program. Child block ProgramFrames
 	// receive an immutable parent snapshot through this typed envelope.
@@ -206,20 +207,25 @@ type WorkflowWait struct {
 type WorkflowTargetKind string
 
 const (
-	WorkflowTargetTool     WorkflowTargetKind = "tool"
-	WorkflowTargetMCPTool  WorkflowTargetKind = "mcpTool"
-	WorkflowTargetService  WorkflowTargetKind = "service"
-	WorkflowTargetActivity WorkflowTargetKind = "activity"
-	WorkflowTargetWorkflow WorkflowTargetKind = "workflow"
-	WorkflowTargetAgent    WorkflowTargetKind = "agent"
-	WorkflowTargetModel    WorkflowTargetKind = "model"
+	WorkflowTargetTool         WorkflowTargetKind = "tool"
+	WorkflowTargetMCPTool      WorkflowTargetKind = "mcpTool"
+	WorkflowTargetService      WorkflowTargetKind = "service"
+	WorkflowTargetActivity     WorkflowTargetKind = "activity"
+	WorkflowTargetWorkflow     WorkflowTargetKind = "workflow"
+	WorkflowTargetAgent        WorkflowTargetKind = "agent"
+	WorkflowTargetModel        WorkflowTargetKind = "model"
+	WorkflowTargetProviderTool WorkflowTargetKind = "providerTool"
 )
 
 type WorkflowTarget struct {
 	Kind WorkflowTargetKind `json:"kind"`
 
-	Artifact *ArtifactPin `json:"artifact,omitempty"`
-	MCP      *WorkflowMCP `json:"mcp,omitempty"`
+	Artifact        *ArtifactPin               `json:"artifact,omitempty"`
+	Direct          *DirectCapabilityPlan      `json:"direct,omitempty"`
+	MCP             *WorkflowMCP               `json:"mcp,omitempty"`
+	ProviderTool    *ProviderManagedToolTarget `json:"providerTool,omitempty"`
+	Transport       WorkflowTargetTransport    `json:"transport"`
+	CapabilityFacts []WorkflowCapabilityFact   `json:"capabilityFacts,omitempty"`
 
 	ServiceID      string `json:"serviceID,omitempty"`
 	ActivityID     string `json:"activityID,omitempty"`
@@ -1353,7 +1359,9 @@ func (i *WorkflowInterpreter) call(
 								},
 							},
 						},
-						Target: target.Artifact,
+						Target:          target.Artifact,
+						Direct:          target.Direct,
+						CapabilityFacts: cloneWorkflowCapabilityFacts(target.CapabilityFacts),
 					},
 				},
 			},
@@ -1395,6 +1403,7 @@ func (i *WorkflowInterpreter) call(
 							Server:   target.MCP.Server,
 							ToolName: target.MCP.ToolName,
 						},
+						CapabilityFacts: cloneWorkflowCapabilityFacts(target.CapabilityFacts),
 					},
 				},
 			},
@@ -1414,10 +1423,12 @@ func (i *WorkflowInterpreter) call(
 				Ports:       clonePortPlans(ports),
 				Input: WorkItemPayload{
 					Service: &ServiceWork{
-						ServiceID:      target.ServiceID,
-						BindingVersion: target.BindingVersion,
-						Input:          input,
-						Context:        workflowExternalContext(contextValue),
+						ServiceID:       target.ServiceID,
+						BindingVersion:  target.BindingVersion,
+						Input:           input,
+						Context:         workflowExternalContext(contextValue),
+						Direct:          cloneDirectCapabilityPlan(target.Direct),
+						CapabilityFacts: cloneWorkflowCapabilityFacts(target.CapabilityFacts),
 					},
 				},
 			},
@@ -1437,10 +1448,12 @@ func (i *WorkflowInterpreter) call(
 				Ports:       clonePortPlans(ports),
 				Input: WorkItemPayload{
 					Activity: &ActivityWork{
-						ActivityID:     target.ActivityID,
-						BindingVersion: target.BindingVersion,
-						Input:          input,
-						Context:        workflowExternalContext(contextValue),
+						ActivityID:      target.ActivityID,
+						BindingVersion:  target.BindingVersion,
+						Input:           input,
+						Context:         workflowExternalContext(contextValue),
+						Direct:          cloneDirectCapabilityPlan(target.Direct),
+						CapabilityFacts: cloneWorkflowCapabilityFacts(target.CapabilityFacts),
 					},
 				},
 			},
@@ -1494,11 +1507,12 @@ func (i *WorkflowInterpreter) call(
 		return ProgramTransition{
 			State: nextState,
 			Frames: []ProgramFrameIntent{{
-				Path:     path,
-				Deadline: cloneTime(state.Deadline),
-				Budget:   cloneBudget(callBudget),
-				Program:  nested,
-				Ports:    ports,
+				Path:            path,
+				DeclarationPath: state.PendingDeclarationPath,
+				Deadline:        cloneTime(state.Deadline),
+				Budget:          cloneBudget(callBudget),
+				Program:         nested,
+				Ports:           ports,
 			}},
 		}, nil
 
@@ -1513,7 +1527,70 @@ func (i *WorkflowInterpreter) call(
 			input,
 			contextValue,
 			nil,
+			ports,
+			callBudget,
 		)
+
+	case WorkflowTargetProviderTool:
+		if target.ProviderTool == nil {
+			return workflowFailure(
+				state,
+				"workflow_target_invalid",
+				"provider-managed Tool target has no typed Model plan",
+			)
+		}
+		modelTarget := WorkflowTarget{
+			Kind:            WorkflowTargetModel,
+			Artifact:        &target.ProviderTool.OwnerModel,
+			Transport:       target.Transport,
+			CapabilityFacts: cloneWorkflowCapabilityFacts(target.CapabilityFacts),
+			Effect:          EffectContract{Kind: EffectKindRead},
+		}
+		invocation, invokeErr := prepareWorkflowLLMInvocation(
+			frame,
+			path,
+			modelTarget,
+			input,
+			contextValue,
+		)
+		if invokeErr != nil {
+			return workflowFailure(
+				state,
+				"workflow_invocation_input_invalid",
+				invokeErr.Error(),
+			)
+		}
+		child, childErr := NewSingleModelWorkflowInvocationProgram(
+			invocation.Defaults,
+			invocation.InputActivityID,
+			invocation.HistoryActivityIDs,
+			nil,
+			[]ProviderManagedToolChoice{target.ProviderTool.Choice},
+			target.CapabilityFacts,
+		)
+		if childErr != nil {
+			return workflowFailure(
+				state,
+				"workflow_invocation_prepare_failed",
+				childErr.Error(),
+			)
+		}
+		state.PendingPath = path
+		state.PendingTarget = targetName
+		transition, transitionErr := workflowTransition(state, nil, nil, nil)
+		if transitionErr != nil {
+			return ProgramTransition{}, transitionErr
+		}
+		transition.Activities = invocation.Activities
+		transition.Frames = []ProgramFrameIntent{{
+			Path:            path,
+			DeclarationPath: state.PendingDeclarationPath,
+			Program:         child,
+			Deadline:        cloneTime(state.Deadline),
+			Budget:          cloneBudget(callBudget),
+			Ports:           clonePortPlans(ports),
+		}}
+		return transition, nil
 
 	default:
 		return workflowFailure(
@@ -2115,6 +2192,16 @@ func (p WorkflowProgram) Validate() error {
 	if strings.TrimSpace(p.Root.DeclarationPath) == "" {
 		return errors.New("workflow root has no declaration path")
 	}
+	for _, requirement := range p.Requirements {
+		if err := requirement.Validate(); err != nil {
+			return err
+		}
+	}
+	for _, target := range p.Targets {
+		if err := target.Validate(); err != nil {
+			return err
+		}
+	}
 	for name, target := range p.Targets {
 		if strings.TrimSpace(name) == "" ||
 			strings.TrimSpace(target.DeclarationPath) == "" {
@@ -2525,12 +2612,23 @@ func (t WorkflowTarget) Validate() error {
 	var err error
 	switch t.Kind {
 	case WorkflowTargetTool:
-		if t.Artifact == nil ||
-			strings.TrimSpace(t.ToolName) == "" ||
-			t.MCP != nil {
+		if strings.TrimSpace(t.ToolName) == "" || t.MCP != nil {
 			return errors.New("Workflow Tool target is invalid")
 		}
-		err = validatePin(*t.Artifact)
+		switch {
+		case t.Direct != nil:
+			if !directCapabilityTargetKindMatches(
+				t.Direct.Target,
+				WorkflowTargetTool,
+			) {
+				return errors.New("Workflow direct Tool target is invalid")
+			}
+			err = t.Direct.Validate()
+		case t.Artifact != nil:
+			err = validatePin(*t.Artifact)
+		default:
+			return errors.New("Workflow Tool target has no target facts")
+		}
 
 	case WorkflowTargetMCPTool:
 		if t.MCP == nil || t.Artifact != nil {
@@ -2538,16 +2636,28 @@ func (t WorkflowTarget) Validate() error {
 		}
 		err = t.MCP.Validate()
 
+	case WorkflowTargetProviderTool:
+		if t.ProviderTool == nil || t.Artifact != nil ||
+			t.Direct != nil || t.MCP != nil {
+			return errors.New("Workflow provider-managed Tool target is invalid")
+		}
+		err = t.ProviderTool.Validate()
+
 	case WorkflowTargetService:
-		if strings.TrimSpace(t.ServiceID) == "" ||
+		if (strings.TrimSpace(t.ServiceID) == "") ==
+			(t.Direct == nil) ||
 			strings.TrimSpace(t.BindingVersion) == "" {
 			return errors.New("Workflow Service target is invalid")
 		}
 
 	case WorkflowTargetActivity:
-		if strings.TrimSpace(t.ActivityID) == "" ||
+		if (strings.TrimSpace(t.ActivityID) == "") ==
+			(t.Direct == nil) ||
 			strings.TrimSpace(t.BindingVersion) == "" {
 			return errors.New("Workflow Activity target is invalid")
+		}
+		if t.Direct != nil {
+			err = t.Direct.Validate()
 		}
 
 	case WorkflowTargetWorkflow:
@@ -2558,10 +2668,20 @@ func (t WorkflowTarget) Validate() error {
 
 	case WorkflowTargetAgent,
 		WorkflowTargetModel:
-		if t.Artifact == nil {
+		if t.Artifact == nil && t.Direct == nil {
 			return errors.New("Workflow Artifact target is invalid")
 		}
-		err = validatePin(*t.Artifact)
+		if t.Artifact != nil && t.Direct != nil {
+			return errors.New("Workflow target has Artifact and direct facts")
+		}
+		if t.Direct != nil {
+			if !directCapabilityTargetKindMatches(t.Direct.Target, t.Kind) {
+				return errors.New("Workflow direct Model or Agent target is invalid")
+			}
+			err = t.Direct.Validate()
+		} else {
+			err = validatePin(*t.Artifact)
+		}
 
 	default:
 		return errors.New("Workflow target kind is unsupported")
@@ -2573,6 +2693,15 @@ func (t WorkflowTarget) Validate() error {
 		if err := t.Contract.Validate(); err != nil {
 			return err
 		}
+	}
+	if err := t.Transport.Validate(); err != nil {
+		return err
+	}
+	if err := ValidateWorkflowCapabilityFacts(
+		nil,
+		t.CapabilityFacts,
+	); err != nil {
+		return err
 	}
 	if t.KeyedCapable {
 		if t.Effect.Kind != EffectKindIdempotent {

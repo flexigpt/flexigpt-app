@@ -14,21 +14,25 @@ func (b *Binder) buildInputs(
 	req sessionv3Runtime.WorkDispatchRequest,
 	defaults sessionv3Runtime.SessionDefaults,
 	injectedContext []string,
+	preparedActivities []sessionv3Runtime.Activity,
 ) ([]inferenceSpec.InputUnion, error) {
 	payload := req.WorkItem.Input.LLM
 	if payload == nil {
 		return nil, errors.New("LLM payload is missing")
 	}
 
-	session := req.Session
 	execution := req.Execution
-	activities, err := llmInputActivitySequence(
-		session,
-		payload,
-		defaults.History,
-	)
-	if err != nil {
-		return nil, err
+	activities := preparedActivities
+	if len(activities) == 0 {
+		var err error
+		activities, err = llmInputActivitySequence(
+			req.Session,
+			payload,
+			defaults.History,
+		)
+		if err != nil {
+			return nil, err
+		}
 	}
 	inputs := make([]inferenceSpec.InputUnion, 0, len(activities))
 	for _, activity := range activities[:len(activities)-1] {

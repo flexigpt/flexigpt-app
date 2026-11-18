@@ -78,6 +78,46 @@ func (e *V3Executor) IsProviderManagedWorkflowTool(
 	}
 }
 
+// PrepareProviderManagedWorkflowTool returns a provider Tool choice for a
+// typed Model child plan. It does not create a local Tool WorkItem.
+func (e *V3Executor) PrepareProviderManagedWorkflowTool(
+	ctx context.Context,
+	pin sessionv3Runtime.ArtifactPin,
+) (sessionv3Runtime.ProviderManagedToolChoice, error) {
+	resolved, err := e.resolvePinnedTool(ctx, pin)
+	if err != nil {
+		return sessionv3Runtime.ProviderManagedToolChoice{}, err
+	}
+	choice, call, err := v3ChoiceForResolvedTool(resolved)
+	if err != nil {
+		return sessionv3Runtime.ProviderManagedToolChoice{}, err
+	}
+	if call.Binding.Kind != sessionv3Runtime.ToolBindingKindProvider {
+		return sessionv3Runtime.ProviderManagedToolChoice{}, ErrProviderManagedWorkflowTool
+	}
+	call.ID = "workflow-provider-choice:" + call.ChoiceID
+	call.Arguments = sessionv3Runtime.MustCanonicalValue(map[string]any{})
+
+	raw, err := json.Marshal(choice.Arguments)
+	if err != nil {
+		return sessionv3Runtime.ProviderManagedToolChoice{}, err
+	}
+	schema, err := sessionv3Runtime.CanonicalValueFrom(raw)
+	if err != nil {
+		return sessionv3Runtime.ProviderManagedToolChoice{}, err
+	}
+	value := sessionv3Runtime.ProviderManagedToolChoice{
+		Artifact:    pin,
+		Type:        string(choice.Type),
+		InputSchema: schema,
+		Call:        call,
+	}
+	if err := value.Validate(); err != nil {
+		return sessionv3Runtime.ProviderManagedToolChoice{}, err
+	}
+	return value, nil
+}
+
 // Choices resolves selected Tool Artifacts, verifies requested pins, and
 // creates provider choices plus durable v3 bindings.
 func (e *V3Executor) Choices(

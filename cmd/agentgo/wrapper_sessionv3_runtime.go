@@ -100,11 +100,22 @@ func (w *SessionV3Wrapper) StartWorkflow(
 	if err != nil {
 		return nil, err
 	}
+	session, err := withSessionV3(
+		w,
+		func(r *sessionv3Runtime.Runtime) (sessionv3Runtime.Session, error) {
+			return r.GetSession(context.Background(), command.SessionID)
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	defaults := session.Defaults
 	program, err := preparation.PrepareWorkflow(
 		context.Background(),
 		workflowruntime.PreparationRequest{
-			Workflow: command.Workflow,
-			Input:    command.Input.Clone(),
+			Workflow:           command.Workflow,
+			Input:              command.Input.Clone(),
+			InvocationDefaults: &defaults,
 		},
 	)
 	if err != nil {

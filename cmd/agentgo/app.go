@@ -717,7 +717,7 @@ func (a *App) initManagers() {
 	}
 	slog.Info("session runtime initialized")
 
-	workflowAdmission, workflowBindings, err := newSessionV3WorkflowAdmission(
+	workflowAdmission, workflowBindings, directTargets, err := newSessionV3WorkflowAdmission(
 		artifactComposition.Artifacts,
 		artifactCompositionResolver,
 		a.toolStoreAPI.api,
@@ -768,6 +768,7 @@ func (a *App) initManagers() {
 			Events:           a.sessionV3RuntimeAPI,
 			Workflow:         workflowAdmission,
 			WorkflowBindings: workflowBindings,
+			DirectTargets:    directTargets,
 		},
 	); err != nil {
 		closeErr := sessionV3Store.Close()

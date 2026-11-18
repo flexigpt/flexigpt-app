@@ -1,8 +1,10 @@
 package sessionv3
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
+	"io"
 	"slices"
 	"strconv"
 )
@@ -34,6 +36,24 @@ type workflowLLMInvocation struct {
 	Defaults           SessionDefaults
 	InputActivityID    ActivityID
 	HistoryActivityIDs []ActivityID
+	DirectTarget       *DirectCapabilityPlan
+}
+
+func decodeWorkflowInvocationValue[T any](
+	value CanonicalValue,
+	label string,
+) (T, error) {
+	var output T
+	decoder := json.NewDecoder(bytes.NewReader(value))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&output); err != nil {
+		return output, errors.New(label + " has unsupported fields or an invalid shape")
+	}
+	var extra any
+	if err := decoder.Decode(&extra); err != io.EOF {
+		return output, errors.New(label + " contains more than one value")
+	}
+	return output, nil
 }
 
 func prepareWorkflowLLMInvocation(
@@ -43,8 +63,11 @@ func prepareWorkflowLLMInvocation(
 	input CanonicalValue,
 	contextValue CanonicalValue,
 ) (workflowLLMInvocation, error) {
-	var request workflowInvocationInput
-	if err := json.Unmarshal(input, &request); err != nil {
+	request, err := decodeWorkflowInvocationValue[workflowInvocationInput](
+		input,
+		"workflow model or agent input",
+	)
+	if err != nil {
 		return workflowLLMInvocation{}, errors.New(
 			"workflow model or agent input must use the explicit messages form",
 		)
@@ -57,7 +80,11 @@ func prepareWorkflowLLMInvocation(
 
 	var context workflowInvocationContext
 	if len(contextValue) != 0 && string(contextValue) != "null" {
-		if err := json.Unmarshal(contextValue, &context); err != nil {
+		context, err = decodeWorkflowInvocationValue[workflowInvocationContext](
+			contextValue,
+			"workflow model or agent context",
+		)
+		if err != nil {
 			return workflowLLMInvocation{}, errors.New(
 				"workflow model or agent context must use the explicit instructions form",
 			)
@@ -85,27 +112,29 @@ func prepareWorkflowLLMInvocation(
 		context.Instructions...,
 	)
 
-	if target.Artifact == nil {
+	if target.Artifact == nil && target.Direct == nil {
 		return workflowLLMInvocation{}, errors.New(
-			"workflow model or agent target has no artifact pin",
+			"workflow model or agent target has no prepared target facts",
 		)
 	}
 
-	selection := &ArtifactSelection{
-		RootID:           target.Artifact.RootID,
-		ArtifactID:       target.Artifact.ArtifactID,
-		ExpectedRevision: target.Artifact.Revision,
-		ExpectedDigest:   target.Artifact.Digest,
-	}
-	switch target.Kind {
-	case WorkflowTargetModel:
-		defaults.Model = selection
-	case WorkflowTargetAgent:
-		defaults.Agent = selection
-	default:
-		return workflowLLMInvocation{}, errors.New(
-			"workflow target is not model or agent",
-		)
+	if target.Artifact != nil {
+		selection := &ArtifactSelection{
+			RootID:           target.Artifact.RootID,
+			ArtifactID:       target.Artifact.ArtifactID,
+			ExpectedRevision: target.Artifact.Revision,
+			ExpectedDigest:   target.Artifact.Digest,
+		}
+		switch target.Kind {
+		case WorkflowTargetModel:
+			defaults.Model = selection
+		case WorkflowTargetAgent:
+			defaults.Agent = selection
+		default:
+			return workflowLLMInvocation{}, errors.New(
+				"workflow target is not model or agent",
+			)
+		}
 	}
 
 	messages := append(
@@ -116,9 +145,14 @@ func prepareWorkflowLLMInvocation(
 	activityIDs := make([]ActivityID, 0, len(messages))
 	for index := range messages {
 		message := messages[index]
-		if message.Role == "" {
+		switch message.Role {
+		case MessageRoleSystem,
+			MessageRoleDeveloper,
+			MessageRoleUser,
+			MessageRoleAssistant:
+		default:
 			return workflowLLMInvocation{}, errors.New(
-				"workflow model or agent message role is required",
+				"workflow model or agent message role is unsupported",
 			)
 		}
 
@@ -148,6 +182,7 @@ func prepareWorkflowLLMInvocation(
 		Defaults:           defaults,
 		InputActivityID:    activityIDs[len(activityIDs)-1],
 		HistoryActivityIDs: append([]ActivityID(nil), activityIDs[:len(activityIDs)-1]...),
+		DirectTarget:       cloneDirectCapabilityPlan(target.Direct),
 	}, nil
 }
 
@@ -173,6 +208,8 @@ func (i *WorkflowInterpreter) invokeWorkflowLLMTarget(
 	input CanonicalValue,
 	contextValue CanonicalValue,
 	handoff *ConversationHandoffIntent,
+	ports []PortPlan,
+	budget *ExecutionBudget,
 ) (ProgramTransition, error) {
 	invocation, err := prepareWorkflowLLMInvocation(
 		frame,
@@ -192,16 +229,22 @@ func (i *WorkflowInterpreter) invokeWorkflowLLMTarget(
 	var child ProgramSnapshot
 	switch target.Kind {
 	case WorkflowTargetModel:
-		child, err = NewSingleModelInvocationProgram(
+		child, err = NewSingleModelWorkflowInvocationProgram(
 			invocation.Defaults,
 			invocation.InputActivityID,
 			invocation.HistoryActivityIDs,
+			invocation.DirectTarget,
+			nil,
+			target.CapabilityFacts,
 		)
 	case WorkflowTargetAgent:
-		child, err = NewAgentLoopInvocationProgram(
+		child, err = NewAgentLoopWorkflowInvocationProgram(
 			invocation.Defaults,
 			invocation.InputActivityID,
 			invocation.HistoryActivityIDs,
+			invocation.DirectTarget,
+			nil,
+			target.CapabilityFacts,
 		)
 	default:
 		return workflowFailure(
@@ -226,10 +269,13 @@ func (i *WorkflowInterpreter) invokeWorkflowLLMTarget(
 	}
 	transition.Activities = invocation.Activities
 	transition.Frames = []ProgramFrameIntent{{
-		Path:     path,
-		Program:  child,
-		Deadline: cloneTime(state.Deadline),
-		Handoff:  handoff,
+		Path:            path,
+		DeclarationPath: state.PendingDeclarationPath,
+		Program:         child,
+		Deadline:        cloneTime(state.Deadline),
+		Budget:          cloneBudget(budget),
+		Ports:           clonePortPlans(ports),
+		Handoff:         handoff,
 	}}
 	return transition, nil
 }
@@ -305,5 +351,7 @@ func (i *WorkflowInterpreter) handoffWorkflowAgentTarget(
 			TargetAgent:         targetAgent,
 			RestoreOnCompletion: call.OnCompletion != "retain",
 		},
+		nil,
+		nil,
 	)
 }

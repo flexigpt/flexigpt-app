@@ -52,6 +52,15 @@ func (normalizeURLServiceBinding) Effect() sessionv3Runtime.EffectContract {
 	}
 }
 
+func (normalizeURLServiceBinding) WorkflowPortCapabilities() workflowruntime.WorkBindingPortCapabilities {
+	return workflowruntime.WorkBindingPortCapabilities{
+		Context:          false,
+		InputPorts:       false,
+		FinalOutputPorts: true,
+		OutputStream:     false,
+	}
+}
+
 func (normalizeURLServiceBinding) Bind(
 	_ context.Context,
 	request workflowruntime.WorkBindingRequest,

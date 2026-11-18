@@ -21,6 +21,24 @@ import (
 	workspaceAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace"
 )
 
+// DirectWorkDispatcher is the setup-owned execution bridge for a direct
+// capability plan prepared by an owning target-domain adapter.
+type DirectWorkDispatcher interface {
+	BindWorkflowDirectWork(
+		ctx context.Context,
+		request sessionv3Runtime.WorkDispatchRequest,
+	) (sessionv3Runtime.BindResult, bool, error)
+	ExecuteWorkflowDirectWork(
+		ctx context.Context,
+		request sessionv3Runtime.WorkDispatchRequest,
+		bound sessionv3Runtime.BoundWork,
+	) (sessionv3Runtime.WorkExecutionResult, bool, error)
+	ResolveWorkflowDirectWait(
+		ctx context.Context,
+		request sessionv3Runtime.WaitResolutionRequest,
+	) (sessionv3Runtime.WaitResolutionResult, bool, error)
+}
+
 type Dependencies struct {
 	Artifacts     artifact.API
 	Providers     *inferenceRuntime.ProviderSetAPI
@@ -34,6 +52,7 @@ type Dependencies struct {
 	SkillRuntime  *skillRuntime.Service
 	MCPRuntime    *mcpConnection.MCPRuntimeManager
 	MCPBridge     *invocation.ToolBridge
+	DirectTargets DirectWorkDispatcher
 }
 
 type Binder struct {
@@ -112,6 +131,18 @@ func (b *Binder) BindWork(
 	ctx context.Context,
 	req sessionv3Runtime.WorkDispatchRequest,
 ) (sessionv3Runtime.BindResult, error) {
+	if sessionv3Runtime.DirectCapabilityPlanForWorkItem(req.WorkItem) != nil {
+		if b.deps.DirectTargets == nil {
+			return sessionv3Runtime.BindResult{}, errors.New(
+				"direct Workflow target dispatcher is unavailable",
+			)
+		}
+		result, handled, err := b.deps.DirectTargets.BindWorkflowDirectWork(ctx, req)
+		if handled || err != nil {
+			return result, err
+		}
+		return sessionv3Runtime.BindResult{}, errors.New("direct Workflow target dispatcher declined work")
+	}
 	if result, handled, err := b.deterministic.Bind(ctx, req); handled || err != nil {
 		return result, err
 	}
@@ -134,6 +165,16 @@ func (b *Binder) ExecuteWork(
 	req sessionv3Runtime.WorkDispatchRequest,
 	bound sessionv3Runtime.BoundWork,
 ) (sessionv3Runtime.WorkExecutionResult, error) {
+	if b.deps.DirectTargets != nil {
+		result, handled, err := b.deps.DirectTargets.ExecuteWorkflowDirectWork(
+			ctx,
+			req,
+			bound,
+		)
+		if handled || err != nil {
+			return result, err
+		}
+	}
 	if result, handled, err := b.deterministic.Execute(ctx, req, bound); handled || err != nil {
 		return result, err
 	}
@@ -154,6 +195,15 @@ func (b *Binder) ResolveWait(
 	ctx context.Context,
 	req sessionv3Runtime.WaitResolutionRequest,
 ) (sessionv3Runtime.WaitResolutionResult, error) {
+	if b.deps.DirectTargets != nil {
+		result, handled, err := b.deps.DirectTargets.ResolveWorkflowDirectWait(
+			ctx,
+			req,
+		)
+		if handled || err != nil {
+			return result, err
+		}
+	}
 	if result, handled, err := b.deterministic.ResolveWait(ctx, req); handled || err != nil {
 		return result, err
 	}

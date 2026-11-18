@@ -162,9 +162,8 @@ does not receive a synthetic Artifact resolution. Requirements never enter
 `WorkflowProgram.Targets`, target-set selection, or callable dispatch.
 
 `Plan.Capabilities` remains a recursive composition and diagnostic projection.
-Runtime setup must consume the separate callable-target and requirement
-collections. It must not rebuild target lookup by walking
-`CapabilityPlan.Occurrences`.
+Consumers must use the separate callable-target and requirement collections.
+They must not rebuild target lookup by walking
 
 `Inventory` source paths are the planning-owned canonical declaration paths for
 blocks, calls, ports, retries, and effects. The root block is `root`; a root
@@ -205,31 +204,19 @@ prepare bindings, schedule work, or retain consumer-private state.
 The read-only plan and closure are the complete Artifact-facing output. This
 document makes no assertion about a consumer's runtime representation.
 
-### 4.1 Validation ownership
+### 4.1 Artifact interpretation boundary
 
-One layer owns each validation class.
+This document defines only Artifact-side interpretation and read-only planning ownership.
 
-| Validation class                                                                                 | Owner                                     | Other layers                               |
-| ------------------------------------------------------------------------------------------------ | ----------------------------------------- | ------------------------------------------ |
-| Artifact envelope, Definition integrity, persistence identity                                    | Artifact Store                            | Consume admitted Artifact facts            |
-| Workflow grammar, source schema, static CEL scope, static source relationships                   | Workflow contract v1                      | Consume typed validated declaration values |
-| Artifact-backed Workflow target and requirement resolution                                       | Workflow planning                         | Expose read-only typed plan facts          |
-| Current execution Artifact pin, enablement, binding, credential, policy, and transport readiness | Setup adapter that owns the target domain | Return typed admission failure             |
-| Durable Session, ProgramFrame, WorkItem, Attempt, Wait, timer, channel, and transition integrity | Session Runtime v3                        | Persist and recover durable facts          |
-| Session document, tombstone, index, and FTS integrity                                            | Session Store v3                          | Rebuild derived records                    |
+| Artifact concern                                                            | Owner                 | Artifact-facing result                                             |
+| --------------------------------------------------------------------------- | --------------------- | ------------------------------------------------------------------ |
+| Artifact envelope, Definition identity, and persistence identity            | Artifact Store        | Admitted immutable source facts                                    |
+| Workflow grammar, source schema, static CEL scope, and source relationships | Workflow contract v1  | Typed admitted Workflow declaration                                |
+| Artifact-backed target and requirement resolution                           | Workflow planning     | Read-only plan, inventory, closure, and direct-capability evidence |
+| Consumer execution, binding, persistence, transport, and scheduling         | Outside this document | No Artifact HLD behavior is specified                              |
 
-Workflow setup is a lowerer and binder assembler. It must not become a second
-Workflow grammar validator, a second CEL scope validator, a second target
-relationship resolver, a second requirement resolver, or a second trigger
-scheduler.
-
-Runtime-neutral Workflow types are deliberate boundary copies. Runtime cannot
-import Artifact or declaration packages. These copies must contain runtime
-semantics only and must not recreate source-language parsing behavior.
-
-After admission, setup and runtime trust static plan facts. Setup adds current
-domain binding facts. Runtime adds durable execution facts. Neither layer
-reconstructs declaration semantics from source-shaped runtime data.
+Artifact planning ends when it returns admitted source facts. Consumer-local
+representations and consumer behavior are not part of Artifact planning.
 
 LLM declaration-family registration is also split by ownership:
 
@@ -1844,26 +1831,7 @@ Workflow planning owns:
 
 Canonical JSON values are used only at arbitrary JSON boundaries.
 
-Session Runtime v3 does not contain a generic Workflow-to-Model or
-Workflow-to-Agent invocation request. The former `LLMInvocationPlan` bridge is
-removed because it could bypass typed setup-owned Model and Agent planning.
-
-Typed structures own:
-
-- IDs.
-- Pins.
-- Kinds.
-- Limits.
-- Effects.
-- Attempts.
-- Waits.
-- Receipts.
-- Errors.
-- Budgets.
-- Trigger state.
-- Port state.
-- Resource claims.
-- Control-flow state.
+External consumer representations, semantic bindings, and execution state are outside this document.
 
 ## 21. Workflow Artifact completion criteria
 
@@ -1872,7 +1840,7 @@ satisfy one result:
 
 - The field is represented in the typed declaration model and static plan.
 - The field is rejected by Workflow v1 language validation.
-- The field is represented as an explicit setup or runtime handoff requirement.
+- The field is represented as an explicit external-consumer handoff requirement.
 
 Workflow Artifact completion includes:
 

@@ -53,6 +53,28 @@ func (b *Binder) toolChoices(
 			}
 		}
 	}
+	if payload := req.WorkItem.Input.LLM; payload != nil {
+		for _, providerTool := range payload.ProviderTools {
+			arguments, err := sessionv3Runtime.DecodeCanonicalValue[map[string]any](
+				providerTool.InputSchema,
+			)
+			if err != nil {
+				return nil, nil, err
+			}
+			if err := register(preparedChoice{
+				Choice: inferenceSpec.ToolChoice{
+					Type:        inferenceSpec.ToolType(providerTool.Type),
+					ID:          providerTool.Call.ChoiceID,
+					Name:        providerTool.Call.Name,
+					Description: providerTool.Call.Description,
+					Arguments:   arguments,
+				},
+				Call: providerTool.Call,
+			}); err != nil {
+				return nil, nil, err
+			}
+		}
+	}
 	if b.goTools == nil {
 		return nil, nil, errors.New(
 			"session v3 Tool runtime is unavailable",

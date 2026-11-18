@@ -42,6 +42,11 @@ func (b *Binder) bindLLM(
 	if payload == nil {
 		return sessionv3Runtime.BindResult{}, errors.New("LLM payload is missing")
 	}
+	if payload.DirectTarget != nil {
+		return sessionv3Runtime.BindResult{}, errors.New(
+			"direct LLM target was not claimed by its owning domain adapter",
+		)
+	}
 
 	plan, err := b.prepareLLMPlan(ctx, req)
 	if err != nil {
@@ -97,6 +102,7 @@ func (b *Binder) bindLLM(
 		req,
 		plan.defaults,
 		plan.context,
+		plan.activities,
 	)
 	if err != nil {
 		return sessionv3Runtime.BindResult{}, err

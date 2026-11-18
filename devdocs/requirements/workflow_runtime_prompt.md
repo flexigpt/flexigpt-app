@@ -1,487 +1,168 @@
-# Session Runtime v3 and Workflow Runtime v3 Implementation Handoff
-
-## 1. Objective
-
-Implement Session Runtime v3 and Workflow Runtime v3 as one typed durable backend.
-
-The completed backend provides:
+## Prompt 1: Complete target-domain and setup support
 
 ```text
-Session Runtime v3
-    +
-Workflow Runtime v3
-    =
-normal Session v2 backend behavior
-    +
-full Workflow v1 execution behavior
+Complete the full target-domain and setup support work in one coherent implementation change set.
+
+Read and use:
+- `devdocs/requirements/workflow_runtime.md`
+- `devdocs/requirements/workflow_artifact.md`
+- the Functional completion ledger
+- the Architecture ownership and duplication register
+
+This is work in progress. Do not bump any version identifier anywhere. Do not change Workflow apiVersion, ProgramFrame payload or interpreter versions, Artifact or Store schema versions, package or module versions, or public API versions.
+
+Out of scope:
+- Tests, test execution, and new validation work.
+- Frontend or Wails integration.
+- Session v2 deletion, cleanup, migration, or stored-session conversion.
+
+Do not return a narrow patch, partial scaffold, or implementation plan. Complete every feasible target-domain item below in one large coherent source change. Update the applicable HLD status rows from Open or Partial to Implemented only after the complete behavior exists.
+
+Required behavior:
+
+1. Direct capability support
+- Carry direct capability evidence from Workflow planning through execution preparation and runtime-neutral program data.
+- Route direct Model, Agent, Tool, Service, and Activity targets through their owning setup-domain adapter.
+- Do not fabricate an Artifact, Source, Definition, revision, or Artifact pin for a direct capability.
+- Do not add a generic Workflow fallback that converts direct capability input into native request text or envelopes.
+
+2. Callable capability requirements
+- Make callable interface capability requirements operational during execution preparation.
+- Keep root Workflow requirements separate from callable interface capability requirements.
+- Resolve current domain capability facts through the owning adapter and persist the resulting runtime-neutral facts for dispatch, retry, recovery, and resumption.
+
+3. Model and Agent Workflow target transport
+- Consume `WorkflowInvocationTargetCapabilities`; do not leave them as unused declarations.
+- Preserve only explicit Model and Agent invocation forms: messages, instructions, defaults, final output ports, streamed output ports, and Agent handoff.
+- Propagate accepted final and streamed PortPlans into Model and Agent child ProgramFrames before child work begins.
+- Do not accept Model or Agent input ports.
+- Do not convert arbitrary Workflow JSON into fallback chat text.
+
+4. Provider-managed SDK Tool support
+- Lower a provider SDK Tool Artifact only through an owning typed Model child plan.
+- Keep provider Tool execution inside the Model request plan.
+- Do not create a local Tool WorkItem, local retry target, synthetic Tool result, or fabricated local success.
+- Preserve provider-managed Tool output semantics for Workflow calls.
+
+5. Go Tool, MCP Tool, Skill Tool, Service, Activity, Text, and attachment boundaries
+- Make each domain own its native request grammar, current readiness, native invocation, and result conversion.
+- Make setup preparation enforce the actual target transport behavior before WorkItem creation.
+- Do not allow unsupported Tool context, input-port, or streamed-port behavior to be silently accepted or converted into a synthetic stream record.
+- Keep confirmed final Tool output delivery in Runtime orchestration.
+- Make Service and Activity transport capability facts available during preparation, not only after a WorkItem exists.
+- Keep URL, text, attachment, Skill, MCP, and Tool behavior in their owning domain packages. Workflow only registers or invokes typed domain bindings.
+
+6. Immutable origin facts for generated Tool WorkItems
+- Persist or reference immutable effective LLM invocation configuration, capability facts, selected bindings, and origin facts for every Tool WorkItem emitted from LLM output.
+- Ensure Tool binders use those retained facts rather than current Session defaults.
+- Remove duplicate Model dispatch-plan processing and duplicate target preparation paths where one authoritative typed plan can be used.
+
+Architecture constraints:
+- Session Runtime v3 owns durable Session state, WorkItem lifecycle, attempts, waits, retries, cancellation, recovery, scheduling facts, and checkpointing.
+- Workflow owns orchestration only.
+- Domain packages own native domain behavior.
+- Core `sessionv3` must not import Artifact Store, setup, provider-client, MCP-client, credential, or native-handle packages.
+- Remove duplicate static declaration interpretation where it is redundant. Keep only the minimum durable integrity behavior in Runtime and current readiness behavior in setup.
+- Do not add new broad validation layers.
+
+Documentation deliverables:
+- Update `workflow_runtime.md` Functional completion ledger and Architecture ownership and duplication register.
+- Mark only fully completed items as Implemented.
+- Keep incomplete items as Open or Partial with precise evidence.
+- Keep the Artifact HLD Artifact-focused.
+
+Produce the full implementation, affected source changes, and HLD status updates in one response. If a narrow set of things remain pending, concretely give the pending items at last and mark the HLD status as such.
 ```
 
-The backend is ready for frontend replacement of Session v2 after the functional implementation phases complete.
-
-All work remains inside the existing Session v3 document and Session Store v3 derived data.
-
-## 2. Source ownership map
-
-| Area                                   | Source directory or file                           |
-| -------------------------------------- | -------------------------------------------------- |
-| Workflow source contract               | `internal/llmartifactory-go/workflow/contract/v1/` |
-| Workflow planning                      | `internal/llmartifactory-go/workflow/`             |
-| Session Runtime v3                     | `internal/agentruntime-go/sessionv3/`              |
-| Session Runtime v2 reference behavior  | `internal/agentruntime-go/session/`                |
-| V3 setup binder                        | `internal/agentruntimesetup/sessionv3runtime/`     |
-| V2 setup reference behavior            | `internal/agentruntimesetup/sessionruntime/`       |
-| Workflow admission and compiler        | `internal/agentruntimesetup/workflowruntime/`      |
-| Model setup                            | `internal/agentruntimesetup/modelruntime/`         |
-| Tool setup                             | `internal/agentruntimesetup/toolruntime/`          |
-| MCP setup                              | `internal/agentruntimesetup/mcpruntime/`           |
-| Skill setup                            | `internal/agentruntimesetup/skillruntime/`         |
-| Attachment domain                      | `internal/agentruntime-go/attachment/`             |
-| MCP domain                             | `internal/agentruntime-go/mcp/`                    |
-| Skill domain                           | `internal/agentruntime-go/skill/`                  |
-| Session Store v3                       | `internal/sessionstorev3/`                         |
-| Session Store v2 reference behavior    | `internal/sessionstore/`                           |
-| Desktop composition and Wails wrappers | `cmd/agentgo/`                                     |
-| Frontend adoption                      | `frontend/`                                        |
-| Requirements documents                 | `devdocs/requirements/`                            |
-
-`cmd/agentgo` is the application entry point and composition root.
-
-The application uses Wails services as transport adapters. Runtime behavior remains in runtime and setup packages.
-
-No module metadata file is required for this work.
-
-## 3. Delivery form
-
-Implementation output uses plain Markdown.
-
-For source changes:
-
-- Produce apply-ready unified diffs for existing files.
-- Produce complete replacement-file contents for deliberate file replacement.
-- Identify exact paths.
-- Distinguish authored patch content from applied working-tree changes.
-- State patch status accurately.
-- Preserve repository state across continuation responses.
-- Continue immediately when output space ends and substantive implementation remains.
-
-A final implementation response uses this structure:
+## Prompt 2: Complete Workflow orchestration and durable runtime behavior
 
 ```text
-implemented:
-- concise source-level facts
+After the target-domain and setup support work is complete, complete the remaining Workflow orchestration and durable Runtime behavior in one coherent implementation change set.
 
-files changed:
-- exact paths
+Read and use:
+- `devdocs/requirements/workflow_runtime.md`
+- the Functional completion ledger
+- the Architecture ownership and duplication register
+- all Workflow interpreter, Runtime v3, Store v3, and Workflow setup source
 
-remaining:
-- only unavailable input, authorization, external contract, environment, or output-limit blockers
+This is work in progress. Do not bump any version identifier anywhere. Do not change Workflow apiVersion, ProgramFrame payload or interpreter versions, Artifact or Store schema versions, package or module versions, or public API versions.
 
-hld status diffs
-- truthful completed and pending items
+Out of scope:
+- Tests, test execution, and new validation work.
+- Frontend or Wails integration.
+- Session v2 deletion, cleanup, migration, or stored-session conversion.
+- Replacing domain-owned native behavior with Workflow-specific logic.
+
+Do not return a narrow patch, partial scaffold, or implementation plan. Complete every feasible Workflow and Runtime item below in one large coherent source change. Update the applicable HLD status rows from Open or Partial to Implemented only after the complete behavior exists.
+
+Required behavior:
+
+1. Trigger lifecycle separation
+- A direct Workflow start creates one Execution only.
+- Only explicit trigger registration creates, activates, changes, or rearms trigger lifecycle state.
+- Trigger registration persists an input-unbound Program template.
+- Direct invocation input must never become trigger template input.
+
+2. Durable declaration identity
+- Preserve the planning-owned declaration path on every root and child ProgramFrame.
+- Preserve it on WorkItems, PortPlans, target facts, and every WorkflowStepOutcome, including skipped, started, cancelled, structured-control, nested-child, retry, reconciliation, compensation, and saga outcomes.
+- Keep runtime paths separate from declaration paths.
+
+3. Runtime-owned logical time
+- Capture initial Workflow logical time from the Runtime-owned clock before initial expression evaluation.
+- Eliminate direct process-clock reads from Workflow semantic initialization and deterministic semantic receipts.
+- Persist and reuse logical time across recovery and resumption.
+
+4. Retry, timers, scheduler, and recovery
+- Rearm every durable retry delay after restore.
+- Make a valid nested Workflow retry policy with `maxAttempts: 1` execute once without rejection.
+- Preserve correct retry semantics for nested Workflow calls, retry boundaries, effect safety, deadlines, cancellation, and recovery.
+- Consolidate duplicated timer scheduling behavior into one Runtime-owned scheduler lifecycle for waits, retries, resource waits, execution deadlines, cleanup deadlines, and trigger schedules.
+- Preserve durable due-time facts only. Do not persist timer objects, callbacks, or contexts.
+
+5. `start`, handoff, cancellation, and child settlement
+- Persist the `start` completion handle and start receipt in the parent step outcome.
+- Preserve independent child ownership, budget, cancellation relationship, and completion semantics.
+- Preserve Agent handoff owner, saved owner, target Agent pin, completion behavior, and durable result facts.
+- Ensure cancellation uses durable ownership boundaries and does not erase uncertainty.
+
+6. Effects, reconciliation, compensation, and saga behavior
+- Complete and audit the entire saga, reconciliation, compensation, retry, and cleanup path as one behavior.
+- Preserve primary failure or cancellation while attaching compensation causes.
+- Reconcile uncertain effects before automatic compensation where required.
+- Preserve confirmed application, confirmed non-application, uncertainty, reconciliation review, compensation ordering, compensation concurrency, and cleanup allowance through restore and cancellation.
+- Do not create synthetic success, confirmed non-application, or compensation facts.
+
+7. Remove orchestration duplication
+- Remove duplicate state transitions, duplicate scheduler pathways, and duplicate declaration-shaped interpretation that are no longer needed after the durable Runtime owns the behavior.
+- Retain Runtime integrity checks only where they protect durable state.
+- Do not reintroduce Artifact resolution, provider configuration, credentials, native requests, Tool invocation grammar, MCP sessions, or other domain behavior into Session Runtime or Workflow interpreter code.
+
+Architecture constraints:
+- Session Runtime v3 owns durable orchestration and persistence-safe semantics.
+- Workflow owns declaration-level orchestration and typed control flow.
+- Domain binders own native execution.
+- Core `sessionv3` must remain independent of Artifact Store and setup imports.
+- Workflow must not become a second Model, Agent, Tool, MCP, Skill, Service, or Activity implementation.
+
+Documentation deliverables:
+- Update `workflow_runtime.md` Functional completion ledger and Architecture ownership and duplication register.
+- Mark only fully completed items as Implemented.
+- Keep incomplete items as Open or Partial with exact remaining behavior.
+- Do not add implementation status to `workflow_artifact.md` beyond Artifact planning concerns.
+
+Produce the full implementation, affected source changes, removal of redundant pathways, and HLD status updates in one response. If a narrow set of things remain pending, concretely give the pending items at last and mark the HLD status as such. Any additional files needed for next stage should be explicitly stated at end.
 ```
 
-End an implementation response with:
+## Remaining items after both implementation prompts
 
-```text
-## Implementation status
-- [x] evidenced completed work
-- [ ] pending work or exact blocker
+Assuming both prompts fully implement their listed scope, these items still remain outside the implementation cycle:
 
-## Next steps
-- [x] completed scope, when applicable
-- [ ] remaining implementation work
+- Test work, integration verification, and failure-injection verification.
+- Frontend and Wails integration.
+- Stored Session migration.
+- Session v2 cleanup, deletion, and retirement.
+- Release/versioning work. No version bump is permitted during this cycle.
+- A formal non-frontend Session v2 to Session v3 parity inventory.
 
-### Expected user actions
-- patch application, required authorization, exact missing input, or environment-only verification
-```
-
-Implementation output contains a large substantive volume of production behavior. Count only additions and modifications that implement runtime behavior, compiler behavior, persistence behavior, recovery behavior, execution behavior, domain binding behavior, or caller wiring.
-
-The implementation scope ends early only when:
-
-- Every requested requirement is complete in the source tree.
-- A hard platform output limit ends the response.
-- A required source file, required authorization, repository write capability, or external domain contract is unavailable.
-
-Complete all independent work before reporting an unavailable dependency.
-
-## 4. Architecture invariants
-
-### 4.1 Durable root
-
-Session v3 is the only durable root.
-
-No additional Workflow repository, invocation store, execution store, event store, trigger store, or task store is created.
-
-Session Store v3 persists:
-
-- Session documents.
-- Session tombstones.
-- Derived index data.
-- Derived FTS data.
-
-Derived data rebuilds from the authoritative Session document.
-
-### 4.2 Layer boundaries
-
-`internal/llmartifactory-go` owns:
-
-- Declaration syntax.
-- Source schema validity.
-- Static CEL scope.
-- Declaration target relationships.
-- Portable declaration validity.
-
-`internal/agentruntimesetup` owns:
-
-- Declaration-to-runtime compilation.
-- Artifact pinning.
-- Dependency resolution.
-- Provider plans.
-- Tool binding.
-- MCP discovery.
-- Skill resolution.
-- Workspace planning.
-- Attachment materialization.
-- Service binding.
-- Activity binding.
-- External domain execution adaptation.
-
-`internal/agentruntime-go/sessionv3` owns:
-
-- ProgramFrames.
-- WorkItems.
-- Attempts.
-- Waits.
-- Timers.
-- Recovery.
-- Command idempotency.
-- Cancellation.
-- Durable state.
-- Persistence-safe semantics.
-- Resource scheduling.
-- Budget accounting.
-- Channel and port delivery.
-
-Session Runtime v3 remains independent of Artifact packages and setup packages.
-
-### 4.3 Typed state
-
-Use concrete types for:
-
-- IDs.
-- Pins.
-- Kinds.
-- Limits.
-- Effects.
-- Attempts.
-- Waits.
-- Receipts.
-- Errors.
-- Budgets.
-- Trigger state.
-- Port state.
-- Control-flow state.
-- Conversation ownership.
-- App identity.
-
-Use `CanonicalValue` only at arbitrary JSON boundaries.
-
-### 4.4 Durable external-work sequence
-
-Every external WorkItem follows this order:
-
-1. Persist typed WorkItem intent.
-2. Resolve dependencies through the owning setup domain.
-3. Verify Artifact pins and current target bindings.
-4. Persist semantic binding facts.
-5. Persist Attempt facts.
-6. Invoke external work.
-7. Persist output, receipt, failure, cancellation, or uncertainty.
-8. Apply effect-contract retry and recovery behavior.
-9. Use Runtime-owned timers for durable timing.
-10. Cancel all timers and owned goroutines during `Runtime.Close`.
-
-### 4.5 Workflow target transport
-
-Workflow owns:
-
-- Ports.
-- Channels.
-- Cursors.
-- Parent-child delivery.
-- Ordering.
-- Retention.
-- Durable replay semantics.
-
-Model, Agent, nested Workflow, and explicitly port-aware Service or Activity bindings support typed Workflow transport.
-
-Go Tool, MCP Tool, and Skill Tool domains preserve native contracts.
-
-Go Tool, MCP Tool, and Skill Tool declarations requiring Workflow context, input ports, or streamed output ports fail during Workflow admission before external work starts.
-
-Runtime can route a confirmed final Tool result to a normal non-stream output port.
-
-Workflow transport does not enter native target APIs through:
-
-- Tool argument envelopes.
-- Go context sidecars.
-- MCP metadata.
-- MCP extensions.
-- Skill sidecars.
-- Provider metadata.
-- Domain imports.
-
-Provider SDK Tool Artifacts remain Model-plan-only capabilities.
-
-### 4.6 V2 and V3 isolation
-
-Session v2 behavior remains unchanged.
-
-Session v2 has no dependency on Session v3.
-
-Session v3 becomes a proper backend superset through typed V3 implementation, not by making V2 code depend on V3 code.
-
-## 5. Active functional work
-
-### 5.1 Normal Session v3 parity
-
-V3 needs the complete normal Session v2 configuration and command surface.
-
-The work includes:
-
-- Full typed Model request defaults and clear semantics.
-- Full Agent, Workspace, Text, Tool, Skill, MCP, history, metadata, and attachment configuration semantics.
-- Typed direct capability selections.
-- Per-message configuration overrides.
-- Per-continuation configuration overrides.
-- Per-execution limits.
-- Operation-level resolved configuration facts.
-- User-message Skill template preparation.
-- Instruction Skill preview.
-- Command parity ledger.
-- Projection parity ledger.
-- Frontend-ready V3 snapshot reads.
-
-Relevant source comparison:
-
-- `internal/agentruntime-go/session/`
-- `internal/agentruntimesetup/sessionruntime/`
-- `internal/agentruntime-go/sessionv3/`
-- `internal/agentruntimesetup/sessionv3runtime/`
-- `cmd/agentgo/`
-
-### 5.2 Workflow state and structured-control closure
-
-The current Workflow runtime requires these functional completions:
-
-- Carry nearest state-owner schema and identity through child scope context.
-- Support inherited `set` behavior in all nested block forms.
-- Add explicit parent-state merge declarations for Parallel and Foreach.
-- Persist failed and uncertain step outcomes.
-- Add structured retry boundaries for every accepted retry declaration.
-- Complete published nested Workflow port schema compatibility.
-- Complete target-specific typed Model and Agent invocation adapters.
-
-Relevant source evidence:
-
-- `WorkflowScopeContext` stores `OuterState` in `internal/agentruntime-go/sessionv3/workflow_structured.go`.
-- `WorkflowInterpreter.set` uses `program.Root.State` in `internal/agentruntime-go/sessionv3/workflow_program.go`.
-- Parallel and Foreach declarations have no parent merge field in `internal/llmartifactory-go/workflow/contract/v1/types.go` and `workflow-v1.schema.json`.
-- `WorkflowStepOutcomeStatus` has no failed or uncertain state in `internal/agentruntime-go/sessionv3/workflow_program.go`.
-- `workflowStepSupportsRetry` limits retry support in `internal/agentruntimesetup/workflowruntime/compiler_retry.go`.
-- `validateWorkflowFramePortBoundary` checks access and channel existence without target channel-schema comparison in `internal/agentruntime-go/sessionv3/workflow_published_ports.go`.
-- `workflowInvocationInputs` accepts strict `messages` and `instructions` forms in `internal/agentruntimesetup/sessionv3runtime/inputs.go`.
-
-## 6. Implementation phases
-
-### Phase 1: Complete normal Session Runtime v3 parity
-
-Outcome:
-
-- Session Runtime v3 supports the full normal Session v2 backend capability set through native V3 commands, projections, planning, persistence, recovery, and cancellation behavior.
-
-Implementation sequence:
-
-1. Define V3 typed configuration and override structures.
-2. Map every V2 `SessionConfiguration` behavior to typed V3 state.
-3. Extend `SessionDefaults` or introduce typed V3 normal invocation options where required.
-4. Add per-message and per-continuation override behavior.
-5. Add per-execution budget behavior for normal conversations.
-6. Persist immutable operation-level configuration and plan facts.
-7. Add V3 Skill template preparation and instruction preview operations.
-8. Add V3 snapshot projections where frontend reads need consolidated state.
-9. Wire all V3 commands and projections through `cmd/agentgo`.
-10. Update V3 persistence validation and derived projections.
-
-Required source coverage:
-
-- `internal/agentruntime-go/session/`
-- `internal/agentruntime-go/sessionv3/`
-- `internal/agentruntimesetup/sessionruntime/`
-- `internal/agentruntimesetup/sessionv3runtime/`
-- `internal/agentruntimesetup/modelruntime/`
-- `internal/agentruntimesetup/toolruntime/`
-- `internal/agentruntimesetup/mcpruntime/`
-- `internal/agentruntimesetup/skillruntime/`
-- `internal/sessionstore/`
-- `internal/sessionstorev3/`
-- `cmd/agentgo/`
-
-### Phase 2: Complete Workflow state and callable-model semantics
-
-Outcome:
-
-- Every Workflow state scope and callable Model or Agent target has typed, durable, recoverable behavior.
-
-Implementation sequence:
-
-1. Extend Workflow scope state with nearest state-owner identity and schema.
-2. Update child ProgramFrame construction for Scope, Choose, Parallel, Foreach, Repeat, Machine, Saga, catch, finally, reconciliation, and compensation.
-3. Update StateUpdate WorkItem construction and settlement.
-4. Add typed parent-state merge syntax, validation, compiler output, WorkItem boundaries, and runtime settlement.
-5. Add failed and uncertain Workflow step outcomes.
-6. Define typed Model and Agent invocation-plan adapters.
-7. Validate callable input and context transport at admission.
-8. Persist complete Model and Agent plans before dispatch.
-9. Preserve all behavior through cancellation, recovery, nested frames, and projections.
-
-Required source coverage:
-
-- `internal/llmartifactory-go/workflow/`
-- `internal/agentruntimesetup/workflowruntime/`
-- `internal/agentruntime-go/sessionv3/`
-- `internal/agentruntimesetup/sessionv3runtime/`
-- `internal/sessionstorev3/`
-
-### Phase 3: Complete structured retry and boundary reliability
-
-Outcome:
-
-- Every accepted Workflow retry, port, child, effect, and cleanup path has one durable runtime behavior.
-
-Implementation sequence:
-
-1. Add typed retry boundaries for supported structured operations.
-2. Preserve WorkItem identity, effect state, attempt identity, deadlines, claims, budgets, and child facts through retry.
-3. Align Workflow declaration validation with retry runtime behavior.
-4. Complete nested Workflow published-port source-to-target schema checks.
-5. Review output-port and stream-port ordering for attached and independent children.
-6. Review cancellation of child frames, independent child Executions, waits, retries, resources, cleanup work, and handoffs.
-7. Review reconciliation, compensation, and finalizer behavior through restart.
-8. Remove reachable permanent unsupported branches from valid Workflow declarations.
-
-Required source coverage:
-
-- `internal/llmartifactory-go/workflow/`
-- `internal/agentruntimesetup/workflowruntime/`
-- `internal/agentruntime-go/sessionv3/`
-- `internal/agentruntimesetup/sessionv3runtime/`
-- `internal/sessionstorev3/`
-
-### Phase 4: Complete the source-to-runtime audit
-
-Outcome:
-
-- Every valid Workflow v1 field and every normal Session v2 backend capability has a typed V3 result.
-
-Implementation sequence:
-
-1. Inventory every valid Workflow field from:
-   - `internal/llmartifactory-go/workflow/contract/v1/types.go`
-   - `internal/llmartifactory-go/workflow/contract/v1/validation.go`
-   - `internal/llmartifactory-go/workflow/contract/v1/workflow-v1.schema.json`
-2. Inventory every normal Session v2 command, projection, runtime behavior, and domain route.
-3. Map every inventory entry to:
-   - Compiler behavior.
-   - Runtime state.
-   - Persistence.
-   - Recovery.
-   - Cancellation.
-   - Binding.
-   - Command.
-   - Projection.
-4. Resolve every compiler, interpreter, binder, and runtime fallback reachable from valid input.
-5. Keep unavailable Artifact, binding, credential, policy, and external domain capability failures at admission or binding boundaries.
-6. Mark functional backend completion after the ledgers are complete.
-
-Required source coverage:
-
-- `internal/llmartifactory-go/workflow/`
-- `internal/agentruntime-go/session/`
-- `internal/agentruntime-go/sessionv3/`
-- `internal/agentruntimesetup/sessionruntime/`
-- `internal/agentruntimesetup/sessionv3runtime/`
-- `internal/agentruntimesetup/workflowruntime/`
-- `internal/sessionstore/`
-- `internal/sessionstorev3/`
-- `cmd/agentgo/`
-
-### Phase 5: Adoption, verification, frontend migration, migration tooling, and cleanup
-
-Outcome:
-
-- Frontend traffic uses V3 commands and projections, Session v2 data has a migration path, and retired paths are cleaned up.
-
-Implementation sequence:
-
-1. Add verification coverage for normal V3 parity and Workflow v1 behavior.
-2. Update requirements and operational documentation.
-3. Move frontend transport to `SessionV3Wrapper`.
-4. Add offline Session v2 to Session v3 migration tooling.
-5. Decide V2 and Session Store v2 deprecation.
-6. Remove retired code after migration completion.
-7. Complete aggregate cleanup.
-
-Required source coverage:
-
-- `frontend/`
-- `cmd/agentgo/`
-- `internal/agentruntime-go/session/`
-- `internal/agentruntime-go/sessionv3/`
-- `internal/agentruntimesetup/sessionruntime/`
-- `internal/agentruntimesetup/sessionv3runtime/`
-- `internal/sessionstore/`
-- `internal/sessionstorev3/`
-- `devdocs/requirements/`
-
-## 8. Engineering rules
-
-- New production behavior uses concrete types and constants end to end.
-- error messages use lower-case text.
-- No hardcoded strings should be used. proper enums everywhere.
-- New domain behavior belongs in the owning domain package.
-- Session Runtime v3 remains orchestration-only.
-- Setup remains the source of Artifact, credential, provider, native-path, MCP, Skill, Workspace, and binding behavior.
-- Wails remains an adapter and composition layer.
-- Workflow v1 remains `apiVersion: v1`.
-- Workflow ProgramFrame payload remains `artifact.workflow.v1@1`.
-- Session v3 remains the only durable root.
-- Functional phases change production behavior and caller wiring.
-- Adoption phase carries tests, documentation, frontend migration, migration tooling, deprecation, and cleanup. This is NOT part of this implementation phase.
-
-At the end of the implementation pass:
-
-- Update only the phase-wise implementation status sections in the two HLD files.
-- Mark completed source behavior with `- [x]`.
-- Mark pending source behavior with `- [ ]`.
-- Do not mark a task complete from type definitions alone.
-- Do not mark a task complete from compiler support alone.
-- Do not mark a task complete from one happy-path dispatch route alone.
-- A completed task requires compiler, interpreter, persistence, recovery, execution, cancellation, and relevant caller wiring.
-- Do not include tests or documentation tasks in the functional completion matrix.
-
-Do not use hostile language. Do not make excuses. Do not use superficial progress claims. Be precise, complete independent work, and preserve the user’s time and financial investment.
-
-Above phases are indicative of full work. current completion state is in HLDs.
-Make sure domain related things are in domains and not aggregated as a dump in session folders.
-
-What all is already there:
-
-- the wrappers are FULLY there with you. this is wails app, there are no other entry points other than this. you need to implement things as a wails entry point nad composition only like others. inspect that and then implement.
-- the agentruntime-go folder, agentruntimesetup and llmartifactory-go and sessionstorev3 folder are fully provided. there is nothing else other than attached things. you need to complete things in the provided things properly. if anything doesnt exist and you think you need it, that jsut means you need to implement it yourself and then integrate. schema jsons are not attached but assume go represents the schema truthfully. if anything needs to change in jsons mention at last.
-- remove all unnecessary validations and duplicate work done making paths hot and diluting ownership. no new validations are to be added if someone down the line already does it. Validations and nil checks are not tasks. only functional work is to be done and nothing else anywhere.
-- at last when you update hlds, take a look at phases carefully, if new phases or new work items are discovered you need to update that and then mark them incomplete or complete accordingly.
-
-Final reminder: code delivery in md out. a substantial output is expected. this is financially sensitive endeavor. go top down phase wise. verify each thing, if not complete do it. if already done or implemented by you, go to next. there are lots of minor things you can do if your token quota is incomplete. again very large single shot output is needed. Do not block unnecessarily. out now properly. hlds capture the current state. keep it udpated at last as a diff.
-if next step would require files that are not given to you, you need to tell which files exactly. no speculations. all existing code is already attached. so tell accordingly or say what needs to be written where. Follow INSTRUCTIONS Cleanly and FULLY.
+The parity inventory remains necessary because the current source proves one known gap, direct capability selection, but does not define every non-frontend Session v2 behavior that must remain available before Session v3 can be declared a full replacement.

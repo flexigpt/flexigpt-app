@@ -290,20 +290,21 @@ func (r *Runtime) materializeForkFramesLocked(
 			handoffID = intent.Handoff.ID
 		}
 		child := ProgramFrame{
-			ID:            intent.ID,
-			ParentFrameID: parent.ID,
-			Lifetime:      lifetime,
-			Depth:         depth,
-			Program:       intent.Program,
-			State:         state,
-			Status:        ProgramFrameStateRunning,
-			Path:          intent.Path,
-			CreatedAt:     now,
-			UpdatedAt:     now,
-			HandoffID:     handoffID,
-			Deadline:      deadline,
-			Budget:        cloneBudget(&childBudget),
-			Ports:         ports,
+			ID:              intent.ID,
+			ParentFrameID:   parent.ID,
+			Lifetime:        lifetime,
+			Depth:           depth,
+			Program:         intent.Program,
+			State:           state,
+			Status:          ProgramFrameStateRunning,
+			Path:            intent.Path,
+			DeclarationPath: intent.DeclarationPath,
+			CreatedAt:       now,
+			UpdatedAt:       now,
+			HandoffID:       handoffID,
+			Deadline:        deadline,
+			Budget:          cloneBudget(&childBudget),
+			Ports:           ports,
 		}
 		execution.ProgramFrames = append(execution.ProgramFrames, child)
 		parent = mutableFrame(execution, parentID)

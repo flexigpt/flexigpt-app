@@ -23,25 +23,27 @@ type WorkflowCapabilityRequirement struct {
 }
 
 type ModelDispatchPlan struct {
-	Agent          *AgentDispatchPlan        `json:"agent,omitempty"`
-	Workspace      *WorkspaceDispatchPlan    `json:"workspace,omitempty"`
-	Model          ModelDispatchTarget       `json:"model"`
-	ModelOverrides *ModelDefaultsOverride    `json:"modelOverrides,omitempty"`
-	Instructions   []InstructionDispatchPlan `json:"instructions,omitempty"`
-	Texts          []TextDispatchPlan        `json:"texts,omitempty"`
-	Tools          []ToolDispatchPlan        `json:"tools,omitempty"`
-	Skills         []SkillDispatchPlan       `json:"skills,omitempty"`
-	MCP            []MCPDispatchPlan         `json:"mcp,omitempty"`
-	Attachments    []AttachmentDispatchPlan  `json:"attachments,omitempty"`
-	Messages       []MessageDispatchPlan     `json:"messages,omitempty"`
-	Context        []ContextDispatchPlan     `json:"context,omitempty"`
-	Channels       []ChannelDispatchPlan     `json:"channels,omitempty"`
-	Ports          []PortPlan                `json:"ports,omitempty"`
-	PortInputs     []PortInput               `json:"portInputs,omitempty"`
+	Agent          *AgentDispatchPlan          `json:"agent,omitempty"`
+	Workspace      *WorkspaceDispatchPlan      `json:"workspace,omitempty"`
+	Model          ModelDispatchTarget         `json:"model"`
+	ProviderTools  []ProviderManagedToolChoice `json:"providerTools,omitempty"`
+	ModelOverrides *ModelDefaultsOverride      `json:"modelOverrides,omitempty"`
+	Instructions   []InstructionDispatchPlan   `json:"instructions,omitempty"`
+	Texts          []TextDispatchPlan          `json:"texts,omitempty"`
+	Tools          []ToolDispatchPlan          `json:"tools,omitempty"`
+	Skills         []SkillDispatchPlan         `json:"skills,omitempty"`
+	MCP            []MCPDispatchPlan           `json:"mcp,omitempty"`
+	Attachments    []AttachmentDispatchPlan    `json:"attachments,omitempty"`
+	Messages       []MessageDispatchPlan       `json:"messages,omitempty"`
+	Context        []ContextDispatchPlan       `json:"context,omitempty"`
+	Channels       []ChannelDispatchPlan       `json:"channels,omitempty"`
+	Ports          []PortPlan                  `json:"ports,omitempty"`
+	PortInputs     []PortInput                 `json:"portInputs,omitempty"`
 }
 
 type AgentDispatchPlan struct {
 	Artifact     ArtifactPin               `json:"artifact"`
+	Direct       *DirectCapabilityPlan     `json:"direct,omitempty"`
 	Model        *ModelDispatchTarget      `json:"model,omitempty"`
 	Workspace    *WorkspaceDispatchPlan    `json:"workspace,omitempty"`
 	Instructions []InstructionDispatchPlan `json:"instructions,omitempty"`
@@ -61,7 +63,8 @@ type WorkspaceDispatchPlan struct {
 }
 
 type ModelDispatchTarget struct {
-	Artifact ArtifactPin `json:"artifact"`
+	Artifact ArtifactPin           `json:"artifact"`
+	Direct   *DirectCapabilityPlan `json:"direct,omitempty"`
 }
 
 type InstructionDispatchPlan struct {
@@ -121,8 +124,8 @@ type ChannelDispatchPlan struct {
 }
 
 func (p ModelDispatchPlan) Validate() error {
-	if err := validatePin(p.Model.Artifact); err != nil {
-		return fmt.Errorf("model dispatch plan model: %w", err)
+	if err := validateModelDispatchTarget(p.Model); err != nil {
+		return fmt.Errorf("model dispatch plan model target: %w", err)
 	}
 	if p.Agent != nil {
 		if err := p.Agent.Validate(); err != nil {
@@ -265,6 +268,11 @@ func (p ModelDispatchPlan) Validate() error {
 			return errors.New("model dispatch plan port is duplicated")
 		}
 		portNames[value.Name] = struct{}{}
+	}
+	for index := range p.ProviderTools {
+		if err := p.ProviderTools[index].Validate(); err != nil {
+			return fmt.Errorf("model dispatch plan provider tool: %w", err)
+		}
 	}
 	return validateExtendedModelDispatchPlan(p)
 }

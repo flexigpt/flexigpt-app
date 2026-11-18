@@ -1126,10 +1126,41 @@ func (p WorkItemPayload) Validate(kind WorkItemType) error {
 		if p.LLM.InputActivityID == "" {
 			return errors.New("llm WorkItem requires an input activity")
 		}
+		if p.LLM.DirectTarget != nil {
+			if p.LLM.Model != nil || p.LLM.Agent != nil {
+				return errors.New(
+					"direct llm WorkItem also contains an Artifact target",
+				)
+			}
+			if err := p.LLM.DirectTarget.Validate(); err != nil {
+				return err
+			}
+		}
+		for _, choice := range p.LLM.ProviderTools {
+			if err := choice.Validate(); err != nil {
+				return err
+			}
+		}
+		if err := ValidateWorkflowCapabilityFacts(
+			nil,
+			p.LLM.CapabilityFacts,
+		); err != nil {
+			return err
+		}
 
 	case WorkItemTypeTool:
 		if err := p.Tool.Call.Validate(); err != nil {
 			return err
+		}
+		if p.Tool.Direct != nil {
+			if err := p.Tool.Direct.Validate(); err != nil {
+				return err
+			}
+		}
+		if p.Tool.Origin != nil {
+			if err := p.Tool.Origin.Validate(); err != nil {
+				return err
+			}
 		}
 		if p.Tool.Target != nil && p.Tool.MCP != nil {
 			return errors.New(
@@ -1153,6 +1184,12 @@ func (p WorkItemPayload) Validate(kind WorkItemType) error {
 			}
 		}
 
+		if err := ValidateWorkflowCapabilityFacts(
+			nil,
+			p.Tool.CapabilityFacts,
+		); err != nil {
+			return err
+		}
 	case WorkItemTypeService:
 		if p.Service.ServiceID == "" ||
 			p.Service.BindingVersion == "" ||
@@ -1160,12 +1197,28 @@ func (p WorkItemPayload) Validate(kind WorkItemType) error {
 			!p.Service.Context.Valid() {
 			return errors.New("invalid service WorkItem")
 		}
+		if p.Service.Direct != nil {
+			if err := p.Service.Direct.Validate(); err != nil {
+				return err
+			}
+		}
+		if err := ValidateWorkflowCapabilityFacts(nil, p.Service.CapabilityFacts); err != nil {
+			return err
+		}
 	case WorkItemTypeActivity:
 		if p.Activity.ActivityID == "" ||
 			p.Activity.BindingVersion == "" ||
 			!p.Activity.Input.Valid() ||
 			!p.Activity.Context.Valid() {
 			return errors.New("invalid activity WorkItem")
+		}
+		if p.Activity.Direct != nil {
+			if err := p.Activity.Direct.Validate(); err != nil {
+				return err
+			}
+		}
+		if err := ValidateWorkflowCapabilityFacts(nil, p.Activity.CapabilityFacts); err != nil {
+			return err
 		}
 	case WorkItemTypeTransform:
 		if !p.Transform.Input.Valid() ||
@@ -1356,6 +1409,14 @@ func (b SemanticBinding) Validate() error {
 		if err := validatePin(artifact); err != nil {
 			return err
 		}
+	}
+	if b.Direct != nil {
+		if err := b.Direct.Validate(); err != nil {
+			return err
+		}
+	}
+	if err := ValidateWorkflowCapabilityFacts(nil, b.Capabilities); err != nil {
+		return err
 	}
 	plans := 0
 	if b.Plan != nil {

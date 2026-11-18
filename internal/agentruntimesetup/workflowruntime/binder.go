@@ -42,6 +42,12 @@ func (b *Binder) BindWork(
 	ctx context.Context,
 	request sessionv3Runtime.WorkDispatchRequest,
 ) (sessionv3Runtime.BindResult, error) {
+	if sessionv3Runtime.DirectCapabilityPlanForWorkItem(
+		request.WorkItem,
+	) != nil {
+		return b.Base.BindWork(ctx, request)
+	}
+
 	switch request.WorkItem.Type {
 	case sessionv3Runtime.WorkItemTypeService:
 		return b.bindService(ctx, request)
@@ -156,7 +162,12 @@ func (b *Binder) ValidatePortPlans(
 	switch request.WorkItem.Type {
 	case sessionv3Runtime.WorkItemTypeService,
 		sessionv3Runtime.WorkItemTypeActivity:
-		return nil
+		if sessionv3Runtime.DirectCapabilityPlanForWorkItem(
+			request.WorkItem,
+		) != nil {
+			break
+		}
+		return b.validateExternalPortPlans(request)
 	default:
 	}
 	validator, found := b.Base.(sessionv3Runtime.PortPlanValidator)
@@ -447,15 +458,19 @@ func requireExternalPortCapabilities(
 ) error {
 	needsContext := len(request.Context) != 0
 	needsInputPorts := len(request.Ports) != 0
-	needsOutputStream := false
+	needsFinalOutput, needsOutputStream := false, false
 	for _, plan := range item.Ports {
-		if plan.Direction == sessionv3Runtime.WorkflowPortDirectionOutput &&
-			plan.Stream {
+		if plan.Direction != sessionv3Runtime.WorkflowPortDirectionOutput {
+			continue
+		}
+		if plan.Stream {
 			needsOutputStream = true
-			break
+		} else {
+			needsFinalOutput = true
 		}
 	}
-	if !needsContext && !needsInputPorts && !needsOutputStream {
+	if !needsContext && !needsInputPorts && !needsFinalOutput &&
+		!needsOutputStream {
 		return nil
 	}
 
@@ -474,6 +489,10 @@ func requireExternalPortCapabilities(
 	case needsInputPorts && !support.InputPorts:
 		return errors.New(
 			"external binding does not support workflow input ports",
+		)
+	case needsFinalOutput && !support.FinalOutputPorts:
+		return errors.New(
+			"external binding does not support workflow final output ports",
 		)
 	case needsOutputStream && !support.OutputStream:
 		return errors.New(
@@ -502,4 +521,54 @@ func cloneExternalPortInputs(
 		}
 	}
 	return output
+}
+
+func (b *Binder) validateExternalPortPlans(
+	request sessionv3Runtime.WorkDispatchRequest,
+) error {
+	switch request.WorkItem.Type {
+	case sessionv3Runtime.WorkItemTypeService:
+		if request.WorkItem.Input.Service == nil {
+			return errors.New("service WorkItem payload is missing")
+		}
+		binding, found := b.Bindings.Service(
+			request.WorkItem.Input.Service.ServiceID,
+		)
+		if !found {
+			return ErrBindingUnavailable
+		}
+		domainRequest, err := externalWorkRequest(
+			request.WorkItem,
+			request.PortStream,
+		)
+		if err != nil {
+			return err
+		}
+		return requireExternalPortCapabilities(
+			binding,
+			request.WorkItem,
+			domainRequest,
+		)
+
+	case sessionv3Runtime.WorkItemTypeActivity:
+		if request.WorkItem.Input.Activity == nil {
+			return errors.New("activity WorkItem payload is missing")
+		}
+		binding, found := b.Bindings.Activity(
+			request.WorkItem.Input.Activity.ActivityID,
+		)
+		if !found {
+			return ErrBindingUnavailable
+		}
+		domainRequest, err := externalWorkRequest(
+			request.WorkItem,
+			request.PortStream,
+		)
+		if err != nil {
+			return err
+		}
+		return requireExternalPortCapabilities(binding, request.WorkItem, domainRequest)
+	default:
+		return errors.New("external port validation has another work item type")
+	}
 }

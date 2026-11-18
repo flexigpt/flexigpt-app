@@ -3,6 +3,7 @@ package workflowruntime
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/modelruntime"
@@ -20,8 +21,15 @@ const workflowInvocationContextInstructions = "instructions"
 // Model and Agent APIs. It does not add a Workflow-specific Model or Agent
 // domain request contract.
 type ModelAgentInvocationAdapter struct {
-	models *modelruntime.SourceResolver
-	agents *agentAPI.Service
+	models       *modelruntime.SourceResolver
+	agents       *agentAPI.Service
+	capabilities WorkflowCapabilityFactProvider
+}
+
+func WithWorkflowInvocationCapabilityFacts(
+	value WorkflowCapabilityFactProvider,
+) func(*ModelAgentInvocationAdapter) {
+	return func(adapter *ModelAgentInvocationAdapter) { adapter.capabilities = value }
 }
 
 func NewModelAgentInvocationAdapter(
@@ -158,6 +166,23 @@ func (a *ModelAgentInvocationAdapter) AdmitWorkflowAgentTarget(
 	return errors.New(
 		"workflow agent target has no available model capability",
 	)
+}
+
+func (a *ModelAgentInvocationAdapter) ResolveWorkflowCapabilityFacts(
+	ctx context.Context,
+	request WorkflowCapabilityFactRequest,
+) ([]sessionv3Runtime.WorkflowCapabilityFact, error) {
+	if len(request.Requirements) == 0 {
+		return nil, nil
+	}
+	if a == nil || a.capabilities == nil {
+		return nil, fmt.Errorf(
+			"%w: workflow %s target capability facts are unavailable",
+			ErrBindingUnavailable,
+			request.TargetKind,
+		)
+	}
+	return a.capabilities.ResolveWorkflowCapabilityFacts(ctx, request)
 }
 
 func workflowInvocationArtifactRef(

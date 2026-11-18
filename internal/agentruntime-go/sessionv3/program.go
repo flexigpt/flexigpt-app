@@ -7,6 +7,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 const (
@@ -36,10 +38,13 @@ type (
 )
 
 type agentLoopProgramPayload struct {
-	Defaults           SessionDefaults `json:"defaults"`
-	InputActivityID    ActivityID      `json:"inputActivityID,omitempty"`
-	IsolatedInput      bool            `json:"isolatedInput,omitempty"`
-	HistoryActivityIDs []ActivityID    `json:"historyActivityIDs,omitempty"`
+	Defaults           SessionDefaults             `json:"defaults"`
+	InputActivityID    ActivityID                  `json:"inputActivityID,omitempty"`
+	IsolatedInput      bool                        `json:"isolatedInput,omitempty"`
+	HistoryActivityIDs []ActivityID                `json:"historyActivityIDs,omitempty"`
+	DirectTarget       *DirectCapabilityPlan       `json:"directTarget,omitempty"`
+	ProviderTools      []ProviderManagedToolChoice `json:"providerTools,omitempty"`
+	CapabilityFacts    []WorkflowCapabilityFact    `json:"capabilityFacts,omitempty"`
 }
 
 type agentLoopProgramState struct {
@@ -52,10 +57,13 @@ type agentLoopProgramState struct {
 }
 
 type singleModelProgramPayload struct {
-	Defaults           SessionDefaults `json:"defaults"`
-	InputActivityID    ActivityID      `json:"inputActivityID,omitempty"`
-	IsolatedInput      bool            `json:"isolatedInput,omitempty"`
-	HistoryActivityIDs []ActivityID    `json:"historyActivityIDs,omitempty"`
+	Defaults           SessionDefaults             `json:"defaults"`
+	InputActivityID    ActivityID                  `json:"inputActivityID,omitempty"`
+	IsolatedInput      bool                        `json:"isolatedInput,omitempty"`
+	HistoryActivityIDs []ActivityID                `json:"historyActivityIDs,omitempty"`
+	DirectTarget       *DirectCapabilityPlan       `json:"directTarget,omitempty"`
+	ProviderTools      []ProviderManagedToolChoice `json:"providerTools,omitempty"`
+	CapabilityFacts    []WorkflowCapabilityFact    `json:"capabilityFacts,omitempty"`
 }
 
 type singleModelProgramState struct {
@@ -91,7 +99,32 @@ func NewAgentLoopInvocationProgram(
 	input ActivityID,
 	history []ActivityID,
 ) (ProgramSnapshot, error) {
-	return newAgentLoopProgram(defaults, input, true, history)
+	return newAgentLoopWorkflowInvocationProgram(
+		defaults,
+		input,
+		history,
+		nil,
+		nil,
+		nil,
+	)
+}
+
+func NewAgentLoopWorkflowInvocationProgram(
+	defaults SessionDefaults,
+	input ActivityID,
+	history []ActivityID,
+	direct *DirectCapabilityPlan,
+	providerTools []ProviderManagedToolChoice,
+	capabilities []WorkflowCapabilityFact,
+) (ProgramSnapshot, error) {
+	return newAgentLoopWorkflowInvocationProgram(
+		defaults,
+		input,
+		history,
+		direct,
+		providerTools,
+		capabilities,
+	)
 }
 
 func newAgentLoopProgram(
@@ -114,6 +147,28 @@ func newAgentLoopProgram(
 	)
 }
 
+func newAgentLoopWorkflowInvocationProgram(
+	defaults SessionDefaults,
+	input ActivityID,
+	history []ActivityID,
+	direct *DirectCapabilityPlan,
+	providerTools []ProviderManagedToolChoice,
+	capabilities []WorkflowCapabilityFact,
+) (ProgramSnapshot, error) {
+	if input == "" {
+		return ProgramSnapshot{}, errors.New("agent-loop input Activity is required")
+	}
+	return programSnapshot(BuiltinAgentLoopInterpreterID, agentLoopProgramPayload{
+		Defaults:           defaults,
+		InputActivityID:    input,
+		IsolatedInput:      true,
+		HistoryActivityIDs: append([]ActivityID(nil), history...),
+		DirectTarget:       cloneDirectCapabilityPlan(direct),
+		ProviderTools:      jsonutil.CloneJSONInValue(providerTools),
+		CapabilityFacts:    cloneWorkflowCapabilityFacts(capabilities),
+	})
+}
+
 func NewSingleModelProgram(
 	defaults SessionDefaults,
 	input ActivityID,
@@ -129,7 +184,32 @@ func NewSingleModelInvocationProgram(
 	input ActivityID,
 	history []ActivityID,
 ) (ProgramSnapshot, error) {
-	return newSingleModelProgram(defaults, input, true, history)
+	return newSingleModelWorkflowInvocationProgram(
+		defaults,
+		input,
+		history,
+		nil,
+		nil,
+		nil,
+	)
+}
+
+func NewSingleModelWorkflowInvocationProgram(
+	defaults SessionDefaults,
+	input ActivityID,
+	history []ActivityID,
+	direct *DirectCapabilityPlan,
+	providerTools []ProviderManagedToolChoice,
+	capabilities []WorkflowCapabilityFact,
+) (ProgramSnapshot, error) {
+	return newSingleModelWorkflowInvocationProgram(
+		defaults,
+		input,
+		history,
+		direct,
+		providerTools,
+		capabilities,
+	)
 }
 
 func newSingleModelProgram(
@@ -150,6 +230,28 @@ func newSingleModelProgram(
 			HistoryActivityIDs: append([]ActivityID(nil), history...),
 		},
 	)
+}
+
+func newSingleModelWorkflowInvocationProgram(
+	defaults SessionDefaults,
+	input ActivityID,
+	history []ActivityID,
+	direct *DirectCapabilityPlan,
+	providerTools []ProviderManagedToolChoice,
+	capabilities []WorkflowCapabilityFact,
+) (ProgramSnapshot, error) {
+	if input == "" {
+		return ProgramSnapshot{}, errors.New("single-model input Activity is required")
+	}
+	return programSnapshot(BuiltinSingleModelInterpreterID, singleModelProgramPayload{
+		Defaults:           defaults,
+		InputActivityID:    input,
+		IsolatedInput:      true,
+		HistoryActivityIDs: append([]ActivityID(nil), history...),
+		DirectTarget:       cloneDirectCapabilityPlan(direct),
+		ProviderTools:      jsonutil.CloneJSONInValue(providerTools),
+		CapabilityFacts:    cloneWorkflowCapabilityFacts(capabilities),
+	})
 }
 
 func programSnapshot(id string, payload any) (ProgramSnapshot, error) {
@@ -364,6 +466,14 @@ func (agentLoopInterpreter) Advance(
 			state.PendingToolIDs = nil
 			state.AwaitingContinue = true
 			work := make([]WorkItemIntent, 0, len(executable))
+			origin, originErr := LLMToolOriginForWorkItem(*item)
+			if originErr != nil {
+				return failedAgentTransition(
+					state,
+					"llm_tool_origin_missing",
+					originErr.Error(),
+				)
+			}
 			for _, call := range executable {
 				work = append(
 					work,
@@ -373,7 +483,10 @@ func (agentLoopInterpreter) Advance(
 						OriginWorkItemID: item.ID,
 						Automatic:        call.Automatic,
 						Effect:           EffectContract{Kind: EffectKindNonIdempotent},
-						Input:            WorkItemPayload{Tool: &ToolWork{Call: call}},
+						Input: WorkItemPayload{Tool: &ToolWork{
+							Call:   call,
+							Origin: cloneLLMToolOrigin(origin),
+						}},
 					},
 				)
 			}
@@ -471,6 +584,9 @@ func agentLLMWork(
 		payload.IsolatedInput,
 		payload.HistoryActivityIDs,
 	)
+	work.DirectTarget = cloneDirectCapabilityPlan(payload.DirectTarget)
+	work.ProviderTools = jsonutil.CloneJSONInValue(payload.ProviderTools)
+	work.CapabilityFacts = cloneWorkflowCapabilityFacts(payload.CapabilityFacts)
 	return work
 }
 
@@ -618,6 +734,9 @@ func (singleModelInterpreter) Advance(
 				payload.IsolatedInput,
 				payload.HistoryActivityIDs,
 			)
+			work.DirectTarget = cloneDirectCapabilityPlan(payload.DirectTarget)
+			work.ProviderTools = jsonutil.CloneJSONInValue(payload.ProviderTools)
+			work.CapabilityFacts = cloneWorkflowCapabilityFacts(payload.CapabilityFacts)
 			status := ProgramFrameStateRunning
 			return ProgramTransition{
 				State:  encodeSingleModelState(state),

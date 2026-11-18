@@ -25,6 +25,7 @@ type llmExecutionPlan struct {
 	texts              []sessionv3Runtime.TextDispatchPlan
 	context            []string
 	artifacts          []sessionv3Runtime.ArtifactPin
+	activities         []sessionv3Runtime.Activity
 }
 
 func (b *Binder) prepareLLMPlan(
@@ -182,6 +183,19 @@ func (b *Binder) prepareLLMPlan(
 			plan.addContext(value)
 		}
 	}
+
+	activities, err := llmInputActivitySequence(
+		request.Session,
+		payload,
+		plan.defaults.History,
+	)
+	if err != nil {
+		return llmExecutionPlan{}, err
+	}
+	plan.activities = append(
+		[]sessionv3Runtime.Activity(nil),
+		activities...,
+	)
 
 	plan.defaults.SystemInstructions = append(
 		[]sessionv3Runtime.Instruction(nil),

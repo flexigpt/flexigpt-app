@@ -343,21 +343,11 @@ func (r *Runtime) deliverWorkPortsLocked(
 		if plan.Direction != WorkflowPortDirectionOutput {
 			continue
 		}
+
+		// Streamed ports contain only ordered stream records emitted through
+		// WorkPortStream or the LLM stream bridge. A final result must never be
+		// converted into a synthetic stream record.
 		if plan.Stream {
-			if portStreamIndex(item.PortStreams, plan.Name) >= 0 {
-				continue
-			}
-			sequence := nextPortStreamSequence(item, plan.Name)
-			if err := r.appendPortMessageLocked(
-				session,
-				execution,
-				plan,
-				portMessageID(item.ID, plan.Name, sequence),
-				portStreamMessageKind,
-				value,
-			); err != nil {
-				return err
-			}
 			continue
 		}
 		if err := r.appendPortMessageLocked(
@@ -388,9 +378,13 @@ func (r *Runtime) deliverFramePortsLocked(
 	}
 
 	for _, plan := range frame.Ports {
-		if plan.Direction != WorkflowPortDirectionOutput {
+		if plan.Direction != WorkflowPortDirectionOutput ||
+			plan.Stream {
 			continue
 		}
+
+		// A child ProgramFrame owns final-output delivery. Stream delivery
+		// occurs on the child WorkItem before child settlement.
 		if err := r.appendPortMessageLocked(
 			session,
 			execution,
