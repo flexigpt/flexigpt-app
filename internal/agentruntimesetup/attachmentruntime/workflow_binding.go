@@ -8,6 +8,7 @@ import (
 
 	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/workflowruntime"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 const (
@@ -96,7 +97,7 @@ func (normalizeURLServiceBinding) Execute(
 
 	return sessionv3Runtime.WorkExecutionResult{
 		Output: &sessionv3Runtime.WorkItemOutput{
-			Value: sessionv3Runtime.MustCanonicalValue(result),
+			Value: jsonutil.MustCanonicalValue(result),
 			Receipt: &sessionv3Runtime.ExternalReceipt{
 				System:      normalizeURLReceiptSystem,
 				Reference:   result.Normalized,
@@ -118,9 +119,9 @@ func (normalizeURLServiceBinding) ResolveWait(
 }
 
 func decodeNormalizeURLInput(
-	value sessionv3Runtime.CanonicalValue,
+	value jsonutil.CanonicalValue,
 ) (normalizeURLInput, error) {
-	input, err := sessionv3Runtime.DecodeCanonicalValue[normalizeURLInput](
+	input, err := jsonutil.DecodeCanonicalValue[normalizeURLInput](
 		value,
 	)
 	if err != nil || strings.TrimSpace(input.URL) == "" {

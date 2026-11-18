@@ -8,6 +8,7 @@ import (
 
 	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/workflowruntime"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
 	"github.com/flexigpt/llmtools-go/texttool"
 )
@@ -64,7 +65,7 @@ func (applyUnifiedDiffActivityBinding) Bind(
 	_ context.Context,
 	request workflowruntime.WorkBindingRequest,
 ) (sessionv3Runtime.SemanticBinding, any, error) {
-	input, err := sessionv3Runtime.DecodeCanonicalValue[texttool.ApplyUnifiedDiffArgs](request.Input)
+	input, err := jsonutil.DecodeCanonicalValue[texttool.ApplyUnifiedDiffArgs](request.Input)
 	if err != nil {
 		return sessionv3Runtime.SemanticBinding{}, nil, errors.New(
 			"apply unified diff input is invalid",
@@ -97,7 +98,7 @@ func (applyUnifiedDiffActivityBinding) Execute(
 		var output *sessionv3Runtime.WorkItemOutput
 		if result != nil {
 			output = &sessionv3Runtime.WorkItemOutput{
-				Value: sessionv3Runtime.MustCanonicalValue(*result),
+				Value: jsonutil.MustCanonicalValue(*result),
 			}
 		}
 		return uncertainDiffFailure(
@@ -116,7 +117,7 @@ func (applyUnifiedDiffActivityBinding) Execute(
 
 	return sessionv3Runtime.WorkExecutionResult{
 		Output: &sessionv3Runtime.WorkItemOutput{
-			Value: sessionv3Runtime.MustCanonicalValue(*result),
+			Value: jsonutil.MustCanonicalValue(*result),
 			Receipt: &sessionv3Runtime.ExternalReceipt{
 				System:      applyUnifiedDiffReceiptSystem,
 				Reference:   ApplyUnifiedDiffActivityID,

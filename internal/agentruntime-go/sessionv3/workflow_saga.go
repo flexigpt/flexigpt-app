@@ -4,6 +4,8 @@ import (
 	"errors"
 	"slices"
 	"strings"
+
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 type WorkflowSagaCompensationPhase string
@@ -56,7 +58,7 @@ type WorkflowSagaProgress struct {
 	BodyPath           string                           `json:"bodyPath"`
 	PrimaryStatus      ProgramFrameState                `json:"primaryStatus,omitempty"`
 	PrimaryError       *SanitizedError                  `json:"primaryError,omitempty"`
-	PrimaryValue       CanonicalValue                   `json:"primaryValue,omitempty"`
+	PrimaryValue       jsonutil.CanonicalValue          `json:"primaryValue,omitempty"`
 	Remaining          []EffectRecordID                 `json:"remaining,omitempty"`
 	Active             []WorkflowSagaActiveCompensation `json:"active,omitempty"`
 	StopRequested      bool                             `json:"stopRequested,omitempty"`
@@ -282,7 +284,7 @@ func (i *WorkflowInterpreter) driveSaga(
 				Compensation: &CompensationWork{
 					OriginalWorkItemID: record.OriginalWorkItemID,
 					EffectID:           effectID,
-					Input:              MustCanonicalValue(record.Completed),
+					Input:              jsonutil.MustCanonicalValue(record.Completed),
 				},
 			},
 		})
@@ -433,7 +435,7 @@ func (i *WorkflowInterpreter) settleSagaWork(
 		)
 	}
 
-	completed := MustCanonicalValue(record.Completed)
+	completed := jsonutil.MustCanonicalValue(record.Completed)
 	scope := WorkflowScopeContext{
 		Completed: &completed,
 		Cleanup:   true,

@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 	_ "time/tzdata"
+
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 // WorkflowTriggerKind identifies one declaration trigger form. It is kept
@@ -78,16 +80,16 @@ type WorkflowTriggerMissed struct {
 // trigger's `event` CEL scope. The Event declaration validates Data and
 // Correlation before this envelope reaches an evaluated trigger template.
 type TriggerEventEnvelope struct {
-	ID          string         `json:"id"`
-	Name        string         `json:"name"`
-	Source      string         `json:"source"`
-	Data        CanonicalValue `json:"data"`
-	Correlation CanonicalValue `json:"correlation,omitempty"`
-	Time        time.Time      `json:"time"`
+	ID          string                  `json:"id"`
+	Name        string                  `json:"name"`
+	Source      string                  `json:"source"`
+	Data        jsonutil.CanonicalValue `json:"data"`
+	Correlation jsonutil.CanonicalValue `json:"correlation,omitempty"`
+	Time        time.Time               `json:"time"`
 }
 
 type WorkflowTriggerEvaluation struct {
-	Input       CanonicalValue
+	Input       jsonutil.CanonicalValue
 	InstanceKey string
 	Matched     bool
 }
@@ -249,17 +251,17 @@ func PrepareWorkflowTrigger(
 	if err != nil {
 		return WorkflowTriggerEvaluation{}, err
 	}
-	program.Input = MustCanonicalValue(nil)
+	program.Input = jsonutil.MustCanonicalValue(nil)
 	program.InputBound = false
 	state := WorkflowState{
 		Version:     WorkflowInterpreterVersion,
-		State:       MustCanonicalValue(map[string]CanonicalValue{}),
+		State:       jsonutil.MustCanonicalValue(map[string]jsonutil.CanonicalValue{}),
 		Outcomes:    []WorkflowStepOutcome{},
 		TargetSets:  []WorkflowTargetSetState{},
 		LogicalTime: logicalTime.UTC(),
 	}
 
-	var eventValue CanonicalValue
+	var eventValue jsonutil.CanonicalValue
 	if event != nil {
 		if event.ID == "" ||
 			event.Name == "" ||
@@ -269,7 +271,7 @@ func PrepareWorkflowTrigger(
 			event.Time.IsZero() {
 			return WorkflowTriggerEvaluation{}, errors.New("workflow trigger event is invalid")
 		}
-		eventValue = MustCanonicalValue(*event)
+		eventValue = jsonutil.MustCanonicalValue(*event)
 	}
 
 	result := WorkflowTriggerEvaluation{Matched: true}
@@ -313,7 +315,7 @@ func PrepareWorkflowTrigger(
 			if keyErr != nil {
 				return WorkflowTriggerEvaluation{}, keyErr
 			}
-			result.InstanceKey, keyErr = DecodeCanonicalValue[string](key)
+			result.InstanceKey, keyErr = jsonutil.DecodeCanonicalValue[string](key)
 			if keyErr != nil {
 				return WorkflowTriggerEvaluation{}, errors.New("workflow trigger instance key must be a string")
 			}
@@ -342,7 +344,7 @@ func PrepareWorkflowTrigger(
 
 func bindWorkflowTriggerInput(
 	snapshot ProgramSnapshot,
-	input CanonicalValue,
+	input jsonutil.CanonicalValue,
 ) (ProgramSnapshot, error) {
 	return workflowSnapshotWithInput(snapshot, input)
 }

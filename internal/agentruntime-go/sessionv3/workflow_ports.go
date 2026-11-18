@@ -3,13 +3,15 @@ package sessionv3
 import (
 	"errors"
 	"fmt"
+
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 func validateWorkflowCallContext(
 	contracts ...*WorkflowCallableInterface,
-) func(CanonicalValue) error {
-	return func(value CanonicalValue) error {
-		context, err := DecodeCanonicalValue[map[string]CanonicalValue](value)
+) func(jsonutil.CanonicalValue) error {
+	return func(value jsonutil.CanonicalValue) error {
+		context, err := jsonutil.DecodeCanonicalValue[map[string]jsonutil.CanonicalValue](value)
 		if err != nil {
 			return errors.New("workflow call context must be an object")
 		}

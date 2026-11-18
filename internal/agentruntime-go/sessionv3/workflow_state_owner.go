@@ -1,13 +1,17 @@
 package sessionv3
 
-import "errors"
+import (
+	"errors"
+
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
+)
 
 // WorkflowStateOwner identifies the nearest durable state-owning boundary.
 // It is propagated into child Workflow programs so inherited set operations
 // retain the schema and owner identity that were active at frame creation.
 type WorkflowStateOwner struct {
-	ID     string         `json:"id"`
-	Schema CanonicalValue `json:"schema"`
+	ID     string                  `json:"id"`
+	Schema jsonutil.CanonicalValue `json:"schema"`
 }
 
 func (o WorkflowStateOwner) Validate() error {
@@ -62,7 +66,7 @@ func workflowSyntheticStateOwner(
 	frameID ProgramFrameID,
 	path string,
 	kind string,
-	schema CanonicalValue,
+	schema jsonutil.CanonicalValue,
 ) *WorkflowStateOwner {
 	return &WorkflowStateOwner{
 		ID:     "state-owner:" + string(frameID) + ":" + path + ":" + kind,

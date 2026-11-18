@@ -7,6 +7,7 @@ import (
 
 	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/toolruntime"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
 
@@ -50,7 +51,7 @@ func (b *Binder) toolChoices(
 	}
 	if payload := req.WorkItem.Input.LLM; payload != nil {
 		for _, providerTool := range payload.ProviderTools {
-			arguments, err := sessionv3Runtime.DecodeCanonicalValue[map[string]any](
+			arguments, err := jsonutil.DecodeCanonicalValue[map[string]any](
 				providerTool.InputSchema,
 			)
 			if err != nil {

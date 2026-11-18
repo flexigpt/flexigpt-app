@@ -35,26 +35,26 @@ type WorkflowPortBinding struct {
 }
 
 type PortPlan struct {
-	Name            string                `json:"name"`
-	Direction       WorkflowPortDirection `json:"direction"`
-	Stream          bool                  `json:"stream,omitempty"`
-	Schema          CanonicalValue        `json:"schema"`
-	ChannelSchema   CanonicalValue        `json:"channelSchema"`
-	Channel         string                `json:"channel"`
-	Access          WorkflowPortAccess    `json:"access"`
-	MaxMessages     int                   `json:"maxMessages,omitempty"`
-	MaxBytes        int                   `json:"maxBytes,omitempty"`
-	OwnerFrameID    ProgramFrameID        `json:"ownerFrameID,omitempty"`
-	ParentFrameID   ProgramFrameID        `json:"parentFrameID,omitempty"`
-	DeclarationPath string                `json:"declarationPath,omitempty"`
+	Name            string                  `json:"name"`
+	Direction       WorkflowPortDirection   `json:"direction"`
+	Stream          bool                    `json:"stream,omitempty"`
+	Schema          jsonutil.CanonicalValue `json:"schema"`
+	ChannelSchema   jsonutil.CanonicalValue `json:"channelSchema"`
+	Channel         string                  `json:"channel"`
+	Access          WorkflowPortAccess      `json:"access"`
+	MaxMessages     int                     `json:"maxMessages,omitempty"`
+	MaxBytes        int                     `json:"maxBytes,omitempty"`
+	OwnerFrameID    ProgramFrameID          `json:"ownerFrameID,omitempty"`
+	ParentFrameID   ProgramFrameID          `json:"parentFrameID,omitempty"`
+	DeclarationPath string                  `json:"declarationPath,omitempty"`
 }
 
 type PortInput struct {
-	Name     string           `json:"name"`
-	Channel  string           `json:"channel"`
-	Cursor   uint64           `json:"cursor,omitempty"`
-	Values   []CanonicalValue `json:"values,omitempty"`
-	Streamed bool             `json:"streamed,omitempty"`
+	Name     string                    `json:"name"`
+	Channel  string                    `json:"channel"`
+	Cursor   uint64                    `json:"cursor,omitempty"`
+	Values   []jsonutil.CanonicalValue `json:"values,omitempty"`
+	Streamed bool                      `json:"streamed,omitempty"`
 }
 
 type PortStream struct {
@@ -222,7 +222,7 @@ func clonePortInputs(values []PortInput) []PortInput {
 	for index := range values {
 		output[index] = values[index]
 		output[index].Values = make(
-			[]CanonicalValue,
+			[]jsonutil.CanonicalValue,
 			len(values[index].Values),
 		)
 		for valueIndex := range values[index].Values {
@@ -277,8 +277,8 @@ func validateUniquePortInputs(values []PortInput) error {
 }
 
 func portSchemaCompatible(
-	portSchema CanonicalValue,
-	channelSchema CanonicalValue,
+	portSchema jsonutil.CanonicalValue,
+	channelSchema jsonutil.CanonicalValue,
 ) error {
 	if len(portSchema) == 0 || len(channelSchema) == 0 {
 		return errors.New("port or channel schema is unavailable")

@@ -4,18 +4,20 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 type WorkflowContextRequirement struct {
-	Name   string         `json:"name"`
-	Schema CanonicalValue `json:"schema"`
+	Name   string                  `json:"name"`
+	Schema jsonutil.CanonicalValue `json:"schema"`
 }
 
 type WorkflowCallablePort struct {
-	Name      string                `json:"name"`
-	Direction WorkflowPortDirection `json:"direction"`
-	Schema    CanonicalValue        `json:"schema"`
-	Stream    bool                  `json:"stream,omitempty"`
+	Name      string                  `json:"name"`
+	Direction WorkflowPortDirection   `json:"direction"`
+	Schema    jsonutil.CanonicalValue `json:"schema"`
+	Stream    bool                    `json:"stream,omitempty"`
 }
 
 type ModelDispatchPlan struct {
@@ -108,8 +110,8 @@ type MessageDispatchPlan struct {
 }
 
 type ContextDispatchPlan struct {
-	Name  string         `json:"name"`
-	Value CanonicalValue `json:"value"`
+	Name  string                  `json:"name"`
+	Value jsonutil.CanonicalValue `json:"value"`
 }
 
 type ChannelDispatchPlan struct {

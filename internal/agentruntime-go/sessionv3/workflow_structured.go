@@ -6,6 +6,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 const (
@@ -22,20 +24,20 @@ const (
 type WorkflowScopeContext struct {
 	Child              bool                        `json:"child,omitempty"`
 	MergeState         bool                        `json:"mergeState,omitempty"`
-	OuterState         CanonicalValue              `json:"outerState,omitempty"`
+	OuterState         jsonutil.CanonicalValue     `json:"outerState,omitempty"`
 	StateOwner         *WorkflowStateOwner         `json:"stateOwner,omitempty"`
 	TargetSets         []WorkflowTargetSetState    `json:"targetSets,omitempty"`
 	OuterOutcomes      []WorkflowStepOutcome       `json:"outerOutcomes,omitempty"`
 	OuterSubscriptions []WorkflowSubscriptionState `json:"outerSubscriptions,omitempty"`
-	Context            *CanonicalValue             `json:"context,omitempty"`
-	Item               *CanonicalValue             `json:"item,omitempty"`
+	Context            *jsonutil.CanonicalValue    `json:"context,omitempty"`
+	Item               *jsonutil.CanonicalValue    `json:"item,omitempty"`
 	Index              *int                        `json:"index,omitempty"`
-	Result             *CanonicalValue             `json:"result,omitempty"`
-	Event              *CanonicalValue             `json:"event,omitempty"`
-	Error              *CanonicalValue             `json:"error,omitempty"`
-	Outcome            *CanonicalValue             `json:"outcome,omitempty"`
-	Operation          *CanonicalValue             `json:"operation,omitempty"`
-	Completed          *CanonicalValue             `json:"completed,omitempty"`
+	Result             *jsonutil.CanonicalValue    `json:"result,omitempty"`
+	Event              *jsonutil.CanonicalValue    `json:"event,omitempty"`
+	Error              *jsonutil.CanonicalValue    `json:"error,omitempty"`
+	Outcome            *jsonutil.CanonicalValue    `json:"outcome,omitempty"`
+	Operation          *jsonutil.CanonicalValue    `json:"operation,omitempty"`
+	Completed          *jsonutil.CanonicalValue    `json:"completed,omitempty"`
 	Ports              []PortInput                 `json:"ports,omitempty"`
 	Saga               *WorkflowSagaScope          `json:"saga,omitempty"`
 	Cleanup            bool                        `json:"cleanup,omitempty"`
@@ -125,9 +127,9 @@ const (
 )
 
 type WorkflowBlockResult struct {
-	Exit  WorkflowExitKind `json:"exit"`
-	Value CanonicalValue   `json:"value"`
-	State CanonicalValue   `json:"state"`
+	Exit  WorkflowExitKind        `json:"exit"`
+	Value jsonutil.CanonicalValue `json:"value"`
+	State jsonutil.CanonicalValue `json:"state"`
 }
 
 func (r WorkflowBlockResult) Validate() error {
@@ -193,11 +195,11 @@ type WorkflowParentStateMerge struct {
 // WorkflowParentStateMergeProgress persists the StateUpdate boundary after
 // all selected child outcomes settle and before the parent receives success.
 type WorkflowParentStateMergeProgress struct {
-	WorkItemID WorkItemID         `json:"workItemID"`
-	Owner      WorkflowStateOwner `json:"owner"`
-	Update     StateUpdateWork    `json:"update"`
-	Output     CanonicalValue     `json:"output"`
-	Applied    bool               `json:"applied,omitempty"`
+	WorkItemID WorkItemID              `json:"workItemID"`
+	Owner      WorkflowStateOwner      `json:"owner"`
+	Update     StateUpdateWork         `json:"update"`
+	Output     jsonutil.CanonicalValue `json:"output"`
+	Applied    bool                    `json:"applied,omitempty"`
 }
 
 type WorkflowParallel struct {
@@ -210,7 +212,7 @@ type WorkflowParallel struct {
 
 type WorkflowForeach struct {
 	Items       WorkflowValue             `json:"items"`
-	ItemSchema  CanonicalValue            `json:"itemSchema"`
+	ItemSchema  jsonutil.CanonicalValue   `json:"itemSchema"`
 	Concurrency int                       `json:"concurrency,omitempty"`
 	MaxItems    int                       `json:"maxItems,omitempty"`
 	Completion  WorkflowCompletion        `json:"completion"`
@@ -276,10 +278,10 @@ type WorkflowChild struct {
 }
 
 type WorkflowNamedOutcome struct {
-	Name   string             `json:"name"`
-	State  WorkflowChildState `json:"state"`
-	Output CanonicalValue     `json:"output,omitempty"`
-	Error  *SanitizedError    `json:"error,omitempty"`
+	Name   string                  `json:"name"`
+	State  WorkflowChildState      `json:"state"`
+	Output jsonutil.CanonicalValue `json:"output,omitempty"`
+	Error  *SanitizedError         `json:"error,omitempty"`
 }
 
 type WorkflowParallelProgress struct {
@@ -291,14 +293,14 @@ type WorkflowParallelProgress struct {
 }
 
 type WorkflowItemOutcome struct {
-	Index  int                `json:"index"`
-	State  WorkflowChildState `json:"state"`
-	Output CanonicalValue     `json:"output,omitempty"`
-	Error  *SanitizedError    `json:"error,omitempty"`
+	Index  int                     `json:"index"`
+	State  WorkflowChildState      `json:"state"`
+	Output jsonutil.CanonicalValue `json:"output,omitempty"`
+	Error  *SanitizedError         `json:"error,omitempty"`
 }
 
 type WorkflowForeachProgress struct {
-	Items       []CanonicalValue          `json:"items"`
+	Items       []jsonutil.CanonicalValue `json:"items"`
 	Outcomes    []WorkflowItemOutcome     `json:"outcomes"`
 	Next        int                       `json:"next"`
 	Concurrency int                       `json:"concurrency"`
@@ -311,12 +313,12 @@ type WorkflowForeachProgress struct {
 }
 
 type WorkflowRepeatProgress struct {
-	State      CanonicalValue `json:"state"`
-	Result     CanonicalValue `json:"result,omitempty"`
-	Iterations int            `json:"iterations"`
-	Count      *int           `json:"count,omitempty"`
-	LocalState bool           `json:"localState"`
-	LaunchNext bool           `json:"launchNext"`
+	State      jsonutil.CanonicalValue `json:"state"`
+	Result     jsonutil.CanonicalValue `json:"result,omitempty"`
+	Iterations int                     `json:"iterations"`
+	Count      *int                    `json:"count,omitempty"`
+	LocalState bool                    `json:"localState"`
+	LaunchNext bool                    `json:"launchNext"`
 }
 
 type WorkflowPending struct {
@@ -503,7 +505,7 @@ func (e workflowChildError) Error() string {
 func (i *WorkflowInterpreter) completeWorkflowBlock(
 	program WorkflowProgram,
 	state WorkflowState,
-	value CanonicalValue,
+	value jsonutil.CanonicalValue,
 	exit WorkflowExitKind,
 ) (ProgramTransition, error) {
 	if !value.Valid() {
@@ -527,7 +529,7 @@ func (i *WorkflowInterpreter) completeWorkflowBlock(
 		return workflowTransition(
 			state,
 			&status,
-			MustCanonicalValue(result),
+			jsonutil.MustCanonicalValue(result),
 			nil,
 		)
 	}
@@ -605,7 +607,7 @@ func workflowScopeOutcomes(
 	return values
 }
 
-func workflowCanonicalPointer(value CanonicalValue) *CanonicalValue {
+func workflowCanonicalPointer(value jsonutil.CanonicalValue) *jsonutil.CanonicalValue {
 	if len(value) == 0 {
 		return nil
 	}
@@ -614,8 +616,8 @@ func workflowCanonicalPointer(value CanonicalValue) *CanonicalValue {
 }
 
 func cloneWorkflowCanonicalPointer(
-	value *CanonicalValue,
-) *CanonicalValue {
+	value *jsonutil.CanonicalValue,
+) *jsonutil.CanonicalValue {
 	if value == nil {
 		return nil
 	}
@@ -633,9 +635,9 @@ func (i *WorkflowInterpreter) childBlockProgram(
 	state WorkflowState,
 	block WorkflowBlock,
 	mergeState bool,
-	item *CanonicalValue,
+	item *jsonutil.CanonicalValue,
 	index *int,
-	result *CanonicalValue,
+	result *jsonutil.CanonicalValue,
 ) (ProgramSnapshot, error) {
 	owner, err := workflowStateOwnerForFrame(frame, program)
 	if err != nil {
@@ -684,9 +686,9 @@ func (i *WorkflowInterpreter) startSingleChild(
 	childName string,
 	block WorkflowBlock,
 	mergeState bool,
-	item *CanonicalValue,
+	item *jsonutil.CanonicalValue,
 	index *int,
-	result *CanonicalValue,
+	result *jsonutil.CanonicalValue,
 ) (ProgramTransition, error) {
 	claims, err := i.workflowResourceClaims(program, state, step)
 	if err != nil {
@@ -956,7 +958,7 @@ func (i *WorkflowInterpreter) startForeach(
 	if err != nil {
 		return workflowFailure(state, "workflow_foreach_items_invalid", err.Error())
 	}
-	items, err := DecodeCanonicalValue[[]CanonicalValue](value)
+	items, err := jsonutil.DecodeCanonicalValue[[]jsonutil.CanonicalValue](value)
 	if err != nil {
 		return workflowFailure(
 			state,
@@ -1000,7 +1002,7 @@ func (i *WorkflowInterpreter) startForeach(
 		Path:   path,
 		Claims: claims,
 		Foreach: &WorkflowForeachProgress{
-			Items:       append([]CanonicalValue(nil), items...),
+			Items:       append([]jsonutil.CanonicalValue(nil), items...),
 			Outcomes:    outcomes,
 			Concurrency: concurrency,
 			Completion:  step.Foreach.Completion,
@@ -1071,7 +1073,7 @@ func (i *WorkflowInterpreter) startRepeat(
 		if err != nil {
 			return workflowFailure(state, "workflow_repeat_count_invalid", err.Error())
 		}
-		count, err := DecodeCanonicalValue[int](value)
+		count, err := jsonutil.DecodeCanonicalValue[int](value)
 		if err != nil || count < 0 {
 			return workflowFailure(
 				state,
@@ -1359,7 +1361,7 @@ func workflowFrameResult(
 ) (WorkflowBlockResult, *SanitizedError) {
 	switch frame.Status {
 	case ProgramFrameStateCompleted:
-		result, err := DecodeCanonicalValue[WorkflowBlockResult](frame.Output)
+		result, err := jsonutil.DecodeCanonicalValue[WorkflowBlockResult](frame.Output)
 		if err != nil {
 			return WorkflowBlockResult{}, &SanitizedError{
 				Code:     "workflow_child_output_invalid",
@@ -1653,7 +1655,7 @@ func workflowRequestParallelCancellation(
 func workflowParallelOutput(
 	children []WorkflowChild,
 	winners []string,
-) (CanonicalValue, error) {
+) (jsonutil.CanonicalValue, error) {
 	outcomes := make([]WorkflowNamedOutcome, 0, len(children))
 	for _, child := range children {
 		outcome := WorkflowNamedOutcome{
@@ -2209,10 +2211,10 @@ func (i *WorkflowInterpreter) finishRepeat(
 	}
 	progress := state.Pending.Repeat
 	value, err := canonicalWorkflowValue(struct {
-		State      CanonicalValue `json:"state"`
-		Result     CanonicalValue `json:"result"`
-		Iterations int            `json:"iterations"`
-		Exhausted  bool           `json:"exhausted"`
+		State      jsonutil.CanonicalValue `json:"state"`
+		Result     jsonutil.CanonicalValue `json:"result"`
+		Iterations int                     `json:"iterations"`
+		Exhausted  bool                    `json:"exhausted"`
 	}{
 		State:      progress.State.Clone(),
 		Result:     progress.Result.Clone(),

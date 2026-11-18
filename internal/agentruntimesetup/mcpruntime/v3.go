@@ -374,7 +374,7 @@ func (e *V3Executor) PrepareAppTool(
 			"app route belongs to another MCP server",
 		)
 	}
-	if _, err := sessionv3Runtime.DecodeCanonicalValue[map[string]any](
+	if _, err := jsonutil.DecodeCanonicalValue[map[string]any](
 		nonEmptyV3Arguments(request.Arguments),
 	); err != nil {
 		return sessionv3Runtime.ToolCall{}, errors.New(
@@ -720,7 +720,7 @@ func (e *V3Executor) Execute(
 	if err != nil {
 		return sessionv3Runtime.WorkExecutionResult{}, true, err
 	}
-	structured, err := sessionv3Runtime.CanonicalValueFrom(
+	structured, err := jsonutil.CanonicalValueFrom(
 		adapted.Structured,
 	)
 	if err != nil {
@@ -1309,12 +1309,12 @@ func v3AppMapping(
 }
 
 func nonEmptyV3Arguments(
-	value sessionv3Runtime.CanonicalValue,
-) sessionv3Runtime.CanonicalValue {
+	value jsonutil.CanonicalValue,
+) jsonutil.CanonicalValue {
 	if len(value) != 0 {
 		return value.Clone()
 	}
-	return sessionv3Runtime.MustCanonicalValue(map[string]any{})
+	return jsonutil.MustCanonicalValue(map[string]any{})
 }
 
 func v3MappedMCPRequest(
@@ -1333,9 +1333,9 @@ func v3MappedMCPRequest(
 
 	arguments := payload.Call.Arguments.Clone()
 	if len(arguments) == 0 {
-		arguments = sessionv3Runtime.MustCanonicalValue(map[string]any{})
+		arguments = jsonutil.MustCanonicalValue(map[string]any{})
 	}
-	values, err := sessionv3Runtime.DecodeCanonicalValue[map[string]any](
+	values, err := jsonutil.DecodeCanonicalValue[map[string]any](
 		arguments,
 	)
 	if err != nil || values == nil {
@@ -1366,12 +1366,12 @@ func v3MappedMCPRequest(
 
 func canonicalV3MCPValue(
 	value any,
-) (sessionv3Runtime.CanonicalValue, error) {
+) (jsonutil.CanonicalValue, error) {
 	raw, err := jsonutil.EncodeToJSONRaw(value)
 	if err != nil {
 		return nil, err
 	}
-	return sessionv3Runtime.CanonicalValueFrom(raw)
+	return jsonutil.CanonicalValueFrom(raw)
 }
 
 func parseV3MCPDeadline(value string) (*time.Time, error) {

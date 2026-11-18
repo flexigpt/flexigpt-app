@@ -235,7 +235,7 @@ func programSnapshot(id string, payload any) (ProgramSnapshot, error) {
 	return ProgramSnapshot{
 		InterpreterID:      id,
 		InterpreterVersion: BuiltinInterpreterVersion,
-		Payload:            MustCanonicalValue(payload),
+		Payload:            jsonutil.MustCanonicalValue(payload),
 	}, nil
 }
 
@@ -338,7 +338,7 @@ func encodeConversationState(value conversationProgramState) ProgramState {
 	return ProgramState{
 		Type:    BuiltinConversationInterpreterID,
 		Version: BuiltinInterpreterVersion,
-		Data:    MustCanonicalValue(value),
+		Data:    jsonutil.MustCanonicalValue(value),
 	}
 }
 
@@ -436,7 +436,7 @@ func (agentLoopInterpreter) Advance(
 				return ProgramTransition{
 					State:      encodeAgentLoopState(state),
 					Status:     &status,
-					Output:     MustCanonicalValue(item.Output.LLM),
+					Output:     jsonutil.MustCanonicalValue(item.Output.LLM),
 					Activities: activities,
 				}, nil
 			}
@@ -616,7 +616,7 @@ func encodeAgentLoopState(value agentLoopProgramState) ProgramState {
 	return ProgramState{
 		Type:    BuiltinAgentLoopInterpreterID,
 		Version: BuiltinInterpreterVersion,
-		Data:    MustCanonicalValue(value),
+		Data:    jsonutil.MustCanonicalValue(value),
 	}
 }
 
@@ -757,7 +757,7 @@ func (singleModelInterpreter) Advance(
 		return ProgramTransition{
 			State:  encodeSingleModelState(state),
 			Status: &status,
-			Output: MustCanonicalValue(item.Output.LLM),
+			Output: jsonutil.MustCanonicalValue(item.Output.LLM),
 			Activities: []Activity{
 				{
 					Kind:       ActivityKindMessage,
@@ -780,7 +780,7 @@ func encodeSingleModelState(value singleModelProgramState) ProgramState {
 	return ProgramState{
 		Type:    BuiltinSingleModelInterpreterID,
 		Version: BuiltinInterpreterVersion,
-		Data:    MustCanonicalValue(value),
+		Data:    jsonutil.MustCanonicalValue(value),
 	}
 }
 

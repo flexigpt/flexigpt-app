@@ -34,14 +34,14 @@ const (
 )
 
 // WorkflowValue is a typed durable expression template. Literal values remain
-// CanonicalValue because Workflow input and output can be arbitrary JSON, but
+// jsonutil.CanonicalValue because Workflow input and output can be arbitrary JSON, but
 // no runtime struct uses json.RawMessage as its public representation.
 type WorkflowValue struct {
-	Kind       WorkflowValueKind   `json:"kind"`
-	Literal    CanonicalValue      `json:"literal,omitempty"`
-	Expression string              `json:"expression,omitempty"`
-	Object     []WorkflowValuePair `json:"object,omitempty"`
-	Array      []WorkflowValue     `json:"array,omitempty"`
+	Kind       WorkflowValueKind       `json:"kind"`
+	Literal    jsonutil.CanonicalValue `json:"literal,omitempty"`
+	Expression string                  `json:"expression,omitempty"`
+	Object     []WorkflowValuePair     `json:"object,omitempty"`
+	Array      []WorkflowValue         `json:"array,omitempty"`
 }
 
 type WorkflowValuePair struct {
@@ -69,10 +69,10 @@ func (o WorkflowChildOwnership) Validate() error {
 
 type WorkflowCallableInterface struct {
 	Modes         []WorkflowCallMode           `json:"modes,omitempty"`
-	InputSchema   CanonicalValue               `json:"inputSchema"`
-	OutputSchema  CanonicalValue               `json:"outputSchema"`
-	ErrorSchema   CanonicalValue               `json:"errorSchema,omitempty"`
-	ReceiptSchema CanonicalValue               `json:"receiptSchema,omitempty"`
+	InputSchema   jsonutil.CanonicalValue      `json:"inputSchema"`
+	OutputSchema  jsonutil.CanonicalValue      `json:"outputSchema"`
+	ErrorSchema   jsonutil.CanonicalValue      `json:"errorSchema,omitempty"`
+	ReceiptSchema jsonutil.CanonicalValue      `json:"receiptSchema,omitempty"`
 	Context       []WorkflowContextRequirement `json:"context,omitempty"`
 	Ports         []WorkflowCallablePort       `json:"ports,omitempty"`
 	Limits        *ExecutionBudget             `json:"limits,omitempty"`
@@ -81,10 +81,10 @@ type WorkflowCallableInterface struct {
 type WorkflowProgram struct {
 	Version uint32 `json:"version"`
 
-	InputSchema  CanonicalValue `json:"inputSchema"`
-	OutputSchema CanonicalValue `json:"outputSchema"`
-	Input        CanonicalValue `json:"input"`
-	InputBound   bool           `json:"inputBound"`
+	InputSchema  jsonutil.CanonicalValue `json:"inputSchema"`
+	OutputSchema jsonutil.CanonicalValue `json:"outputSchema"`
+	Input        jsonutil.CanonicalValue `json:"input"`
+	InputBound   bool                    `json:"inputBound"`
 
 	Root         WorkflowBlock                `json:"root"`
 	Targets      map[string]WorkflowTarget    `json:"targets"`
@@ -113,8 +113,8 @@ type WorkflowBlock struct {
 }
 
 type WorkflowStateSpec struct {
-	Schema  CanonicalValue `json:"schema"`
-	Initial WorkflowValue  `json:"initial"`
+	Schema  jsonutil.CanonicalValue `json:"schema"`
+	Initial WorkflowValue           `json:"initial"`
 }
 
 type WorkflowStep struct {
@@ -124,7 +124,7 @@ type WorkflowStep struct {
 	When            *WorkflowValue          `json:"when,omitempty"`
 	Retry           *RetryPolicy            `json:"retry,omitempty"`
 	Effect          *WorkflowStepEffect     `json:"effect,omitempty"`
-	OutputSchema    CanonicalValue          `json:"outputSchema,omitempty"`
+	OutputSchema    jsonutil.CanonicalValue `json:"outputSchema,omitempty"`
 	Claims          []WorkflowResourceClaim `json:"claims,omitempty"`
 	Limits          *ExecutionBudget        `json:"limits,omitempty"`
 
@@ -166,8 +166,8 @@ type WorkflowCall struct {
 }
 
 type WorkflowTransform struct {
-	Value        WorkflowValue  `json:"value"`
-	OutputSchema CanonicalValue `json:"outputSchema,omitempty"`
+	Value        WorkflowValue           `json:"value"`
+	OutputSchema jsonutil.CanonicalValue `json:"outputSchema,omitempty"`
 }
 
 type WorkflowCancel struct {
@@ -254,7 +254,7 @@ const (
 type WorkflowStepOutcome struct {
 	ID              string                    `json:"id"`
 	Status          WorkflowStepOutcomeStatus `json:"status"`
-	Output          CanonicalValue            `json:"output,omitempty"`
+	Output          jsonutil.CanonicalValue   `json:"output,omitempty"`
 	Target          string                    `json:"target,omitempty"`
 	Receipt         *ExternalReceipt          `json:"receipt,omitempty"`
 	Error           *SanitizedError           `json:"error,omitempty"`
@@ -284,11 +284,11 @@ type WorkflowState struct {
 	PendingTarget          string                       `json:"pendingTarget,omitempty"`
 	Pending                *WorkflowPending             `json:"pending,omitempty"`
 	Exit                   WorkflowExitKind             `json:"exit,omitempty"`
-	ExitValue              CanonicalValue               `json:"exitValue,omitempty"`
+	ExitValue              jsonutil.CanonicalValue      `json:"exitValue,omitempty"`
 	LogicalTime            time.Time                    `json:"logicalTime,omitzero"`
 	Deadline               *time.Time                   `json:"deadline,omitempty"`
-	State                  CanonicalValue               `json:"state"`
-	Messages               CanonicalValue               `json:"messages,omitempty"`
+	State                  jsonutil.CanonicalValue      `json:"state"`
+	Messages               jsonutil.CanonicalValue      `json:"messages,omitempty"`
 	Outcomes               []WorkflowStepOutcome        `json:"outcomes"`
 	Subscriptions          []WorkflowSubscriptionState  `json:"subscriptions,omitempty"`
 	CancelChildPaths       []string                     `json:"cancelChildPaths,omitempty"`
@@ -450,7 +450,7 @@ func (i *WorkflowInterpreter) ValidateSnapshot(
 		return errors.New("Workflow Program definition digest is invalid")
 	}
 
-	program, err := DecodeCanonicalValue[WorkflowProgram](snapshot.Payload)
+	program, err := jsonutil.DecodeCanonicalValue[WorkflowProgram](snapshot.Payload)
 	if err != nil {
 		return err
 	}
@@ -465,7 +465,7 @@ func (*WorkflowInterpreter) ValidateState(
 		return errors.New("unsupported Workflow state version")
 	}
 
-	value, err := DecodeCanonicalValue[WorkflowState](state.Data)
+	value, err := jsonutil.DecodeCanonicalValue[WorkflowState](state.Data)
 	if err != nil {
 		return err
 	}
@@ -486,7 +486,7 @@ func (i *WorkflowInterpreter) InitialState(
 		)
 	}
 
-	initialState := MustCanonicalValue(map[string]CanonicalValue{})
+	initialState := jsonutil.MustCanonicalValue(map[string]jsonutil.CanonicalValue{})
 	if program.Scope.Child && len(program.Scope.OuterState) != 0 {
 		initialState = program.Scope.OuterState.Clone()
 	}
@@ -495,7 +495,7 @@ func (i *WorkflowInterpreter) InitialState(
 		State:       initialState,
 		Outcomes:    []WorkflowStepOutcome{},
 		TargetSets:  program.Scope.TargetSets,
-		Messages:    MustCanonicalValue(map[string][]WorkflowChannelMessageSnapshot{}),
+		Messages:    jsonutil.MustCanonicalValue(map[string][]WorkflowChannelMessageSnapshot{}),
 		LogicalTime: logicalTime.UTC(),
 	}
 	if program.Root.State != nil {
@@ -1127,7 +1127,7 @@ func (i *WorkflowInterpreter) drive(
 			return i.completeWorkflowBlock(
 				program,
 				state,
-				MustCanonicalValue(nil),
+				jsonutil.MustCanonicalValue(nil),
 				WorkflowExitBreak,
 			)
 
@@ -1135,7 +1135,7 @@ func (i *WorkflowInterpreter) drive(
 			return i.completeWorkflowBlock(
 				program,
 				state,
-				MustCanonicalValue(nil),
+				jsonutil.MustCanonicalValue(nil),
 				WorkflowExitContinue,
 			)
 
@@ -1979,7 +1979,7 @@ func (i *WorkflowInterpreter) validateStepOutput(
 	program WorkflowProgram,
 	state WorkflowState,
 	step WorkflowStep,
-	value CanonicalValue,
+	value jsonutil.CanonicalValue,
 ) error {
 	if err := validateWorkflowSchema(step.OutputSchema, value); err != nil {
 		return fmt.Errorf("validate Workflow step output: %w", err)
@@ -2014,7 +2014,7 @@ func (i *WorkflowInterpreter) validateStepOutput(
 
 func validateWorkflowInterfaceInput(
 	contract *WorkflowCallableInterface,
-	value CanonicalValue,
+	value jsonutil.CanonicalValue,
 ) error {
 	if contract == nil {
 		return nil
@@ -2024,7 +2024,7 @@ func validateWorkflowInterfaceInput(
 
 func validateWorkflowInterfaceOutput(
 	contract *WorkflowCallableInterface,
-	value CanonicalValue,
+	value jsonutil.CanonicalValue,
 ) error {
 	if contract == nil {
 		return nil
@@ -2063,7 +2063,7 @@ func (i *WorkflowInterpreter) evaluate(
 	value WorkflowValue,
 	program WorkflowProgram,
 	state WorkflowState,
-) (CanonicalValue, error) {
+) (jsonutil.CanonicalValue, error) {
 	switch value.Kind {
 	case WorkflowValueLiteral:
 		return value.Literal.Clone(), nil
@@ -2099,7 +2099,7 @@ func (i *WorkflowInterpreter) evaluate(
 
 	case WorkflowValueObject:
 		output := make(
-			map[string]CanonicalValue,
+			map[string]jsonutil.CanonicalValue,
 			len(value.Object),
 		)
 		for _, field := range value.Object {
@@ -2113,7 +2113,7 @@ func (i *WorkflowInterpreter) evaluate(
 
 	case WorkflowValueArray:
 		output := make(
-			[]CanonicalValue,
+			[]jsonutil.CanonicalValue,
 			len(value.Array),
 		)
 		for index := range value.Array {
@@ -2143,7 +2143,7 @@ func (i *WorkflowInterpreter) condition(
 	if err != nil {
 		return false, err
 	}
-	return DecodeCanonicalValue[bool](result)
+	return jsonutil.DecodeCanonicalValue[bool](result)
 }
 
 func (i *WorkflowInterpreter) stringValue(
@@ -2155,7 +2155,7 @@ func (i *WorkflowInterpreter) stringValue(
 	if err != nil {
 		return "", err
 	}
-	return DecodeCanonicalValue[string](result)
+	return jsonutil.DecodeCanonicalValue[string](result)
 }
 
 func (p WorkflowProgram) Validate() error {
@@ -2688,7 +2688,7 @@ func workflowProgramFromSnapshot(
 			"Workflow Program snapshot has another interpreter",
 		)
 	}
-	program, err := DecodeCanonicalValue[WorkflowProgram](
+	program, err := jsonutil.DecodeCanonicalValue[WorkflowProgram](
 		snapshot.Payload,
 	)
 	if err != nil {
@@ -2708,7 +2708,7 @@ func decodeWorkflowProgram(
 		return WorkflowProgram{}, WorkflowState{}, err
 	}
 
-	state, err := DecodeCanonicalValue[WorkflowState](
+	state, err := jsonutil.DecodeCanonicalValue[WorkflowState](
 		frame.State.Data,
 	)
 	if err != nil {
@@ -2723,7 +2723,7 @@ func decodeWorkflowProgram(
 func workflowTransition(
 	state WorkflowState,
 	status *ProgramFrameState,
-	output CanonicalValue,
+	output jsonutil.CanonicalValue,
 	work []WorkItemIntent,
 ) (ProgramTransition, error) {
 	releaseClaims := state.ReleaseFrameClaims
@@ -2993,7 +2993,7 @@ func workflowActivationWithScope(
 		}
 		completedValue = value
 	}
-	portsValue, err := workflowActivationValue(MustCanonicalValue(program.Scope.Ports))
+	portsValue, err := workflowActivationValue(jsonutil.MustCanonicalValue(program.Scope.Ports))
 	if err != nil {
 		return nil, err
 	}
@@ -3019,21 +3019,21 @@ func (i *WorkflowInterpreter) conditionWithEvent(
 	value WorkflowValue,
 	program WorkflowProgram,
 	state WorkflowState,
-	event CanonicalValue,
+	event jsonutil.CanonicalValue,
 ) (bool, error) {
 	result, err := i.evaluateWithEvent(value, program, state, event)
 	if err != nil {
 		return false, err
 	}
-	return DecodeCanonicalValue[bool](result)
+	return jsonutil.DecodeCanonicalValue[bool](result)
 }
 
 func (i *WorkflowInterpreter) evaluateWithEvent(
 	value WorkflowValue,
 	program WorkflowProgram,
 	state WorkflowState,
-	event CanonicalValue,
-) (CanonicalValue, error) {
+	event jsonutil.CanonicalValue,
+) (jsonutil.CanonicalValue, error) {
 	activation, err := workflowActivation(program, state)
 	if err != nil {
 		return nil, err
@@ -3050,15 +3050,15 @@ func (i *WorkflowInterpreter) evaluateWithEvent(
 
 func applyWorkflowStateUpdate(
 	update StateUpdateWork,
-) (CanonicalValue, error) {
-	values, err := DecodeCanonicalValue[map[string]CanonicalValue](
+) (jsonutil.CanonicalValue, error) {
+	values, err := jsonutil.DecodeCanonicalValue[map[string]jsonutil.CanonicalValue](
 		update.Base,
 	)
 	if err != nil {
 		return nil, err
 	}
 	if values == nil {
-		values = map[string]CanonicalValue{}
+		values = map[string]jsonutil.CanonicalValue{}
 	}
 
 	for _, assignment := range update.Assignments {
@@ -3073,7 +3073,7 @@ func applyWorkflowStateUpdate(
 
 func workflowWorkValue(
 	item WorkItem,
-) (CanonicalValue, error) {
+) (jsonutil.CanonicalValue, error) {
 	if item.Output == nil {
 		return nil, errors.New("Workflow WorkItem has no output")
 	}
@@ -3089,8 +3089,8 @@ func workflowWorkValue(
 	)
 }
 
-func workflowExternalContext(value CanonicalValue) CanonicalValue {
-	context, err := DecodeCanonicalValue[map[string]CanonicalValue](value)
+func workflowExternalContext(value jsonutil.CanonicalValue) jsonutil.CanonicalValue {
+	context, err := jsonutil.DecodeCanonicalValue[map[string]jsonutil.CanonicalValue](value)
 	if err == nil && len(context) == 0 {
 		return nil
 	}
@@ -3099,7 +3099,7 @@ func workflowExternalContext(value CanonicalValue) CanonicalValue {
 
 func workflowSnapshotWithInput(
 	snapshot ProgramSnapshot,
-	input CanonicalValue,
+	input jsonutil.CanonicalValue,
 ) (ProgramSnapshot, error) {
 	program, err := workflowProgramFromSnapshot(snapshot)
 	if err != nil {
@@ -3122,7 +3122,7 @@ func workflowSnapshotWithInput(
 
 func workflowSnapshotWithContext(
 	snapshot ProgramSnapshot,
-	context CanonicalValue,
+	context jsonutil.CanonicalValue,
 ) (ProgramSnapshot, error) {
 	if !context.Valid() {
 		return ProgramSnapshot{}, errors.New(
@@ -3154,17 +3154,17 @@ func workflowSnapshotWithContext(
 
 func canonicalWorkflowValue(
 	value any,
-) (CanonicalValue, error) {
+) (jsonutil.CanonicalValue, error) {
 	raw, err := jsonutil.EncodeToJSONRaw(value)
 	if err != nil {
 		return nil, err
 	}
-	return CanonicalValueFrom(raw)
+	return jsonutil.CanonicalValueFrom(raw)
 }
 
 func validateWorkflowSchema(
-	schema CanonicalValue,
-	value CanonicalValue,
+	schema jsonutil.CanonicalValue,
+	value jsonutil.CanonicalValue,
 ) error {
 	if len(schema) == 0 {
 		return nil

@@ -3,6 +3,8 @@ package sessionv3
 import (
 	"errors"
 	"fmt"
+
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 func (o WorkflowStepOutcome) Validate() error {
@@ -100,7 +102,7 @@ func (i *WorkflowInterpreter) recordTerminalWorkflowStepOutcome(
 	if err != nil {
 		return transition, nil
 	}
-	state, err := DecodeCanonicalValue[WorkflowState](transition.State.Data)
+	state, err := jsonutil.DecodeCanonicalValue[WorkflowState](transition.State.Data)
 	if err != nil {
 		return ProgramTransition{}, err
 	}

@@ -14,6 +14,7 @@ import (
 	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	toolAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool"
 	toolv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/contract/v1"
 )
@@ -96,13 +97,13 @@ func (e *V3Executor) PrepareProviderManagedWorkflowTool(
 		return sessionv3Runtime.ProviderManagedToolChoice{}, ErrProviderManagedWorkflowTool
 	}
 	call.ID = "workflow-provider-choice:" + call.ChoiceID
-	call.Arguments = sessionv3Runtime.MustCanonicalValue(map[string]any{})
+	call.Arguments = jsonutil.MustCanonicalValue(map[string]any{})
 
 	raw, err := json.Marshal(choice.Arguments)
 	if err != nil {
 		return sessionv3Runtime.ProviderManagedToolChoice{}, err
 	}
-	schema, err := sessionv3Runtime.CanonicalValueFrom(raw)
+	schema, err := jsonutil.CanonicalValueFrom(raw)
 	if err != nil {
 		return sessionv3Runtime.ProviderManagedToolChoice{}, err
 	}
@@ -306,7 +307,7 @@ func (e *V3Executor) ExecuteGo(
 
 	arguments := payload.Call.Arguments.Clone()
 	if len(arguments) == 0 {
-		arguments = sessionv3Runtime.MustCanonicalValue(map[string]any{})
+		arguments = jsonutil.MustCanonicalValue(map[string]any{})
 	}
 	if !arguments.Valid() {
 		return sessionv3Runtime.WorkExecutionResult{
@@ -332,7 +333,7 @@ func (e *V3Executor) ExecuteGo(
 			},
 		}, nil
 	}
-	structured, conversionErr := sessionv3Runtime.CanonicalValueFrom(
+	structured, conversionErr := jsonutil.CanonicalValueFrom(
 		adapted.Structured,
 	)
 	if conversionErr != nil {
@@ -394,12 +395,12 @@ func (e *V3Executor) ExecuteGo(
 // structured representation from one Tool Runtime response.
 func V3ToolOutputs(
 	outputs []llmtoolsSpec.ToolOutputUnion,
-) (t string, s sessionv3Runtime.CanonicalValue, err error) {
+) (t string, s jsonutil.CanonicalValue, err error) {
 	adapted, err := AdaptToolOutputs(outputs)
 	if err != nil {
 		return "", nil, err
 	}
-	value, err := sessionv3Runtime.CanonicalValueFrom(adapted.Structured)
+	value, err := jsonutil.CanonicalValueFrom(adapted.Structured)
 	if err != nil {
 		return "", nil, err
 	}

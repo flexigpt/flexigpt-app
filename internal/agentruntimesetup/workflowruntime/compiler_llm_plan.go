@@ -4,6 +4,7 @@ import (
 	"sort"
 
 	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	workflowv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workflow/contract/v1"
 )
 
@@ -13,7 +14,7 @@ func compileWorkflowValueObject(
 	if len(values) == 0 {
 		return sessionv3Runtime.WorkflowValue{
 			Kind:    sessionv3Runtime.WorkflowValueLiteral,
-			Literal: sessionv3Runtime.MustCanonicalValue(struct{}{}),
+			Literal: jsonutil.MustCanonicalValue(struct{}{}),
 		}, nil
 	}
 

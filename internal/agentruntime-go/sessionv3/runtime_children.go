@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 type readyExecutionWork struct {
@@ -450,15 +452,15 @@ func (r *Runtime) settleTerminalExecutionLocked(
 
 func completionExecutionResult(
 	execution Execution,
-) (CanonicalValue, *SanitizedError, bool) {
-	var output CanonicalValue
+) (jsonutil.CanonicalValue, *SanitizedError, bool) {
+	var output jsonutil.CanonicalValue
 	for _, frame := range execution.ProgramFrames {
 		if frame.ParentFrameID == "" && len(frame.Output) != 0 {
 			output = frame.Output.Clone()
 			break
 		}
 	}
-	value := MustCanonicalValue(completionWaitOutput{
+	value := jsonutil.MustCanonicalValue(completionWaitOutput{
 		ExecutionID: execution.ID,
 		Output:      output,
 	})

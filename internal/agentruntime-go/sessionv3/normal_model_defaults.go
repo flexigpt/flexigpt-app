@@ -1,6 +1,10 @@
 package sessionv3
 
-import "slices"
+import (
+	"slices"
+
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
+)
 
 func (s WorkspaceSelectionOverrides) Empty() bool {
 	return len(s.Context) == 0 &&
@@ -42,10 +46,10 @@ type ModelCacheControlOverride struct {
 }
 
 type ModelOutputJSONSchemaOverride struct {
-	Name        *string        `json:"name,omitempty"`
-	Description *string        `json:"description,omitempty"`
-	Schema      CanonicalValue `json:"schema,omitempty"`
-	Strict      *bool          `json:"strict,omitempty"`
+	Name        *string                 `json:"name,omitempty"`
+	Description *string                 `json:"description,omitempty"`
+	Schema      jsonutil.CanonicalValue `json:"schema,omitempty"`
+	Strict      *bool                   `json:"strict,omitempty"`
 }
 
 type ModelOutputFormatOverride struct {
@@ -62,18 +66,18 @@ type ModelOutputOverride struct {
 // request/defaults surface. Setup translates it once through the existing
 // modelruntime RuntimeRequestPatch boundary.
 type ModelDefaultsOverride struct {
-	Stream            *bool                      `json:"stream,omitempty"`
-	MaxPromptTokens   *int                       `json:"maxPromptTokens,omitempty"`
-	MaxOutputTokens   *int                       `json:"maxOutputTokens,omitempty"`
-	Temperature       *float64                   `json:"temperature,omitempty"`
-	SystemPrompt      *string                    `json:"systemPrompt,omitempty"`
-	TimeoutMS         *int                       `json:"timeoutMS,omitempty"`
-	Reasoning         *ModelReasoningOverride    `json:"reasoning,omitempty"`
-	CacheControl      *ModelCacheControlOverride `json:"cacheControl,omitempty"`
-	Output            *ModelOutputOverride       `json:"output,omitempty"`
-	StopSequences     *[]string                  `json:"stopSequences,omitempty"`
-	AdapterParameters map[string]CanonicalValue  `json:"adapterParameters,omitempty"`
-	Clear             []ModelDefaultField        `json:"clear,omitempty"`
+	Stream            *bool                              `json:"stream,omitempty"`
+	MaxPromptTokens   *int                               `json:"maxPromptTokens,omitempty"`
+	MaxOutputTokens   *int                               `json:"maxOutputTokens,omitempty"`
+	Temperature       *float64                           `json:"temperature,omitempty"`
+	SystemPrompt      *string                            `json:"systemPrompt,omitempty"`
+	TimeoutMS         *int                               `json:"timeoutMS,omitempty"`
+	Reasoning         *ModelReasoningOverride            `json:"reasoning,omitempty"`
+	CacheControl      *ModelCacheControlOverride         `json:"cacheControl,omitempty"`
+	Output            *ModelOutputOverride               `json:"output,omitempty"`
+	StopSequences     *[]string                          `json:"stopSequences,omitempty"`
+	AdapterParameters map[string]jsonutil.CanonicalValue `json:"adapterParameters,omitempty"`
+	Clear             []ModelDefaultField                `json:"clear,omitempty"`
 }
 
 func MergeModelDefaultsOverride(

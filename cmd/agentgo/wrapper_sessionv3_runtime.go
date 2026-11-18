@@ -6,6 +6,7 @@ import (
 
 	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/workflowruntime"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/sessionstorev3"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
@@ -28,7 +29,7 @@ type WorkflowStartCommand struct {
 	SessionID   sessionv3Runtime.SessionID         `json:"sessionID"`
 	ExecutionID sessionv3Runtime.ExecutionID       `json:"executionID,omitempty"`
 	Workflow    sessionv3Runtime.ArtifactSelection `json:"workflow"`
-	Input       sessionv3Runtime.CanonicalValue    `json:"input"`
+	Input       jsonutil.CanonicalValue            `json:"input"`
 }
 
 type WorkflowTriggerRegistrationCommand struct {

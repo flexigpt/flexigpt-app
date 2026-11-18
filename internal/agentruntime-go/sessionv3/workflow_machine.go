@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 const maximumWorkflowMachineMicrosteps = 1024
@@ -55,19 +57,19 @@ type WorkflowMachineWait struct {
 }
 
 type WorkflowMachineProgress struct {
-	Current            string                `json:"current"`
-	State              CanonicalValue        `json:"state"`
-	LocalState         bool                  `json:"localState"`
-	Phase              WorkflowMachinePhase  `json:"phase"`
-	SelectedTransition int                   `json:"selectedTransition"`
-	Generation         uint64                `json:"generation"`
-	EnteredAt          time.Time             `json:"enteredAt"`
-	Event              CanonicalValue        `json:"event,omitempty"`
-	ChildPath          string                `json:"childPath,omitempty"`
-	ChildMergesState   bool                  `json:"childMergesState,omitempty"`
-	Waits              []WorkflowMachineWait `json:"waits,omitempty"`
-	Subscriptions      []string              `json:"subscriptions,omitempty"`
-	Microsteps         int                   `json:"microsteps"`
+	Current            string                  `json:"current"`
+	State              jsonutil.CanonicalValue `json:"state"`
+	LocalState         bool                    `json:"localState"`
+	Phase              WorkflowMachinePhase    `json:"phase"`
+	SelectedTransition int                     `json:"selectedTransition"`
+	Generation         uint64                  `json:"generation"`
+	EnteredAt          time.Time               `json:"enteredAt"`
+	Event              jsonutil.CanonicalValue `json:"event,omitempty"`
+	ChildPath          string                  `json:"childPath,omitempty"`
+	ChildMergesState   bool                    `json:"childMergesState,omitempty"`
+	Waits              []WorkflowMachineWait   `json:"waits,omitempty"`
+	Subscriptions      []string                `json:"subscriptions,omitempty"`
+	Microsteps         int                     `json:"microsteps"`
 }
 
 func (m WorkflowMachine) Validate() error {
@@ -396,7 +398,7 @@ func (i *WorkflowInterpreter) machineSubscriptions(
 	program WorkflowProgram,
 	state WorkflowState,
 	declarations []WorkflowSubscription,
-	machineState CanonicalValue,
+	machineState jsonutil.CanonicalValue,
 ) ([]WorkflowSubscriptionState, error) {
 	if len(declarations) == 0 {
 		return nil, nil
@@ -440,7 +442,7 @@ func (i *WorkflowInterpreter) machineSubscriptions(
 			return nil, err
 		}
 
-		correlation := CanonicalValue(nil)
+		correlation := jsonutil.CanonicalValue(nil)
 		if declaration.Correlation != nil {
 			value, err := i.evaluate(
 				*declaration.Correlation,
@@ -991,7 +993,7 @@ func (i *WorkflowInterpreter) machineTransitionMatches(
 	program WorkflowProgram,
 	state WorkflowState,
 	progress WorkflowMachineProgress,
-	event CanonicalValue,
+	event jsonutil.CanonicalValue,
 ) (bool, error) {
 	if transition.When == nil {
 		return true, nil
@@ -1009,7 +1011,7 @@ func (i *WorkflowInterpreter) machineTransitionMatches(
 func selectMachineTransition(
 	state *WorkflowState,
 	index int,
-	event CanonicalValue,
+	event jsonutil.CanonicalValue,
 ) error {
 	if state == nil || state.Pending == nil ||
 		state.Pending.Machine == nil {

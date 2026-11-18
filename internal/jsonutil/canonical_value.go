@@ -57,6 +57,10 @@ func (v CanonicalValue) Valid() bool {
 	return err == nil && bytes.Equal(v, canonical)
 }
 
+func (v CanonicalValue) IsZero() bool {
+	return len(v) == 0
+}
+
 func (v CanonicalValue) MarshalJSON() ([]byte, error) {
 	if len(v) == 0 {
 		return []byte("null"), nil

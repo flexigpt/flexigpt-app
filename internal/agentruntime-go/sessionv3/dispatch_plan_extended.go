@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 type TextDispatchInsert string
@@ -38,23 +40,23 @@ type MCPPromptDispatchPlan struct {
 }
 
 type ServiceDispatchPlan struct {
-	ID             string         `json:"id"`
-	BindingVersion string         `json:"bindingVersion"`
-	Input          CanonicalValue `json:"input"`
-	Context        CanonicalValue `json:"context,omitempty"`
-	Ports          []PortPlan     `json:"ports,omitempty"`
-	PortInputs     []PortInput    `json:"portInputs,omitempty"`
-	Effect         EffectContract `json:"effect"`
+	ID             string                  `json:"id"`
+	BindingVersion string                  `json:"bindingVersion"`
+	Input          jsonutil.CanonicalValue `json:"input"`
+	Context        jsonutil.CanonicalValue `json:"context,omitempty"`
+	Ports          []PortPlan              `json:"ports,omitempty"`
+	PortInputs     []PortInput             `json:"portInputs,omitempty"`
+	Effect         EffectContract          `json:"effect"`
 }
 
 type ActivityDispatchPlan struct {
-	ID             string         `json:"id"`
-	BindingVersion string         `json:"bindingVersion"`
-	Input          CanonicalValue `json:"input"`
-	Context        CanonicalValue `json:"context,omitempty"`
-	Ports          []PortPlan     `json:"ports,omitempty"`
-	PortInputs     []PortInput    `json:"portInputs,omitempty"`
-	Effect         EffectContract `json:"effect"`
+	ID             string                  `json:"id"`
+	BindingVersion string                  `json:"bindingVersion"`
+	Input          jsonutil.CanonicalValue `json:"input"`
+	Context        jsonutil.CanonicalValue `json:"context,omitempty"`
+	Ports          []PortPlan              `json:"ports,omitempty"`
+	PortInputs     []PortInput             `json:"portInputs,omitempty"`
+	Effect         EffectContract          `json:"effect"`
 }
 
 func (p AgentDispatchPlan) Validate() error {
@@ -135,8 +137,8 @@ func validateExternalDispatchPlan(
 	label string,
 	id string,
 	version string,
-	input CanonicalValue,
-	contextValue CanonicalValue,
+	input jsonutil.CanonicalValue,
+	contextValue jsonutil.CanonicalValue,
 	ports []PortPlan,
 	portInputs []PortInput,
 	effect EffectContract,

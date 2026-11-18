@@ -6,22 +6,24 @@ import (
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 type WorkflowEventContract struct {
-	Name              string         `json:"name"`
-	Source            string         `json:"source"`
-	Schema            CanonicalValue `json:"schema"`
-	CorrelationSchema CanonicalValue `json:"correlationSchema,omitempty"`
+	Name              string                  `json:"name"`
+	Source            string                  `json:"source"`
+	Schema            jsonutil.CanonicalValue `json:"schema"`
+	CorrelationSchema jsonutil.CanonicalValue `json:"correlationSchema,omitempty"`
 }
 
 type WorkflowChannel struct {
-	Name        string         `json:"name"`
-	Schema      CanonicalValue `json:"schema"`
-	MaxMessages int            `json:"maxMessages,omitempty"`
-	MaxBytes    int            `json:"maxBytes,omitempty"`
-	Readers     []string       `json:"readers,omitempty"`
-	Writers     []string       `json:"writers,omitempty"`
+	Name        string                  `json:"name"`
+	Schema      jsonutil.CanonicalValue `json:"schema"`
+	MaxMessages int                     `json:"maxMessages,omitempty"`
+	MaxBytes    int                     `json:"maxBytes,omitempty"`
+	Readers     []string                `json:"readers,omitempty"`
+	Writers     []string                `json:"writers,omitempty"`
 }
 
 type WorkflowSubscription struct {
@@ -38,9 +40,9 @@ type WorkflowSubscriptionState struct {
 	Name              string                      `json:"name"`
 	Event             string                      `json:"event"`
 	Source            string                      `json:"source"`
-	Correlation       CanonicalValue              `json:"correlation,omitempty"`
-	CorrelationSchema CanonicalValue              `json:"correlationSchema,omitempty"`
-	DataSchema        CanonicalValue              `json:"dataSchema,omitempty"`
+	Correlation       jsonutil.CanonicalValue     `json:"correlation,omitempty"`
+	CorrelationSchema jsonutil.CanonicalValue     `json:"correlationSchema,omitempty"`
+	DataSchema        jsonutil.CanonicalValue     `json:"dataSchema,omitempty"`
 	Filter            *WorkflowWaitFilter         `json:"filter,omitempty"`
 	Retention         WorkflowDuration            `json:"retention,omitempty"`
 	Capacity          int                         `json:"capacity"`
@@ -61,11 +63,11 @@ type WorkflowSubscriptionEvent struct {
 }
 
 type WorkflowWaitFilter struct {
-	Filters  []WorkflowValue       `json:"filters"`
-	Input    CanonicalValue        `json:"input"`
-	State    CanonicalValue        `json:"state"`
-	Messages CanonicalValue        `json:"messages,omitempty"`
-	Steps    []WorkflowStepOutcome `json:"steps"`
+	Filters  []WorkflowValue         `json:"filters"`
+	Input    jsonutil.CanonicalValue `json:"input"`
+	State    jsonutil.CanonicalValue `json:"state"`
+	Messages jsonutil.CanonicalValue `json:"messages,omitempty"`
+	Steps    []WorkflowStepOutcome   `json:"steps"`
 }
 
 type WorkflowEventWait struct {
@@ -86,10 +88,10 @@ type WorkflowCompletionWait struct {
 }
 
 type WorkflowHumanWait struct {
-	Users          *WorkflowValue `json:"users,omitempty"`
-	Roles          *WorkflowValue `json:"roles,omitempty"`
-	Request        WorkflowValue  `json:"request"`
-	ResponseSchema CanonicalValue `json:"responseSchema"`
+	Users          *WorkflowValue          `json:"users,omitempty"`
+	Roles          *WorkflowValue          `json:"roles,omitempty"`
+	Request        WorkflowValue           `json:"request"`
+	ResponseSchema jsonutil.CanonicalValue `json:"responseSchema"`
 }
 
 type WorkflowEmit struct {
@@ -329,7 +331,7 @@ func (f WorkflowWaitFilter) Validate() error {
 	return nil
 }
 
-func (f WorkflowWaitFilter) Matches(event CanonicalValue) (bool, error) {
+func (f WorkflowWaitFilter) Matches(event jsonutil.CanonicalValue) (bool, error) {
 	if err := f.Validate(); err != nil {
 		return false, err
 	}
@@ -365,7 +367,7 @@ func (f WorkflowWaitFilter) Matches(event CanonicalValue) (bool, error) {
 		if err != nil {
 			return false, err
 		}
-		matched, err := DecodeCanonicalValue[bool](value)
+		matched, err := jsonutil.DecodeCanonicalValue[bool](value)
 		if err != nil {
 			return false, err
 		}
@@ -379,7 +381,7 @@ func (f WorkflowWaitFilter) Matches(event CanonicalValue) (bool, error) {
 func (i *WorkflowInterpreter) evaluateWithActivation(
 	value WorkflowValue,
 	activation map[string]any,
-) (CanonicalValue, error) {
+) (jsonutil.CanonicalValue, error) {
 	switch value.Kind {
 	case WorkflowValueLiteral:
 		return value.Literal.Clone(), nil
@@ -403,7 +405,7 @@ func (i *WorkflowInterpreter) evaluateWithActivation(
 		return canonicalWorkflowCELValue(result)
 
 	case WorkflowValueObject:
-		output := make(map[string]CanonicalValue, len(value.Object))
+		output := make(map[string]jsonutil.CanonicalValue, len(value.Object))
 		for _, field := range value.Object {
 			child, err := i.evaluateWithActivation(field.Value, activation)
 			if err != nil {
@@ -414,7 +416,7 @@ func (i *WorkflowInterpreter) evaluateWithActivation(
 		return canonicalWorkflowValue(output)
 
 	case WorkflowValueArray:
-		output := make([]CanonicalValue, len(value.Array))
+		output := make([]jsonutil.CanonicalValue, len(value.Array))
 		for index := range value.Array {
 			child, err := i.evaluateWithActivation(value.Array[index], activation)
 			if err != nil {
@@ -533,7 +535,7 @@ func (i *WorkflowInterpreter) activateWorkflowSubscriptions(
 			return err
 		}
 
-		correlation := CanonicalValue(nil)
+		correlation := jsonutil.CanonicalValue(nil)
 		if declaration.Correlation != nil {
 			value, err := i.evaluate(*declaration.Correlation, program, *state)
 			if err != nil {
@@ -643,7 +645,7 @@ func (i *WorkflowInterpreter) wait(
 			if err != nil {
 				return workflowFailure(state, "workflow_wait_invalid", err.Error())
 			}
-			cursor, err = DecodeCanonicalValue[uint64](value)
+			cursor, err = jsonutil.DecodeCanonicalValue[uint64](value)
 			if err != nil {
 				return workflowFailure(
 					state,
@@ -676,7 +678,7 @@ func (i *WorkflowInterpreter) wait(
 		if err != nil {
 			return workflowFailure(state, "workflow_wait_invalid", err.Error())
 		}
-		handle, err := DecodeCanonicalValue[CompletionHandle](value)
+		handle, err := jsonutil.DecodeCanonicalValue[CompletionHandle](value)
 		if err != nil {
 			return workflowFailure(state, "workflow_wait_invalid", "workflow completion handle is invalid")
 		}
@@ -711,9 +713,9 @@ func (i *WorkflowInterpreter) wait(
 		if err != nil {
 			return workflowFailure(state, "workflow_wait_invalid", err.Error())
 		}
-		summary := MustCanonicalValue(struct {
-			Assignees WaitAssignees  `json:"assignees"`
-			Request   CanonicalValue `json:"request"`
+		summary := jsonutil.MustCanonicalValue(struct {
+			Assignees WaitAssignees           `json:"assignees"`
+			Request   jsonutil.CanonicalValue `json:"request"`
 		}{
 			Assignees: assignees,
 			Request:   request,
@@ -748,7 +750,7 @@ func (i *WorkflowInterpreter) emit(
 	if err != nil {
 		return workflowFailure(state, "workflow_emit_invalid", err.Error())
 	}
-	correlation := MustCanonicalValue(nil)
+	correlation := jsonutil.MustCanonicalValue(nil)
 	if spec.Correlation != nil {
 		correlation, err = i.evaluate(*spec.Correlation, program, state)
 		if err != nil {
@@ -820,7 +822,7 @@ func (i *WorkflowInterpreter) workflowStringValues(
 	if err != nil {
 		return nil, err
 	}
-	values, err := DecodeCanonicalValue[[]string](resolved)
+	values, err := jsonutil.DecodeCanonicalValue[[]string](resolved)
 	if err != nil {
 		return nil, errors.New("workflow human assignees must be string arrays")
 	}

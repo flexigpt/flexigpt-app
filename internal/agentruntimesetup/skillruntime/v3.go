@@ -18,6 +18,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/toolruntime"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 const (
@@ -247,7 +248,7 @@ func (e *V3Executor) Execute(
 
 	arguments := payload.Call.Arguments.Clone()
 	if len(arguments) == 0 {
-		arguments = sessionv3Runtime.MustCanonicalValue(map[string]any{})
+		arguments = jsonutil.MustCanonicalValue(map[string]any{})
 	}
 	if !arguments.Valid() {
 		return sessionv3Runtime.WorkExecutionResult{
@@ -289,7 +290,7 @@ func (e *V3Executor) Execute(
 	if err != nil {
 		return sessionv3Runtime.WorkExecutionResult{}, true, err
 	}
-	structured, err := sessionv3Runtime.CanonicalValueFrom(
+	structured, err := jsonutil.CanonicalValueFrom(
 		adapted.Structured,
 	)
 	if err != nil {

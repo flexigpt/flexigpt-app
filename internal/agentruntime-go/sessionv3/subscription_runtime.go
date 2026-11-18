@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"slices"
 	"time"
+
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 func (r *Runtime) acceptSignalForSubscriptionsLocked(
@@ -115,7 +117,7 @@ func workflowSubscriptionMatchesSignal(
 		return true, nil
 	}
 
-	event := MustCanonicalValue(eventWaitOutput{
+	event := jsonutil.MustCanonicalValue(eventWaitOutput{
 		ID:          signal.ID,
 		Name:        signal.Name,
 		Source:      signal.Source,

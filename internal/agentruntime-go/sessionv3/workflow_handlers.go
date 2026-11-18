@@ -6,14 +6,16 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 type WorkflowErrorMatch struct {
-	Categories   []ErrorCategory `json:"categories,omitempty"`
-	Codes        []string        `json:"codes,omitempty"`
-	Retryable    *bool           `json:"retryable,omitempty"`
-	EffectStates []EffectState   `json:"effectStates,omitempty"`
-	Schema       CanonicalValue  `json:"schema,omitempty"`
+	Categories   []ErrorCategory         `json:"categories,omitempty"`
+	Codes        []string                `json:"codes,omitempty"`
+	Retryable    *bool                   `json:"retryable,omitempty"`
+	EffectStates []EffectState           `json:"effectStates,omitempty"`
+	Schema       jsonutil.CanonicalValue `json:"schema,omitempty"`
 }
 
 type WorkflowCatchHandler struct {
@@ -32,21 +34,21 @@ const (
 // is being completed through catch and finally behavior. It contains no
 // handler closure, timer, client, or compiled expression.
 type WorkflowTerminalState struct {
-	Status     ProgramFrameState     `json:"status"`
-	Exit       WorkflowExitKind      `json:"exit,omitempty"`
-	Value      CanonicalValue        `json:"value,omitempty"`
-	Error      *SanitizedError       `json:"error,omitempty"`
-	Phase      WorkflowTerminalPhase `json:"phase,omitempty"`
-	Handler    int                   `json:"handler,omitempty"`
-	ChildPath  string                `json:"childPath,omitempty"`
-	MergeState bool                  `json:"mergeState,omitempty"`
+	Status     ProgramFrameState       `json:"status"`
+	Exit       WorkflowExitKind        `json:"exit,omitempty"`
+	Value      jsonutil.CanonicalValue `json:"value,omitempty"`
+	Error      *SanitizedError         `json:"error,omitempty"`
+	Phase      WorkflowTerminalPhase   `json:"phase,omitempty"`
+	Handler    int                     `json:"handler,omitempty"`
+	ChildPath  string                  `json:"childPath,omitempty"`
+	MergeState bool                    `json:"mergeState,omitempty"`
 }
 
 type WorkflowOutcomeContext struct {
-	Status ProgramFrameState `json:"status"`
-	Exit   WorkflowExitKind  `json:"exit,omitempty"`
-	Value  CanonicalValue    `json:"value,omitempty"`
-	Error  *SanitizedError   `json:"error,omitempty"`
+	Status ProgramFrameState       `json:"status"`
+	Exit   WorkflowExitKind        `json:"exit,omitempty"`
+	Value  jsonutil.CanonicalValue `json:"value,omitempty"`
+	Error  *SanitizedError         `json:"error,omitempty"`
 }
 
 func (m WorkflowErrorMatch) Validate() error {
@@ -234,8 +236,8 @@ func workflowTerminalFailure(
 
 func workflowTerminalOutcomeValue(
 	value WorkflowTerminalState,
-) CanonicalValue {
-	return MustCanonicalValue(WorkflowOutcomeContext{
+) jsonutil.CanonicalValue {
+	return jsonutil.MustCanonicalValue(WorkflowOutcomeContext{
 		Status: value.Status,
 		Exit:   value.Exit,
 		Value:  value.Value.Clone(),
@@ -253,7 +255,7 @@ func (i *WorkflowInterpreter) prepareWorkflowTerminal(
 		return transition, nil
 	}
 
-	state, err := DecodeCanonicalValue[WorkflowState](
+	state, err := jsonutil.DecodeCanonicalValue[WorkflowState](
 		transition.State.Data,
 	)
 	if err != nil {
@@ -615,7 +617,7 @@ func (i *WorkflowInterpreter) finishWorkflowTerminal(
 			return workflowTransition(
 				state,
 				&status,
-				MustCanonicalValue(result),
+				jsonutil.MustCanonicalValue(result),
 				nil,
 			)
 		}

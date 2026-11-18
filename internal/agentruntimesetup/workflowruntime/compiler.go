@@ -39,7 +39,7 @@ func (*UnsupportedOperationError) Unwrap() error {
 func compileWorkflowProgram(
 	document workflowv1.WorkflowDocument,
 	inventory workflowAPI.Inventory,
-	input sessionv3Runtime.CanonicalValue,
+	input jsonutil.CanonicalValue,
 ) (sessionv3Runtime.WorkflowProgram, error) {
 	return compileWorkflowProgramWithInput(
 		document,
@@ -64,7 +64,7 @@ func compileWorkflowProgramTemplate(
 func compileWorkflowProgramWithInput(
 	document workflowv1.WorkflowDocument,
 	inventory workflowAPI.Inventory,
-	input sessionv3Runtime.CanonicalValue,
+	input jsonutil.CanonicalValue,
 	inputBound bool,
 ) (sessionv3Runtime.WorkflowProgram, error) {
 	resources, err := compileWorkflowResources(document)
@@ -698,7 +698,7 @@ func compileWorkflowStepEffect(
 func compileWorkflowSchema(
 	document workflowv1.WorkflowDocument,
 	schema workflowv1.Schema,
-) (sessionv3Runtime.CanonicalValue, error) {
+) (jsonutil.CanonicalValue, error) {
 	if len(schema) == 0 {
 		return nil, nil
 	}
@@ -707,7 +707,7 @@ func compileWorkflowSchema(
 	if err != nil {
 		return nil, err
 	}
-	return sessionv3Runtime.CanonicalValueFrom(raw)
+	return jsonutil.CanonicalValueFrom(raw)
 }
 
 func compileWorkflowValue(
@@ -716,7 +716,7 @@ func compileWorkflowValue(
 	if len(bytes.TrimSpace(input)) == 0 {
 		return sessionv3Runtime.WorkflowValue{
 			Kind:    sessionv3Runtime.WorkflowValueLiteral,
-			Literal: sessionv3Runtime.MustCanonicalValue(nil),
+			Literal: jsonutil.MustCanonicalValue(nil),
 		}, nil
 	}
 
@@ -763,7 +763,7 @@ func compileWorkflowValueNode(
 			if err != nil {
 				return sessionv3Runtime.WorkflowValue{}, err
 			}
-			value, err := sessionv3Runtime.CanonicalValueFrom(raw)
+			value, err := jsonutil.CanonicalValueFrom(raw)
 			if err != nil {
 				return sessionv3Runtime.WorkflowValue{}, err
 			}
@@ -821,7 +821,7 @@ func compileWorkflowValueNode(
 		if err != nil {
 			return sessionv3Runtime.WorkflowValue{}, err
 		}
-		literal, err := sessionv3Runtime.CanonicalValueFrom(raw)
+		literal, err := jsonutil.CanonicalValueFrom(raw)
 		if err != nil {
 			return sessionv3Runtime.WorkflowValue{}, err
 		}

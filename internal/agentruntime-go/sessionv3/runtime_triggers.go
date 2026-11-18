@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 const (
@@ -52,19 +54,19 @@ type TriggerRegistration struct {
 }
 
 type TriggerOccurrence struct {
-	ID            TriggerOccurrenceID    `json:"id"`
-	Source        string                 `json:"source"`
-	SourceID      string                 `json:"sourceID"`
-	OccurredAt    time.Time              `json:"occurredAt"`
-	AcceptedAt    time.Time              `json:"acceptedAt"`
-	Data          CanonicalValue         `json:"data,omitempty"`
-	Correlation   CanonicalValue         `json:"correlation,omitempty"`
-	Input         CanonicalValue         `json:"input"`
-	InstanceKey   string                 `json:"instanceKey,omitempty"`
-	State         TriggerOccurrenceState `json:"state"`
-	ExecutionID   ExecutionID            `json:"executionID,omitempty"`
-	QueuePosition int                    `json:"queuePosition,omitempty"`
-	Error         *SanitizedError        `json:"error,omitempty"`
+	ID            TriggerOccurrenceID     `json:"id"`
+	Source        string                  `json:"source"`
+	SourceID      string                  `json:"sourceID"`
+	OccurredAt    time.Time               `json:"occurredAt"`
+	AcceptedAt    time.Time               `json:"acceptedAt"`
+	Data          jsonutil.CanonicalValue `json:"data,omitempty"`
+	Correlation   jsonutil.CanonicalValue `json:"correlation,omitempty"`
+	Input         jsonutil.CanonicalValue `json:"input"`
+	InstanceKey   string                  `json:"instanceKey,omitempty"`
+	State         TriggerOccurrenceState  `json:"state"`
+	ExecutionID   ExecutionID             `json:"executionID,omitempty"`
+	QueuePosition int                     `json:"queuePosition,omitempty"`
+	Error         *SanitizedError         `json:"error,omitempty"`
 }
 
 // TriggerExecution links an Execution to the trigger occurrence that started
@@ -514,9 +516,9 @@ func (r *Runtime) fireScheduledTriggerLocked(
 		SourceID:    at.UTC().Format(time.RFC3339Nano),
 		OccurredAt:  at.UTC(),
 		AcceptedAt:  r.now(),
-		Data:        MustCanonicalValue(nil),
-		Correlation: MustCanonicalValue(nil),
-		Input:       MustCanonicalValue(nil),
+		Data:        jsonutil.MustCanonicalValue(nil),
+		Correlation: jsonutil.MustCanonicalValue(nil),
+		Input:       jsonutil.MustCanonicalValue(nil),
 		State:       triggerOccurrenceStateAccepted,
 	}
 	if evaluateErr != nil {
@@ -634,7 +636,7 @@ func appendFailedEventTriggerOccurrence(
 		AcceptedAt:  now,
 		Data:        event.Data.Clone(),
 		Correlation: event.Correlation.Clone(),
-		Input:       MustCanonicalValue(nil),
+		Input:       jsonutil.MustCanonicalValue(nil),
 		State:       triggerOccurrenceStateFailed,
 		Error: &SanitizedError{
 			Code:     code,
@@ -1092,7 +1094,7 @@ func (r *Runtime) startTriggerExecutionLocked(
 		Workflow: &WorkflowActivity{
 			Phase:   "triggered",
 			Summary: "workflow trigger occurrence accepted",
-			Output: MustCanonicalValue(struct {
+			Output: jsonutil.MustCanonicalValue(struct {
 				TriggerID    TriggerID           `json:"triggerID"`
 				OccurrenceID TriggerOccurrenceID `json:"occurrenceID"`
 			}{
@@ -1165,11 +1167,11 @@ func (r *Runtime) signalTriggerExecutionLocked(
 			Workflow: &WorkflowActivity{
 				Phase:   "trigger-signal",
 				Summary: event.Name,
-				Output: MustCanonicalValue(struct {
-					Source      string         `json:"source"`
-					ID          string         `json:"id"`
-					Data        CanonicalValue `json:"data"`
-					Correlation CanonicalValue `json:"correlation,omitempty"`
+				Output: jsonutil.MustCanonicalValue(struct {
+					Source      string                  `json:"source"`
+					ID          string                  `json:"id"`
+					Data        jsonutil.CanonicalValue `json:"data"`
+					Correlation jsonutil.CanonicalValue `json:"correlation,omitempty"`
 				}{
 					Source:      event.Source,
 					ID:          event.ID,
@@ -1306,9 +1308,9 @@ func (r *Runtime) recoverSessionTriggersLocked(
 					SourceID:    at.Format(time.RFC3339Nano),
 					OccurredAt:  at,
 					AcceptedAt:  now,
-					Data:        MustCanonicalValue(nil),
-					Correlation: MustCanonicalValue(nil),
-					Input:       MustCanonicalValue(nil),
+					Data:        jsonutil.MustCanonicalValue(nil),
+					Correlation: jsonutil.MustCanonicalValue(nil),
+					Input:       jsonutil.MustCanonicalValue(nil),
 					State:       triggerOccurrenceStateSkipped,
 				}
 				if mutableTriggerOccurrence(registration, occurrence.ID) == nil {

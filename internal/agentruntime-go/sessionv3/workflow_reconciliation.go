@@ -4,6 +4,8 @@ import (
 	"errors"
 	"slices"
 	"strings"
+
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 type WorkflowReconciliationPhase string
@@ -25,10 +27,10 @@ type WorkflowReconciliationProgress struct {
 }
 
 type WorkflowReconciliationResult struct {
-	Decision ReconciliationDecision `json:"decision"`
-	Output   CanonicalValue         `json:"output,omitempty"`
-	Receipt  *ExternalReceipt       `json:"receipt,omitempty"`
-	Error    *SanitizedError        `json:"error,omitempty"`
+	Decision ReconciliationDecision  `json:"decision"`
+	Output   jsonutil.CanonicalValue `json:"output,omitempty"`
+	Receipt  *ExternalReceipt        `json:"receipt,omitempty"`
+	Error    *SanitizedError         `json:"error,omitempty"`
 }
 
 type WorkflowReconciliationReview struct {
@@ -232,7 +234,7 @@ func (i *WorkflowInterpreter) settleReconciliationIntent(
 		)
 	}
 
-	operationValue := MustCanonicalValue(
+	operationValue := jsonutil.MustCanonicalValue(
 		pending.Reconciliation.Operation,
 	)
 	childScope := WorkflowScopeContext{
@@ -328,7 +330,7 @@ func (i *WorkflowInterpreter) settleReconciliationChild(
 		)
 	}
 
-	reconciled, err := DecodeCanonicalValue[WorkflowReconciliationResult](result.Value)
+	reconciled, err := jsonutil.DecodeCanonicalValue[WorkflowReconciliationResult](result.Value)
 	if err != nil {
 		return i.beginReconciliationReview(
 			frame,
@@ -556,7 +558,7 @@ func (i *WorkflowInterpreter) driveReconciliation(
 				":reconciliation-review",
 		)
 		progress.ReviewWorkItemID = reviewID
-		summary := MustCanonicalValue(WorkflowReconciliationReview{
+		summary := jsonutil.MustCanonicalValue(WorkflowReconciliationReview{
 			OriginalWorkItemID: progress.OriginalWorkItemID,
 			Message:            "reconciliation requires recovery review",
 			Error:              cloneReconciliationError(progress.ReviewError),
@@ -640,7 +642,7 @@ func workflowOperationFacts(
 	return facts, nil
 }
 
-func reconciliationInput(item WorkItem) (CanonicalValue, error) {
+func reconciliationInput(item WorkItem) (jsonutil.CanonicalValue, error) {
 	switch item.Type {
 	case WorkItemTypeTool:
 		if item.Input.Tool == nil {

@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 const deterministicCompensationIntentSystem = "session-v3-compensation-intent"
@@ -83,7 +85,7 @@ func (DeterministicExecutor) Execute(
 	}
 
 	item := request.WorkItem
-	var value CanonicalValue
+	var value jsonutil.CanonicalValue
 
 	switch item.Type {
 	case WorkItemTypeFork:
@@ -98,7 +100,7 @@ func (DeterministicExecutor) Execute(
 				"deterministic compensation WorkItem has no payload",
 			)
 		}
-		value := MustCanonicalValue(deterministicCompensationIntentOutput{
+		value := jsonutil.MustCanonicalValue(deterministicCompensationIntentOutput{
 			EffectID:           item.Input.Compensation.EffectID,
 			OriginalWorkItemID: item.Input.Compensation.OriginalWorkItemID,
 		})
@@ -188,7 +190,7 @@ func (DeterministicExecutor) Execute(
 		if err := output.Validate(); err != nil {
 			return WorkExecutionResult{}, true, err
 		}
-		value = MustCanonicalValue(output)
+		value = jsonutil.MustCanonicalValue(output)
 		return WorkExecutionResult{
 			Output: &WorkItemOutput{
 				Value:          value,
@@ -224,10 +226,10 @@ type forkWorkOutput struct {
 }
 
 type joinWorkFrame struct {
-	ID     ProgramFrameID    `json:"id"`
-	Status ProgramFrameState `json:"status"`
-	Output CanonicalValue    `json:"output,omitempty"`
-	Error  *SanitizedError   `json:"error,omitempty"`
+	ID     ProgramFrameID          `json:"id"`
+	Status ProgramFrameState       `json:"status"`
+	Output jsonutil.CanonicalValue `json:"output,omitempty"`
+	Error  *SanitizedError         `json:"error,omitempty"`
 }
 
 type joinWorkOutput struct {
@@ -248,7 +250,7 @@ func deterministicForkResult(
 			"deterministic fork WorkItem has no child frames",
 		)
 	}
-	value := MustCanonicalValue(forkWorkOutput{
+	value := jsonutil.MustCanonicalValue(forkWorkOutput{
 		ChildFrames: append(
 			[]ProgramFrameID(nil),
 			item.Input.Fork.ChildFrames...,
@@ -279,7 +281,7 @@ func deterministicReconciliationResult(
 		return WorkExecutionResult{}, true, err
 	}
 
-	value := MustCanonicalValue(struct {
+	value := jsonutil.MustCanonicalValue(struct {
 		OriginalWorkItemID WorkItemID `json:"originalWorkItemID"`
 	}{
 		OriginalWorkItemID: item.Input.Reconciliation.OriginalWorkItemID,
@@ -347,7 +349,7 @@ func deterministicJoinResult(
 		Policy: item.Input.Join.Policy,
 		Frames: frames,
 	}
-	value := MustCanonicalValue(output)
+	value := jsonutil.MustCanonicalValue(output)
 	return WorkExecutionResult{
 		Output: &WorkItemOutput{
 			Value: value,
@@ -390,7 +392,7 @@ func (DeterministicExecutor) ResolveWait(
 
 	value := request.Response.Clone()
 	if len(value) == 0 {
-		value = MustCanonicalValue(nil)
+		value = jsonutil.MustCanonicalValue(nil)
 	}
 	if err := validateWorkflowSchema(request.Wait.Request.InputSchema, value); err != nil {
 		return WaitResolutionResult{}, true, fmt.Errorf(
@@ -413,20 +415,20 @@ func (DeterministicExecutor) ResolveWait(
 }
 
 func normalizeDeterministicCondition(
-	value CanonicalValue,
-) (CanonicalValue, error) {
-	direct, err := DecodeCanonicalValue[bool](value)
+	value jsonutil.CanonicalValue,
+) (jsonutil.CanonicalValue, error) {
+	direct, err := jsonutil.DecodeCanonicalValue[bool](value)
 	if err == nil {
-		return MustCanonicalValue(direct), nil
+		return jsonutil.MustCanonicalValue(direct), nil
 	}
 
 	type wrappedCondition struct {
 		Value *bool `json:"value"`
 	}
-	wrapped, err := DecodeCanonicalValue[wrappedCondition](value)
+	wrapped, err := jsonutil.DecodeCanonicalValue[wrappedCondition](value)
 	if err == nil &&
 		wrapped.Value != nil {
-		return MustCanonicalValue(*wrapped.Value), nil
+		return jsonutil.MustCanonicalValue(*wrapped.Value), nil
 	}
 
 	return nil, errors.New(

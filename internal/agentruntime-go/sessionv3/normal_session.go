@@ -765,7 +765,7 @@ func (r *Runtime) completeNormalToolCall(
 			if item.Effect.Kind == EffectKindRead {
 				effect = EffectStateNotApplicable
 			}
-			value := MustCanonicalValue(struct {
+			value := jsonutil.MustCanonicalValue(struct {
 				WorkItemID WorkItemID     `json:"workItemID"`
 				Kind       ToolOutputKind `json:"kind"`
 				Message    string         `json:"message"`

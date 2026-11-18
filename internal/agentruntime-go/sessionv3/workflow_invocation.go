@@ -7,6 +7,8 @@ import (
 	"io"
 	"slices"
 	"strconv"
+
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 // workflowInvocationMessage is a Workflow-owned explicit message transfer.
@@ -39,7 +41,7 @@ type workflowLLMInvocation struct {
 }
 
 func decodeWorkflowInvocationValue[T any](
-	value CanonicalValue,
+	value jsonutil.CanonicalValue,
 	label string,
 ) (T, error) {
 	var output T
@@ -59,8 +61,8 @@ func prepareWorkflowLLMInvocation(
 	frame ProgramFrame,
 	path string,
 	target WorkflowTarget,
-	input CanonicalValue,
-	contextValue CanonicalValue,
+	input jsonutil.CanonicalValue,
+	contextValue jsonutil.CanonicalValue,
 ) (workflowLLMInvocation, error) {
 	request, err := decodeWorkflowInvocationValue[workflowInvocationInput](
 		input,
@@ -203,8 +205,8 @@ func (i *WorkflowInterpreter) invokeWorkflowLLMTarget(
 	path string,
 	targetName string,
 	target WorkflowTarget,
-	input CanonicalValue,
-	contextValue CanonicalValue,
+	input jsonutil.CanonicalValue,
+	contextValue jsonutil.CanonicalValue,
 	handoff *ConversationHandoffIntent,
 	ports []PortPlan,
 	budget *ExecutionBudget,
@@ -281,8 +283,8 @@ func (i *WorkflowInterpreter) handoffWorkflowAgentTarget(
 	path string,
 	targetName string,
 	target WorkflowTarget,
-	input CanonicalValue,
-	contextValue CanonicalValue,
+	input jsonutil.CanonicalValue,
+	contextValue jsonutil.CanonicalValue,
 	call WorkflowCall,
 	ports []PortPlan,
 	budget *ExecutionBudget,

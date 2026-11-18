@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 func (b *Binder) durableLLMDispatchPlan(
@@ -119,7 +120,7 @@ func (b *Binder) durableLLMDispatchPlan(
 			output.Context,
 			sessionv3Runtime.ContextDispatchPlan{
 				Name:  fmt.Sprintf("context-%d", index),
-				Value: sessionv3Runtime.MustCanonicalValue(value),
+				Value: jsonutil.MustCanonicalValue(value),
 			},
 		)
 	}

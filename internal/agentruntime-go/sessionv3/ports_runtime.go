@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 const (
@@ -405,7 +407,7 @@ func (r *Runtime) appendWorkPortStream(
 	executionID ExecutionID,
 	workItemID WorkItemID,
 	name string,
-	value CanonicalValue,
+	value jsonutil.CanonicalValue,
 ) error {
 	if len(value) == 0 || !value.Valid() {
 		return errors.New("port stream value is not canonical json")
@@ -477,7 +479,7 @@ func (r *Runtime) deliverLLMStreamPortsLocked(
 	if session == nil || execution == nil || item == nil || value == "" {
 		return nil
 	}
-	streamValue := MustCanonicalValue(value)
+	streamValue := jsonutil.MustCanonicalValue(value)
 	for _, plan := range item.Ports {
 		// A streamed port carries incremental records only.
 		if plan.Direction != WorkflowPortDirectionOutput || !plan.Stream {
@@ -532,7 +534,7 @@ func (r *Runtime) appendPortMessageLocked(
 	plan PortPlan,
 	messageID string,
 	kind string,
-	value CanonicalValue,
+	value jsonutil.CanonicalValue,
 ) error {
 	if err := plan.Validate(); err != nil {
 		return err
@@ -619,7 +621,7 @@ func portRetention(plan PortPlan) (maxMessages, maxBytes int) {
 	return maxMessages, maxBytes
 }
 
-func portOutputValue(item WorkItem) (CanonicalValue, error) {
+func portOutputValue(item WorkItem) (jsonutil.CanonicalValue, error) {
 	if item.Output == nil {
 		return nil, errors.New("port owner has no output")
 	}

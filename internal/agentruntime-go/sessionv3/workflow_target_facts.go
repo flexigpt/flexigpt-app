@@ -20,10 +20,10 @@ type WorkflowTargetTransport struct {
 // ProviderManagedToolChoice is one SDK Tool choice owned by a typed Model
 // request plan. It cannot be lowered to a local Tool WorkItem.
 type ProviderManagedToolChoice struct {
-	Artifact    ArtifactPin    `json:"artifact"`
-	Type        string         `json:"type"`
-	InputSchema CanonicalValue `json:"inputSchema"`
-	Call        ToolCall       `json:"call"`
+	Artifact    ArtifactPin             `json:"artifact"`
+	Type        string                  `json:"type"`
+	InputSchema jsonutil.CanonicalValue `json:"inputSchema"`
+	Call        ToolCall                `json:"call"`
 }
 
 // ProviderManagedToolTarget identifies the typed Model child plan that owns a

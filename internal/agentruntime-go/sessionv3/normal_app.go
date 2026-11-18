@@ -5,7 +5,17 @@ import (
 	"errors"
 	"slices"
 	"strings"
+
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
+
+type AppToolPreparationRequest struct {
+	SessionID   SessionID
+	ExecutionID ExecutionID
+	App         AppInstance
+	ToolName    string
+	Arguments   jsonutil.CanonicalValue
+}
 
 func (r *Runtime) OpenAppView(
 	ctx context.Context,
@@ -609,12 +619,4 @@ func cloneAppContextUpdate(value AppContextUpdate) AppContextUpdate {
 		)
 	}
 	return output
-}
-
-type AppToolPreparationRequest struct {
-	SessionID   SessionID
-	ExecutionID ExecutionID
-	App         AppInstance
-	ToolName    string
-	Arguments   CanonicalValue
 }

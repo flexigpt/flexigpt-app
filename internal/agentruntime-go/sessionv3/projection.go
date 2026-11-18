@@ -2,6 +2,8 @@ package sessionv3
 
 import (
 	"time"
+
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 // SessionRuntimeProjection is the transport-neutral projection for normal
@@ -62,15 +64,15 @@ type ExecutionUsageProjection struct {
 }
 
 type ProtocolOutputProjection struct {
-	ExecutionID ExecutionID      `json:"executionID"`
-	WorkItemID  WorkItemID       `json:"workItemID"`
-	Outputs     []CanonicalValue `json:"outputs,omitempty"`
+	ExecutionID ExecutionID               `json:"executionID"`
+	WorkItemID  WorkItemID                `json:"workItemID"`
+	Outputs     []jsonutil.CanonicalValue `json:"outputs,omitempty"`
 }
 
 type DebuggerProjection struct {
-	ExecutionID ExecutionID    `json:"executionID"`
-	WorkItemID  WorkItemID     `json:"workItemID"`
-	Details     CanonicalValue `json:"details,omitempty"`
+	ExecutionID ExecutionID             `json:"executionID"`
+	WorkItemID  WorkItemID              `json:"workItemID"`
+	Details     jsonutil.CanonicalValue `json:"details,omitempty"`
 }
 
 // BuildSessionRuntimeProjection builds a stable projection from a durable
@@ -216,7 +218,7 @@ func BuildWorkflowProjection(
 				continue
 			}
 			workflowExecution = true
-			state, err := DecodeCanonicalValue[WorkflowState](frame.State.Data)
+			state, err := jsonutil.DecodeCanonicalValue[WorkflowState](frame.State.Data)
 			if err != nil {
 				continue
 			}
@@ -272,11 +274,11 @@ func BuildSessionSnapshotProjection(
 	}
 }
 
-func cloneCanonicalValues(values []CanonicalValue) []CanonicalValue {
+func cloneCanonicalValues(values []jsonutil.CanonicalValue) []jsonutil.CanonicalValue {
 	if len(values) == 0 {
 		return nil
 	}
-	output := make([]CanonicalValue, len(values))
+	output := make([]jsonutil.CanonicalValue, len(values))
 	for index := range values {
 		output[index] = values[index].Clone()
 	}

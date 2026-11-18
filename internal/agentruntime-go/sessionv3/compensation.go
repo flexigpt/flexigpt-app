@@ -8,6 +8,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 type CompensationState string
@@ -32,12 +34,12 @@ const (
 )
 
 type WorkflowCompletedOperationFacts struct {
-	OriginalWorkItemID WorkItemID       `json:"originalWorkItemID"`
-	EffectID           EffectRecordID   `json:"effectID"`
-	Input              CanonicalValue   `json:"input"`
-	Output             CanonicalValue   `json:"output"`
-	Receipt            *ExternalReceipt `json:"receipt,omitempty"`
-	IdempotencyKey     string           `json:"idempotencyKey,omitempty"`
+	OriginalWorkItemID WorkItemID              `json:"originalWorkItemID"`
+	EffectID           EffectRecordID          `json:"effectID"`
+	Input              jsonutil.CanonicalValue `json:"input"`
+	Output             jsonutil.CanonicalValue `json:"output"`
+	Receipt            *ExternalReceipt        `json:"receipt,omitempty"`
+	IdempotencyKey     string                  `json:"idempotencyKey,omitempty"`
 }
 
 type EffectRecord struct {
@@ -258,7 +260,7 @@ func (r *Runtime) recordConfirmedEffectLocked(
 	return nil
 }
 
-func compensationInput(item WorkItem) (CanonicalValue, error) {
+func compensationInput(item WorkItem) (jsonutil.CanonicalValue, error) {
 	switch item.Type {
 	case WorkItemTypeTool:
 		if item.Input.Tool == nil {

@@ -14,6 +14,7 @@ import (
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	workflowAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workflow"
 	workflowv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workflow/contract/v1"
@@ -67,8 +68,8 @@ type WorkflowInvocationTargetAdapter interface {
 // Service or Activity invocation. Ports are already durable Runtime facts.
 // Stream is process-private and can only emit to declared streamed ports.
 type WorkBindingRequest struct {
-	Input   sessionv3Runtime.CanonicalValue
-	Context sessionv3Runtime.CanonicalValue
+	Input   jsonutil.CanonicalValue
+	Context jsonutil.CanonicalValue
 	Ports   []sessionv3Runtime.PortInput
 	Stream  sessionv3Runtime.WorkPortStream
 }
@@ -78,9 +79,9 @@ type WorkBindingRequest struct {
 type WorkBindingWaitRequest struct {
 	Wait       sessionv3Runtime.Wait
 	Resolution sessionv3Runtime.WaitResolution
-	Response   sessionv3Runtime.CanonicalValue
-	Input      sessionv3Runtime.CanonicalValue
-	Context    sessionv3Runtime.CanonicalValue
+	Response   jsonutil.CanonicalValue
+	Input      jsonutil.CanonicalValue
+	Context    jsonutil.CanonicalValue
 	Ports      []sessionv3Runtime.PortInput
 }
 
@@ -246,7 +247,7 @@ func NewAdmission(
 // ProgramSnapshot. Session Runtime never receives this selection request.
 type PreparationRequest struct {
 	Workflow           sessionv3Runtime.ArtifactSelection
-	Input              sessionv3Runtime.CanonicalValue
+	Input              jsonutil.CanonicalValue
 	InvocationDefaults *sessionv3Runtime.SessionDefaults
 }
 
@@ -375,7 +376,7 @@ func (a *Admission) prepareWorkflowTriggers(
 		return sessionv3Runtime.ProgramSnapshot{}, err
 	}
 
-	program, err := sessionv3Runtime.DecodeCanonicalValue[sessionv3Runtime.WorkflowProgram](result.Program.Payload)
+	program, err := jsonutil.DecodeCanonicalValue[sessionv3Runtime.WorkflowProgram](result.Program.Payload)
 	if err != nil {
 		return sessionv3Runtime.ProgramSnapshot{}, err
 	}
@@ -506,7 +507,7 @@ func (a *Admission) admitRoot(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 	selection sessionv3Runtime.ArtifactSelection,
-	input sessionv3Runtime.CanonicalValue,
+	input jsonutil.CanonicalValue,
 	inputBound bool,
 	defaults *sessionv3Runtime.SessionDefaults,
 ) (sessionv3Runtime.WorkflowAdmissionResult, error) {
@@ -541,7 +542,7 @@ func (a *Admission) admitPlanned(
 	ctx context.Context,
 	plan workflowAdmissionPlan,
 	selection sessionv3Runtime.ArtifactSelection,
-	input sessionv3Runtime.CanonicalValue,
+	input jsonutil.CanonicalValue,
 	closure *workflowAdmissionClosure,
 	inputBound bool,
 	defaults *sessionv3Runtime.SessionDefaults,
@@ -634,7 +635,7 @@ func (a *Admission) admitPlanned(
 			InterpreterVersion: InterpreterVersion,
 			Artifact:           &pin,
 			DefinitionDigest:   pin.Digest,
-			Payload:            sessionv3Runtime.MustCanonicalValue(program),
+			Payload:            jsonutil.MustCanonicalValue(program),
 		},
 	}, nil
 }

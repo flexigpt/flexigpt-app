@@ -16,7 +16,7 @@ import (
 
 // workflowActivationValue is the JSON-to-CEL boundary. It preserves integers
 // where CEL has an exact integer representation.
-func workflowActivationValue(value CanonicalValue) (any, error) {
+func workflowActivationValue(value jsonutil.CanonicalValue) (any, error) {
 	if len(value) == 0 {
 		return nil, nil
 	}
@@ -74,13 +74,13 @@ func workflowActivationNode(value any) (any, error) {
 
 // canonicalWorkflowCELValue converts CEL collections through their typed
 // iteration contracts. Runtime never persists CEL values or compiled programs.
-func canonicalWorkflowCELValue(value ref.Val) (CanonicalValue, error) {
+func canonicalWorkflowCELValue(value ref.Val) (jsonutil.CanonicalValue, error) {
 	if value == nil {
 		return nil, errors.New("workflow expression returned no value")
 	}
 
 	if object, ok := value.(traits.Mapper); ok {
-		output := make(map[string]CanonicalValue)
+		output := make(map[string]jsonutil.CanonicalValue)
 		iterator := object.Iterator()
 		for iterator.HasNext().Value() == true {
 			key := iterator.Next()
@@ -98,7 +98,7 @@ func canonicalWorkflowCELValue(value ref.Val) (CanonicalValue, error) {
 	}
 
 	if list, ok := value.(traits.Lister); ok {
-		output := make([]CanonicalValue, 0)
+		output := make([]jsonutil.CanonicalValue, 0)
 		iterator := list.Iterator()
 		for iterator.HasNext().Value() == true {
 			child, err := canonicalWorkflowCELValue(iterator.Next())

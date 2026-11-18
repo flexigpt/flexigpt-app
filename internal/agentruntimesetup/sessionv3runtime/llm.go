@@ -330,9 +330,9 @@ func (b *Binder) executeLLM(
 
 func canonicalProviderOutputs(
 	values []inferenceSpec.OutputUnion,
-) ([]sessionv3Runtime.CanonicalValue, error) {
+) ([]jsonutil.CanonicalValue, error) {
 	output := make(
-		[]sessionv3Runtime.CanonicalValue,
+		[]jsonutil.CanonicalValue,
 		0,
 		len(values),
 	)
@@ -341,7 +341,7 @@ func canonicalProviderOutputs(
 		if err != nil {
 			return nil, err
 		}
-		value, err := sessionv3Runtime.CanonicalValueFrom(raw)
+		value, err := jsonutil.CanonicalValueFrom(raw)
 		if err != nil {
 			return nil, err
 		}
@@ -352,7 +352,7 @@ func canonicalProviderOutputs(
 
 func canonicalProviderDebugDetails(
 	value any,
-) (sessionv3Runtime.CanonicalValue, error) {
+) (jsonutil.CanonicalValue, error) {
 	if value == nil {
 		return nil, nil
 	}
@@ -360,7 +360,7 @@ func canonicalProviderDebugDetails(
 	if err != nil {
 		return nil, err
 	}
-	return sessionv3Runtime.CanonicalValueFrom(raw)
+	return jsonutil.CanonicalValueFrom(raw)
 }
 
 func (b *Binder) decodeProviderOutputs(
@@ -397,9 +397,9 @@ func (b *Binder) decodeProviderOutputs(
 			callID = fmt.Sprintf("provider-call-%d", len(calls)+1)
 		}
 
-		arguments := sessionv3Runtime.MustCanonicalValue(map[string]any{})
+		arguments := jsonutil.MustCanonicalValue(map[string]any{})
 		if raw := strings.TrimSpace(call.Arguments); raw != "" {
-			value, err := sessionv3Runtime.CanonicalValueFrom([]byte(raw))
+			value, err := jsonutil.CanonicalValueFrom([]byte(raw))
 			if err != nil {
 				calls = append(calls, unresolvedProviderToolCall(
 					call,
@@ -440,7 +440,7 @@ func (b *Binder) decodeProviderOutputs(
 func unresolvedProviderToolCall(
 	call *inferenceSpec.ToolCall,
 	callID string,
-	arguments sessionv3Runtime.CanonicalValue,
+	arguments jsonutil.CanonicalValue,
 	reason string,
 ) sessionv3Runtime.ToolCall {
 	return sessionv3Runtime.ToolCall{

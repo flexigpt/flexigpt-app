@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 const workflowStateMergeWorkPrefix = "state-merge"
@@ -49,7 +51,7 @@ func (i *WorkflowInterpreter) ensureParentStateMerge(
 	frame ProgramFrame,
 	program WorkflowProgram,
 	state *WorkflowState,
-	output CanonicalValue,
+	output jsonutil.CanonicalValue,
 ) (bool, error) {
 	if state == nil || state.Pending == nil ||
 		state.Pending.ParentStateMerge == nil {

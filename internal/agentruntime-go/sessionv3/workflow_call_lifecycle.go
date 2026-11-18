@@ -2,6 +2,8 @@ package sessionv3
 
 import (
 	"slices"
+
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 const workflowStartReceiptSystem = "workflow-start"
@@ -19,9 +21,9 @@ type WorkflowStartOutput struct {
 }
 
 type WorkflowCancelOutput struct {
-	Handle    CompletionHandle `json:"handle"`
-	Requested bool             `json:"requested"`
-	Reason    CanonicalValue   `json:"reason,omitempty"`
+	Handle    CompletionHandle        `json:"handle"`
+	Requested bool                    `json:"requested"`
+	Reason    jsonutil.CanonicalValue `json:"reason,omitempty"`
 }
 
 func (i *WorkflowInterpreter) startCall(
@@ -32,8 +34,8 @@ func (i *WorkflowInterpreter) startCall(
 	step WorkflowStep,
 	targetName string,
 	target WorkflowTarget,
-	input CanonicalValue,
-	contextValue CanonicalValue,
+	input jsonutil.CanonicalValue,
+	contextValue jsonutil.CanonicalValue,
 	call WorkflowCall,
 	ports []PortPlan,
 	budget *ExecutionBudget,
@@ -103,7 +105,7 @@ func (i *WorkflowInterpreter) startCall(
 	childCall.InternalLifecycleChild = true
 	childCall.Target = WorkflowValue{
 		Kind:    WorkflowValueLiteral,
-		Literal: MustCanonicalValue(targetName),
+		Literal: jsonutil.MustCanonicalValue(targetName),
 	}
 	childCall.Input = WorkflowValue{
 		Kind:    WorkflowValueLiteral,
@@ -151,7 +153,7 @@ func (i *WorkflowInterpreter) startCall(
 		)
 	}
 
-	output := MustCanonicalValue(WorkflowStartOutput{
+	output := jsonutil.MustCanonicalValue(WorkflowStartOutput{
 		Handle:   handle,
 		Lifetime: lifetime,
 	})
@@ -274,7 +276,7 @@ func (i *WorkflowInterpreter) cancelCall(
 		)
 	}
 
-	handle, err := DecodeCanonicalValue[CompletionHandle](handleValue)
+	handle, err := jsonutil.DecodeCanonicalValue[CompletionHandle](handleValue)
 	if err != nil {
 		return workflowFailure(
 			state,
@@ -299,7 +301,7 @@ func (i *WorkflowInterpreter) cancelCall(
 		)
 	}
 
-	var reason CanonicalValue
+	var reason jsonutil.CanonicalValue
 	if spec.Reason != nil {
 		reason, err = i.evaluate(*spec.Reason, program, state)
 		if err != nil {
@@ -311,7 +313,7 @@ func (i *WorkflowInterpreter) cancelCall(
 		}
 	}
 
-	output := MustCanonicalValue(WorkflowCancelOutput{
+	output := jsonutil.MustCanonicalValue(WorkflowCancelOutput{
 		Handle:    handle,
 		Requested: true,
 		Reason:    reason,

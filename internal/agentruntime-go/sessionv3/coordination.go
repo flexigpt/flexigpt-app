@@ -8,6 +8,8 @@ import (
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 const (
@@ -17,32 +19,32 @@ const (
 )
 
 type eventWaitOutput struct {
-	ID          string         `json:"id"`
-	Name        string         `json:"name"`
-	Source      string         `json:"source,omitempty"`
-	Data        CanonicalValue `json:"data"`
-	Correlation CanonicalValue `json:"correlation,omitempty"`
-	Time        time.Time      `json:"time"`
+	ID          string                  `json:"id"`
+	Name        string                  `json:"name"`
+	Source      string                  `json:"source,omitempty"`
+	Data        jsonutil.CanonicalValue `json:"data"`
+	Correlation jsonutil.CanonicalValue `json:"correlation,omitempty"`
+	Time        time.Time               `json:"time"`
 }
 
 type channelWaitOutput struct {
-	ID          string         `json:"id"`
-	Sequence    uint64         `json:"sequence"`
-	Channel     string         `json:"channel"`
-	Kind        string         `json:"kind,omitempty"`
-	Data        CanonicalValue `json:"data"`
-	Correlation CanonicalValue `json:"correlation,omitempty"`
-	Time        time.Time      `json:"time"`
+	ID          string                  `json:"id"`
+	Sequence    uint64                  `json:"sequence"`
+	Channel     string                  `json:"channel"`
+	Kind        string                  `json:"kind,omitempty"`
+	Data        jsonutil.CanonicalValue `json:"data"`
+	Correlation jsonutil.CanonicalValue `json:"correlation,omitempty"`
+	Time        time.Time               `json:"time"`
 }
 
 type completionWaitOutput struct {
-	WorkItemID  WorkItemID     `json:"workItemID,omitempty"`
-	FrameID     ProgramFrameID `json:"frameID,omitempty"`
-	ExecutionID ExecutionID    `json:"executionID,omitempty"`
-	Output      CanonicalValue `json:"output,omitempty"`
+	WorkItemID  WorkItemID              `json:"workItemID,omitempty"`
+	FrameID     ProgramFrameID          `json:"frameID,omitempty"`
+	ExecutionID ExecutionID             `json:"executionID,omitempty"`
+	Output      jsonutil.CanonicalValue `json:"output,omitempty"`
 }
 
-func canonicalValuesEqual(left, right CanonicalValue) bool {
+func canonicalValuesEqual(left, right jsonutil.CanonicalValue) bool {
 	return bytes.Equal(left, right)
 }
 
@@ -52,10 +54,10 @@ func containsWaitID(values []WaitID, want WaitID) bool {
 
 func waitMatchesEvent(
 	wait Wait,
-	event CanonicalValue,
+	event jsonutil.CanonicalValue,
 	source string,
-	data CanonicalValue,
-	correlation CanonicalValue,
+	data jsonutil.CanonicalValue,
+	correlation jsonutil.CanonicalValue,
 ) bool {
 	if wait.Request.EventSource != "" &&
 		wait.Request.EventSource != source {
@@ -224,7 +226,7 @@ func (r *Runtime) dispatchEmit(
 			},
 		)
 	} else {
-		value := MustCanonicalValue(receipt)
+		value := jsonutil.MustCanonicalValue(receipt)
 		r.finishWorkLocked(
 			session,
 			execution,
@@ -531,7 +533,7 @@ func (r *Runtime) wakeEventWaitsLocked(
 			continue
 		}
 
-		response := MustCanonicalValue(eventWaitOutput{
+		response := jsonutil.MustCanonicalValue(eventWaitOutput{
 			ID:          signal.ID,
 			Name:        signal.Name,
 			Source:      signal.Source,
@@ -618,7 +620,7 @@ func (r *Runtime) wakeChannelWaitsLocked(
 			continue
 		}
 
-		response := MustCanonicalValue(channelWaitOutput{
+		response := jsonutil.MustCanonicalValue(channelWaitOutput{
 			ID:          message.ID,
 			Sequence:    message.Sequence,
 			Channel:     message.Channel,
@@ -681,7 +683,7 @@ func (r *Runtime) resolveDurableWaitLocked(
 	session *Session,
 	execution *Execution,
 	wait *Wait,
-	value CanonicalValue,
+	value jsonutil.CanonicalValue,
 	receipt *ExternalReceipt,
 	errorValue *SanitizedError,
 	confirmed bool,
@@ -770,7 +772,7 @@ func (r *Runtime) wakeCompletionFrameWaitsLocked(
 			continue
 		}
 
-		value := MustCanonicalValue(completionWaitOutput{
+		value := jsonutil.MustCanonicalValue(completionWaitOutput{
 			FrameID: frame.ID,
 			Output:  frame.Output.Clone(),
 		})
@@ -810,8 +812,8 @@ func (r *Runtime) wakeCompletionFrameWaitsLocked(
 
 func completionWorkItemResult(
 	item WorkItem,
-) (CanonicalValue, *SanitizedError, bool) {
-	output := CanonicalValue(nil)
+) (jsonutil.CanonicalValue, *SanitizedError, bool) {
+	output := jsonutil.CanonicalValue(nil)
 	if item.Output != nil {
 		output = item.Output.Value.Clone()
 		if len(output) == 0 && item.Output.Tool != nil {
@@ -819,7 +821,7 @@ func completionWorkItemResult(
 		}
 	}
 	if len(output) == 0 {
-		output = MustCanonicalValue(completionWaitOutput{
+		output = jsonutil.MustCanonicalValue(completionWaitOutput{
 			WorkItemID: item.ID,
 		})
 	}

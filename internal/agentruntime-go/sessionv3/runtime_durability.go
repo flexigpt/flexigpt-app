@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 // dispatchAllowedLocked is used both when work is queued and immediately
@@ -155,13 +157,13 @@ func (r *Runtime) resumeRestoredWork(ctx context.Context) {
 	}
 }
 
-func validateWaitResponse(wait Wait, response CanonicalValue) error {
+func validateWaitResponse(wait Wait, response jsonutil.CanonicalValue) error {
 	if !response.Valid() {
 		return errors.New("wait response is not canonical json")
 	}
 	value := response
 	if len(value) == 0 {
-		value = MustCanonicalValue(nil)
+		value = jsonutil.MustCanonicalValue(nil)
 	}
 	if err := validateWorkflowSchema(wait.Request.InputSchema, value); err != nil {
 		return fmt.Errorf("validate wait response: %w", err)
@@ -208,7 +210,7 @@ func (r *Runtime) settleTimerLocked(
 
 	wait.Status = WaitStatusResolved
 	wait.UpdatedAt = now
-	wait.Response = MustCanonicalValue(TimerWaitOutput{
+	wait.Response = jsonutil.MustCanonicalValue(TimerWaitOutput{
 		ScheduledAt: timer.ScheduledAt,
 		FireAt:      timer.FireAt,
 		FiredAt:     now,

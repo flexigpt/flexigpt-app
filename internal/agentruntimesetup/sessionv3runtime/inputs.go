@@ -342,11 +342,11 @@ func durableActivityInputs(
 }
 
 func providerOutputsAsInputs(
-	values []sessionv3Runtime.CanonicalValue,
+	values []jsonutil.CanonicalValue,
 ) ([]inferenceSpec.InputUnion, error) {
 	output := make([]inferenceSpec.InputUnion, 0, len(values))
 	for index := range values {
-		value, err := sessionv3Runtime.DecodeCanonicalValue[inferenceSpec.OutputUnion](
+		value, err := jsonutil.DecodeCanonicalValue[inferenceSpec.OutputUnion](
 			values[index],
 		)
 		if err != nil {
@@ -515,11 +515,11 @@ func activityToolResultInputs(
 func appContextInputText(
 	update sessionv3Runtime.AppContextUpdate,
 ) string {
-	value := sessionv3Runtime.MustCanonicalValue(struct {
+	value := jsonutil.MustCanonicalValue(struct {
 		Source            string                               `json:"source"`
 		ResourceURI       string                               `json:"resourceURI,omitempty"`
 		Content           []sessionv3Runtime.AppContextContent `json:"content,omitempty"`
-		StructuredContent sessionv3Runtime.CanonicalValue      `json:"structuredContent,omitempty"`
+		StructuredContent jsonutil.CanonicalValue              `json:"structuredContent,omitempty"`
 	}{
 		Source:            "approved MCP App context",
 		ResourceURI:       update.ResourceURI,

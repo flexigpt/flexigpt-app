@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 func (r WorkflowTargetSetResolution) Validate() error {
@@ -141,7 +143,7 @@ func (i *WorkflowInterpreter) evaluateResolverMembers(
 			err,
 		)
 	}
-	resolved, err := DecodeCanonicalValue[[]string](value)
+	resolved, err := jsonutil.DecodeCanonicalValue[[]string](value)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"workflow target set %q must resolve to a string array",
@@ -175,7 +177,7 @@ func (i *WorkflowInterpreter) evaluateResolverMembers(
 			continue
 		}
 		if targetSet.Resolved.Constraints != nil {
-			candidate := MustCanonicalValue(member)
+			candidate := jsonutil.MustCanonicalValue(member)
 			constrained := program
 			constrained.Scope.Item = &candidate
 			matched, matchErr := i.condition(

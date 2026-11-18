@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 // NewInterpreter returns the runtime-owned interpreter. Workflow Artifact
@@ -323,7 +324,7 @@ func externalWaitRequest(
 
 func externalWorkContext(
 	item sessionv3Runtime.WorkItem,
-) (sessionv3Runtime.CanonicalValue, error) {
+) (jsonutil.CanonicalValue, error) {
 	switch item.Type {
 	case sessionv3Runtime.WorkItemTypeService:
 		if item.Input.Service == nil {
@@ -347,7 +348,7 @@ func externalWorkContext(
 
 func externalWorkInput(
 	item sessionv3Runtime.WorkItem,
-) (sessionv3Runtime.CanonicalValue, error) {
+) (jsonutil.CanonicalValue, error) {
 	switch item.Type {
 	case sessionv3Runtime.WorkItemTypeService:
 		if item.Input.Service == nil {
@@ -495,7 +496,7 @@ func cloneExternalPortInputs(
 	for index := range values {
 		output[index] = values[index]
 		output[index].Values = make(
-			[]sessionv3Runtime.CanonicalValue,
+			[]jsonutil.CanonicalValue,
 			len(values[index].Values),
 		)
 		for valueIndex := range values[index].Values {

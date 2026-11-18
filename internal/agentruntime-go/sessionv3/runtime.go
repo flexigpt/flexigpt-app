@@ -862,9 +862,9 @@ func (r *Runtime) SignalExecution(ctx context.Context, command SignalExecutionCo
 					Workflow: &WorkflowActivity{
 						Phase:   "signal",
 						Summary: command.Name,
-						Output: MustCanonicalValue(struct {
-							Correlation CanonicalValue `json:"correlation,omitempty"`
-							Data        CanonicalValue `json:"data"`
+						Output: jsonutil.MustCanonicalValue(struct {
+							Correlation jsonutil.CanonicalValue `json:"correlation,omitempty"`
+							Data        jsonutil.CanonicalValue `json:"data"`
 						}{
 							Correlation: command.Correlation.Clone(),
 							Data:        command.Data.Clone(),
@@ -2602,7 +2602,7 @@ func (r *Runtime) executeOne(
 		WorkItem:  *item,
 	}
 	request.PortStream = WorkPortStream{
-		Emit: func(name string, value CanonicalValue) error {
+		Emit: func(name string, value jsonutil.CanonicalValue) error {
 			return r.appendWorkPortStream(
 				ctx,
 				sessionID,
@@ -2930,7 +2930,7 @@ func (r *Runtime) addRecoveryWaitLocked(session *Session, execution *Execution, 
 		Status:     WaitStatusPending,
 		Request: WaitRequest{
 			Kind: WaitKindRecovery,
-			Summary: MustCanonicalValue(
+			Summary: jsonutil.MustCanonicalValue(
 				map[string]string{"message": "external WorkItem outcome requires recovery review"},
 			),
 			AllowedResolutions: []WaitResolution{WaitResolutionContinue, WaitResolutionCancel},
@@ -3775,7 +3775,7 @@ func (r *Runtime) recoverLocked(session *Session) bool {
 				Status:     WaitStatusPending,
 				Request: WaitRequest{
 					Kind: WaitKindRecovery,
-					Summary: MustCanonicalValue(
+					Summary: jsonutil.MustCanonicalValue(
 						map[string]string{"message": "recovery review is required before external work can continue"},
 					),
 					AllowedResolutions: []WaitResolution{WaitResolutionContinue, WaitResolutionCancel},

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
 
@@ -33,7 +34,7 @@ type Session struct {
 	CreatedAt             time.Time                    `json:"createdAt"`
 	UpdatedAt             time.Time                    `json:"updatedAt"`
 	Defaults              SessionDefaults              `json:"defaults"`
-	Metadata              CanonicalValue               `json:"metadata,omitempty"`
+	Metadata              jsonutil.CanonicalValue      `json:"metadata,omitempty"`
 	Timeline              []Activity                   `json:"timeline"`
 	Executions            []Execution                  `json:"executions"`
 	ConversationOwnership []ConversationOwnershipState `json:"conversationOwnership,omitempty"`
@@ -51,7 +52,7 @@ type SessionDefaults struct {
 	SystemInstructions   []Instruction               `json:"systemInstructions,omitempty"`
 	InstructionArtifacts []ArtifactSelection         `json:"instructionArtifacts,omitempty"`
 	Temperature          *float64                    `json:"temperature,omitempty"`
-	Metadata             CanonicalValue              `json:"metadata,omitempty"`
+	Metadata             jsonutil.CanonicalValue     `json:"metadata,omitempty"`
 	History              HistorySelection            `json:"history"`
 	Tools                []ArtifactSelection         `json:"tools,omitempty"`
 	Skills               []ArtifactSelection         `json:"skills,omitempty"`
@@ -74,7 +75,7 @@ type SessionDefaultsOverride struct {
 	SystemInstructions   *[]Instruction               `json:"systemInstructions,omitempty"`
 	InstructionArtifacts *[]ArtifactSelection         `json:"instructionArtifacts,omitempty"`
 	Temperature          *float64                     `json:"temperature,omitempty"`
-	Metadata             *CanonicalValue              `json:"metadata,omitempty"`
+	Metadata             *jsonutil.CanonicalValue     `json:"metadata,omitempty"`
 	History              *HistorySelection            `json:"history,omitempty"`
 	Tools                *[]ArtifactSelection         `json:"tools,omitempty"`
 	Skills               *[]ArtifactSelection         `json:"skills,omitempty"`
@@ -243,16 +244,16 @@ type Activity struct {
 }
 
 type MessageActivity struct {
-	Role               MessageRole          `json:"role"`
-	Status             string               `json:"status,omitempty"`
-	Text               string               `json:"text,omitempty"`
-	Attachments        []Attachment         `json:"attachments,omitempty"`
-	ToolResults        []ToolResultActivity `json:"toolResults,omitempty"`
-	AppContext         []AppContextUpdate   `json:"appContext,omitempty"`
-	Metadata           CanonicalValue       `json:"metadata,omitempty"`
-	Error              *SanitizedError      `json:"error,omitempty"`
-	InvocationDefaults *SessionDefaults     `json:"invocationDefaults,omitempty"`
-	InvocationBudget   *ExecutionBudget     `json:"invocationBudget,omitempty"`
+	Role               MessageRole             `json:"role"`
+	Status             string                  `json:"status,omitempty"`
+	Text               string                  `json:"text,omitempty"`
+	Attachments        []Attachment            `json:"attachments,omitempty"`
+	ToolResults        []ToolResultActivity    `json:"toolResults,omitempty"`
+	AppContext         []AppContextUpdate      `json:"appContext,omitempty"`
+	Metadata           jsonutil.CanonicalValue `json:"metadata,omitempty"`
+	Error              *SanitizedError         `json:"error,omitempty"`
+	InvocationDefaults *SessionDefaults        `json:"invocationDefaults,omitempty"`
+	InvocationBudget   *ExecutionBudget        `json:"invocationBudget,omitempty"`
 }
 
 type AttachmentKind string
@@ -338,7 +339,7 @@ type ToolResultActivity struct {
 	Kind           ToolOutputKind                      `json:"kind"`
 	Text           string                              `json:"text,omitempty"`
 	Contents       []inferenceSpec.ToolOutputItemUnion `json:"contents,omitempty"`
-	Structured     CanonicalValue                      `json:"structured,omitempty"`
+	Structured     jsonutil.CanonicalValue             `json:"structured,omitempty"`
 	Error          string                              `json:"error,omitempty"`
 }
 
@@ -358,13 +359,13 @@ type AppContextContent struct {
 // It contains semantic values only. It does not contain a browser handle,
 // MCP connection, approval token, or callback.
 type AppContextUpdate struct {
-	AppInstanceID     AppInstanceID       `json:"appInstanceID"`
-	ViewID            AppViewID           `json:"viewID"`
-	ServerID          string              `json:"serverID"`
-	ResourceURI       string              `json:"resourceURI,omitempty"`
-	Content           []AppContextContent `json:"content,omitempty"`
-	StructuredContent CanonicalValue      `json:"structuredContent,omitempty"`
-	UpdatedAt         time.Time           `json:"updatedAt"`
+	AppInstanceID     AppInstanceID           `json:"appInstanceID"`
+	ViewID            AppViewID               `json:"viewID"`
+	ServerID          string                  `json:"serverID"`
+	ResourceURI       string                  `json:"resourceURI,omitempty"`
+	Content           []AppContextContent     `json:"content,omitempty"`
+	StructuredContent jsonutil.CanonicalValue `json:"structuredContent,omitempty"`
+	UpdatedAt         time.Time               `json:"updatedAt"`
 
 	ServerDisplayName      string `json:"serverDisplayName,omitempty"`
 	AppDisplayName         string `json:"appDisplayName,omitempty"`
@@ -373,21 +374,21 @@ type AppContextUpdate struct {
 }
 
 type ActionActivity struct {
-	Title      string           `json:"title"`
-	Summary    string           `json:"summary,omitempty"`
-	ActionKind string           `json:"actionKind,omitempty"`
-	Outcome    string           `json:"outcome,omitempty"`
-	Output     CanonicalValue   `json:"output,omitempty"`
-	Error      *SanitizedError  `json:"error,omitempty"`
-	Receipt    *ExternalReceipt `json:"receipt,omitempty"`
+	Title      string                  `json:"title"`
+	Summary    string                  `json:"summary,omitempty"`
+	ActionKind string                  `json:"actionKind,omitempty"`
+	Outcome    string                  `json:"outcome,omitempty"`
+	Output     jsonutil.CanonicalValue `json:"output,omitempty"`
+	Error      *SanitizedError         `json:"error,omitempty"`
+	Receipt    *ExternalReceipt        `json:"receipt,omitempty"`
 }
 
 type WorkflowActivity struct {
-	Phase   string          `json:"phase"`
-	Summary string          `json:"summary,omitempty"`
-	Path    string          `json:"path,omitempty"`
-	Output  CanonicalValue  `json:"output,omitempty"`
-	Error   *SanitizedError `json:"error,omitempty"`
+	Phase   string                  `json:"phase"`
+	Summary string                  `json:"summary,omitempty"`
+	Path    string                  `json:"path,omitempty"`
+	Output  jsonutil.CanonicalValue `json:"output,omitempty"`
+	Error   *SanitizedError         `json:"error,omitempty"`
 }
 
 type WaitActivity struct {
@@ -592,17 +593,17 @@ func (s ProgramFrameState) Terminal() bool {
 // ProgramSnapshot contains only durable orchestration meaning. Payload is
 // bounded canonical JSON owned and validated by the named interpreter.
 type ProgramSnapshot struct {
-	InterpreterID      string         `json:"interpreterID"`
-	InterpreterVersion uint32         `json:"interpreterVersion"`
-	Artifact           *ArtifactPin   `json:"artifact,omitempty"`
-	DefinitionDigest   string         `json:"definitionDigest,omitempty"`
-	Payload            CanonicalValue `json:"payload,omitempty"`
+	InterpreterID      string                  `json:"interpreterID"`
+	InterpreterVersion uint32                  `json:"interpreterVersion"`
+	Artifact           *ArtifactPin            `json:"artifact,omitempty"`
+	DefinitionDigest   string                  `json:"definitionDigest,omitempty"`
+	Payload            jsonutil.CanonicalValue `json:"payload,omitempty"`
 }
 
 type ProgramState struct {
-	Type    string         `json:"type"`
-	Version uint32         `json:"version"`
-	Data    CanonicalValue `json:"data,omitempty"`
+	Type    string                  `json:"type"`
+	Version uint32                  `json:"version"`
+	Data    jsonutil.CanonicalValue `json:"data,omitempty"`
 }
 
 type ChildFrameLifetime string
@@ -613,30 +614,30 @@ const (
 )
 
 type ProgramFrame struct {
-	ID                ProgramFrameID     `json:"id"`
-	ParentFrameID     ProgramFrameID     `json:"parentFrameID,omitempty"`
-	Lifetime          ChildFrameLifetime `json:"lifetime,omitempty"`
-	Depth             int                `json:"depth,omitempty"`
-	Program           ProgramSnapshot    `json:"program"`
-	State             ProgramState       `json:"state"`
-	Status            ProgramFrameState  `json:"status"`
-	Path              string             `json:"path,omitempty"`
-	DeclarationPath   string             `json:"declarationPath,omitempty"`
-	CreatedAt         time.Time          `json:"createdAt"`
-	UpdatedAt         time.Time          `json:"updatedAt"`
-	Deadline          *time.Time         `json:"deadline,omitempty"`
-	Budget            *ExecutionBudget   `json:"budget,omitempty"`
-	ChildFrameIDs     []ProgramFrameID   `json:"childFrameIDs,omitempty"`
-	ChildExecutionIDs []ExecutionID      `json:"childExecutionIDs,omitempty"`
-	WorkItemIDs       []WorkItemID       `json:"workItemIDs,omitempty"`
-	Ports             []PortPlan         `json:"ports,omitempty"`
-	PortInputs        []PortInput        `json:"portInputs,omitempty"`
-	Output            CanonicalValue     `json:"output,omitempty"`
-	Receipt           *ExternalReceipt   `json:"receipt,omitempty"`
-	Error             *SanitizedError    `json:"error,omitempty"`
-	HandoffID         string             `json:"handoffID,omitempty"`
-	Fork              *ForkBoundary      `json:"fork,omitempty"`
-	Joins             []JoinBoundary     `json:"joins,omitempty"`
+	ID                ProgramFrameID          `json:"id"`
+	ParentFrameID     ProgramFrameID          `json:"parentFrameID,omitempty"`
+	Lifetime          ChildFrameLifetime      `json:"lifetime,omitempty"`
+	Depth             int                     `json:"depth,omitempty"`
+	Program           ProgramSnapshot         `json:"program"`
+	State             ProgramState            `json:"state"`
+	Status            ProgramFrameState       `json:"status"`
+	Path              string                  `json:"path,omitempty"`
+	DeclarationPath   string                  `json:"declarationPath,omitempty"`
+	CreatedAt         time.Time               `json:"createdAt"`
+	UpdatedAt         time.Time               `json:"updatedAt"`
+	Deadline          *time.Time              `json:"deadline,omitempty"`
+	Budget            *ExecutionBudget        `json:"budget,omitempty"`
+	ChildFrameIDs     []ProgramFrameID        `json:"childFrameIDs,omitempty"`
+	ChildExecutionIDs []ExecutionID           `json:"childExecutionIDs,omitempty"`
+	WorkItemIDs       []WorkItemID            `json:"workItemIDs,omitempty"`
+	Ports             []PortPlan              `json:"ports,omitempty"`
+	PortInputs        []PortInput             `json:"portInputs,omitempty"`
+	Output            jsonutil.CanonicalValue `json:"output,omitempty"`
+	Receipt           *ExternalReceipt        `json:"receipt,omitempty"`
+	Error             *SanitizedError         `json:"error,omitempty"`
+	HandoffID         string                  `json:"handoffID,omitempty"`
+	Fork              *ForkBoundary           `json:"fork,omitempty"`
+	Joins             []JoinBoundary          `json:"joins,omitempty"`
 }
 
 // ForkBoundary is a durable child-scheduling boundary. The parent frame
@@ -760,7 +761,7 @@ type WorkflowOperationTargetFacts struct {
 type WorkflowOperationFacts struct {
 	WorkItemID     WorkItemID                   `json:"workItemID"`
 	AttemptID      AttemptID                    `json:"attemptID,omitempty"`
-	Input          CanonicalValue               `json:"input"`
+	Input          jsonutil.CanonicalValue      `json:"input"`
 	Target         WorkflowOperationTargetFacts `json:"target"`
 	IdempotencyKey string                       `json:"idempotencyKey,omitempty"`
 	Receipt        *ExternalReceipt             `json:"receipt,omitempty"`
@@ -778,11 +779,11 @@ type ReconciliationWork struct {
 // a reconciliation child block returns a validated typed decision. Runtime
 // applies it atomically to the original WorkItem.
 type ReconciliationSettlement struct {
-	OriginalWorkItemID WorkItemID             `json:"originalWorkItemID"`
-	Decision           ReconciliationDecision `json:"decision"`
-	Output             CanonicalValue         `json:"output,omitempty"`
-	Receipt            *ExternalReceipt       `json:"receipt,omitempty"`
-	Error              *SanitizedError        `json:"error,omitempty"`
+	OriginalWorkItemID WorkItemID              `json:"originalWorkItemID"`
+	Decision           ReconciliationDecision  `json:"decision"`
+	Output             jsonutil.CanonicalValue `json:"output,omitempty"`
+	Receipt            *ExternalReceipt        `json:"receipt,omitempty"`
+	Error              *SanitizedError         `json:"error,omitempty"`
 }
 
 // WorkflowStepEffect is the evaluated declaration-level effect constraint for
@@ -822,11 +823,11 @@ func (p WorkflowEffectPlan) Validate() error {
 }
 
 type RetryMatcher struct {
-	Categories   []ErrorCategory `json:"categories,omitempty"`
-	Codes        []string        `json:"codes,omitempty"`
-	Retryable    *bool           `json:"retryable,omitempty"`
-	EffectStates []EffectState   `json:"effectStates,omitempty"`
-	Schema       CanonicalValue  `json:"schema,omitempty"`
+	Categories   []ErrorCategory         `json:"categories,omitempty"`
+	Codes        []string                `json:"codes,omitempty"`
+	Retryable    *bool                   `json:"retryable,omitempty"`
+	EffectStates []EffectState           `json:"effectStates,omitempty"`
+	Schema       jsonutil.CanonicalValue `json:"schema,omitempty"`
 }
 
 // RetryBackoff is durable retry timing policy. Durations remain typed values
@@ -1025,18 +1026,18 @@ type MCPToolTarget struct {
 }
 
 type ToolCall struct {
-	ID             string                 `json:"id"`
-	ProviderCallID string                 `json:"providerCallID,omitempty"`
-	Name           string                 `json:"name"`
-	ChoiceID       string                 `json:"choiceID,omitempty"`
-	Type           inferenceSpec.ToolType `json:"type,omitempty"`
-	DisplayName    string                 `json:"displayName,omitempty"`
-	Description    string                 `json:"description,omitempty"`
-	Source         ToolCallSource         `json:"source,omitempty"`
-	AppInstanceID  AppInstanceID          `json:"appInstanceID,omitempty"`
-	Arguments      CanonicalValue         `json:"arguments,omitempty"`
-	Binding        ToolBinding            `json:"binding"`
-	Automatic      bool                   `json:"automatic"`
+	ID             string                  `json:"id"`
+	ProviderCallID string                  `json:"providerCallID,omitempty"`
+	Name           string                  `json:"name"`
+	ChoiceID       string                  `json:"choiceID,omitempty"`
+	Type           inferenceSpec.ToolType  `json:"type,omitempty"`
+	DisplayName    string                  `json:"displayName,omitempty"`
+	Description    string                  `json:"description,omitempty"`
+	Source         ToolCallSource          `json:"source,omitempty"`
+	AppInstanceID  AppInstanceID           `json:"appInstanceID,omitempty"`
+	Arguments      jsonutil.CanonicalValue `json:"arguments,omitempty"`
+	Binding        ToolBinding             `json:"binding"`
+	Automatic      bool                    `json:"automatic"`
 }
 
 type ToolBindingKind string
@@ -1091,31 +1092,31 @@ type UnresolvedToolBinding struct {
 }
 
 type ServiceWork struct {
-	ServiceID      string         `json:"serviceID"`
-	BindingVersion string         `json:"bindingVersion"`
-	Input          CanonicalValue `json:"input"`
-	Context        CanonicalValue `json:"context,omitempty"`
+	ServiceID      string                  `json:"serviceID"`
+	BindingVersion string                  `json:"bindingVersion"`
+	Input          jsonutil.CanonicalValue `json:"input"`
+	Context        jsonutil.CanonicalValue `json:"context,omitempty"`
 }
 
 type ActivityWork struct {
-	ActivityID     string         `json:"activityID"`
-	BindingVersion string         `json:"bindingVersion"`
-	Input          CanonicalValue `json:"input"`
-	Context        CanonicalValue `json:"context,omitempty"`
+	ActivityID     string                  `json:"activityID"`
+	BindingVersion string                  `json:"bindingVersion"`
+	Input          jsonutil.CanonicalValue `json:"input"`
+	Context        jsonutil.CanonicalValue `json:"context,omitempty"`
 }
 
 type TransformWork struct {
-	Input        CanonicalValue `json:"input"`
-	OutputSchema CanonicalValue `json:"outputSchema,omitempty"`
+	Input        jsonutil.CanonicalValue `json:"input"`
+	OutputSchema jsonutil.CanonicalValue `json:"outputSchema,omitempty"`
 }
 
 type ConditionWork struct {
-	Input CanonicalValue `json:"input"`
+	Input jsonutil.CanonicalValue `json:"input"`
 }
 
 type StateAssignment struct {
-	Path  string         `json:"path"`
-	Value CanonicalValue `json:"value"`
+	Path  string                  `json:"path"`
+	Value jsonutil.CanonicalValue `json:"value"`
 }
 
 type StateUpdateWork struct {
@@ -1126,11 +1127,11 @@ type StateUpdateWork struct {
 
 	// Base is the immutable state snapshot observed when the Workflow step was
 	// prepared. All assignments apply atomically to this value.
-	Base CanonicalValue `json:"base"`
+	Base jsonutil.CanonicalValue `json:"base"`
 
 	// Schema is the state-owning block boundary. It is generic JSON Schema
 	// data, not a compiled schema.
-	Schema CanonicalValue `json:"schema,omitempty"`
+	Schema jsonutil.CanonicalValue `json:"schema,omitempty"`
 
 	Assignments []StateAssignment `json:"assignments,omitempty"`
 	RemovePaths []string          `json:"removePaths,omitempty"`
@@ -1183,8 +1184,8 @@ type ExecutionSignal struct {
 	ID                       string                    `json:"id"`
 	Name                     string                    `json:"name"`
 	Source                   string                    `json:"source,omitempty"`
-	Data                     CanonicalValue            `json:"data"`
-	Correlation              CanonicalValue            `json:"correlation,omitempty"`
+	Data                     jsonutil.CanonicalValue   `json:"data"`
+	Correlation              jsonutil.CanonicalValue   `json:"correlation,omitempty"`
 	CreatedAt                time.Time                 `json:"createdAt"`
 	ConsumedBy               []WaitID                  `json:"consumedBy,omitempty"`
 	ConsumedSubscriptions    []string                  `json:"consumedSubscriptions,omitempty"`
@@ -1201,15 +1202,15 @@ type SubscriptionConsumption struct {
 
 // ChannelMessage is one retained local channel record.
 type ChannelMessage struct {
-	ID               string         `json:"id"`
-	Sequence         uint64         `json:"sequence"`
-	Channel          string         `json:"channel"`
-	Kind             string         `json:"kind,omitempty"`
-	Data             CanonicalValue `json:"data"`
-	Correlation      CanonicalValue `json:"correlation,omitempty"`
-	DeduplicationKey string         `json:"deduplicationKey,omitempty"`
-	CreatedAt        time.Time      `json:"createdAt"`
-	ConsumedBy       []WaitID       `json:"consumedBy,omitempty"`
+	ID               string                  `json:"id"`
+	Sequence         uint64                  `json:"sequence"`
+	Channel          string                  `json:"channel"`
+	Kind             string                  `json:"kind,omitempty"`
+	Data             jsonutil.CanonicalValue `json:"data"`
+	Correlation      jsonutil.CanonicalValue `json:"correlation,omitempty"`
+	DeduplicationKey string                  `json:"deduplicationKey,omitempty"`
+	CreatedAt        time.Time               `json:"createdAt"`
+	ConsumedBy       []WaitID                `json:"consumedBy,omitempty"`
 }
 
 // ChannelLog is an invocation-local append-only channel log.
@@ -1232,22 +1233,22 @@ type EmitReceipt struct {
 }
 
 type EmitWork struct {
-	Destination       EmitDestination `json:"destination"`
-	Kind              string          `json:"kind,omitempty"`
-	Data              CanonicalValue  `json:"data"`
-	Correlation       CanonicalValue  `json:"correlation,omitempty"`
-	DeduplicationKey  string          `json:"deduplicationKey,omitempty"`
-	EventSource       string          `json:"eventSource,omitempty"`
-	DataSchema        CanonicalValue  `json:"dataSchema,omitempty"`
-	CorrelationSchema CanonicalValue  `json:"correlationSchema,omitempty"`
-	MaxMessages       int             `json:"maxMessages,omitempty"`
-	MaxBytes          int             `json:"maxBytes,omitempty"`
+	Destination       EmitDestination         `json:"destination"`
+	Kind              string                  `json:"kind,omitempty"`
+	Data              jsonutil.CanonicalValue `json:"data"`
+	Correlation       jsonutil.CanonicalValue `json:"correlation,omitempty"`
+	DeduplicationKey  string                  `json:"deduplicationKey,omitempty"`
+	EventSource       string                  `json:"eventSource,omitempty"`
+	DataSchema        jsonutil.CanonicalValue `json:"dataSchema,omitempty"`
+	CorrelationSchema jsonutil.CanonicalValue `json:"correlationSchema,omitempty"`
+	MaxMessages       int                     `json:"maxMessages,omitempty"`
+	MaxBytes          int                     `json:"maxBytes,omitempty"`
 }
 
 type CompensationWork struct {
-	OriginalWorkItemID WorkItemID     `json:"originalWorkItemID"`
-	EffectID           EffectRecordID `json:"effectID"`
-	Input              CanonicalValue `json:"input,omitempty"`
+	OriginalWorkItemID WorkItemID              `json:"originalWorkItemID"`
+	EffectID           EffectRecordID          `json:"effectID"`
+	Input              jsonutil.CanonicalValue `json:"input,omitempty"`
 }
 
 type SemanticBinding struct {
@@ -1261,14 +1262,14 @@ type SemanticBinding struct {
 }
 
 type WorkItemOutput struct {
-	LLM            *LLMOutput            `json:"llm,omitempty"`
-	Tool           *ToolOutput           `json:"tool,omitempty"`
-	Value          CanonicalValue        `json:"value,omitempty"`
-	Emit           *EmitReceipt          `json:"emit,omitempty"`
-	App            *AppOutput            `json:"app,omitempty"`
-	AppInstanceID  AppInstanceID         `json:"appInstanceID,omitempty"`
-	TargetResolver *TargetResolverOutput `json:"targetResolver,omitempty"`
-	Receipt        *ExternalReceipt      `json:"receipt,omitempty"`
+	LLM            *LLMOutput              `json:"llm,omitempty"`
+	Tool           *ToolOutput             `json:"tool,omitempty"`
+	Value          jsonutil.CanonicalValue `json:"value,omitempty"`
+	Emit           *EmitReceipt            `json:"emit,omitempty"`
+	App            *AppOutput              `json:"app,omitempty"`
+	AppInstanceID  AppInstanceID           `json:"appInstanceID,omitempty"`
+	TargetResolver *TargetResolverOutput   `json:"targetResolver,omitempty"`
+	Receipt        *ExternalReceipt        `json:"receipt,omitempty"`
 }
 
 // AppOutput is the durable semantic result of an MCP Tool response that
@@ -1292,15 +1293,15 @@ type AppInstance struct {
 }
 
 type ContinuationInput struct {
-	Revision           Revision           `json:"revision"`
-	ConsumedRevision   Revision           `json:"consumedRevision,omitempty"`
-	Text               string             `json:"text,omitempty"`
-	Attachments        []Attachment       `json:"attachments,omitempty"`
-	AppContext         []AppContextUpdate `json:"appContext,omitempty"`
-	Metadata           CanonicalValue     `json:"metadata,omitempty"`
-	InvocationDefaults *SessionDefaults   `json:"invocationDefaults,omitempty"`
-	InvocationBudget   *ExecutionBudget   `json:"invocationBudget,omitempty"`
-	UpdatedAt          time.Time          `json:"updatedAt,omitzero"`
+	Revision           Revision                `json:"revision"`
+	ConsumedRevision   Revision                `json:"consumedRevision,omitempty"`
+	Text               string                  `json:"text,omitempty"`
+	Attachments        []Attachment            `json:"attachments,omitempty"`
+	AppContext         []AppContextUpdate      `json:"appContext,omitempty"`
+	Metadata           jsonutil.CanonicalValue `json:"metadata,omitempty"`
+	InvocationDefaults *SessionDefaults        `json:"invocationDefaults,omitempty"`
+	InvocationBudget   *ExecutionBudget        `json:"invocationBudget,omitempty"`
+	UpdatedAt          time.Time               `json:"updatedAt,omitzero"`
 }
 
 // LLMStreamState is the durable incremental output observed before a final
@@ -1312,12 +1313,12 @@ type LLMStreamState struct {
 }
 
 type LLMOutput struct {
-	Text            string               `json:"text,omitempty"`
-	Thinking        string               `json:"thinking,omitempty"`
-	ToolCalls       []ToolCall           `json:"toolCalls,omitempty"`
-	Usage           *inferenceSpec.Usage `json:"usage,omitempty"`
-	ProtocolOutputs []CanonicalValue     `json:"protocolOutputs,omitempty"`
-	DebugDetails    CanonicalValue       `json:"debugDetails,omitempty"`
+	Text            string                    `json:"text,omitempty"`
+	Thinking        string                    `json:"thinking,omitempty"`
+	ToolCalls       []ToolCall                `json:"toolCalls,omitempty"`
+	Usage           *inferenceSpec.Usage      `json:"usage,omitempty"`
+	ProtocolOutputs []jsonutil.CanonicalValue `json:"protocolOutputs,omitempty"`
+	DebugDetails    jsonutil.CanonicalValue   `json:"debugDetails,omitempty"`
 }
 
 type ToolOutputKind string
@@ -1340,7 +1341,7 @@ type ToolOutput struct {
 	Kind       ToolOutputKind                      `json:"kind"`
 	Text       string                              `json:"text,omitempty"`
 	Contents   []inferenceSpec.ToolOutputItemUnion `json:"contents,omitempty"`
-	Structured CanonicalValue                      `json:"structured,omitempty"`
+	Structured jsonutil.CanonicalValue             `json:"structured,omitempty"`
 	Error      string                              `json:"error,omitempty"`
 	SkillState *SkillSelectionState                `json:"skillState,omitempty"`
 }
@@ -1416,18 +1417,18 @@ const (
 )
 
 type WaitRequest struct {
-	Kind               WaitKind         `json:"kind"`
-	Summary            CanonicalValue   `json:"summary,omitempty"`
-	InputSchema        CanonicalValue   `json:"inputSchema,omitempty"`
-	AllowedResolutions []WaitResolution `json:"allowedResolutions"`
-	Deadline           *time.Time       `json:"deadline,omitempty"`
-	RuntimeBound       bool             `json:"runtimeBound"`
+	Kind               WaitKind                `json:"kind"`
+	Summary            jsonutil.CanonicalValue `json:"summary,omitempty"`
+	InputSchema        jsonutil.CanonicalValue `json:"inputSchema,omitempty"`
+	AllowedResolutions []WaitResolution        `json:"allowedResolutions"`
+	Deadline           *time.Time              `json:"deadline,omitempty"`
+	RuntimeBound       bool                    `json:"runtimeBound"`
 
-	Correlation       CanonicalValue      `json:"correlation,omitempty"`
-	CorrelationSchema CanonicalValue      `json:"correlationSchema,omitempty"`
-	DataSchema        CanonicalValue      `json:"dataSchema,omitempty"`
-	EventSource       string              `json:"eventSource,omitempty"`
-	Filter            *WorkflowWaitFilter `json:"filter,omitempty"`
+	Correlation       jsonutil.CanonicalValue `json:"correlation,omitempty"`
+	CorrelationSchema jsonutil.CanonicalValue `json:"correlationSchema,omitempty"`
+	DataSchema        jsonutil.CanonicalValue `json:"dataSchema,omitempty"`
+	EventSource       string                  `json:"eventSource,omitempty"`
+	Filter            *WorkflowWaitFilter     `json:"filter,omitempty"`
 
 	Subscription        string            `json:"subscription,omitempty"`
 	SubscriptionFrameID ProgramFrameID    `json:"subscriptionFrameID,omitempty"`
@@ -1438,8 +1439,8 @@ type WaitRequest struct {
 	Completion          *CompletionHandle `json:"completion,omitempty"`
 	Timer               *TimerWait        `json:"timer,omitempty"`
 
-	Assignees *WaitAssignees `json:"assignees,omitempty"`
-	Request   CanonicalValue `json:"request,omitempty"`
+	Assignees *WaitAssignees          `json:"assignees,omitempty"`
+	Request   jsonutil.CanonicalValue `json:"request,omitempty"`
 }
 
 type WaitAssignees struct {
@@ -1448,27 +1449,27 @@ type WaitAssignees struct {
 }
 
 type Wait struct {
-	ID         WaitID          `json:"id"`
-	WorkItemID WorkItemID      `json:"workItemID"`
-	Status     WaitStatus      `json:"status"`
-	Request    WaitRequest     `json:"request"`
-	Resolution WaitResolution  `json:"resolution,omitempty"`
-	Response   CanonicalValue  `json:"response,omitempty"`
-	CreatedAt  time.Time       `json:"createdAt"`
-	UpdatedAt  time.Time       `json:"updatedAt"`
-	ResolvedBy *HumanActor     `json:"resolvedBy,omitempty"`
-	Error      *SanitizedError `json:"error,omitempty"`
+	ID         WaitID                  `json:"id"`
+	WorkItemID WorkItemID              `json:"workItemID"`
+	Status     WaitStatus              `json:"status"`
+	Request    WaitRequest             `json:"request"`
+	Resolution WaitResolution          `json:"resolution,omitempty"`
+	Response   jsonutil.CanonicalValue `json:"response,omitempty"`
+	CreatedAt  time.Time               `json:"createdAt"`
+	UpdatedAt  time.Time               `json:"updatedAt"`
+	ResolvedBy *HumanActor             `json:"resolvedBy,omitempty"`
+	Error      *SanitizedError         `json:"error,omitempty"`
 }
 
 type SanitizedError struct {
-	Code      string           `json:"code"`
-	Category  ErrorCategory    `json:"category,omitempty"`
-	Message   string           `json:"message"`
-	Retryable bool             `json:"retryable,omitempty"`
-	StepPath  string           `json:"stepPath,omitempty"`
-	Effect    EffectState      `json:"effectState,omitempty"`
-	Details   CanonicalValue   `json:"details,omitempty"`
-	Causes    []SanitizedError `json:"causes,omitempty"`
+	Code      string                  `json:"code"`
+	Category  ErrorCategory           `json:"category,omitempty"`
+	Message   string                  `json:"message"`
+	Retryable bool                    `json:"retryable,omitempty"`
+	StepPath  string                  `json:"stepPath,omitempty"`
+	Effect    EffectState             `json:"effectState,omitempty"`
+	Details   jsonutil.CanonicalValue `json:"details,omitempty"`
+	Causes    []SanitizedError        `json:"causes,omitempty"`
 }
 
 type ProgramEventKind string
@@ -1531,7 +1532,7 @@ type WorkItemIntent struct {
 type ProgramTransition struct {
 	State                   ProgramState               `json:"state"`
 	Status                  *ProgramFrameState         `json:"status,omitempty"`
-	Output                  CanonicalValue             `json:"output,omitempty"`
+	Output                  jsonutil.CanonicalValue    `json:"output,omitempty"`
 	Error                   *SanitizedError            `json:"error,omitempty"`
 	Activities              []Activity                 `json:"activities,omitempty"`
 	Frames                  []ProgramFrameIntent       `json:"frames,omitempty"`
@@ -1560,7 +1561,7 @@ type ProgramInterpreter interface {
 // external domain to append a value to one declared streamed output port.
 // The callback is process-private and is never serialized.
 type WorkPortStream struct {
-	Emit func(name string, value CanonicalValue) error `json:"-"`
+	Emit func(name string, value jsonutil.CanonicalValue) error `json:"-"`
 }
 
 type WorkDispatchRequest struct {
@@ -1600,7 +1601,7 @@ type WaitResolutionRequest struct {
 	WorkItem   WorkItem
 	Wait       Wait
 	Resolution WaitResolution
-	Response   CanonicalValue
+	Response   jsonutil.CanonicalValue
 	Private    any `json:"-"`
 }
 
@@ -1655,10 +1656,10 @@ type ExecutionBindingCloser interface {
 }
 
 type WorkflowAdmissionRequest struct {
-	SessionID   SessionID         `json:"sessionID"`
-	ExecutionID ExecutionID       `json:"executionID"`
-	Workflow    ArtifactSelection `json:"workflow"`
-	Input       CanonicalValue    `json:"input"`
+	SessionID   SessionID               `json:"sessionID"`
+	ExecutionID ExecutionID             `json:"executionID"`
+	Workflow    ArtifactSelection       `json:"workflow"`
+	Input       jsonutil.CanonicalValue `json:"input"`
 }
 
 type WorkflowAdmissionResult struct {
@@ -1769,11 +1770,11 @@ type CommandReceipt struct {
 }
 
 type CreateSessionCommand struct {
-	Meta      CommandMeta     `json:"meta"`
-	SessionID SessionID       `json:"sessionID,omitempty"`
-	Title     string          `json:"title,omitempty"`
-	Defaults  SessionDefaults `json:"defaults"`
-	Metadata  CanonicalValue  `json:"metadata,omitempty"`
+	Meta      CommandMeta             `json:"meta"`
+	SessionID SessionID               `json:"sessionID,omitempty"`
+	Title     string                  `json:"title,omitempty"`
+	Defaults  SessionDefaults         `json:"defaults"`
+	Metadata  jsonutil.CanonicalValue `json:"metadata,omitempty"`
 }
 
 type RenameSessionCommand struct {
@@ -1825,32 +1826,32 @@ type SetTriggerRegistrationStateCommand struct {
 // Source and EventID form the external deduplication identity. Command
 // idempotency remains independent and is retained by Session.Commands.
 type AcceptTriggerEventCommand struct {
-	Meta        CommandMeta    `json:"meta"`
-	SessionID   SessionID      `json:"sessionID"`
-	Source      string         `json:"source"`
-	EventID     string         `json:"eventID"`
-	Name        string         `json:"name"`
-	Data        CanonicalValue `json:"data"`
-	Correlation CanonicalValue `json:"correlation,omitempty"`
-	OccurredAt  time.Time      `json:"occurredAt"`
+	Meta        CommandMeta             `json:"meta"`
+	SessionID   SessionID               `json:"sessionID"`
+	Source      string                  `json:"source"`
+	EventID     string                  `json:"eventID"`
+	Name        string                  `json:"name"`
+	Data        jsonutil.CanonicalValue `json:"data"`
+	Correlation jsonutil.CanonicalValue `json:"correlation,omitempty"`
+	OccurredAt  time.Time               `json:"occurredAt"`
 }
 
 type SignalExecutionCommand struct {
-	Meta        CommandMeta    `json:"meta"`
-	SessionID   SessionID      `json:"sessionID"`
-	ExecutionID ExecutionID    `json:"executionID"`
-	SignalID    string         `json:"signalID,omitempty"`
-	Source      string         `json:"source,omitempty"`
-	Name        string         `json:"name"`
-	Correlation CanonicalValue `json:"correlation,omitempty"`
-	Data        CanonicalValue `json:"data"`
+	Meta        CommandMeta             `json:"meta"`
+	SessionID   SessionID               `json:"sessionID"`
+	ExecutionID ExecutionID             `json:"executionID"`
+	SignalID    string                  `json:"signalID,omitempty"`
+	Source      string                  `json:"source,omitempty"`
+	Name        string                  `json:"name"`
+	Correlation jsonutil.CanonicalValue `json:"correlation,omitempty"`
+	Data        jsonutil.CanonicalValue `json:"data"`
 }
 
 type MessageInput struct {
 	Text              string                   `json:"text,omitempty"`
 	Attachments       []Attachment             `json:"attachments,omitempty"`
 	AttachmentSources []AttachmentSource       `json:"attachmentSources,omitempty"`
-	Metadata          CanonicalValue           `json:"metadata,omitempty"`
+	Metadata          jsonutil.CanonicalValue  `json:"metadata,omitempty"`
 	Defaults          *SessionDefaultsOverride `json:"defaults,omitempty"`
 	InvocationBudget  *ExecutionBudget         `json:"invocationBudget,omitempty"`
 }
@@ -1933,13 +1934,13 @@ type ContinueExecutionCommand struct {
 }
 
 type ResolveWaitCommand struct {
-	Meta        CommandMeta    `json:"meta"`
-	SessionID   SessionID      `json:"sessionID"`
-	ExecutionID ExecutionID    `json:"executionID"`
-	WaitID      WaitID         `json:"waitID"`
-	Resolution  WaitResolution `json:"resolution"`
-	Response    CanonicalValue `json:"response,omitempty"`
-	Actor       *HumanActor    `json:"actor,omitempty"`
+	Meta        CommandMeta             `json:"meta"`
+	SessionID   SessionID               `json:"sessionID"`
+	ExecutionID ExecutionID             `json:"executionID"`
+	WaitID      WaitID                  `json:"waitID"`
+	Resolution  WaitResolution          `json:"resolution"`
+	Response    jsonutil.CanonicalValue `json:"response,omitempty"`
+	Actor       *HumanActor             `json:"actor,omitempty"`
 }
 
 type PauseExecutionCommand struct {
@@ -1980,13 +1981,13 @@ type OpenAppViewCommand struct {
 }
 
 type ExecuteAppToolCommand struct {
-	Meta          CommandMeta    `json:"meta"`
-	SessionID     SessionID      `json:"sessionID"`
-	ExecutionID   ExecutionID    `json:"executionID"`
-	AppInstanceID AppInstanceID  `json:"appInstanceID"`
-	ViewID        AppViewID      `json:"viewID"`
-	ToolName      string         `json:"toolName"`
-	Arguments     CanonicalValue `json:"arguments,omitempty"`
+	Meta          CommandMeta             `json:"meta"`
+	SessionID     SessionID               `json:"sessionID"`
+	ExecutionID   ExecutionID             `json:"executionID"`
+	AppInstanceID AppInstanceID           `json:"appInstanceID"`
+	ViewID        AppViewID               `json:"viewID"`
+	ToolName      string                  `json:"toolName"`
+	Arguments     jsonutil.CanonicalValue `json:"arguments,omitempty"`
 }
 
 type StageAppContextCommand struct {
@@ -2017,7 +2018,7 @@ type AppContextStagingRequest struct {
 }
 
 type AppResourceReadResult struct {
-	Content CanonicalValue `json:"content"`
+	Content jsonutil.CanonicalValue `json:"content"`
 }
 
 type EditAndResendCommand struct {

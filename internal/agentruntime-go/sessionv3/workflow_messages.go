@@ -3,15 +3,17 @@ package sessionv3
 import (
 	"errors"
 	"time"
+
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 type WorkflowChannelMessageSnapshot struct {
-	ID          string         `json:"id"`
-	Sequence    uint64         `json:"sequence"`
-	Kind        string         `json:"kind,omitempty"`
-	Data        CanonicalValue `json:"data"`
-	Correlation CanonicalValue `json:"correlation,omitempty"`
-	Time        time.Time      `json:"time"`
+	ID          string                  `json:"id"`
+	Sequence    uint64                  `json:"sequence"`
+	Kind        string                  `json:"kind,omitempty"`
+	Data        jsonutil.CanonicalValue `json:"data"`
+	Correlation jsonutil.CanonicalValue `json:"correlation,omitempty"`
+	Time        time.Time               `json:"time"`
 }
 
 // captureWorkflowMessages records the authorized channel snapshot used by the
@@ -76,12 +78,12 @@ func captureWorkflowMessages(
 // clock. Call context remains otherwise unchanged. This does not feed generic
 // Workflow JSON into a model request; it is only CEL evaluation data.
 func workflowActivationContext(
-	value *CanonicalValue,
+	value *jsonutil.CanonicalValue,
 	logicalTime time.Time,
 ) (any, error) {
-	contextValues := map[string]CanonicalValue{}
+	contextValues := map[string]jsonutil.CanonicalValue{}
 	if value != nil && len(*value) != 0 {
-		decoded, err := DecodeCanonicalValue[map[string]CanonicalValue](*value)
+		decoded, err := jsonutil.DecodeCanonicalValue[map[string]jsonutil.CanonicalValue](*value)
 		if err != nil {
 			return nil, errors.New("workflow context must be an object")
 		}
@@ -89,6 +91,6 @@ func workflowActivationContext(
 			contextValues[key] = current.Clone()
 		}
 	}
-	contextValues["time"] = MustCanonicalValue(logicalTime.UTC().Format(time.RFC3339Nano))
-	return workflowActivationValue(MustCanonicalValue(contextValues))
+	contextValues["time"] = jsonutil.MustCanonicalValue(logicalTime.UTC().Format(time.RFC3339Nano))
+	return workflowActivationValue(jsonutil.MustCanonicalValue(contextValues))
 }

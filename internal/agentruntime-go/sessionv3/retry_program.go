@@ -5,6 +5,8 @@ import (
 	"errors"
 	"strconv"
 	"time"
+
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 const (
@@ -526,7 +528,7 @@ func encodeRetryProgramState(
 	return ProgramState{
 		Type:    BuiltinRetryBoundaryInterpreterID,
 		Version: retryBoundaryInterpreterVersion,
-		Data:    MustCanonicalValue(value),
+		Data:    jsonutil.MustCanonicalValue(value),
 	}
 }
 
