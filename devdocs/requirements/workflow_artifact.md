@@ -11,15 +11,13 @@ Invocation = one execution of a Workflow
 An Agent owns reusable reasoning and interaction behavior.
 A Workflow owns declaration-level process behavior, target-selection rules, and portable orchestration semantics.
 
-A Workflow declaration does not own runtime interpretation, runtime state,
-provider configuration, target binding, persistence, recovery, timers, or frontend transport.
-Those concerns are specified in `workflow_runtime.md`.
+This document specifies the Workflow source Artifact family: declaration
+admission, canonical Definition construction, read-only plan resolution,
+static dependency closure, and source-backed identity facts.
 
-Session Runtime v3 is the durable execution host for both normal conversation work and Workflow work.
-
-Session Runtime v3 + Workflow Runtime v3 = typed durable backend that includes normal Session v2 behavior + full Workflow v1 behavior
-
-Workflow Artifact completion is tracked only through Artifact planning work items in this document. Runtime completion, frontend migration, and Session v2 replacement status are tracked only in `workflow_runtime.md`.
+Execution preparation, runtime interpretation, persistence, scheduling, and
+frontend behavior are outside this document. Their status belongs in
+`workflow_runtime.md`.
 
 ## 2. Version contract
 
@@ -57,9 +55,9 @@ A Workflow declaration owns orchestration semantics:
 - Resource claims and execution budgets.
 - Cancellation and cleanup behavior.
 
-Workflow setup creates current executable target bindings from already planned
-Workflow facts. Session Runtime owns durable ProgramFrames, WorkItems, waits,
-retries, effects, cancellation, recovery, and control-flow execution.
+Workflow Artifact planning exposes admitted static facts and deterministic
+source-backed relationships. This document does not specify how a consumer
+lowers, binds, schedules, persists, or executes those facts.
 
 A Workflow does not own:
 
@@ -85,12 +83,11 @@ Workflow document, callable targets, requirements, source inventory, direct
 capability evidence, and a complete static Artifact dependency closure.
 
 The closure contains only source-backed Artifact identity facts and static
-relationships. It contains no runtime program, binding, timer, provider
-request, credential, client, callback, or native handle.
+relationships. It contains no execution-private program, binding, timer,
+provider request, credential, client, callback, or native handle.
 
-Runtime setup consumes this plan and converts typed Workflow language facts to
-runtime types. Runtime setup does not ask Workflow Artifact planning to
-interpret the Workflow for execution.
+Consumers can use the plan as a read-only source-fact projection. Consumer
+lowering and execution behavior are not specified in this document.
 
 Artifact Store is a passive source-fact provider. It admits and returns
 definitions, relationships, identity facts, and static planning facts. It does
@@ -114,11 +111,10 @@ An Agent can contribute:
 - Model system prompt behavior.
 - Agent-specific capability requirements.
 
-Workflow source can declare an Agent target. Admission uses the Workflow-owned
-typed Agent invocation adapter and existing Agent and setup-owned invocation
-APIs. It rejects unavailable current Agent or Model capability state and
-unsupported transport before execution starts. Workflow input must never become
-fallback chat text or a generic Agent-domain request envelope.
+Workflow source can declare an Agent target. Artifact planning records the
+declared static relationship, callable interface, and source identity facts.
+Current capability readiness and native invocation behavior are outside this
+Artifact planning document.
 
 ### 3.4 Workflow Artifact API
 
@@ -189,35 +185,25 @@ record for it.
 
 ```mermaid
 flowchart TD
-    A[Workflow source v1] --> B[Workflow contract validation]
+    A[Workflow source v1] --> B[Workflow contract admission]
     B --> C[Generic Artifact admission]
     C --> D[Read-only Workflow Artifact plan]
-    D --> E[Workflow setup pinning and lowering]
-    E --> F[Session Runtime v3 Workflow ProgramFrame interpreter]
-    F --> G[Setup-owned domain binders]
-    G --> H[Model, Agent, Tool, MCP, Skill, Service, Activity domains]
-
-    F --> I[Session v3 document]
-    I --> J[Session Store v3]
-    J --> K[Derived index and FTS]
+    D --> E[Static Artifact closure and source inventory]
+    E --> F[External consumer boundary]
 ```
 
-| Layer                          | Primary package area                                                    | Responsibilities                                                                                                                             |
-| ------------------------------ | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| Declaration language           | `internal/llmartifactory-go/workflow/contract/v1/`                      | Source grammar, source schema, static validation, JSON Schema validity, CEL scope validity, target and requirement declaration validity      |
-| Workflow planning              | `internal/llmartifactory-go/workflow/`                                  | Read-only Artifact-backed relationship resolution, callable-target and requirement inventory, direct Artifact references, and planning facts |
-| Workflow execution preparation | `internal/agentruntimesetup/workflowruntime/`                           | Current Artifact pins, local enablement, target adapter selection, typed WorkflowProgram lowering, and target transport admission            |
-| Durable orchestration          | `internal/agentruntime-go/sessionv3/`                                   | ProgramFrames, WorkItems, Attempts, Waits, timers, effects, recovery, cancellation, durable control flow                                     |
-| Domain binding                 | `internal/agentruntimesetup/sessionv3runtime/`, domain runtime packages | Domain-native Model, Agent, Tool, MCP, Skill, Workspace, attachment, Service, Activity, and provider adaptation                              |
-| Persistence                    | `internal/sessionstorev3/`                                              | Authoritative Session v3 documents, tombstones, derived index, derived FTS                                                                   |
-| Desktop composition            | `cmd/agentgo/`                                                          | Wails transport attachment, runtime composition, application binding registration                                                            |
+| Layer                      | Primary package area                               | Responsibilities                                                                                                                             |
+| -------------------------- | -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Declaration language       | `internal/llmartifactory-go/workflow/contract/v1/` | Source grammar, source schema, static validation, JSON Schema validity, CEL scope validity, target and requirement declaration validity      |
+| Workflow planning          | `internal/llmartifactory-go/workflow/`             | Read-only Artifact-backed relationship resolution, callable-target and requirement inventory, direct Artifact references, and planning facts |
+| Artifact Store             | Generic Artifact Store packages                    | Passive Definition storage, identity, relationships, admitted source facts, and read-only retrieval                                          |
+| External consumer boundary | Outside this document                              | Consumer behavior is intentionally not specified here                                                                                        |
 
-Session Runtime v3 has no Artifact Store or setup import. It does not parse source, resolve Artifacts, configure providers, read Workspace files, discover MCP capabilities, render Skills, invoke native Tools directly, or materialize native attachments.
+The Artifact Store has no execution role. It does not parse consumer intent,
+prepare bindings, schedule work, or retain consumer-private state.
 
-Session Runtime receives a prepared Workflow Program snapshot and immutable
-runtime pins. It does not receive a Workflow source document, Workflow source
-selection, static Artifact closure, Artifact Store handle, or execution
-preparation port.
+The read-only plan and closure are the complete Artifact-facing output. This
+document makes no assertion about a consumer's runtime representation.
 
 ### 4.1 Validation ownership
 
@@ -1818,21 +1804,13 @@ A valid Workflow declaration has:
 - Valid limit inheritance.
 - Explicit root output mapping.
 
-Admission resolves:
+Artifact planning resolves static declaration relationships and source-backed
+Artifact identity facts represented by the admitted plan and closure.
 
-- Current execution Artifact pins.
-- Nested Workflow pins.
-- Current Service bindings.
-- Current Activity bindings.
-- Provider-managed Tool ownership.
-- Tool-family transport capability.
-- Model and Agent invocation capability.
-- Current policy and binding availability.
+Current execution pinning, binding availability, provider ownership, policy,
+and transport behavior are outside this document.
 
-Runtime setup never accepts a valid operation and later ignores it. Workflow
-artifact planning never creates an execution pin or a target-domain binding.
-
-## 20. Compiler and runtime boundary
+## 20. Artifact consumer boundary
 
 ```text
 Workflow source v1
@@ -1847,16 +1825,7 @@ Generic Artifact admission
 Read-only Workflow Artifact plan
         |
         v
-Setup-owned Workflow execution preparation, pinning, binding, and lowering
-        |
-        v
-Typed runtime-neutral WorkflowProgram
-        |
-        v
-Session Runtime v3 ProgramFrame interpreter
-        |
-        v
-Setup-owned domain binders
+External consumer boundary
 ```
 
 The declaration layer owns:
@@ -1872,35 +1841,6 @@ Workflow planning owns:
 - Read-only target and requirement resolution.
 - Callable-target and requirement inventory projection.
 - Direct source-backed Artifact reference projection.
-
-Runtime setup owns:
-
-- Execution Artifact pinning and local enablement checks.
-- Current dependency verification.
-- Provider planning.
-- Tool binding.
-- MCP discovery.
-- Skill resolution.
-- Workspace planning.
-- Attachment materialization.
-- Service binding.
-- Activity binding.
-- External domain adaptation.
-
-Session Runtime v3 owns:
-
-- ProgramFrames.
-- WorkItems.
-- Attempts.
-- Waits.
-- Timers.
-- Recovery.
-- Idempotency.
-- Cancellation.
-- Durable effect state.
-- Trigger state.
-- Control-flow state.
-- Persistence-safe semantics.
 
 Canonical JSON values are used only at arbitrary JSON boundaries.
 
@@ -1949,12 +1889,12 @@ Workflow Artifact completion includes:
 
 ## 22. Workflow Artifact implementation status
 
-| Artifact planning task                                           | Status      | Evidence or required result                                                                                                                        |
-| ---------------------------------------------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Decode and validate Workflow v1 declarations                     | Implemented | `internal/llmartifactory-go/workflow/contract/v1/`                                                                                                 |
-| Build callable-target and requirement inventory                  | Implemented | `internal/llmartifactory-go/workflow/inventory.go`                                                                                                 |
-| Preserve direct capability evidence without Artifact fabrication | Implemented | `internal/llmartifactory-go/workflow/closure.go` emits direct evidence without synthetic Artifact nodes                                            |
-| Publish a deterministic complete static Artifact closure         | Implemented | `internal/llmartifactory-go/workflow/closure.go` publishes sorted nodes, edges, paths, and refresh checks                                          |
-| Include nested Workflow plan nodes in the closure                | Implemented | `ArtifactClosureNode.Workflow` contains admitted nested Workflow document, inventory, and composition facts                                        |
-| Publish one canonical declaration-path model                     | Implemented | Contract validation, Inventory, closure paths, lowered descriptors, ProgramFrames, WorkItems, and PortPlans retain `root/...` declaration identity |
-| Keep runtime interpretation outside Artifact planning            | Implemented | `internal/llmartifactory-go/workflow/` imports Artifact and declaration planning contracts only                                                    |
+| Artifact planning task                                           | Status      | Evidence or required result                                                                                 |
+| ---------------------------------------------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------- |
+| Decode and validate Workflow v1 declarations                     | Implemented | `internal/llmartifactory-go/workflow/contract/v1/`                                                          |
+| Build callable-target and requirement inventory                  | Implemented | `internal/llmartifactory-go/workflow/inventory.go`                                                          |
+| Preserve direct capability evidence without Artifact fabrication | Implemented | `internal/llmartifactory-go/workflow/closure.go` emits direct evidence without synthetic Artifact nodes     |
+| Publish a deterministic complete static Artifact closure         | Implemented | `internal/llmartifactory-go/workflow/closure.go` publishes sorted nodes, edges, paths, and refresh checks   |
+| Include nested Workflow plan nodes in the closure                | Implemented | `ArtifactClosureNode.Workflow` contains admitted nested Workflow document, inventory, and composition facts |
+| Publish one canonical declaration-path model                     | Implemented | Contract admission, Inventory, and closure paths retain the canonical `root/...` declaration identity       |
+| Keep runtime interpretation outside Artifact planning            | Implemented | `internal/llmartifactory-go/workflow/` imports Artifact and declaration planning contracts only             |
