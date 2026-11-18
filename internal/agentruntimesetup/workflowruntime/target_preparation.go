@@ -4,12 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sort"
 
 	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	workflowAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workflow"
 	workflowv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workflow/contract/v1"
 )
@@ -59,261 +57,137 @@ func (a *Admission) workflowOwnerModel(
 	return &pin, nil
 }
 
-func workflowDirectCapabilityTarget(
-	value workflowAPI.TargetPlan,
-) (sessionv3Runtime.DirectCapabilityTarget, bool, error) {
-	if value.Resolution == nil ||
-		value.Resolution.Target == nil ||
-		value.Resolution.Target.Form != composition.TargetFormDirect {
-		return sessionv3Runtime.DirectCapabilityTarget{}, false, nil
-	}
-	target := value.Resolution.Target
-	kind, err := workflowRuntimeTargetKind(value.Target.Kind)
-	if err != nil {
-		return sessionv3Runtime.DirectCapabilityTarget{}, false, err
-	}
-	output := sessionv3Runtime.DirectCapabilityTarget{
-		Kind:             kind,
-		Name:             string(target.Name),
-		ProviderIdentity: target.ProviderIdentity,
-		ProviderLocalID:  target.ProviderLocalID,
-		Evidence:         string(target.Evidence),
-	}
-	if err := output.Validate(); err != nil {
-		return sessionv3Runtime.DirectCapabilityTarget{}, false, err
-	}
-	return output, true, nil
-}
-
-func workflowRuntimeTargetKind(
-	value workflowv1.TargetKind,
-) (sessionv3Runtime.WorkflowTargetKind, error) {
-	switch value {
-	case workflowv1.TargetModel:
-		return sessionv3Runtime.WorkflowTargetModel, nil
-	case workflowv1.TargetAgent:
-		return sessionv3Runtime.WorkflowTargetAgent, nil
-	case workflowv1.TargetTool:
-		return sessionv3Runtime.WorkflowTargetTool, nil
-	case workflowv1.TargetService:
-		return sessionv3Runtime.WorkflowTargetService, nil
-	case workflowv1.TargetActivity:
-		return sessionv3Runtime.WorkflowTargetActivity, nil
-	case workflowv1.TargetWorkflow:
-		return sessionv3Runtime.WorkflowTargetWorkflow, nil
-	default:
-		return "", fmt.Errorf("unsupported workflow target kind %q", value)
-	}
-}
-
-func (a *Admission) bindDirectTarget(
+// prepareRequirement preserves root requirements as named prerequisites.
+// It does not create a callable target, WorkItem, direct target plan, or
+// generic callable capability fact.
+func (a *Admission) prepareRequirement(
 	ctx context.Context,
-	document workflowv1.WorkflowDocument,
-	source workflowv1.Target,
-	direct sessionv3Runtime.DirectCapabilityTarget,
-	requirements []sessionv3Runtime.WorkflowCapabilityRequirement,
-) (sessionv3Runtime.WorkflowTarget, error) {
-	if a.direct == nil {
-		return sessionv3Runtime.WorkflowTarget{}, fmt.Errorf(
-			"%w: direct target provider %q",
-			ErrBindingUnavailable,
-			direct.ProviderIdentity,
-		)
-	}
-	plan, err := a.direct.PrepareWorkflowDirectTarget(
-		ctx,
-		DirectTargetPreparationRequest{
-			Target:       direct,
-			Requirements: requirements,
-		},
-	)
-	if err != nil {
-		return sessionv3Runtime.WorkflowTarget{}, err
+	requirement workflowAPI.TargetPlan,
+	closure *workflowAdmissionClosure,
+) (sessionv3Runtime.WorkflowRequirementFact, error) {
+	target := requirement.Target
+	result := sessionv3Runtime.WorkflowRequirementFact{
+		Name: requirement.Name,
 	}
 
-	target := sessionv3Runtime.WorkflowTarget{
-		Kind:            direct.Kind,
-		Direct:          &plan,
-		Transport:       plan.Transport,
-		CapabilityFacts: cloneDirectCapabilityFacts(plan.Capabilities),
-		Effect: sessionv3Runtime.EffectContract{
-			Kind: sessionv3Runtime.EffectKindNonIdempotent,
-		},
-	}
-	switch direct.Kind {
-	case sessionv3Runtime.WorkflowTargetTool:
-		target.ToolName = direct.Name
-	case sessionv3Runtime.WorkflowTargetService:
-		target.ServiceID = direct.Name
-		target.BindingVersion = plan.AdapterID
-	case sessionv3Runtime.WorkflowTargetActivity:
-		target.ActivityID = direct.Name
-		target.BindingVersion = plan.AdapterID
-	case sessionv3Runtime.WorkflowTargetModel,
-		sessionv3Runtime.WorkflowTargetAgent:
-	default:
-		return sessionv3Runtime.WorkflowTarget{}, errors.New(
-			"direct Workflow target kind is unavailable",
-		)
-	}
-	return finalizeWorkflowTarget(document, source, target)
-}
-
-func workflowTargetRequirements(
-	target workflowv1.Target,
-) ([]sessionv3Runtime.WorkflowCapabilityRequirement, error) {
-	if target.Interface == nil {
-		return nil, nil
-	}
-	output := make(
-		[]sessionv3Runtime.WorkflowCapabilityRequirement,
-		0,
-		len(target.Interface.Capabilities),
-	)
-	for _, name := range target.Interface.Capabilities {
-		output = append(output, sessionv3Runtime.WorkflowCapabilityRequirement{
-			Name: name,
-		})
-	}
-	return output, nil
-}
-
-func workflowCallableRequirements(
-	document workflowv1.WorkflowDocument,
-	inventory workflowAPI.Inventory,
-	target workflowAPI.TargetPlan,
-) ([]sessionv3Runtime.WorkflowCapabilityRequirement, error) {
-	names := make(map[string]struct{})
-	appendContract := func(value *workflowv1.CallableInterface) {
-		if value == nil {
-			return
-		}
-		for _, name := range value.Capabilities {
-			names[name] = struct{}{}
-		}
-	}
-	appendContract(target.Target.Interface)
-
-	for _, call := range inventory.Calls {
-		selected := false
-		for _, use := range call.TargetUses {
-			if use.Name == target.Name {
-				selected = true
-				break
-			}
-		}
-		if !selected {
-			continue
-		}
-		appendContract(call.Call.Interface)
-		if call.Call.Allowed == "" {
-			continue
-		}
-		set, found := document.TargetSets[call.Call.Allowed]
+	switch target.Kind {
+	case workflowv1.TargetService:
+		binding, found := a.bindings.Service(target.Ref)
 		if !found {
-			return nil, fmt.Errorf(
-				"workflow target set %q is unavailable",
-				call.Call.Allowed,
+			return sessionv3Runtime.WorkflowRequirementFact{}, fmt.Errorf(
+				"%w: service requirement %q",
+				ErrBindingUnavailable,
+				target.Ref,
 			)
 		}
-		if set.Resolved != nil {
-			appendContract(&set.Resolved.Interface)
+		result.Kind = sessionv3Runtime.WorkflowTargetService
+		result.BindingID = binding.ID()
+		result.BindingVersion = binding.Version()
+
+	case workflowv1.TargetActivity:
+		binding, found := a.bindings.Activity(target.Ref)
+		if !found {
+			return sessionv3Runtime.WorkflowRequirementFact{}, fmt.Errorf(
+				"%w: activity requirement %q",
+				ErrBindingUnavailable,
+				target.Ref,
+			)
+		}
+		result.Kind = sessionv3Runtime.WorkflowTargetActivity
+		result.BindingID = binding.ID()
+		result.BindingVersion = binding.Version()
+
+	case workflowv1.TargetModel:
+		if a.invocations == nil {
+			return sessionv3Runtime.WorkflowRequirementFact{}, ErrBindingUnavailable
+		}
+		pin, err := a.pinInvocationTarget(ctx, requirement, closure)
+		if err != nil {
+			return sessionv3Runtime.WorkflowRequirementFact{}, err
+		}
+		if err := a.invocations.AdmitWorkflowModelTarget(ctx, pin); err != nil {
+			return sessionv3Runtime.WorkflowRequirementFact{}, err
+		}
+		result.Kind = sessionv3Runtime.WorkflowTargetModel
+		result.Artifact = &pin
+
+	case workflowv1.TargetAgent:
+		if a.invocations == nil {
+			return sessionv3Runtime.WorkflowRequirementFact{}, ErrBindingUnavailable
+		}
+		pin, err := a.pinInvocationTarget(ctx, requirement, closure)
+		if err != nil {
+			return sessionv3Runtime.WorkflowRequirementFact{}, err
+		}
+		if err := a.invocations.AdmitWorkflowAgentTarget(ctx, pin); err != nil {
+			return sessionv3Runtime.WorkflowRequirementFact{}, err
+		}
+		result.Kind = sessionv3Runtime.WorkflowTargetAgent
+		result.Artifact = &pin
+
+	case workflowv1.TargetTool:
+		ref, err := requireWorkflowTargetArtifactRef(
+			requirement,
+			"Tool requirement",
+		)
+		if err != nil {
+			return sessionv3Runtime.WorkflowRequirementFact{}, err
+		}
+		pin, err := a.pinClosureArtifact(ctx, closure, ref)
+		if err != nil {
+			return sessionv3Runtime.WorkflowRequirementFact{}, err
+		}
+		if target.Server != nil {
+			result.Kind = sessionv3Runtime.WorkflowTargetMCPTool
 		} else {
-			appendContract(set.Interface)
+			if _, err := a.tools.IsProviderManagedWorkflowTool(ctx, pin); err != nil {
+				return sessionv3Runtime.WorkflowRequirementFact{}, err
+			}
+			result.Kind = sessionv3Runtime.WorkflowTargetTool
 		}
-	}
+		result.Artifact = &pin
 
-	ordered := make([]string, 0, len(names))
-	for name := range names {
-		ordered = append(ordered, name)
-	}
-	sort.Strings(ordered)
+	case workflowv1.TargetWorkflow:
+		ref, err := requireWorkflowTargetArtifactRef(
+			requirement,
+			"nested Workflow requirement",
+		)
+		if err != nil {
+			return sessionv3Runtime.WorkflowRequirementFact{}, err
+		}
+		if _, found := closure.workflow(ref); !found {
+			return sessionv3Runtime.WorkflowRequirementFact{}, fmt.Errorf(
+				"%w: nested Workflow requirement %q is absent from the static Artifact closure",
+				ErrBindingUnavailable,
+				requirement.Name,
+			)
+		}
+		pin, err := a.pinClosureArtifact(ctx, closure, ref)
+		if err != nil {
+			return sessionv3Runtime.WorkflowRequirementFact{}, err
+		}
+		result.Kind = sessionv3Runtime.WorkflowTargetWorkflow
+		result.Artifact = &pin
 
-	output := make(
-		[]sessionv3Runtime.WorkflowCapabilityRequirement,
-		0,
-		len(ordered),
-	)
-	for _, name := range ordered {
-		output = append(output, sessionv3Runtime.WorkflowCapabilityRequirement{
-			Name: name,
-		})
-	}
-	return output, nil
-}
-
-func workflowRequirementFact(
-	name string,
-	target sessionv3Runtime.WorkflowTarget,
-) sessionv3Runtime.WorkflowRequirementFact {
-	output := sessionv3Runtime.WorkflowRequirementFact{
-		Name:         name,
-		Kind:         target.Kind,
-		Capabilities: cloneDirectCapabilityFacts(target.CapabilityFacts),
-	}
-	switch target.Kind {
-	case sessionv3Runtime.WorkflowTargetModel,
-		sessionv3Runtime.WorkflowTargetAgent,
-		sessionv3Runtime.WorkflowTargetTool:
-		if target.Artifact != nil {
-			value := *target.Artifact
-			output.Artifact = &value
-		}
-	case sessionv3Runtime.WorkflowTargetMCPTool:
-		if target.MCP != nil {
-			value := target.MCP.Server
-			output.Artifact = &value
-		}
-	case sessionv3Runtime.WorkflowTargetProviderTool:
-		if target.ProviderTool != nil {
-			value := target.ProviderTool.Choice.Artifact
-			output.Artifact = &value
-		}
-	case sessionv3Runtime.WorkflowTargetService:
-		output.BindingID = target.ServiceID
-		output.BindingVersion = target.BindingVersion
-	case sessionv3Runtime.WorkflowTargetActivity:
-		output.BindingID = target.ActivityID
-		output.BindingVersion = target.BindingVersion
 	default:
+		return sessionv3Runtime.WorkflowRequirementFact{}, fmt.Errorf(
+			"%w: unsupported Workflow requirement kind %q",
+			ErrBindingUnavailable,
+			target.Kind,
+		)
 	}
-	if target.Direct != nil {
-		output.Direct = cloneDirectCapabilityPlan(target.Direct)
+
+	if err := result.Validate(); err != nil {
+		return sessionv3Runtime.WorkflowRequirementFact{}, err
 	}
-	return output
+	return result, nil
 }
 
 func (a *Admission) prepareBoundTarget(
 	ctx context.Context,
 	targetPlan workflowAPI.TargetPlan,
 	target sessionv3Runtime.WorkflowTarget,
-	requirements []sessionv3Runtime.WorkflowCapabilityRequirement,
 ) (sessionv3Runtime.WorkflowTarget, error) {
-	if target.Direct != nil {
-		if err := sessionv3Runtime.ValidateWorkflowCapabilityFacts(
-			requirements,
-			target.Direct.Capabilities,
-		); err != nil {
-			return sessionv3Runtime.WorkflowTarget{}, err
-		}
-		target.Transport = target.Direct.Transport
-		target.CapabilityFacts = cloneDirectCapabilityFacts(
-			target.Direct.Capabilities,
-		)
-		return target, nil
-	}
-
-	request := WorkflowCapabilityFactRequest{
-		TargetName:   targetPlan.Name,
-		TargetKind:   target.Kind,
-		Requirements: requirements,
-	}
-
-	var (
-		facts    []sessionv3Runtime.WorkflowCapabilityFact
-		provider any
-	)
-
 	switch target.Kind {
 	case sessionv3Runtime.WorkflowTargetModel:
 		if a.invocations == nil || target.Artifact == nil {
@@ -323,12 +197,9 @@ func (a *Admission) prepareBoundTarget(
 				targetPlan.Name,
 			)
 		}
-		pin := *target.Artifact
-		request.Artifact = &pin
 		target.Transport = invocationTransport(
 			a.invocations.ModelInvocationCapabilities(),
 		)
-		provider = a.invocations
 
 	case sessionv3Runtime.WorkflowTargetAgent:
 		if a.invocations == nil || target.Artifact == nil {
@@ -338,25 +209,13 @@ func (a *Admission) prepareBoundTarget(
 				targetPlan.Name,
 			)
 		}
-		pin := *target.Artifact
-		request.Artifact = &pin
 		target.Transport = invocationTransport(
 			a.invocations.AgentInvocationCapabilities(),
 		)
-		provider = a.invocations
 
 	case sessionv3Runtime.WorkflowTargetTool,
 		sessionv3Runtime.WorkflowTargetMCPTool:
 		target.Transport = workflowToolTransport()
-		if target.Artifact != nil {
-			pin := *target.Artifact
-			request.Artifact = &pin
-		}
-		if target.MCP != nil {
-			pin := target.MCP.Server
-			request.Artifact = &pin
-		}
-		provider = a.tools
 
 	case sessionv3Runtime.WorkflowTargetProviderTool:
 		if target.ProviderTool == nil || a.invocations == nil {
@@ -366,12 +225,9 @@ func (a *Admission) prepareBoundTarget(
 				targetPlan.Name,
 			)
 		}
-		pin := target.ProviderTool.OwnerModel
-		request.Artifact = &pin
 		target.Transport = invocationTransport(
 			a.invocations.ModelInvocationCapabilities(),
 		)
-		provider = a.invocations
 
 	case sessionv3Runtime.WorkflowTargetService:
 		binding, found := a.bindings.Service(target.ServiceID)
@@ -384,7 +240,6 @@ func (a *Admission) prepareBoundTarget(
 			)
 		}
 		target.Transport = externalBindingTransport(binding)
-		provider = binding
 
 	case sessionv3Runtime.WorkflowTargetActivity:
 		binding, found := a.bindings.Activity(target.ActivityID)
@@ -397,16 +252,8 @@ func (a *Admission) prepareBoundTarget(
 			)
 		}
 		target.Transport = externalBindingTransport(binding)
-		provider = binding
 
 	case sessionv3Runtime.WorkflowTargetWorkflow:
-		if len(requirements) != 0 {
-			return sessionv3Runtime.WorkflowTarget{}, fmt.Errorf(
-				"%w: nested Workflow target %q has callable capability requirements without an owning capability adapter",
-				ErrBindingUnavailable,
-				targetPlan.Name,
-			)
-		}
 		target.Transport = sessionv3Runtime.WorkflowTargetTransport{
 			Modes: []sessionv3Runtime.WorkflowCallMode{
 				sessionv3Runtime.WorkflowCallModeInvoke,
@@ -429,11 +276,6 @@ func (a *Admission) prepareBoundTarget(
 	if err := target.Transport.Validate(); err != nil {
 		return sessionv3Runtime.WorkflowTarget{}, err
 	}
-	facts, err := resolveWorkflowCapabilityFacts(ctx, provider, request)
-	if err != nil {
-		return sessionv3Runtime.WorkflowTarget{}, err
-	}
-	target.CapabilityFacts = cloneDirectCapabilityFacts(facts)
 	return target, nil
 }
 
@@ -448,40 +290,6 @@ func workflowToolTransport() sessionv3Runtime.WorkflowTargetTransport {
 		FinalOutputPorts:  true,
 		StreamOutputPorts: false,
 	}
-}
-
-func cloneDirectCapabilityPlan(
-	value *sessionv3Runtime.DirectCapabilityPlan,
-) *sessionv3Runtime.DirectCapabilityPlan {
-	if value == nil {
-		return nil
-	}
-	output := *value
-	output.Facts = value.Facts.Clone()
-	output.Capabilities = cloneWorkflowCapabilityFacts(value.Capabilities)
-	output.Transport.Modes = append(
-		[]sessionv3Runtime.WorkflowCallMode(nil),
-		value.Transport.Modes...,
-	)
-	output.Transport.ContextForms = append(
-		[]string(nil),
-		value.Transport.ContextForms...,
-	)
-	return &output
-}
-
-func cloneWorkflowCapabilityFacts(
-	values []sessionv3Runtime.WorkflowCapabilityFact,
-) []sessionv3Runtime.WorkflowCapabilityFact {
-	if len(values) == 0 {
-		return nil
-	}
-	output := make([]sessionv3Runtime.WorkflowCapabilityFact, len(values))
-	for index := range values {
-		output[index] = values[index]
-		output[index].Details = values[index].Details.Clone()
-	}
-	return output
 }
 
 // invocationTransport converts current Model or Agent adapter transport facts
@@ -533,67 +341,5 @@ func externalBindingTransport(
 		output.ContextForms = []string{"*"}
 	}
 
-	return output
-}
-
-// resolveWorkflowCapabilityFacts invokes only an owning target-domain
-// capability provider. A requirement is never silently treated as satisfied.
-// This keeps root Workflow requirements and callable requirements operational
-// without making Workflow interpret domain-specific capability names.
-func resolveWorkflowCapabilityFacts(
-	ctx context.Context,
-	provider any,
-	request WorkflowCapabilityFactRequest,
-) ([]sessionv3Runtime.WorkflowCapabilityFact, error) {
-	if len(request.Requirements) == 0 {
-		return nil, nil
-	}
-
-	resolver, found := provider.(interface {
-		ResolveWorkflowCapabilityFacts(
-			ctx context.Context,
-			req WorkflowCapabilityFactRequest,
-		) ([]sessionv3Runtime.WorkflowCapabilityFact, error)
-	})
-	if !found || resolver == nil {
-		return nil, fmt.Errorf(
-			"%w: target %q has callable capability requirements but its owning domain exposes no capability-fact resolver",
-			ErrBindingUnavailable,
-			request.TargetName,
-		)
-	}
-
-	facts, err := resolver.ResolveWorkflowCapabilityFacts(
-		ctx,
-		request,
-	)
-	if err != nil {
-		return nil, err
-	}
-	if err := sessionv3Runtime.ValidateWorkflowCapabilityFacts(
-		request.Requirements,
-		facts,
-	); err != nil {
-		return nil, err
-	}
-
-	return clonePreparedCapabilityFacts(facts), nil
-}
-
-func clonePreparedCapabilityFacts(
-	values []sessionv3Runtime.WorkflowCapabilityFact,
-) []sessionv3Runtime.WorkflowCapabilityFact {
-	if len(values) == 0 {
-		return nil
-	}
-
-	output := make(
-		[]sessionv3Runtime.WorkflowCapabilityFact,
-		len(values),
-	)
-	for index := range values {
-		output[index] = values[index]
-		output[index].Details = values[index].Details.Clone()
-	}
 	return output
 }

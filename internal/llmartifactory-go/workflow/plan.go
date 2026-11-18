@@ -46,10 +46,10 @@ type Plan struct {
 	// Inventory rather than rebuilding dispatch lookup from this value.
 	Capabilities composition.CapabilityPlan `json:"capabilities"`
 
-	// CompositionComplete covers only relationships represented in
-	// Capabilities. Direct capabilities count as available composition
-	// results. This field does not establish binding readiness, authorization,
-	// dynamic target availability, or runtime support.
+	// CompositionComplete covers generic source relationship resolution.
+	// Workflow-relevant direct composition results are rejected during closure
+	// planning and cannot be lowered to runtime state. This field does not
+	// establish binding readiness, authorization, or runtime support.
 	CompositionComplete bool `json:"compositionComplete"`
 
 	// Inventory exposes the typed declaration facts required for runtime

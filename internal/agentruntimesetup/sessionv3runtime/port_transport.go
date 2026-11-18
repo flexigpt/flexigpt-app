@@ -2,37 +2,9 @@ package sessionv3runtime
 
 import (
 	"errors"
-	"fmt"
 
 	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 )
-
-func validatePortTransport(
-	plans []sessionv3Runtime.PortPlan,
-	transport sessionv3Runtime.WorkflowTargetTransport,
-) error {
-	if err := transport.Validate(); err != nil {
-		return err
-	}
-	for _, plan := range plans {
-		switch plan.Direction {
-		case sessionv3Runtime.WorkflowPortDirectionInput:
-			if !transport.InputPorts {
-				return errors.New("target does not support workflow input ports")
-			}
-		case sessionv3Runtime.WorkflowPortDirectionOutput:
-			if plan.Stream && !transport.StreamOutputPorts {
-				return errors.New("target does not support streamed output ports")
-			}
-			if !plan.Stream && !transport.FinalOutputPorts {
-				return errors.New("target does not support final output ports")
-			}
-		default:
-			return fmt.Errorf("unsupported workflow port direction %q", plan.Direction)
-		}
-	}
-	return nil
-}
 
 func validateLLMPortTransport(
 	item sessionv3Runtime.WorkItem,

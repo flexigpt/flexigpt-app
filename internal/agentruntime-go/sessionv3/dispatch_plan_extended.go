@@ -58,11 +58,7 @@ type ActivityDispatchPlan struct {
 }
 
 func (p AgentDispatchPlan) Validate() error {
-	if p.Direct != nil {
-		if err := p.Direct.Validate(); err != nil {
-			return err
-		}
-	} else if err := validatePin(p.Artifact); err != nil {
+	if err := validatePin(p.Artifact); err != nil {
 		return err
 	}
 	if p.Model != nil {
@@ -205,22 +201,6 @@ func validateExtendedModelDispatchPlan(
 func validateModelDispatchTarget(
 	target ModelDispatchTarget,
 ) error {
-	if target.Direct != nil {
-		if target.Artifact.RootID != "" ||
-			target.Artifact.ArtifactID != "" ||
-			target.Artifact.Revision != 0 ||
-			target.Artifact.Digest != "" {
-			return errors.New(
-				"direct model dispatch target also contains an artifact pin",
-			)
-		}
-		if target.Direct.Target.Kind != WorkflowTargetModel {
-			return errors.New(
-				"direct model dispatch target has another target kind",
-			)
-		}
-		return target.Direct.Validate()
-	}
 	return validatePin(target.Artifact)
 }
 

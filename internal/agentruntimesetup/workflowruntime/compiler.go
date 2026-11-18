@@ -585,12 +585,6 @@ func compileWorkflowCallableInterface(
 	if err != nil {
 		return nil, err
 	}
-	capabilities, err := compileWorkflowCapabilityRequirements(
-		input.Capabilities,
-	)
-	if err != nil {
-		return nil, err
-	}
 
 	return &sessionv3Runtime.WorkflowCallableInterface{
 		Modes:         append([]sessionv3Runtime.WorkflowCallMode(nil), workflowCallModes(input.Modes)...),
@@ -601,7 +595,6 @@ func compileWorkflowCallableInterface(
 		Context:       contextRequirements,
 		Ports:         ports,
 		Limits:        limits,
-		Capabilities:  capabilities,
 	}, nil
 }
 

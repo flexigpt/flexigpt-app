@@ -141,26 +141,6 @@ func compileWorkflowCallablePorts(
 	return output, nil
 }
 
-func compileWorkflowCapabilityRequirements(
-	values []string,
-) ([]sessionv3Runtime.WorkflowCapabilityRequirement, error) {
-	output := make(
-		[]sessionv3Runtime.WorkflowCapabilityRequirement,
-		0,
-		len(values),
-	)
-	for _, value := range values {
-		requirement := sessionv3Runtime.WorkflowCapabilityRequirement{
-			Name: value,
-		}
-		if err := requirement.Validate(); err != nil {
-			return nil, err
-		}
-		output = append(output, requirement)
-	}
-	return output, nil
-}
-
 func compileWorkflowOptionalExecutionBudget(
 	input *workflowv1.Limits,
 ) (*sessionv3Runtime.ExecutionBudget, error) {

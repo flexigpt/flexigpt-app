@@ -40,8 +40,10 @@ const (
 type WorkflowPlanNode struct {
 	Document workflowv1.WorkflowDocument `json:"document"`
 
-	// Capabilities remains diagnostic composition information. Callers use
-	// Inventory for callable-target and requirement semantics.
+	// Capabilities remains a diagnostic generic-composition projection.
+	// Inventory is the only callable-target and requirement projection.
+	// Workflow-relevant direct composition results are rejected before this
+	// node is returned to a caller.
 	Capabilities        composition.CapabilityPlan `json:"capabilities"`
 	CompositionComplete bool                       `json:"compositionComplete"`
 	Inventory           Inventory                  `json:"inventory"`
@@ -75,31 +77,19 @@ type ArtifactClosureEdge struct {
 	Required bool                     `json:"required"`
 }
 
-// DirectCapabilityEvidence records an available direct capability at a static
-// relationship path. It deliberately has no synthetic Artifact node.
-type DirectCapabilityEvidence struct {
-	Parent   ArtifactClosureNodeID        `json:"parent"`
-	Path     string                       `json:"path"`
-	Role     ArtifactRelationshipRole     `json:"role"`
-	Required bool                         `json:"required"`
-	Target   composition.CapabilityTarget `json:"target"`
-}
-
 // ArtifactClosure is the complete source-backed static dependency graph for a
 // Workflow plan. Complete describes only static composition availability. It
 // does not establish enablement, credential, provider, policy, binding, or
 // execution readiness.
 type ArtifactClosure struct {
-	Root ArtifactClosureNodeID `json:"root"`
+	Root     ArtifactClosureNodeID `json:"root"`
+	Complete bool                  `json:"complete"`
 
-	Complete bool `json:"complete"`
+	Nodes []ArtifactClosureNode `json:"nodes"`
+	Edges []ArtifactClosureEdge `json:"edges"`
 
-	Nodes              []ArtifactClosureNode      `json:"nodes"`
-	Edges              []ArtifactClosureEdge      `json:"edges"`
-	DirectCapabilities []DirectCapabilityEvidence `json:"directCapabilities"`
-
-	// Fingerprint is a canonical digest of Root, Complete, Nodes, Edges, and
-	// DirectCapabilities. It excludes runtime state and local enablement.
+	// Fingerprint is a canonical digest of Root, Complete, Nodes, and Edges.
+	// It excludes runtime state and local enablement.
 	Fingerprint cryptoutil.Digest `json:"fingerprint"`
 }
 
@@ -163,6 +153,46 @@ func (*PlanConflictError) Unwrap() error {
 	return storeSpec.ErrConflict
 }
 
+// UnsupportedDirectCapabilityError reports a direct composition result that
+// Workflow cannot represent. It is a planning error, not runtime input.
+//
+// The error stores only diagnostic source facts. It does not preserve a
+// direct target plan, provider binding, request envelope, or executable
+// closure record.
+type UnsupportedDirectCapabilityError struct {
+	Artifact   artifactModel.ArtifactRef
+	Path       string
+	TargetType declaration.Type
+}
+
+func (e *UnsupportedDirectCapabilityError) Error() string {
+	if e == nil {
+		return "workflow direct capability is unsupported"
+	}
+
+	message := "workflow direct capability is unsupported"
+	if e.Path != "" {
+		message += " at " + e.Path
+	}
+	if e.TargetType != "" {
+		message += fmt.Sprintf(
+			" for target family %q",
+			e.TargetType,
+		)
+	}
+	if e.Artifact.ArtifactID != "" {
+		message += fmt.Sprintf(
+			" in Workflow Artifact %q",
+			e.Artifact.ArtifactID,
+		)
+	}
+	return message
+}
+
+func (*UnsupportedDirectCapabilityError) Unwrap() error {
+	return storeSpec.ErrUnsupported
+}
+
 // Clone returns a detached caller-owned snapshot.
 func (p Plan) Clone() (Plan, error) {
 	return jsonutil.CloneJSON(p)
@@ -190,9 +220,6 @@ type artifactClosureBuilder struct {
 	edges    []ArtifactClosureEdge
 	edgeKeys map[string]struct{}
 
-	directCapabilities []DirectCapabilityEvidence
-	directKeys         map[string]struct{}
-
 	active map[ArtifactClosureNodeID]struct{}
 }
 
@@ -206,11 +233,10 @@ func buildArtifactClosure(
 	}
 
 	builder := artifactClosureBuilder{
-		nodes:      make(map[ArtifactClosureNodeID]*ArtifactClosureNode),
-		nodePaths:  make(map[ArtifactClosureNodeID]map[string]struct{}),
-		edgeKeys:   make(map[string]struct{}),
-		directKeys: make(map[string]struct{}),
-		active:     make(map[ArtifactClosureNodeID]struct{}),
+		nodes:     make(map[ArtifactClosureNodeID]*ArtifactClosureNode),
+		nodePaths: make(map[ArtifactClosureNodeID]map[string]struct{}),
+		edgeKeys:  make(map[string]struct{}),
+		active:    make(map[ArtifactClosureNodeID]struct{}),
 	}
 	rootID, err := builder.visit(root, "root")
 	if err != nil {
@@ -410,11 +436,12 @@ func validateClosureSourceEntry(
 			Reason:   "closure capability target identity differs from Artifact",
 		}
 	}
-	if target.Form == composition.TargetFormArtifact &&
-		(target.Artifact == nil || *target.Artifact != artifact.Ref()) {
+	if target.Form != composition.TargetFormArtifact ||
+		target.Artifact == nil ||
+		*target.Artifact != artifact.Ref() {
 		return &PlanConflictError{
 			Artifact: artifact.Ref(),
-			Reason:   "Artifact capability target differs from closure Artifact",
+			Reason:   "source-backed closure entry has no matching Artifact target",
 		}
 	}
 	return nil
@@ -475,8 +502,32 @@ func (b *artifactClosureBuilder) linkEntry(
 			Reason:   "closure relationship child is nil",
 		}
 	}
+	if child.Target != nil &&
+		child.Target.Form == composition.TargetFormDirect {
+		if err := b.handleDirectCapability(
+			parent,
+			path,
+			child.Target,
+		); err != nil {
+			return err
+		}
+		if child.Artifact == nil {
+			// A non-Workflow direct composition result has no source-backed
+			// closure node and is not executable Workflow output.
+			return nil
+		}
+		return &PlanConflictError{
+			Artifact: b.nodes[parent].Artifact,
+			Path:     path,
+			Reason:   "source-backed closure entry has direct capability facts",
+		}
+	}
 	if child.Artifact == nil {
-		return b.addDirectCapability(parent, path, role, required, child.Target)
+		return &PlanConflictError{
+			Artifact: b.nodes[parent].Artifact,
+			Path:     path,
+			Reason:   "closure relationship has no source-backed Artifact",
+		}
 	}
 
 	childID, err := b.addNode(child, path)
@@ -490,19 +541,6 @@ func (b *artifactClosureBuilder) linkEntry(
 		Role:     role,
 		Required: required,
 	})
-
-	if child.Target != nil &&
-		child.Target.Form == composition.TargetFormDirect {
-		if err := b.addDirectCapability(
-			parent,
-			path,
-			role,
-			required,
-			child.Target,
-		); err != nil {
-			return err
-		}
-	}
 
 	if !descend {
 		return nil
@@ -611,18 +649,16 @@ func workflowTargetRelationship(
 	return nil
 }
 
-func (b *artifactClosureBuilder) addDirectCapability(
+func (b *artifactClosureBuilder) handleDirectCapability(
 	parent ArtifactClosureNodeID,
 	path string,
-	role ArtifactRelationshipRole,
-	required bool,
 	target *composition.CapabilityTarget,
 ) error {
 	if target == nil {
 		return &PlanConflictError{
 			Artifact: b.nodes[parent].Artifact,
 			Path:     path,
-			Reason:   "direct capability relationship has no target evidence",
+			Reason:   "direct composition relationship has no target",
 		}
 	}
 
@@ -631,41 +667,48 @@ func (b *artifactClosureBuilder) addDirectCapability(
 		return &PlanConflictError{
 			Artifact: b.nodes[parent].Artifact,
 			Path:     path,
-			Reason:   fmt.Sprintf("direct capability evidence is invalid: %v", err),
+			Reason:   fmt.Sprintf("direct composition target is invalid: %v", err),
 		}
 	}
 	if value.Form != composition.TargetFormDirect {
 		return &PlanConflictError{
 			Artifact: b.nodes[parent].Artifact,
 			Path:     path,
-			Reason:   "non-Artifact closure relationship has no direct capability target",
+			Reason:   "non-Artifact closure relationship has no direct target",
 		}
 	}
 
-	evidence := DirectCapabilityEvidence{
-		Parent:   parent,
-		Path:     path,
-		Role:     role,
-		Required: required,
-		Target:   value,
-	}
-	key := strings.Join([]string{
-		string(evidence.Parent),
-		evidence.Path,
-		string(evidence.Role),
-		strconv.FormatBool(evidence.Required),
-		string(value.Type),
-		string(value.Name),
-		value.ProviderIdentity,
-		value.ProviderLocalID,
-		string(value.Evidence),
-	}, "\x00")
-	if _, found := b.directKeys[key]; found {
+	if !workflowRestrictedDirectTargetType(value.Type) {
 		return nil
 	}
-	b.directKeys[key] = struct{}{}
-	b.directCapabilities = append(b.directCapabilities, evidence)
-	return nil
+
+	return &UnsupportedDirectCapabilityError{
+		Artifact:   b.nodes[parent].Artifact,
+		Path:       path,
+		TargetType: value.Type,
+	}
+}
+
+func workflowRestrictedDirectTargetType(
+	targetType declaration.Type,
+) bool {
+	switch targetType {
+	case declaration.TypeModel,
+		declaration.TypeAgent,
+		declaration.TypeTool,
+		declaration.TypeMCP,
+		declaration.TypeSkill,
+		declaration.TypeWorkflow:
+		return true
+	default:
+	}
+
+	switch string(targetType) {
+	case "service", "activity":
+		return true
+	default:
+		return false
+	}
 }
 
 func (b *artifactClosureBuilder) addEdge(
@@ -733,20 +776,11 @@ func (b *artifactClosureBuilder) finish(
 		return closureEdgeLess(edges[left], edges[right])
 	})
 
-	direct := append(
-		[]DirectCapabilityEvidence(nil),
-		b.directCapabilities...,
-	)
-	sort.Slice(direct, func(left, right int) bool {
-		return closureDirectCapabilityLess(direct[left], direct[right])
-	})
-
 	output := ArtifactClosure{
-		Root:               root,
-		Complete:           rootNode.Workflow.CompositionComplete,
-		Nodes:              nodes,
-		Edges:              edges,
-		DirectCapabilities: direct,
+		Root:     root,
+		Complete: rootNode.Workflow.CompositionComplete,
+		Nodes:    nodes,
+		Edges:    edges,
 	}
 	fingerprint, err := artifactClosureFingerprint(output)
 	if err != nil {
@@ -760,17 +794,15 @@ func artifactClosureFingerprint(
 	closure ArtifactClosure,
 ) (cryptoutil.Digest, error) {
 	return cryptoutil.CanonicalDigest(struct {
-		Root               ArtifactClosureNodeID      `json:"root"`
-		Complete           bool                       `json:"complete"`
-		Nodes              []ArtifactClosureNode      `json:"nodes"`
-		Edges              []ArtifactClosureEdge      `json:"edges"`
-		DirectCapabilities []DirectCapabilityEvidence `json:"directCapabilities"`
+		Root     ArtifactClosureNodeID `json:"root"`
+		Complete bool                  `json:"complete"`
+		Nodes    []ArtifactClosureNode `json:"nodes"`
+		Edges    []ArtifactClosureEdge `json:"edges"`
 	}{
-		Root:               closure.Root,
-		Complete:           closure.Complete,
-		Nodes:              closure.Nodes,
-		Edges:              closure.Edges,
-		DirectCapabilities: closure.DirectCapabilities,
+		Root:     closure.Root,
+		Complete: closure.Complete,
+		Nodes:    closure.Nodes,
+		Edges:    closure.Edges,
 	})
 }
 
@@ -874,42 +906,6 @@ func closureEdgeLess(
 	}
 	if left.Child != right.Child {
 		return left.Child < right.Child
-	}
-	if left.Required != right.Required {
-		return !left.Required && right.Required
-	}
-	return false
-}
-
-func closureDirectCapabilityLess(
-	left DirectCapabilityEvidence,
-	right DirectCapabilityEvidence,
-) bool {
-	if left.Parent != right.Parent {
-		return left.Parent < right.Parent
-	}
-	if left.Path != right.Path {
-		return left.Path < right.Path
-	}
-	if left.Role != right.Role {
-		return left.Role < right.Role
-	}
-	if left.Target.ProviderIdentity != right.Target.ProviderIdentity {
-		return left.Target.ProviderIdentity <
-			right.Target.ProviderIdentity
-	}
-	if left.Target.ProviderLocalID != right.Target.ProviderLocalID {
-		return left.Target.ProviderLocalID <
-			right.Target.ProviderLocalID
-	}
-	if left.Target.Type != right.Target.Type {
-		return left.Target.Type < right.Target.Type
-	}
-	if left.Target.Name != right.Target.Name {
-		return left.Target.Name < right.Target.Name
-	}
-	if left.Target.Evidence != right.Target.Evidence {
-		return left.Target.Evidence < right.Target.Evidence
 	}
 	if left.Required != right.Required {
 		return !left.Required && right.Required

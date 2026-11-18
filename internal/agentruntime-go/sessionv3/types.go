@@ -1000,18 +1000,14 @@ type LLMWork struct {
 	IsolatedInput      bool         `json:"isolatedInput,omitempty"`
 	HistoryActivityIDs []ActivityID `json:"historyActivityIDs,omitempty"`
 
-	DirectTarget    *DirectCapabilityPlan       `json:"directTarget,omitempty"`
-	ProviderTools   []ProviderManagedToolChoice `json:"providerTools,omitempty"`
-	CapabilityFacts []WorkflowCapabilityFact    `json:"capabilityFacts,omitempty"`
+	ProviderTools []ProviderManagedToolChoice `json:"providerTools,omitempty"`
 }
 
 type ToolWork struct {
-	Call            ToolCall                 `json:"call"`
-	Target          *ArtifactPin             `json:"target,omitempty"`
-	MCP             *MCPToolTarget           `json:"mcp,omitempty"`
-	Direct          *DirectCapabilityPlan    `json:"direct,omitempty"`
-	CapabilityFacts []WorkflowCapabilityFact `json:"capabilityFacts,omitempty"`
-	Origin          *LLMToolOrigin           `json:"origin,omitempty"`
+	Call   ToolCall       `json:"call"`
+	Target *ArtifactPin   `json:"target,omitempty"`
+	MCP    *MCPToolTarget `json:"mcp,omitempty"`
+	Origin *LLMToolOrigin `json:"origin,omitempty"`
 }
 
 type ToolCallSource string
@@ -1095,21 +1091,17 @@ type UnresolvedToolBinding struct {
 }
 
 type ServiceWork struct {
-	ServiceID       string                   `json:"serviceID"`
-	BindingVersion  string                   `json:"bindingVersion"`
-	Input           CanonicalValue           `json:"input"`
-	Context         CanonicalValue           `json:"context,omitempty"`
-	Direct          *DirectCapabilityPlan    `json:"direct,omitempty"`
-	CapabilityFacts []WorkflowCapabilityFact `json:"capabilityFacts,omitempty"`
+	ServiceID      string         `json:"serviceID"`
+	BindingVersion string         `json:"bindingVersion"`
+	Input          CanonicalValue `json:"input"`
+	Context        CanonicalValue `json:"context,omitempty"`
 }
 
 type ActivityWork struct {
-	ActivityID      string                   `json:"activityID"`
-	BindingVersion  string                   `json:"bindingVersion"`
-	Input           CanonicalValue           `json:"input"`
-	Context         CanonicalValue           `json:"context,omitempty"`
-	Direct          *DirectCapabilityPlan    `json:"direct,omitempty"`
-	CapabilityFacts []WorkflowCapabilityFact `json:"capabilityFacts,omitempty"`
+	ActivityID     string         `json:"activityID"`
+	BindingVersion string         `json:"bindingVersion"`
+	Input          CanonicalValue `json:"input"`
+	Context        CanonicalValue `json:"context,omitempty"`
 }
 
 type TransformWork struct {
@@ -1259,15 +1251,13 @@ type CompensationWork struct {
 }
 
 type SemanticBinding struct {
-	Version           string                   `json:"version"`
-	Artifacts         []ArtifactPin            `json:"artifacts,omitempty"`
-	Plan              *ModelDispatchPlan       `json:"plan,omitempty"`
-	Service           *ServiceDispatchPlan     `json:"service,omitempty"`
-	Activity          *ActivityDispatchPlan    `json:"activity,omitempty"`
-	Direct            *DirectCapabilityPlan    `json:"direct,omitempty"`
-	Capabilities      []WorkflowCapabilityFact `json:"capabilities,omitempty"`
-	TargetFingerprint string                   `json:"targetFingerprint"`
-	BoundAt           time.Time                `json:"boundAt"`
+	Version           string                `json:"version"`
+	Artifacts         []ArtifactPin         `json:"artifacts,omitempty"`
+	Plan              *ModelDispatchPlan    `json:"plan,omitempty"`
+	Service           *ServiceDispatchPlan  `json:"service,omitempty"`
+	Activity          *ActivityDispatchPlan `json:"activity,omitempty"`
+	TargetFingerprint string                `json:"targetFingerprint"`
+	BoundAt           time.Time             `json:"boundAt"`
 }
 
 type WorkItemOutput struct {

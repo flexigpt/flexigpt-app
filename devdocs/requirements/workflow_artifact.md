@@ -83,14 +83,16 @@ Workflow document, callable targets, requirements, source inventory, and a
 complete static Artifact dependency closure.
 
 The closure contains only source-backed Artifact identity facts and static
-relationships. It contains no execution-private program, binding, timer,
-provider request, credential, client, callback, or native handle.
+relationships. It contains no direct-capability evidence, execution-private
+program, binding, timer, provider request, credential, client, callback, or
+native handle.
 
 Workflow does not support direct capabilities for Model, Agent, Tool, MCP,
 Skill, Service, or Activity. A direct composition result for one of those
-families is unsupported Workflow input. Planning must report that result as an
-issue. It must not publish a usable direct target, fabricate an Artifact, or
-create a synthetic pin.
+families, including Nested Workflow, is unsupported Workflow input. Planning
+returns an unsupported planning error before it creates a usable plan. It must
+not publish a direct target, fabricate an Artifact, Source, Definition,
+revision, pin, or binding.
 
 Consumers can use the plan as a read-only source-fact projection. Consumer
 lowering and execution behavior are not specified in this document.
@@ -166,13 +168,15 @@ Service and Activity remain typed registered binding prerequisites. They are
 not Artifacts and are not direct composition capabilities.
 
 An Artifact-backed requirement receives ordinary composition resolution. A
-Service or Activity requirement remains a typed setup-binding prerequisite and
-does not receive a synthetic Artifact resolution. Requirements never enter
-`WorkflowProgram.Targets`, target-set selection, or callable dispatch.
+Service or Activity requirement remains a typed registered-binding
+prerequisite. It does not receive a synthetic Artifact resolution.
+Requirements never enter `WorkflowProgram.Targets`, target-set selection, or
+callable dispatch.
 
 `Plan.Capabilities` remains a recursive composition and diagnostic projection.
 Consumers must use the separate callable-target and requirement collections.
-They must not rebuild target lookup by walking
+They must not rebuild callable target lookup by walking this diagnostic
+projection. It is not executable Workflow target data.
 
 `Inventory` source paths are the planning-owned canonical declaration paths for
 blocks, calls, ports, retries, and effects. The root block is `root`; a root
@@ -292,29 +296,29 @@ finally:
   steps: []
 ```
 
-| Field          |                 Required | Meaning                                            |
-| -------------- | -----------------------: | -------------------------------------------------- |
-| `apiVersion`   | Yes in standalone source | Must be `v1`.                                      |
-| `type`         |                      Yes | Must be `workflow`.                                |
-| `name`         |                      Yes | Portable Workflow name.                            |
-| `inputSchema`  |                      Yes | JSON Schema for invocation input.                  |
-| `outputSchema` |                      Yes | JSON Schema for successful root output.            |
-| `schemas`      |                       No | Reusable JSON Schema definitions.                  |
-| `targets`      |                       No | Named callable targets.                            |
-| `targetSets`   |                       No | Static or resolver-backed target collections.      |
-| `events`       |                       No | Typed external event contracts.                    |
-| `channels`     |                       No | Invocation-local durable message logs.             |
-| `ports`        |                       No | Published typed port bindings.                     |
-| `triggers`     |                       No | Event and schedule entry points.                   |
-| `requirements` |                       No | Named capability requirements.                     |
-| `resources`    |                       No | Named claimable resource definitions.              |
-| `limits`       |                       No | Invocation limits and cleanup allowance.           |
-| `state`        |                       No | Root typed state declaration.                      |
-| `listen`       |                       No | Root subscriptions active before root work begins. |
-| `steps`        |                      Yes | Ordered root steps.                                |
-| `output`       |                      Yes | Explicit successful root output mapping.           |
-| `catch`        |                       No | Ordered root failure handlers.                     |
-| `finally`      |                       No | Root finalization block.                           |
+| Field          |                 Required | Meaning                                             |
+| -------------- | -----------------------: | --------------------------------------------------- |
+| `apiVersion`   | Yes in standalone source | Must be `v1`.                                       |
+| `type`         |                      Yes | Must be `workflow`.                                 |
+| `name`         |                      Yes | Portable Workflow name.                             |
+| `inputSchema`  |                      Yes | JSON Schema for invocation input.                   |
+| `outputSchema` |                      Yes | JSON Schema for successful root output.             |
+| `schemas`      |                       No | Reusable JSON Schema definitions.                   |
+| `targets`      |                       No | Named callable targets.                             |
+| `targetSets`   |                       No | Static or resolver-backed target collections.       |
+| `events`       |                       No | Typed external event contracts.                     |
+| `channels`     |                       No | Invocation-local durable message logs.              |
+| `ports`        |                       No | Published typed port bindings.                      |
+| `triggers`     |                       No | Event and schedule entry points.                    |
+| `requirements` |                       No | Named Artifact or registered-binding prerequisites. |
+| `resources`    |                       No | Named claimable resource definitions.               |
+| `limits`       |                       No | Invocation limits and cleanup allowance.            |
+| `state`        |                       No | Root typed state declaration.                       |
+| `listen`       |                       No | Root subscriptions active before root work begins.  |
+| `steps`        |                      Yes | Ordered root steps.                                 |
+| `output`       |                      Yes | Explicit successful root output mapping.            |
+| `catch`        |                       No | Ordered root failure handlers.                      |
+| `finally`      |                       No | Root finalization block.                            |
 
 The root Workflow has no implicit output. The final successful value is the root `output` value or an explicit Workflow-level `return`.
 
@@ -653,7 +657,6 @@ A callable interface defines:
 - Typed ports.
 - Effect capability.
 - Limits.
-- Capability requirements.
 
 A call-level interface can narrow a target interface. It cannot widen the target interface.
 
@@ -1867,22 +1870,22 @@ Workflow Artifact completion includes:
 
 ## 22. Workflow Artifact implementation status
 
-| Artifact planning task                                    | Status      | Evidence or required result                                                                                                                                               |
-| --------------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Decode and validate Workflow v1 declarations              | Implemented | `internal/llmartifactory-go/workflow/contract/v1/`                                                                                                                        |
-| Build callable-target and requirement inventory           | Implemented | `internal/llmartifactory-go/workflow/inventory.go`                                                                                                                        |
-| Reject direct capability composition for Workflow targets | Open        | Remove `DirectCapabilityEvidence` as Workflow plan output. Convert direct Model, Agent, Tool, MCP, Skill, Service, and Activity composition results into planning issues. |
-| Publish a deterministic complete static Artifact closure  | Implemented | `internal/llmartifactory-go/workflow/closure.go` publishes sorted nodes, edges, paths, and refresh checks                                                                 |
-| Include nested Workflow plan nodes in the closure         | Implemented | `ArtifactClosureNode.Workflow` contains admitted nested Workflow document, inventory, and composition facts                                                               |
-| Publish one canonical declaration-path model              | Implemented | Contract admission, Inventory, and closure paths retain the canonical `root/...` declaration identity                                                                     |
-| Keep runtime interpretation outside Artifact planning     | Implemented | `internal/llmartifactory-go/workflow/` imports Artifact and declaration planning contracts only                                                                           |
+| Artifact planning task                                    | Status      | Evidence or required result                                                                                                                                              |
+| --------------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Decode and validate Workflow v1 declarations              | Implemented | `internal/llmartifactory-go/workflow/contract/v1/`                                                                                                                       |
+| Build callable-target and requirement inventory           | Implemented | `internal/llmartifactory-go/workflow/inventory.go`                                                                                                                       |
+| Reject direct capability composition for Workflow targets | Implemented | `internal/llmartifactory-go/workflow/closure.go` rejects direct Model, Agent, Tool, MCP, Skill, Service, Activity, and Nested Workflow composition before a plan exists. |
+| Publish a deterministic complete static Artifact closure  | Implemented | `internal/llmartifactory-go/workflow/closure.go` publishes sorted nodes, edges, paths, and refresh checks                                                                |
+| Include nested Workflow plan nodes in the closure         | Implemented | `ArtifactClosureNode.Workflow` contains admitted nested Workflow document, inventory, and composition facts                                                              |
+| Publish one canonical declaration-path model              | Implemented | Contract admission, Inventory, and closure paths retain the canonical `root/...` declaration identity                                                                    |
+| Keep runtime interpretation outside Artifact planning     | Implemented | `internal/llmartifactory-go/workflow/` imports Artifact and declaration planning contracts only                                                                          |
 
 ## 23. Direct-capability and generic-callable-capability cleanup
 
-| Cleanup task                                                                     | Status | Required result                                                                                                                                                                                           |
-| -------------------------------------------------------------------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Reject direct composition results for Workflow callable targets and requirements | Open   | `workflow.Service.ResolvePlan` reports an unsupported target issue. It does not emit `DirectCapabilityEvidence` for executable target families.                                                           |
-| Remove Workflow direct-capability closure data                                   | Open   | Remove Workflow-only direct evidence fields, sorting, fingerprint input, inventory projection, and consumer assumptions. Do not remove generic composition support without a repository-wide owner audit. |
-| Preserve Service and Activity binding targets                                    | Open   | Keep `service` and `activity` as binding IDs. They remain non-Artifact targets and must not enter direct-capability handling.                                                                             |
-| Preserve inline text as declaration data                                         | Open   | Keep literal values, explicit Model and Agent messages, and explicit instructions. Do not represent inline text as a direct capability.                                                                   |
-| Remove generic callable capability runtime semantics                             | Open   | Keep the source field only for compatibility until contract admission rejects non-empty values. Do not create runtime facts, adapter registries, or generic capability evaluators.                        |
+| Cleanup task                                                                     | Status      | Required result                                                                                                                                                                                                      |
+| -------------------------------------------------------------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Reject direct composition results for Workflow callable targets and requirements | Implemented | `internal/llmartifactory-go/workflow/closure.go` returns `UnsupportedDirectCapabilityError` for Model, Agent, Tool, MCP, Skill, Service, Activity, and Nested Workflow direct composition.                           |
+| Remove Workflow direct-capability closure data                                   | Implemented | `internal/llmartifactory-go/workflow/closure.go` has no `DirectCapabilityEvidence`, direct sorting, direct fingerprint input, or direct closure field. Generic `composition.CapabilityPlan` remains diagnostic only. |
+| Preserve Service and Activity binding targets                                    | Implemented | `internal/llmartifactory-go/workflow/contract/v1/validation.go` keeps them non-Artifact declarations. `internal/agentruntimesetup/workflowruntime/admission.go` resolves them only through registered bindings.      |
+| Preserve inline text as declaration data                                         | Implemented | `internal/llmartifactory-go/workflow/contract/v1/workflow-v1.schema.json` retains ordinary `value` grammar. It adds no direct target form.                                                                           |
+| Remove generic callable capability runtime semantics                             | Implemented | `internal/llmartifactory-go/workflow/contract/v1/types.go` and `workflow-v1.schema.json` remove `CallableInterface.capabilities`. The closed schema rejects the former field at admission.                           |

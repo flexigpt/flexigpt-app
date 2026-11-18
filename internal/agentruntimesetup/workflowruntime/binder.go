@@ -42,12 +42,6 @@ func (b *Binder) BindWork(
 	ctx context.Context,
 	request sessionv3Runtime.WorkDispatchRequest,
 ) (sessionv3Runtime.BindResult, error) {
-	if sessionv3Runtime.DirectCapabilityPlanForWorkItem(
-		request.WorkItem,
-	) != nil {
-		return b.Base.BindWork(ctx, request)
-	}
-
 	switch request.WorkItem.Type {
 	case sessionv3Runtime.WorkItemTypeService:
 		return b.bindService(ctx, request)
@@ -162,11 +156,6 @@ func (b *Binder) ValidatePortPlans(
 	switch request.WorkItem.Type {
 	case sessionv3Runtime.WorkItemTypeService,
 		sessionv3Runtime.WorkItemTypeActivity:
-		if sessionv3Runtime.DirectCapabilityPlanForWorkItem(
-			request.WorkItem,
-		) != nil {
-			break
-		}
 		return b.validateExternalPortPlans(request)
 	default:
 	}

@@ -58,7 +58,6 @@ type SessionV3Params struct {
 	Events           sessionv3Runtime.EventPublisher
 	WorkflowBindings *workflowruntime.BindingRegistry
 	Workflow         *workflowruntime.Admission
-	DirectTargets    sessionv3runtime.DirectWorkDispatcher
 }
 
 var (
@@ -91,7 +90,6 @@ func newSessionV3WorkflowAdmission(
 ) (
 	*workflowruntime.Admission,
 	*workflowruntime.BindingRegistry,
-	*workflowruntime.DirectTargetRegistry,
 	error,
 ) {
 	if artifacts == nil ||
@@ -100,39 +98,37 @@ func newSessionV3WorkflowAdmission(
 		toolCaller == nil ||
 		models == nil ||
 		agents == nil {
-		return nil, nil, nil, errSessionV3Deps
+		return nil, nil, errSessionV3Deps
 	}
 
 	workflows, err := workflowAPI.NewService(resolver)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 	toolInspector, err := toolruntime.NewV3Executor(tools, toolCaller)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 	invocations, err := workflowruntime.NewModelAgentInvocationAdapter(
 		models,
 		agents,
 	)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
 	bindings := workflowruntime.NewBindingRegistry()
-	directTargets := workflowruntime.NewDirectTargetRegistry()
-	admission, err := workflowruntime.NewAdmissionWithDirectTargets(
+	admission, err := workflowruntime.NewAdmission(
 		workflows,
 		artifacts,
 		bindings,
 		toolInspector,
-		directTargets,
 		invocations,
 	)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
-	return admission, bindings, directTargets, nil
+	return admission, bindings, nil
 }
 
 func InitComposedSessionV3Runtime(
@@ -160,7 +156,6 @@ func InitComposedSessionV3Runtime(
 			SkillRuntime:  params.SkillRuntime,
 			MCPRuntime:    params.MCPRuntime,
 			MCPBridge:     params.MCPBridge,
-			DirectTargets: params.DirectTargets,
 		},
 	)
 	if err != nil {

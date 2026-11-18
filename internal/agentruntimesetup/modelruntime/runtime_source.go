@@ -77,7 +77,6 @@ func (a *SourceResolver) ResolveRuntimeModelWithRequestPatch(
 }
 
 // ResolveRuntimeModelTarget handles source-backed Model capability targets.
-// Direct targets remain the direct-capability provider's concern.
 func (a *SourceResolver) ResolveRuntimeModelTarget(
 	ctx context.Context,
 	target composition.CapabilityTarget,
@@ -94,7 +93,7 @@ func (a *SourceResolver) ResolveRuntimeModelTarget(
 	}
 	if target.Form != composition.TargetFormArtifact || target.Artifact == nil {
 		return inferenceRuntime.RuntimeConfiguration{}, fmt.Errorf(
-			"%w: direct Model capability targets require an application runtime adapter",
+			"%w: Model capability targets must be source-backed Artifacts",
 			storeSpec.ErrUnsupported,
 		)
 	}

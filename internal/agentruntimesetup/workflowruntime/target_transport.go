@@ -43,18 +43,6 @@ func validatePreparedTargetTransport(
 				)
 			}
 
-			for name := range call.Call.Context {
-				if !target.Transport.SupportsContext(name) &&
-					!target.Transport.SupportsContext("*") {
-					return fmt.Errorf(
-						"%w: target %q does not support workflow context form %q",
-						ErrBindingUnavailable,
-						use.Name,
-						name,
-					)
-				}
-			}
-
 			for _, port := range portUses[call.Path] {
 				if port.TargetName != "" && port.TargetName != use.Name {
 					continue

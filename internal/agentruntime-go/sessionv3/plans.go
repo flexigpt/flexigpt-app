@@ -18,10 +18,6 @@ type WorkflowCallablePort struct {
 	Stream    bool                  `json:"stream,omitempty"`
 }
 
-type WorkflowCapabilityRequirement struct {
-	Name string `json:"name"`
-}
-
 type ModelDispatchPlan struct {
 	Agent          *AgentDispatchPlan          `json:"agent,omitempty"`
 	Workspace      *WorkspaceDispatchPlan      `json:"workspace,omitempty"`
@@ -43,7 +39,6 @@ type ModelDispatchPlan struct {
 
 type AgentDispatchPlan struct {
 	Artifact     ArtifactPin               `json:"artifact"`
-	Direct       *DirectCapabilityPlan     `json:"direct,omitempty"`
 	Model        *ModelDispatchTarget      `json:"model,omitempty"`
 	Workspace    *WorkspaceDispatchPlan    `json:"workspace,omitempty"`
 	Instructions []InstructionDispatchPlan `json:"instructions,omitempty"`
@@ -63,8 +58,7 @@ type WorkspaceDispatchPlan struct {
 }
 
 type ModelDispatchTarget struct {
-	Artifact ArtifactPin           `json:"artifact"`
-	Direct   *DirectCapabilityPlan `json:"direct,omitempty"`
+	Artifact ArtifactPin `json:"artifact"`
 }
 
 type InstructionDispatchPlan struct {
@@ -300,10 +294,6 @@ func (p WorkflowCallablePort) Validate() error {
 		return errors.New("workflow callable port schema is invalid")
 	}
 	return nil
-}
-
-func (p WorkflowCapabilityRequirement) Validate() error {
-	return validateID("workflow capability requirement", p.Name)
 }
 
 func workflowContextRequirement(

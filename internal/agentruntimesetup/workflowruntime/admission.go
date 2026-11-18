@@ -207,7 +207,6 @@ type Admission struct {
 	bindings    *BindingRegistry
 	tools       ToolTargetInspector
 	invocations WorkflowInvocationTargetAdapter
-	direct      *DirectTargetRegistry
 }
 
 func NewAdmission(
@@ -241,28 +240,6 @@ func NewAdmission(
 		tools:       tools,
 		invocations: invocations,
 	}, nil
-}
-
-func NewAdmissionWithDirectTargets(
-	workflows *workflowAPI.Service,
-	artifacts artifact.API,
-	bindings *BindingRegistry,
-	tools ToolTargetInspector,
-	direct *DirectTargetRegistry,
-	invocationAdapters ...WorkflowInvocationTargetAdapter,
-) (*Admission, error) {
-	value, err := NewAdmission(
-		workflows,
-		artifacts,
-		bindings,
-		tools,
-		invocationAdapters...,
-	)
-	if err != nil {
-		return nil, err
-	}
-	value.direct = direct
-	return value, nil
 }
 
 // PreparationRequest is the setup-owned request for one input-bound Workflow
@@ -434,8 +411,8 @@ type workflowAdmissionClosure struct {
 // workflowAdmissionClosureFromPlan indexes planning-owned closure facts.
 //
 // "workflow.ResolvePlan" already validates source, consistency, closure
-// completeness, ordering, nested Workflow facts, and direct-capability
-// evidence. Setup keeps only the structural checks required to avoid silently
+// completeness, ordering, nested Workflow facts, and unsupported direct
+// composition rejection. Setup keeps only the structural checks required to avoid silently
 // selecting a missing or conflicting closure node.
 func workflowAdmissionClosureFromPlan(
 	plan workflowAPI.Plan,
@@ -622,7 +599,6 @@ func (a *Admission) admitPlanned(
 		ctx,
 		plan,
 		closure,
-		ownerModel,
 	)
 	if err != nil {
 		return sessionv3Runtime.WorkflowAdmissionResult{}, err
@@ -680,21 +656,12 @@ func (a *Admission) bindCallableTargets(
 			)
 		}
 
-		requirements, err := workflowCallableRequirements(
-			plan.facts.Document,
-			plan.facts.Inventory,
-			targetPlan,
-		)
-		if err != nil {
-			return err
-		}
 		bound, err := a.bindTarget(
 			ctx,
 			plan.facts.Document,
 			targetPlan,
 			closure,
 			ownerModel,
-			requirements,
 		)
 		if err != nil {
 			return err
@@ -703,7 +670,6 @@ func (a *Admission) bindCallableTargets(
 			ctx,
 			targetPlan,
 			bound,
-			requirements,
 		)
 		if err != nil {
 			return err
@@ -721,35 +687,18 @@ func (a *Admission) prepareRequirements(
 	ctx context.Context,
 	plan workflowAdmissionPlan,
 	closure *workflowAdmissionClosure,
-	ownerModel *sessionv3Runtime.ArtifactPin,
 ) ([]sessionv3Runtime.WorkflowRequirementFact, error) {
 	output := make([]sessionv3Runtime.WorkflowRequirementFact, 0, len(plan.facts.Inventory.Requirements))
 	for _, requirement := range plan.facts.Inventory.Requirements {
-		capabilities, err := workflowTargetRequirements(requirement.Target)
-		if err != nil {
-			return nil, err
-		}
-		target, err := a.bindTarget(
+		fact, err := a.prepareRequirement(
 			ctx,
-			plan.facts.Document,
 			requirement,
 			closure,
-			ownerModel,
-			capabilities,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("workflow requirement %q: %w", requirement.Name, err)
 		}
-		target, err = a.prepareBoundTarget(
-			ctx,
-			requirement,
-			target,
-			capabilities,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("workflow requirement %q: %w", requirement.Name, err)
-		}
-		output = append(output, workflowRequirementFact(requirement.Name, target))
+		output = append(output, fact)
 	}
 	return output, nil
 }
@@ -760,21 +709,8 @@ func (a *Admission) bindTarget(
 	targetPlan workflowAPI.TargetPlan,
 	closure *workflowAdmissionClosure,
 	ownerModel *sessionv3Runtime.ArtifactPin,
-	requirements []sessionv3Runtime.WorkflowCapabilityRequirement,
 ) (sessionv3Runtime.WorkflowTarget, error) {
 	target := targetPlan.Target
-
-	if direct, found, err := workflowDirectCapabilityTarget(targetPlan); err != nil {
-		return sessionv3Runtime.WorkflowTarget{}, err
-	} else if found {
-		return a.bindDirectTarget(
-			ctx,
-			document,
-			target,
-			direct,
-			requirements,
-		)
-	}
 
 	switch target.Kind {
 	case workflowv1.TargetService:
@@ -1032,15 +968,12 @@ func requireWorkflowTargetArtifactRef(
 	}
 
 	if value.Resolution != nil &&
-		value.Resolution.Status == composition.ResolutionAvailable &&
-		value.Resolution.Target != nil &&
-		value.Resolution.Target.Form == composition.TargetFormDirect {
+		value.Resolution.Status == composition.ResolutionAvailable {
 		return artifactModel.ArtifactRef{}, fmt.Errorf(
-			"%w: %s %q resolves to direct capability provider %q without an owning Workflow adapter",
+			"%w: %s %q has a non-Artifact composition result; Workflow direct capabilities are unsupported",
 			ErrBindingUnavailable,
 			targetLabel,
 			value.Name,
-			value.Resolution.Target.ProviderIdentity,
 		)
 	}
 

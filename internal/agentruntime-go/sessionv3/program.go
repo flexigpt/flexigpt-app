@@ -42,9 +42,7 @@ type agentLoopProgramPayload struct {
 	InputActivityID    ActivityID                  `json:"inputActivityID,omitempty"`
 	IsolatedInput      bool                        `json:"isolatedInput,omitempty"`
 	HistoryActivityIDs []ActivityID                `json:"historyActivityIDs,omitempty"`
-	DirectTarget       *DirectCapabilityPlan       `json:"directTarget,omitempty"`
 	ProviderTools      []ProviderManagedToolChoice `json:"providerTools,omitempty"`
-	CapabilityFacts    []WorkflowCapabilityFact    `json:"capabilityFacts,omitempty"`
 }
 
 type agentLoopProgramState struct {
@@ -61,9 +59,7 @@ type singleModelProgramPayload struct {
 	InputActivityID    ActivityID                  `json:"inputActivityID,omitempty"`
 	IsolatedInput      bool                        `json:"isolatedInput,omitempty"`
 	HistoryActivityIDs []ActivityID                `json:"historyActivityIDs,omitempty"`
-	DirectTarget       *DirectCapabilityPlan       `json:"directTarget,omitempty"`
 	ProviderTools      []ProviderManagedToolChoice `json:"providerTools,omitempty"`
-	CapabilityFacts    []WorkflowCapabilityFact    `json:"capabilityFacts,omitempty"`
 }
 
 type singleModelProgramState struct {
@@ -104,8 +100,6 @@ func NewAgentLoopInvocationProgram(
 		input,
 		history,
 		nil,
-		nil,
-		nil,
 	)
 }
 
@@ -113,17 +107,13 @@ func NewAgentLoopWorkflowInvocationProgram(
 	defaults SessionDefaults,
 	input ActivityID,
 	history []ActivityID,
-	direct *DirectCapabilityPlan,
 	providerTools []ProviderManagedToolChoice,
-	capabilities []WorkflowCapabilityFact,
 ) (ProgramSnapshot, error) {
 	return newAgentLoopWorkflowInvocationProgram(
 		defaults,
 		input,
 		history,
-		direct,
 		providerTools,
-		capabilities,
 	)
 }
 
@@ -151,9 +141,7 @@ func newAgentLoopWorkflowInvocationProgram(
 	defaults SessionDefaults,
 	input ActivityID,
 	history []ActivityID,
-	direct *DirectCapabilityPlan,
 	providerTools []ProviderManagedToolChoice,
-	capabilities []WorkflowCapabilityFact,
 ) (ProgramSnapshot, error) {
 	if input == "" {
 		return ProgramSnapshot{}, errors.New("agent-loop input Activity is required")
@@ -163,9 +151,7 @@ func newAgentLoopWorkflowInvocationProgram(
 		InputActivityID:    input,
 		IsolatedInput:      true,
 		HistoryActivityIDs: append([]ActivityID(nil), history...),
-		DirectTarget:       cloneDirectCapabilityPlan(direct),
 		ProviderTools:      jsonutil.CloneJSONInValue(providerTools),
-		CapabilityFacts:    cloneWorkflowCapabilityFacts(capabilities),
 	})
 }
 
@@ -189,8 +175,6 @@ func NewSingleModelInvocationProgram(
 		input,
 		history,
 		nil,
-		nil,
-		nil,
 	)
 }
 
@@ -198,17 +182,13 @@ func NewSingleModelWorkflowInvocationProgram(
 	defaults SessionDefaults,
 	input ActivityID,
 	history []ActivityID,
-	direct *DirectCapabilityPlan,
 	providerTools []ProviderManagedToolChoice,
-	capabilities []WorkflowCapabilityFact,
 ) (ProgramSnapshot, error) {
 	return newSingleModelWorkflowInvocationProgram(
 		defaults,
 		input,
 		history,
-		direct,
 		providerTools,
-		capabilities,
 	)
 }
 
@@ -236,9 +216,7 @@ func newSingleModelWorkflowInvocationProgram(
 	defaults SessionDefaults,
 	input ActivityID,
 	history []ActivityID,
-	direct *DirectCapabilityPlan,
 	providerTools []ProviderManagedToolChoice,
-	capabilities []WorkflowCapabilityFact,
 ) (ProgramSnapshot, error) {
 	if input == "" {
 		return ProgramSnapshot{}, errors.New("single-model input Activity is required")
@@ -248,9 +226,7 @@ func newSingleModelWorkflowInvocationProgram(
 		InputActivityID:    input,
 		IsolatedInput:      true,
 		HistoryActivityIDs: append([]ActivityID(nil), history...),
-		DirectTarget:       cloneDirectCapabilityPlan(direct),
 		ProviderTools:      jsonutil.CloneJSONInValue(providerTools),
-		CapabilityFacts:    cloneWorkflowCapabilityFacts(capabilities),
 	})
 }
 
@@ -584,9 +560,7 @@ func agentLLMWork(
 		payload.IsolatedInput,
 		payload.HistoryActivityIDs,
 	)
-	work.DirectTarget = cloneDirectCapabilityPlan(payload.DirectTarget)
 	work.ProviderTools = jsonutil.CloneJSONInValue(payload.ProviderTools)
-	work.CapabilityFacts = cloneWorkflowCapabilityFacts(payload.CapabilityFacts)
 	return work
 }
 
@@ -734,9 +708,7 @@ func (singleModelInterpreter) Advance(
 				payload.IsolatedInput,
 				payload.HistoryActivityIDs,
 			)
-			work.DirectTarget = cloneDirectCapabilityPlan(payload.DirectTarget)
 			work.ProviderTools = jsonutil.CloneJSONInValue(payload.ProviderTools)
-			work.CapabilityFacts = cloneWorkflowCapabilityFacts(payload.CapabilityFacts)
 			status := ProgramFrameStateRunning
 			return ProgramTransition{
 				State:  encodeSingleModelState(state),

@@ -36,7 +36,6 @@ type workflowLLMInvocation struct {
 	Defaults           SessionDefaults
 	InputActivityID    ActivityID
 	HistoryActivityIDs []ActivityID
-	DirectTarget       *DirectCapabilityPlan
 }
 
 func decodeWorkflowInvocationValue[T any](
@@ -112,9 +111,9 @@ func prepareWorkflowLLMInvocation(
 		context.Instructions...,
 	)
 
-	if target.Artifact == nil && target.Direct == nil {
+	if target.Artifact == nil {
 		return workflowLLMInvocation{}, errors.New(
-			"workflow model or agent target has no prepared target facts",
+			"workflow model or agent target has no source-backed Artifact pin",
 		)
 	}
 
@@ -182,7 +181,6 @@ func prepareWorkflowLLMInvocation(
 		Defaults:           defaults,
 		InputActivityID:    activityIDs[len(activityIDs)-1],
 		HistoryActivityIDs: append([]ActivityID(nil), activityIDs[:len(activityIDs)-1]...),
-		DirectTarget:       cloneDirectCapabilityPlan(target.Direct),
 	}, nil
 }
 
@@ -233,18 +231,14 @@ func (i *WorkflowInterpreter) invokeWorkflowLLMTarget(
 			invocation.Defaults,
 			invocation.InputActivityID,
 			invocation.HistoryActivityIDs,
-			invocation.DirectTarget,
 			nil,
-			target.CapabilityFacts,
 		)
 	case WorkflowTargetAgent:
 		child, err = NewAgentLoopWorkflowInvocationProgram(
 			invocation.Defaults,
 			invocation.InputActivityID,
 			invocation.HistoryActivityIDs,
-			invocation.DirectTarget,
 			nil,
-			target.CapabilityFacts,
 		)
 	default:
 		return workflowFailure(

@@ -92,7 +92,6 @@ type CallableInterface struct {
 	Ports         map[string]CallablePort `json:"ports,omitempty"`
 	Effect        *EffectContract         `json:"effect,omitempty"`
 	Limits        *Limits                 `json:"limits,omitempty"`
-	Capabilities  []string                `json:"capabilities,omitempty"`
 }
 
 type CallablePort struct {

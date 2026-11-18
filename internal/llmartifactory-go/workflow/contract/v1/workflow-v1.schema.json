@@ -304,8 +304,7 @@
 					"additionalProperties": { "$ref": "#/$defs/callablePort" }
 				},
 				"effect": { "$ref": "#/$defs/effectContract" },
-				"limits": { "$ref": "#/$defs/limits" },
-				"capabilities": { "$ref": "#/$defs/names" }
+				"limits": { "$ref": "#/$defs/limits" }
 			}
 		},
 		"callablePort": {

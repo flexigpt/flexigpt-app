@@ -45,11 +45,9 @@ type TargetPlan struct {
 type TargetResolution struct {
 	Status composition.ResolutionStatus `json:"status"`
 
-	Target *composition.CapabilityTarget `json:"target,omitempty"`
-
-	// ResolvedArtifactRef is set only when normal composition selected an
-	// actual source-backed Artifact. Direct capabilities retain provider
-	// identity, provider-local identity, and evidence in Target instead.
+	// ResolvedArtifactRef is present only for a source-backed Artifact
+	// selected by composition. Workflow rejects restricted direct composition
+	// results before an Inventory is returned.
 	ResolvedArtifactRef *artifactModel.ArtifactRef `json:"resolvedArtifactRef,omitempty"`
 
 	Code    string `json:"code,omitempty"`
@@ -302,14 +300,11 @@ func targetResolutionForOccurrence(
 		Code:    occurrence.Code,
 		Message: occurrence.Message,
 	}
-	if occurrence.Target != nil {
-		target := occurrence.Target.Clone()
-		output.Target = &target
-		if target.Form == composition.TargetFormArtifact &&
-			target.Artifact != nil {
-			ref := *target.Artifact
-			output.ResolvedArtifactRef = &ref
-		}
+	if occurrence.Target != nil &&
+		occurrence.Target.Form == composition.TargetFormArtifact &&
+		occurrence.Target.Artifact != nil {
+		ref := *occurrence.Target.Artifact
+		output.ResolvedArtifactRef = &ref
 	}
 	return output
 }
