@@ -572,15 +572,13 @@ func (r *Runtime) armExecutionDeadlineLocked(
 	if r == nil || execution.Deadline == nil || execution.ID == "" {
 		return
 	}
-	if r.executionTimers == nil {
-		r.executionTimers = make(map[ExecutionID]context.CancelFunc)
-	}
-	if _, found := r.executionTimers[execution.ID]; found {
+	timerCtx, armed := r.armDueTimeLocked(
+		executionDeadlineDueTimeKey(execution.ID),
+	)
+	if !armed {
 		return
 	}
 
-	timerCtx, cancel := context.WithCancel(r.lifecycleCtx)
-	r.executionTimers[execution.ID] = cancel
 	deadline := execution.Deadline.UTC()
 	r.launchAsync(
 		executionDeadlineTimerOperation,
@@ -600,13 +598,7 @@ func (r *Runtime) armExecutionDeadlineLocked(
 func (r *Runtime) cancelExecutionDeadlineLocked(
 	executionID ExecutionID,
 ) {
-	if r == nil || r.executionTimers == nil {
-		return
-	}
-	if cancel, found := r.executionTimers[executionID]; found {
-		delete(r.executionTimers, executionID)
-		cancel()
-	}
+	r.cancelDueTimeLocked(executionDeadlineDueTimeKey(executionID))
 }
 
 func (r *Runtime) armCleanupDeadlineLocked(
@@ -622,15 +614,13 @@ func (r *Runtime) armCleanupDeadlineLocked(
 		execution.ID == "" {
 		return
 	}
-	if r.cleanupTimers == nil {
-		r.cleanupTimers = make(map[ExecutionID]context.CancelFunc)
-	}
-	if _, found := r.cleanupTimers[execution.ID]; found {
+	timerCtx, armed := r.armDueTimeLocked(
+		cleanupDeadlineDueTimeKey(execution.ID),
+	)
+	if !armed {
 		return
 	}
 
-	timerCtx, cancel := context.WithCancel(r.lifecycleCtx)
-	r.cleanupTimers[execution.ID] = cancel
 	deadline := execution.Cleanup.Deadline.UTC()
 	r.launchAsync(
 		cleanupDeadlineTimerOperation,
@@ -650,13 +640,7 @@ func (r *Runtime) armCleanupDeadlineLocked(
 func (r *Runtime) cancelCleanupDeadlineLocked(
 	executionID ExecutionID,
 ) {
-	if r == nil || r.cleanupTimers == nil {
-		return
-	}
-	if cancel, found := r.cleanupTimers[executionID]; found {
-		delete(r.cleanupTimers, executionID)
-		cancel()
-	}
+	r.cancelDueTimeLocked(cleanupDeadlineDueTimeKey(executionID))
 }
 
 func (r *Runtime) waitForCleanupDeadline(
@@ -690,7 +674,7 @@ func (r *Runtime) waitForCleanupDeadline(
 		execution.State.Terminal() {
 		return
 	}
-	delete(r.cleanupTimers, executionID)
+	r.consumeDueTimeLocked(cleanupDeadlineDueTimeKey(executionID))
 
 	now := r.now()
 	execution.Cleanup.Expired = true
@@ -857,7 +841,7 @@ func (r *Runtime) waitForExecutionDeadline(
 		execution.State.Terminal() {
 		return
 	}
-	delete(r.executionTimers, executionID)
+	r.consumeDueTimeLocked(executionDeadlineDueTimeKey(executionID))
 
 	now := r.now()
 	execution.Controls.CancellationRequested = true

@@ -28,6 +28,8 @@ func (b *Binder) buildInputs(
 		var err error
 		activities, err = llmInputActivitySequence(
 			req.Session,
+			req.Execution,
+			req.WorkItem,
 			payload,
 			defaults.History,
 		)
@@ -35,37 +37,65 @@ func (b *Binder) buildInputs(
 			return nil, err
 		}
 	}
+	if len(activities) == 0 {
+		return nil, errors.New("LLM has no semantic activities")
+	}
+
 	inputs := make([]inferenceSpec.InputUnion, 0, len(activities))
-	for _, activity := range activities[:len(activities)-1] {
+	emittedToolResults := make(map[sessionv3Runtime.WorkItemID]struct{})
+	appendActivity := func(activity sessionv3Runtime.Activity) error {
 		value, inputErr := durableActivityInputs(req.Session, execution, activity)
 		if inputErr != nil {
-			return nil, inputErr
+			return inputErr
 		}
 		inputs = append(inputs, value...)
+		for _, item := range completedToolResultItemsForAssistant(
+			execution,
+			activity,
+		) {
+			if _, found := emittedToolResults[item.ID]; found {
+				continue
+			}
+			inputs = append(inputs, toolResultToInput(item))
+			emittedToolResults[item.ID] = struct{}{}
+		}
+		return nil
 	}
-	for index, value := range injectedContext {
-		value = strings.TrimSpace(value)
-		if value == "" {
+
+	contextInserted := false
+	for _, activity := range activities {
+		if activity.ID == payload.InputActivityID {
+			for index, value := range injectedContext {
+				value = strings.TrimSpace(value)
+				if value == "" {
+					continue
+				}
+				inputs = append(inputs, injectedContextInput(
+					payload.InputActivityID,
+					index,
+					value,
+				))
+			}
+			contextInserted = true
+		}
+		if err := appendActivity(activity); err != nil {
+			return nil, err
+		}
+	}
+	if !contextInserted {
+		return nil, errors.New("LLM input activity is absent from its semantic sequence")
+	}
+
+	for _, id := range payload.ContinuationWorkItemIDs {
+		if _, found := emittedToolResults[id]; found {
 			continue
 		}
-		inputs = append(inputs, injectedContextInput(
-			payload.InputActivityID,
-			index,
-			value,
-		))
-	}
-	current := activities[len(activities)-1]
-	currentInputs, inputErr := durableActivityInputs(req.Session, execution, current)
-	if inputErr != nil {
-		return nil, inputErr
-	}
-	inputs = append(inputs, currentInputs...)
-	for _, id := range payload.ContinuationWorkItemIDs {
-		item := findWorkItem(execution, id)
-		if item == nil || item.Output == nil || item.Output.Tool == nil {
+		item := findSessionWorkItem(req.Session, execution, id)
+		if item == nil || !completedSemanticToolOutput(*item) {
 			continue
 		}
 		inputs = append(inputs, toolResultToInput(*item))
+		emittedToolResults[id] = struct{}{}
 	}
 	if len(inputs) == 0 {
 		return nil, errors.New("LLM has no inputs")
@@ -75,75 +105,177 @@ func (b *Binder) buildInputs(
 
 func llmInputActivitySequence(
 	session sessionv3Runtime.Session,
+	execution sessionv3Runtime.Execution,
+	workItem sessionv3Runtime.WorkItem,
 	payload *sessionv3Runtime.LLMWork,
 	historySelection sessionv3Runtime.HistorySelection,
 ) ([]sessionv3Runtime.Activity, error) {
-	current := findActivity(session, payload.InputActivityID)
-	if current == nil {
+	currentIndex := -1
+	for index := range session.Timeline {
+		if session.Timeline[index].ID == payload.InputActivityID {
+			currentIndex = index
+			break
+		}
+	}
+	if currentIndex < 0 {
 		return nil, fmt.Errorf(
 			"LLM input activity %q not found",
 			payload.InputActivityID,
 		)
 	}
-
-	if !payload.IsolatedInput {
-		history := selectHistory(
-			session,
-			payload,
-			historySelection,
+	current := session.Timeline[currentIndex]
+	if payload.IsolatedInput {
+		output := make(
+			[]sessionv3Runtime.Activity,
+			0,
+			len(payload.HistoryActivityIDs)+1,
 		)
-		return append(history, *current), nil
+		for _, activityID := range payload.HistoryActivityIDs {
+			activity := findActivity(session, activityID)
+			if activity == nil {
+				return nil, fmt.Errorf(
+					"isolated LLM history activity %q not found",
+					activityID,
+				)
+			}
+			output = append(output, *activity)
+		}
+		return append(output, current), nil
 	}
 
-	output := make(
-		[]sessionv3Runtime.Activity,
-		0,
-		len(payload.HistoryActivityIDs)+1,
+	history := selectHistory(
+		session,
+		currentIndex,
+		historySelection,
 	)
-	for _, activityID := range payload.HistoryActivityIDs {
-		activity := findActivity(session, activityID)
-		if activity == nil {
-			return nil, fmt.Errorf(
-				"isolated LLM history activity %q not found",
-				activityID,
-			)
+	history = append(history, current)
+	for _, activity := range session.Timeline[currentIndex+1:] {
+		if activity.Kind != sessionv3Runtime.ActivityKindMessage ||
+			activity.Message == nil ||
+			activity.Message.Role != sessionv3Runtime.MessageRoleAssistant ||
+			activity.ExecutionID != execution.ID ||
+			activity.FrameID != workItem.FrameID {
+			continue
 		}
-		output = append(output, *activity)
+		history = append(history, activity)
 	}
-	return append(output, *current), nil
+	return history, nil
 }
 
 func selectHistory(
 	session sessionv3Runtime.Session,
-	payload *sessionv3Runtime.LLMWork,
+	currentIndex int,
 	selection sessionv3Runtime.HistorySelection,
 ) []sessionv3Runtime.Activity {
 	reversed := make([]sessionv3Runtime.Activity, 0)
 	countUser := 0
-	for _, a := range slices.Backward(session.Timeline) {
-		if a.Kind != sessionv3Runtime.ActivityKindMessage || a.Message == nil {
+	for _, activity := range slices.Backward(session.Timeline[:currentIndex]) {
+		if activity.Kind != sessionv3Runtime.ActivityKindMessage ||
+			activity.Message == nil {
 			continue
 		}
-		if a.ID == payload.InputActivityID {
-			continue
-		}
-		reversed = append(reversed, a)
-		if a.Message.Role == sessionv3Runtime.MessageRoleUser {
+		reversed = append(reversed, activity)
+		if activity.Message.Role == sessionv3Runtime.MessageRoleUser {
 			countUser++
 		}
-		if !selection.All && countUser > selection.IncludePreviousUserTurns {
+		if !selection.All &&
+			countUser > selection.IncludePreviousUserTurns {
 			break
 		}
 	}
 
-	out := make([]sessionv3Runtime.Activity, len(reversed))
+	output := make([]sessionv3Runtime.Activity, len(reversed))
 	for index := range reversed {
-		out[len(reversed)-1-index] = reversed[index]
+		output[len(reversed)-1-index] = reversed[index]
 	}
-	return out
+	return output
 }
 
-func findActivity(session sessionv3Runtime.Session, id sessionv3Runtime.ActivityID) *sessionv3Runtime.Activity {
+func completedToolResultItemsForAssistant(
+	execution sessionv3Runtime.Execution,
+	activity sessionv3Runtime.Activity,
+) []sessionv3Runtime.WorkItem {
+	if activity.Kind != sessionv3Runtime.ActivityKindMessage ||
+		activity.Message == nil ||
+		activity.Message.Role != sessionv3Runtime.MessageRoleAssistant ||
+		activity.WorkItemID == "" {
+		return nil
+	}
+	return completedToolResultItemsForOrigin(execution, activity.WorkItemID)
+}
+
+func completedToolResultItemsForOrigin(
+	execution sessionv3Runtime.Execution,
+	originID sessionv3Runtime.WorkItemID,
+) []sessionv3Runtime.WorkItem {
+	candidates := make([]sessionv3Runtime.WorkItem, 0)
+	for _, item := range execution.WorkItems {
+		if item.Type != sessionv3Runtime.WorkItemTypeTool ||
+			item.OriginWorkItemID != originID ||
+			!completedSemanticToolOutput(item) {
+			continue
+		}
+		candidates = append(candidates, item)
+	}
+	if len(candidates) == 0 {
+		return nil
+	}
+
+	ordered := make([]sessionv3Runtime.WorkItem, 0, len(candidates))
+	used := make(map[sessionv3Runtime.WorkItemID]struct{}, len(candidates))
+	origin := findWorkItem(execution, originID)
+	if origin != nil &&
+		origin.Output != nil &&
+		origin.Output.LLM != nil {
+		for _, call := range origin.Output.LLM.ToolCalls {
+			for _, item := range candidates {
+				if _, found := used[item.ID]; found ||
+					item.Input.Tool == nil ||
+					!sameToolCallIdentity(item.Input.Tool.Call, call) {
+					continue
+				}
+				ordered = append(ordered, item)
+				used[item.ID] = struct{}{}
+				break
+			}
+		}
+	}
+	for _, item := range candidates {
+		if _, found := used[item.ID]; found {
+			continue
+		}
+		ordered = append(ordered, item)
+	}
+	return ordered
+}
+
+func completedSemanticToolOutput(item sessionv3Runtime.WorkItem) bool {
+	switch item.State {
+	case sessionv3Runtime.WorkItemStateCompleted,
+		sessionv3Runtime.WorkItemStateFailed:
+	default:
+		return false
+	}
+	return item.EffectState != sessionv3Runtime.EffectStateUncertain &&
+		item.Output != nil &&
+		item.Output.Tool != nil
+}
+
+func sameToolCallIdentity(
+	left sessionv3Runtime.ToolCall,
+	right sessionv3Runtime.ToolCall,
+) bool {
+	if left.ID != "" && left.ID == right.ID {
+		return true
+	}
+	return left.ProviderCallID != "" &&
+		left.ProviderCallID == right.ProviderCallID
+}
+
+func findActivity(
+	session sessionv3Runtime.Session,
+	id sessionv3Runtime.ActivityID,
+) *sessionv3Runtime.Activity {
 	for i := range session.Timeline {
 		if session.Timeline[i].ID == id {
 			v := session.Timeline[i]
@@ -153,7 +285,10 @@ func findActivity(session sessionv3Runtime.Session, id sessionv3Runtime.Activity
 	return nil
 }
 
-func findWorkItem(execution sessionv3Runtime.Execution, id sessionv3Runtime.WorkItemID) *sessionv3Runtime.WorkItem {
+func findWorkItem(
+	execution sessionv3Runtime.Execution,
+	id sessionv3Runtime.WorkItemID,
+) *sessionv3Runtime.WorkItem {
 	for i := range execution.WorkItems {
 		if execution.WorkItems[i].ID == id {
 			v := execution.WorkItems[i]

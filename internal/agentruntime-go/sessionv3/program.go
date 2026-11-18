@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
@@ -263,7 +264,7 @@ func (conversationInterpreter) ValidateState(state ProgramState) error {
 	return json.Unmarshal(state.Data, &value)
 }
 
-func (conversationInterpreter) InitialState(ProgramSnapshot) (ProgramState, error) {
+func (conversationInterpreter) InitialState(ProgramSnapshot, time.Time) (ProgramState, error) {
 	return encodeConversationState(conversationProgramState{}), nil
 }
 
@@ -374,7 +375,7 @@ func (agentLoopInterpreter) ValidateState(state ProgramState) error {
 	return nil
 }
 
-func (agentLoopInterpreter) InitialState(snapshot ProgramSnapshot) (ProgramState, error) {
+func (agentLoopInterpreter) InitialState(snapshot ProgramSnapshot, _ time.Time) (ProgramState, error) {
 	var payload agentLoopProgramPayload
 	if err := json.Unmarshal(snapshot.Payload, &payload); err != nil {
 		return ProgramState{}, err
@@ -669,7 +670,7 @@ func (singleModelInterpreter) ValidateState(state ProgramState) error {
 	return json.Unmarshal(state.Data, &value)
 }
 
-func (singleModelInterpreter) InitialState(snapshot ProgramSnapshot) (ProgramState, error) {
+func (singleModelInterpreter) InitialState(snapshot ProgramSnapshot, _ time.Time) (ProgramState, error) {
 	var payload singleModelProgramPayload
 	if err := json.Unmarshal(snapshot.Payload, &payload); err != nil {
 		return ProgramState{}, err

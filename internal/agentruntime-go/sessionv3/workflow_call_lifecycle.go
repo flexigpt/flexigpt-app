@@ -166,16 +166,17 @@ func (i *WorkflowInterpreter) startCall(
 	if executionID != "" {
 		receiptReference = string(executionID)
 	}
+	receipt := &ExternalReceipt{
+		System:      workflowStartReceiptSystem,
+		Reference:   receiptReference,
+		ConfirmedAt: state.LogicalTime,
+		EffectState: EffectStateNotApplicable,
+	}
 	if err := validateWorkflowCallReceiptForTarget(
 		program,
 		targetName,
 		step,
-		&ExternalReceipt{
-			System:      workflowStartReceiptSystem,
-			Reference:   receiptReference,
-			ConfirmedAt: state.LogicalTime,
-			EffectState: EffectStateNotApplicable,
-		},
+		receipt,
 	); err != nil {
 		return workflowFailure(
 			state,
@@ -183,11 +184,15 @@ func (i *WorkflowInterpreter) startCall(
 			err.Error(),
 		)
 	}
+	declarationPath := state.PendingDeclarationPath
 	if err := state.recordOutcome(WorkflowStepOutcome{
-		ID:     step.ID,
-		Status: WorkflowStepOutcomeSucceeded,
-		Output: output,
-		Target: targetName,
+		ID:              step.ID,
+		Status:          WorkflowStepOutcomeSucceeded,
+		Output:          output,
+		Target:          targetName,
+		Receipt:         cloneReconciliationReceipt(receipt),
+		Effect:          EffectStateNotApplicable,
+		DeclarationPath: declarationPath,
 	}); err != nil {
 		return workflowFailure(
 			state,
@@ -198,6 +203,7 @@ func (i *WorkflowInterpreter) startCall(
 
 	state.Index++
 	state.PendingPath = ""
+	state.PendingDeclarationPath = ""
 	state.PendingTarget = ""
 	state.Deadline = nil
 
@@ -214,7 +220,7 @@ func (i *WorkflowInterpreter) startCall(
 		ID:              frameID,
 		ExecutionID:     executionID,
 		Path:            path + "/started",
-		DeclarationPath: state.PendingDeclarationPath,
+		DeclarationPath: declarationPath,
 		Program:         childProgram,
 		Deadline:        cloneTime(frame.Deadline),
 		Budget:          cloneBudget(budget),

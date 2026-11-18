@@ -278,19 +278,11 @@ func mutableTriggerOccurrence(
 	return nil
 }
 
-func triggerTimerKey(sessionID SessionID, triggerID TriggerID) string {
-	return string(sessionID) + "\x00" + string(triggerID)
-}
-
 func (r *Runtime) cancelTriggerLocked(
 	sessionID SessionID,
 	triggerID TriggerID,
 ) {
-	key := triggerTimerKey(sessionID, triggerID)
-	if cancel, found := r.triggerTimers[key]; found {
-		delete(r.triggerTimers, key)
-		cancel()
-	}
+	r.cancelDueTimeLocked(triggerDueTimeKey(sessionID, triggerID))
 }
 
 func workflowTriggerRegistrationID(
@@ -405,15 +397,12 @@ func (r *Runtime) armTriggerLocked(
 		registration.ID == "" {
 		return
 	}
-	key := triggerTimerKey(sessionID, registration.ID)
-	if r.triggerTimers == nil {
-		r.triggerTimers = make(map[string]context.CancelFunc)
-	}
-	if _, found := r.triggerTimers[key]; found {
+	timerCtx, armed := r.armDueTimeLocked(
+		triggerDueTimeKey(sessionID, registration.ID),
+	)
+	if !armed {
 		return
 	}
-	timerCtx, cancel := context.WithCancel(r.lifecycleCtx)
-	r.triggerTimers[key] = cancel
 
 	at := registration.NextOccurrence.UTC()
 	r.launchAsync(
@@ -465,7 +454,7 @@ func (r *Runtime) waitForTrigger(
 		r.mu.Unlock()
 		return
 	}
-	delete(r.triggerTimers, triggerTimerKey(sessionID, triggerID))
+	r.consumeDueTimeLocked(triggerDueTimeKey(sessionID, triggerID))
 	ready, changed, err := r.fireScheduledTriggerLocked(
 		persistContext,
 		session,
@@ -1045,7 +1034,7 @@ func (r *Runtime) startTriggerExecutionLocked(
 	if interpreter == nil {
 		return errors.New("workflow trigger interpreter is unavailable")
 	}
-	state, err := interpreter.InitialState(program)
+	state, err := interpreter.InitialState(program, now)
 	if err != nil {
 		return err
 	}
@@ -1071,15 +1060,16 @@ func (r *Runtime) startTriggerExecutionLocked(
 			OccurredAt:     occurrence.OccurredAt,
 		},
 		ProgramFrames: []ProgramFrame{{
-			ID:        frameID,
-			Depth:     1,
-			Program:   program,
-			State:     state,
-			Status:    ProgramFrameStateRunning,
-			Path:      "workflow",
-			CreatedAt: now,
-			UpdatedAt: now,
-			Deadline:  cloneTime(deadline),
+			ID:              frameID,
+			Depth:           1,
+			Program:         program,
+			State:           state,
+			Status:          ProgramFrameStateRunning,
+			Path:            "workflow",
+			DeclarationPath: workflow.Root.DeclarationPath,
+			CreatedAt:       now,
+			UpdatedAt:       now,
+			Deadline:        cloneTime(deadline),
 		}},
 		WorkItems:      []WorkItem{},
 		Attempts:       []Attempt{},

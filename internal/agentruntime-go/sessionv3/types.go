@@ -1552,7 +1552,7 @@ type ProgramInterpreter interface {
 	Version() uint32
 	ValidateSnapshot(snapshot ProgramSnapshot) error
 	ValidateState(state ProgramState) error
-	InitialState(snapshot ProgramSnapshot) (ProgramState, error)
+	InitialState(snapshot ProgramSnapshot, logicalTime time.Time) (ProgramState, error)
 	Advance(frame ProgramFrame, execution Execution, event ProgramEvent) (ProgramTransition, error)
 }
 

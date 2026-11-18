@@ -119,10 +119,11 @@ func (i *WorkflowInterpreter) recordTerminalWorkflowStepOutcome(
 	}
 
 	outcome := WorkflowStepOutcome{
-		ID:     step.ID,
-		Status: status,
-		Target: target,
-		Error:  failure,
+		ID:              step.ID,
+		Status:          status,
+		Target:          target,
+		Error:           failure,
+		DeclarationPath: step.DeclarationPath,
 	}
 	if err := state.recordTerminalOutcome(outcome); err != nil {
 		return ProgramTransition{}, fmt.Errorf(

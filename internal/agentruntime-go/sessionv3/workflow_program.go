@@ -474,10 +474,16 @@ func (*WorkflowInterpreter) ValidateState(
 
 func (i *WorkflowInterpreter) InitialState(
 	snapshot ProgramSnapshot,
+	logicalTime time.Time,
 ) (ProgramState, error) {
 	program, err := workflowProgramFromSnapshot(snapshot)
 	if err != nil {
 		return ProgramState{}, err
+	}
+	if logicalTime.IsZero() {
+		return ProgramState{}, errors.New(
+			"workflow logical initialization time is required",
+		)
 	}
 
 	initialState := MustCanonicalValue(map[string]CanonicalValue{})
@@ -490,7 +496,7 @@ func (i *WorkflowInterpreter) InitialState(
 		Outcomes:    []WorkflowStepOutcome{},
 		TargetSets:  program.Scope.TargetSets,
 		Messages:    MustCanonicalValue(map[string][]WorkflowChannelMessageSnapshot{}),
-		LogicalTime: time.Now().UTC(),
+		LogicalTime: logicalTime.UTC(),
 	}
 	if program.Root.State != nil {
 		value, err := i.evaluate(
@@ -514,9 +520,6 @@ func (i *WorkflowInterpreter) InitialState(
 		program.Root.State == nil &&
 		len(program.Scope.OuterState) != 0 {
 		state.State = program.Scope.OuterState.Clone()
-	}
-	if !program.Scope.Child && state.LogicalTime.IsZero() {
-		state.LogicalTime = time.Now().UTC()
 	}
 
 	if err := i.activateWorkflowSubscriptions(program, &state); err != nil {
@@ -1452,13 +1455,6 @@ func (i *WorkflowInterpreter) call(
 		)
 
 	case WorkflowTargetWorkflow:
-		if step.Retry != nil {
-			return workflowFailure(
-				state,
-				"workflow_retry_unsupported",
-				"nested workflow calls cannot retry until child-frame retry state is implemented",
-			)
-		}
 		if target.NestedProgram == nil {
 			return workflowFailure(
 				state,
@@ -1941,11 +1937,12 @@ func (i *WorkflowInterpreter) settleChild(
 		}
 		selectedTarget := state.PendingTarget
 		outcome := WorkflowStepOutcome{
-			ID:      step.ID,
-			Status:  WorkflowStepOutcomeSucceeded,
-			Output:  child.Output,
-			Target:  selectedTarget,
-			Receipt: cloneReconciliationReceipt(child.Receipt),
+			ID:              step.ID,
+			Status:          WorkflowStepOutcomeSucceeded,
+			Output:          child.Output,
+			Target:          selectedTarget,
+			Receipt:         cloneReconciliationReceipt(child.Receipt),
+			DeclarationPath: state.PendingDeclarationPath,
 		}
 		if child.Receipt != nil {
 			outcome.Effect = child.Receipt.EffectState

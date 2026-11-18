@@ -258,7 +258,7 @@ func (r *Runtime) materializeForkFramesLocked(
 		if budgetErr != nil {
 			return budgetErr
 		}
-		state, err := childInterpreter.InitialState(intent.Program)
+		state, err := childInterpreter.InitialState(intent.Program, now)
 		if err != nil {
 			return err
 		}

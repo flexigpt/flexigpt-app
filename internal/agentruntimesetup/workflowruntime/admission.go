@@ -299,6 +299,7 @@ func (a *Admission) PrepareWorkflowTriggers(
 	return a.prepareWorkflowTriggers(
 		ctx,
 		request.Workflow,
+		request.InvocationDefaults,
 	)
 }
 
@@ -350,6 +351,7 @@ func (a *Admission) VerifyArtifactPin(
 func (a *Admission) prepareWorkflowTriggers(
 	ctx context.Context,
 	selection sessionv3Runtime.ArtifactSelection,
+	defaults *sessionv3Runtime.SessionDefaults,
 ) (sessionv3Runtime.ProgramSnapshot, error) {
 	if selection.RootID == "" || selection.ArtifactID == "" {
 		return sessionv3Runtime.ProgramSnapshot{}, errors.New(
@@ -367,7 +369,7 @@ func (a *Admission) prepareWorkflowTriggers(
 		selection,
 		nil,
 		false,
-		nil,
+		defaults,
 	)
 	if err != nil {
 		return sessionv3Runtime.ProgramSnapshot{}, err

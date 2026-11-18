@@ -461,15 +461,11 @@ func (r *Runtime) armResourceWaitLocked(
 		item.ResourceWait.WakeAt == nil {
 		return
 	}
-	if r.resourceTimers == nil {
-		r.resourceTimers = make(map[WorkItemID]context.CancelFunc)
-	}
-	if _, found := r.resourceTimers[item.ID]; found {
+	waitCtx, armed := r.armDueTimeLocked(resourceDueTimeKey(item.ID))
+	if !armed {
 		return
 	}
 
-	waitCtx, cancel := context.WithCancel(r.lifecycleCtx)
-	r.resourceTimers[item.ID] = cancel
 	wakeAt := item.ResourceWait.WakeAt.UTC()
 	generation := item.ResourceWait.Generation
 	r.launchAsync(
@@ -503,13 +499,7 @@ func (r *Runtime) armExecutionResourceWaitsLocked(
 func (r *Runtime) cancelResourceWaitLocked(
 	workItemID WorkItemID,
 ) {
-	if r == nil || r.resourceTimers == nil {
-		return
-	}
-	if cancel, found := r.resourceTimers[workItemID]; found {
-		delete(r.resourceTimers, workItemID)
-		cancel()
-	}
+	r.cancelDueTimeLocked(resourceDueTimeKey(workItemID))
 }
 
 func (r *Runtime) waitForResource(
@@ -550,7 +540,7 @@ func (r *Runtime) waitForResource(
 		!item.ResourceWait.WakeAt.Equal(wakeAt) {
 		return
 	}
-	delete(r.resourceTimers, workItemID)
+	r.consumeDueTimeLocked(resourceDueTimeKey(workItemID))
 
 	if execution.Controls.CancellationRequested ||
 		execution.State.Terminal() {

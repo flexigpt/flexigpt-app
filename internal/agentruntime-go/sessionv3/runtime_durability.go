@@ -60,18 +60,6 @@ func (r *Runtime) resumeRestoredWork(ctx context.Context) {
 		r.armSessionTriggersLocked(ctx, session)
 		for index := range session.Executions {
 			execution := &session.Executions[index]
-			r.armExecutionDeadlineLocked(
-				ctx,
-				session.ID,
-				execution.ID,
-				*execution,
-			)
-			r.armCleanupDeadlineLocked(
-				ctx,
-				session.ID,
-				execution.ID,
-				*execution,
-			)
 			if execution.State.Terminal() {
 				continue
 			}
@@ -156,12 +144,7 @@ func (r *Runtime) resumeRestoredWork(ctx context.Context) {
 					break
 				}
 			}
-			for _, wait := range execution.Waits {
-				if wait.Status == WaitStatusPending {
-					r.scheduleWaitDeadlineLocked(ctx, session.ID, execution.ID, wait)
-				}
-			}
-			r.armExecutionResourceWaitsLocked(
+			r.armExecutionDueTimesLocked(
 				ctx,
 				session.ID,
 				execution.ID,

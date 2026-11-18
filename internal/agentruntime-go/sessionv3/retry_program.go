@@ -103,6 +103,7 @@ func (retryBoundaryInterpreter) ValidateState(state ProgramState) error {
 
 func (retryBoundaryInterpreter) InitialState(
 	_ ProgramSnapshot,
+	_ time.Time,
 ) (ProgramState, error) {
 	return encodeRetryProgramState(retryProgramState{}), nil
 }

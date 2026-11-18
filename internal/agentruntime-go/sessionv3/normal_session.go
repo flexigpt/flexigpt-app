@@ -597,6 +597,7 @@ func (r *Runtime) consumeContinuationLocked(
 		input,
 		nil,
 		staged.InvocationDefaults,
+		staged.AppContext,
 	)
 	if err != nil {
 		return nil, false, err
@@ -630,6 +631,7 @@ func (r *Runtime) submitNormalMessageLocked(
 		input,
 		carried,
 		nil,
+		nil,
 	)
 }
 
@@ -639,6 +641,7 @@ func (r *Runtime) submitNormalMessageWithDefaultsLocked(
 	input MessageInput,
 	carried []ToolResultActivity,
 	resolvedDefaults *SessionDefaults,
+	appContext []AppContextUpdate,
 ) (Activity, error) {
 	frame := normalConversationFrame(execution)
 	if frame == nil || frame.Status.Terminal() {
@@ -669,6 +672,7 @@ func (r *Runtime) submitNormalMessageWithDefaultsLocked(
 			Text:               input.Text,
 			Attachments:        append([]Attachment(nil), input.Attachments...),
 			ToolResults:        append([]ToolResultActivity(nil), carried...),
+			AppContext:         cloneAppContextUpdates(appContext),
 			Metadata:           input.Metadata.Clone(),
 			InvocationDefaults: cloneInvocationDefaults(resolvedDefaults),
 			InvocationBudget:   cloneBudget(input.InvocationBudget),

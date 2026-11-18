@@ -203,6 +203,8 @@ func (b *Binder) prepareLLMPlan(
 
 	activities, err := llmInputActivitySequence(
 		request.Session,
+		request.Execution,
+		request.WorkItem,
 		payload,
 		plan.defaults.History,
 	)

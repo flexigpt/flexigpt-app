@@ -176,7 +176,8 @@ func (r *Runtime) createIndependentChildExecutionLocked(
 	if err := interpreter.ValidateSnapshot(intent.Program); err != nil {
 		return nil, err
 	}
-	state, err := interpreter.InitialState(intent.Program)
+	now := r.now()
+	state, err := interpreter.InitialState(intent.Program, now)
 	if err != nil {
 		return nil, err
 	}
@@ -217,7 +218,6 @@ func (r *Runtime) createIndependentChildExecutionLocked(
 		return nil, err
 	}
 
-	now := r.now()
 	depth, err := childProgramFrameDepth(*parentFrame, effectiveBudget)
 	if err != nil {
 		return nil, err
@@ -562,8 +562,44 @@ func (r *Runtime) armSessionExecutionTimersLocked(
 	}
 	for index := range session.Executions {
 		execution := &session.Executions[index]
-		r.armExecutionDeadlineLocked(ctx, session.ID, execution.ID, *execution)
-		r.armCleanupDeadlineLocked(ctx, session.ID, execution.ID, *execution)
+		r.armExecutionDueTimesLocked(ctx, session.ID, execution.ID, *execution)
+	}
+}
+
+func (r *Runtime) armExecutionDueTimesLocked(
+	ctx context.Context,
+	sessionID SessionID,
+	executionID ExecutionID,
+	execution Execution,
+) {
+	if r == nil || execution.State.Terminal() {
+		return
+	}
+
+	r.armExecutionDeadlineLocked(ctx, sessionID, executionID, execution)
+	r.armCleanupDeadlineLocked(ctx, sessionID, executionID, execution)
+	r.armExecutionRetriesLocked(ctx, sessionID, executionID, execution)
+	r.armExecutionResourceWaitsLocked(ctx, sessionID, executionID, execution)
+	for _, wait := range execution.Waits {
+		if wait.Status == WaitStatusPending {
+			r.scheduleWaitDeadlineLocked(ctx, sessionID, executionID, wait)
+		}
+	}
+}
+
+func (r *Runtime) cancelExecutionDueTimesLocked(execution Execution) {
+	if r == nil {
+		return
+	}
+
+	r.cancelExecutionDeadlineLocked(execution.ID)
+	r.cancelCleanupDeadlineLocked(execution.ID)
+	for _, wait := range execution.Waits {
+		r.cancelWaitDeadlineLocked(wait.ID)
+	}
+	for _, item := range execution.WorkItems {
+		r.cancelRetryLocked(item.ID)
+		r.cancelResourceWaitLocked(item.ID)
 	}
 }
 

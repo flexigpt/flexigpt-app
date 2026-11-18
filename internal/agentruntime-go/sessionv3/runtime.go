@@ -43,17 +43,12 @@ type Runtime struct {
 	privateBindings      map[WorkItemID]BoundWork
 	privateWaits         map[WaitID]any
 	cancels              map[WorkItemID]context.CancelFunc
-	retryTimers          map[WorkItemID]context.CancelFunc
+	dueTimers            map[dueTimeKey]context.CancelFunc
 	checkpointPending    map[SessionID]bool
-	executionTimers      map[ExecutionID]context.CancelFunc
-	cleanupTimers        map[ExecutionID]context.CancelFunc
-	resourceTimers       map[WorkItemID]context.CancelFunc
 	resourceWaitSequence uint64
 
 	lifecycleCtx    context.Context
 	lifecycleCancel context.CancelFunc
-	waitTimers      map[WaitID]context.CancelFunc
-	triggerTimers   map[string]context.CancelFunc
 
 	asyncMu      sync.Mutex
 	asyncWG      sync.WaitGroup
@@ -85,15 +80,10 @@ func NewRuntime(dependencies RuntimeDependencies) (*Runtime, error) {
 		privateBindings:   map[WorkItemID]BoundWork{},
 		privateWaits:      map[WaitID]any{},
 		cancels:           map[WorkItemID]context.CancelFunc{},
-		retryTimers:       map[WorkItemID]context.CancelFunc{},
+		dueTimers:         map[dueTimeKey]context.CancelFunc{},
 		checkpointPending: map[SessionID]bool{},
-		executionTimers:   map[ExecutionID]context.CancelFunc{},
-		cleanupTimers:     map[ExecutionID]context.CancelFunc{},
-		resourceTimers:    map[WorkItemID]context.CancelFunc{},
 		lifecycleCtx:      lifecycleCtx,
 		lifecycleCancel:   lifecycleCancel,
-		waitTimers:        map[WaitID]context.CancelFunc{},
-		triggerTimers:     map[string]context.CancelFunc{},
 	}
 	for _, interpreter := range dependencies.Interpreters {
 		if interpreter == nil || interpreter.ID() == "" || interpreter.Version() == 0 {
@@ -134,33 +124,7 @@ func (r *Runtime) Close() {
 		cancel()
 	}
 	clear(r.cancels)
-	for _, cancel := range r.waitTimers {
-		cancel()
-	}
-	for _, cancel := range r.executionTimers {
-		cancel()
-	}
-	clear(r.executionTimers)
-	for _, cancel := range r.cleanupTimers {
-		cancel()
-	}
-	clear(r.cleanupTimers)
-	triggerCancels := make([]context.CancelFunc, 0, len(r.triggerTimers))
-	for _, cancel := range r.triggerTimers {
-		triggerCancels = append(triggerCancels, cancel)
-	}
-	retryCancels := make([]context.CancelFunc, 0, len(r.retryTimers))
-	for _, cancel := range r.retryTimers {
-		retryCancels = append(retryCancels, cancel)
-	}
-	resourceCancels := make([]context.CancelFunc, 0, len(r.resourceTimers))
-	for _, cancel := range r.resourceTimers {
-		resourceCancels = append(resourceCancels, cancel)
-	}
-	clear(r.retryTimers)
-	clear(r.resourceTimers)
-	clear(r.waitTimers)
-	clear(r.triggerTimers)
+	dueCancels := r.takeAllDueTimesLocked()
 
 	executionIDs := make([]ExecutionID, 0)
 	for _, session := range r.sessions {
@@ -178,13 +142,7 @@ func (r *Runtime) Close() {
 	if lifecycleCancel != nil {
 		lifecycleCancel()
 	}
-	for _, cancel := range retryCancels {
-		cancel()
-	}
-	for _, cancel := range resourceCancels {
-		cancel()
-	}
-	for _, cancel := range triggerCancels {
+	for _, cancel := range dueCancels {
 		cancel()
 	}
 	r.asyncWG.Wait()
@@ -493,6 +451,7 @@ func (r *Runtime) SubmitMessage(ctx context.Context, command SubmitMessageComman
 		input,
 		nil,
 		&resolvedDefaults,
+		nil,
 	)
 	if err != nil {
 		*session = previous
@@ -608,7 +567,7 @@ func (r *Runtime) StartWorkflow(ctx context.Context, command StartWorkflowComman
 	}
 	previous := cloneSession(*session)
 	now := r.now()
-	state, err := interpreter.InitialState(command.Program)
+	state, err := interpreter.InitialState(command.Program, now)
 	if err != nil {
 		r.mu.Unlock()
 		return nil, err
@@ -673,11 +632,6 @@ func (r *Runtime) StartWorkflow(ctx context.Context, command StartWorkflowComman
 	}
 	active = mutableSessionExecution(session, executionID)
 	r.refreshExecutionStateLocked(active)
-	if err := r.registerWorkflowTriggersLocked(session, command.Program); err != nil {
-		*session = previous
-		r.mu.Unlock()
-		return nil, err
-	}
 	r.touchSessionLocked(session)
 	receipt := CommandReceipt{
 		CommandID:         command.Meta.ID,
@@ -693,14 +647,13 @@ func (r *Runtime) StartWorkflow(ctx context.Context, command StartWorkflowComman
 		r.mu.Unlock()
 		return nil, err
 	}
-	r.armExecutionDeadlineLocked(
+	r.armExecutionDueTimesLocked(
 		ctx,
 		session.ID,
 		active.ID,
 		*active,
 	)
 	ready := r.readyWorkForSessionLocked(session)
-	r.armSessionTriggersLocked(ctx, session)
 	r.publishLocked(ctx, session, active.ID, RuntimeEventExecutionChanged)
 	r.mu.Unlock()
 	r.launchReadyWork(ctx, command.SessionID, ready)
@@ -1709,11 +1662,11 @@ func (r *Runtime) conversationExecutionLocked(session *Session) (*Execution, err
 	if interpreter == nil {
 		return nil, errors.New("conversation interpreter unavailable")
 	}
-	state, err := interpreter.InitialState(program)
+	now := r.now()
+	state, err := interpreter.InitialState(program, now)
 	if err != nil {
 		return nil, err
 	}
-	now := r.now()
 	execution := Execution{
 		ID:        ExecutionID(r.newID()),
 		SessionID: session.ID,
@@ -3001,8 +2954,10 @@ func (r *Runtime) scheduleWaitDeadlineLocked(
 		return
 	}
 	r.cancelWaitDeadlineLocked(wait.ID)
-	waitCtx, cancel := context.WithCancel(r.lifecycleCtx)
-	r.waitTimers[wait.ID] = cancel
+	waitCtx, armed := r.armDueTimeLocked(waitDueTimeKey(wait.ID))
+	if !armed {
+		return
+	}
 	deadline := wakeAt.UTC()
 	r.launchAsync(
 		"session-v3 wait deadline",
@@ -3014,10 +2969,7 @@ func (r *Runtime) scheduleWaitDeadlineLocked(
 }
 
 func (r *Runtime) cancelWaitDeadlineLocked(waitID WaitID) {
-	if cancel := r.waitTimers[waitID]; cancel != nil {
-		cancel()
-		delete(r.waitTimers, waitID)
-	}
+	r.cancelDueTimeLocked(waitDueTimeKey(waitID))
 }
 
 func (r *Runtime) expireAt(
@@ -3045,7 +2997,7 @@ func (r *Runtime) expireAt(
 	if r.closed {
 		return
 	}
-	delete(r.waitTimers, waitID)
+	r.consumeDueTimeLocked(waitDueTimeKey(waitID))
 	wait := mutableWait(execution, waitID)
 	if wait == nil || wait.Status != WaitStatusPending {
 		return
@@ -3373,8 +3325,7 @@ func (r *Runtime) completeExecutionLocked(
 		execution.State = ExecutionStateCompleted
 	}
 	r.settleTerminalExecutionLocked(session, execution)
-	r.cancelExecutionDeadlineLocked(execution.ID)
-	r.cancelCleanupDeadlineLocked(execution.ID)
+	r.cancelExecutionDueTimesLocked(*execution)
 	r.touchExecutionLocked(session, execution)
 	if closer, ok := r.deps.Binder.(ExecutionBindingCloser); ok {
 		id := execution.ID

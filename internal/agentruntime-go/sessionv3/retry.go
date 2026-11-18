@@ -180,15 +180,11 @@ func (r *Runtime) armRetryLocked(
 		item.RetryState == nil {
 		return
 	}
-	if r.retryTimers == nil {
-		r.retryTimers = make(map[WorkItemID]context.CancelFunc)
-	}
-	if _, found := r.retryTimers[item.ID]; found {
+	retryCtx, armed := r.armDueTimeLocked(retryDueTimeKey(item.ID))
+	if !armed {
 		return
 	}
 
-	retryCtx, cancel := context.WithCancel(r.lifecycleCtx)
-	r.retryTimers[item.ID] = cancel
 	retryAt := item.RetryState.NextAttemptAt.UTC()
 
 	r.launchAsync(
@@ -219,13 +215,7 @@ func (r *Runtime) armExecutionRetriesLocked(
 }
 
 func (r *Runtime) cancelRetryLocked(id WorkItemID) {
-	if r == nil || r.retryTimers == nil {
-		return
-	}
-	if cancel, found := r.retryTimers[id]; found {
-		delete(r.retryTimers, id)
-		cancel()
-	}
+	r.cancelDueTimeLocked(retryDueTimeKey(id))
 }
 
 func (r *Runtime) waitForRetry(
@@ -265,7 +255,7 @@ func (r *Runtime) waitForRetry(
 		!item.RetryState.NextAttemptAt.Equal(at) {
 		return
 	}
-	delete(r.retryTimers, workItemID)
+	r.consumeDueTimeLocked(retryDueTimeKey(workItemID))
 
 	now := r.now()
 	if execution.Controls.CancellationRequested || execution.State.Terminal() {
