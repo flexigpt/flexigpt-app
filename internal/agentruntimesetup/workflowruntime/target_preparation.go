@@ -7,7 +7,7 @@ import (
 
 	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	workflowAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workflow"
 	workflowv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workflow/contract/v1"
 )
@@ -26,35 +26,63 @@ func (a *Admission) workflowOwnerModel(
 	ctx context.Context,
 	defaults *sessionv3Runtime.SessionDefaults,
 ) (*sessionv3Runtime.ArtifactPin, error) {
-	if defaults == nil || defaults.Model == nil {
+	if defaults == nil {
+		return nil, nil
+	}
+
+	if defaults.Model != nil {
+		ref := artifactModel.ArtifactRef{
+			RootID:     rootModel.RootID(defaults.Model.RootID),
+			ArtifactID: artifactModel.ArtifactID(defaults.Model.ArtifactID),
+		}
+		pin, err := a.pinArtifact(ctx, ref)
+		if err != nil {
+			return nil, err
+		}
+		if defaults.Model.ExpectedRevision != 0 &&
+			defaults.Model.ExpectedRevision != pin.Revision {
+			return nil, errors.New("selected workflow owner Model revision changed")
+		}
+		if defaults.Model.ExpectedDigest != "" &&
+			defaults.Model.ExpectedDigest != pin.Digest {
+			return nil, errors.New("selected workflow owner Model definition changed")
+		}
+		if a.invocations == nil {
+			return nil, fmt.Errorf(
+				"%w: provider-managed Tool lowering requires a Model adapter",
+				ErrBindingUnavailable,
+			)
+		}
+		if err := a.invocations.AdmitWorkflowModelTarget(ctx, pin); err != nil {
+			return nil, err
+		}
+		return &pin, nil
+	}
+
+	if defaults.Agent == nil || a.invocations == nil {
 		return nil, nil
 	}
 	ref := artifactModel.ArtifactRef{
-		RootID:     model.RootID(defaults.Model.RootID),
-		ArtifactID: artifactModel.ArtifactID(defaults.Model.ArtifactID),
+		RootID:     rootModel.RootID(defaults.Agent.RootID),
+		ArtifactID: artifactModel.ArtifactID(defaults.Agent.ArtifactID),
 	}
-	pin, err := a.pinArtifact(ctx, ref)
+	agent, err := a.pinArtifact(ctx, ref)
 	if err != nil {
 		return nil, err
 	}
-	if defaults.Model.ExpectedRevision != 0 &&
-		defaults.Model.ExpectedRevision != pin.Revision {
-		return nil, errors.New("selected workflow owner Model revision changed")
+	if defaults.Agent.ExpectedRevision != 0 &&
+		defaults.Agent.ExpectedRevision != agent.Revision {
+		return nil, errors.New("selected workflow owner Agent revision changed")
 	}
-	if defaults.Model.ExpectedDigest != "" &&
-		defaults.Model.ExpectedDigest != pin.Digest {
-		return nil, errors.New("selected workflow owner Model definition changed")
+	if defaults.Agent.ExpectedDigest != "" &&
+		defaults.Agent.ExpectedDigest != agent.Digest {
+		return nil, errors.New("selected workflow owner Agent definition changed")
 	}
-	if a.invocations == nil {
-		return nil, fmt.Errorf(
-			"%w: provider-managed Tool lowering requires a Model adapter",
-			ErrBindingUnavailable,
-		)
-	}
-	if err := a.invocations.AdmitWorkflowModelTarget(ctx, pin); err != nil {
+	model, err := a.invocations.ResolveWorkflowAgentOwnerModel(ctx, agent)
+	if err != nil {
 		return nil, err
 	}
-	return &pin, nil
+	return &model, nil
 }
 
 // prepareRequirement preserves root requirements as named prerequisites.
@@ -138,6 +166,16 @@ func (a *Admission) prepareRequirement(
 			return sessionv3Runtime.WorkflowRequirementFact{}, err
 		}
 		if target.Server != nil {
+			if a.mcpTools == nil {
+				return sessionv3Runtime.WorkflowRequirementFact{}, ErrBindingUnavailable
+			}
+			if _, err := a.mcpTools.PrepareWorkflowMCPTool(
+				ctx,
+				pin,
+				target.Ref,
+			); err != nil {
+				return sessionv3Runtime.WorkflowRequirementFact{}, err
+			}
 			result.Kind = sessionv3Runtime.WorkflowTargetMCPTool
 		} else {
 			if _, err := a.tools.IsProviderManagedWorkflowTool(ctx, pin); err != nil {

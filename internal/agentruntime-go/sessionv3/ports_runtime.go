@@ -15,6 +15,7 @@ const (
 	portInputFactsChangedMessage                 = "port input facts differ from its plan"
 	portChannelParentExecutionUnavailableMessage = "parent port channel execution is unavailable"
 	portChannelParentFrameUnavailableMessage     = "parent port channel frame is unavailable"
+	portChannelForwardingCycleMessage            = "port channel forwarding contains a cycle"
 )
 
 const (
@@ -303,25 +304,114 @@ func portChannelExecution(
 	execution *Execution,
 	plan PortPlan,
 ) (*Execution, error) {
+	return resolvePortChannelExecution(
+		session,
+		execution,
+		plan,
+		map[portForwardingIdentity]struct{}{},
+	)
+}
+
+type portForwardingIdentity struct {
+	ExecutionID ExecutionID
+	FrameID     ProgramFrameID
+	Name        string
+	Channel     string
+	Direction   WorkflowPortDirection
+	Stream      bool
+}
+
+func resolvePortChannelExecution(
+	session *Session,
+	execution *Execution,
+	plan PortPlan,
+	visited map[portForwardingIdentity]struct{},
+) (*Execution, error) {
 	if session == nil || execution == nil {
 		return nil, errors.New(portInputOwnerUnavailableMessage)
 	}
 
-	// Attached child frames share their parent Execution. Independent child
-	// Executions retain the parent-frame identity in the port plan and must
-	// use the parent Execution channel log.
-	if plan.ParentFrameID == "" || execution.ParentExecutionID == "" {
+	frameID := plan.ParentFrameID
+	if frameID == "" {
+		frameID = plan.OwnerFrameID
+	}
+	if frameID == "" {
 		return execution, nil
 	}
 
-	parent := mutableSessionExecution(session, execution.ParentExecutionID)
-	if parent == nil {
-		return nil, errors.New(portChannelParentExecutionUnavailableMessage)
+	ownerExecution, ownerFrame, err := portFrameOwner(
+		session,
+		execution,
+		frameID,
+	)
+	if err != nil {
+		return nil, err
 	}
-	if mutableFrame(parent, plan.ParentFrameID) == nil {
-		return nil, errors.New(portChannelParentFrameUnavailableMessage)
+
+	identity := portForwardingIdentity{
+		ExecutionID: ownerExecution.ID,
+		FrameID:     ownerFrame.ID,
+		Name:        plan.Name,
+		Channel:     plan.Channel,
+		Direction:   plan.Direction,
+		Stream:      plan.Stream,
 	}
-	return parent, nil
+	if _, found := visited[identity]; found {
+		return nil, errors.New(portChannelForwardingCycleMessage)
+	}
+	visited[identity] = struct{}{}
+
+	if forwarding := forwardingPortPlan(*ownerFrame, plan); forwarding != nil &&
+		forwarding.ParentFrameID != "" {
+		return resolvePortChannelExecution(
+			session,
+			ownerExecution,
+			*forwarding,
+			visited,
+		)
+	}
+	return ownerExecution, nil
+}
+
+func portFrameOwner(
+	session *Session,
+	execution *Execution,
+	frameID ProgramFrameID,
+) (*Execution, *ProgramFrame, error) {
+	current := execution
+	for current != nil {
+		if frame := mutableFrame(current, frameID); frame != nil {
+			return current, frame, nil
+		}
+		if current.ParentExecutionID == "" {
+			break
+		}
+		current = mutableSessionExecution(
+			session,
+			current.ParentExecutionID,
+		)
+	}
+	if execution.ParentExecutionID == "" {
+		return nil, nil, errors.New(portChannelParentFrameUnavailableMessage)
+	}
+	return nil, nil, errors.New(portChannelParentExecutionUnavailableMessage)
+}
+
+func forwardingPortPlan(
+	frame ProgramFrame,
+	plan PortPlan,
+) *PortPlan {
+	for index := range frame.Ports {
+		candidate := &frame.Ports[index]
+		if candidate.Name != plan.Name ||
+			candidate.Channel != plan.Channel ||
+			candidate.Direction != plan.Direction ||
+			candidate.Stream != plan.Stream {
+			continue
+		}
+		return candidate
+	}
+	return nil
 }
 
 func (r *Runtime) deliverWorkPortsLocked(
@@ -373,6 +463,9 @@ func (r *Runtime) deliverFramePortsLocked(
 ) error {
 	if session == nil || execution == nil || frame == nil ||
 		len(frame.Ports) == 0 || len(frame.Output) == 0 {
+		return nil
+	}
+	if !frame.PortDelivery.DeliversFinalOutput() {
 		return nil
 	}
 	if err := validateFramePortOwnership(*execution, *frame); err != nil {

@@ -106,9 +106,9 @@ func (b *Binder) prepareLLMPlan(
 		}
 	}
 
-	plan.defaults.Tools, pins, err = b.pinSelections(
+	toolSelections, pins, err := b.pinToolSelections(
 		ctx,
-		plan.defaults.Tools,
+		sessionv3Runtime.EffectiveToolSelections(plan.defaults),
 	)
 	if err != nil {
 		return llmExecutionPlan{}, err
@@ -118,6 +118,10 @@ func (b *Binder) prepareLLMPlan(
 			return llmExecutionPlan{}, err
 		}
 	}
+	plan.defaults.ToolSelections = toolSelections
+	plan.defaults.Tools = artifactSelectionsForToolSelections(
+		toolSelections,
+	)
 
 	plan.defaults.Skills, pins, err = b.pinSelections(
 		ctx,
@@ -858,6 +862,52 @@ func (b *Binder) pinSelections(
 	return output, pins, nil
 }
 
+func (b *Binder) pinToolSelections(
+	ctx context.Context,
+	selections []sessionv3Runtime.ToolSelection,
+) ([]sessionv3Runtime.ToolSelection, []sessionv3Runtime.ArtifactPin, error) {
+	if len(selections) == 0 {
+		return nil, nil, nil
+	}
+
+	output := make(
+		[]sessionv3Runtime.ToolSelection,
+		0,
+		len(selections),
+	)
+	pins := make(
+		[]sessionv3Runtime.ArtifactPin,
+		0,
+		len(selections),
+	)
+	seen := make(map[string]struct{}, len(selections))
+	for _, selection := range selections {
+		if err := selection.Validate(); err != nil {
+			return nil, nil, err
+		}
+		pin, err := b.pinSelection(ctx, selection.Artifact)
+		if err != nil {
+			return nil, nil, err
+		}
+		key := pin.RootID + "\x00" + pin.ArtifactID
+		if _, duplicate := seen[key]; duplicate {
+			return nil, nil, errors.New("tool selection is duplicated")
+		}
+		seen[key] = struct{}{}
+		output = append(output, sessionv3Runtime.ToolSelection{
+			Artifact: sessionv3Runtime.ArtifactSelection{
+				RootID:           pin.RootID,
+				ArtifactID:       pin.ArtifactID,
+				ExpectedRevision: pin.Revision,
+				ExpectedDigest:   pin.Digest,
+			},
+			UserArguments: selection.UserArguments.Clone(),
+		})
+		pins = append(pins, pin)
+	}
+	return output, pins, nil
+}
+
 func (b *Binder) pinMCPSelections(
 	ctx context.Context,
 	selections []sessionv3Runtime.MCPServerSelection,
@@ -1144,6 +1194,19 @@ func v3ArtifactRefsForCapabilities(
 		}
 		seen[ref] = struct{}{}
 		output = append(output, ref)
+	}
+	return output
+}
+
+func artifactSelectionsForToolSelections(
+	values []sessionv3Runtime.ToolSelection,
+) []sessionv3Runtime.ArtifactSelection {
+	if len(values) == 0 {
+		return nil
+	}
+	output := make([]sessionv3Runtime.ArtifactSelection, 0, len(values))
+	for _, value := range values {
+		output = append(output, value.Artifact)
 	}
 	return output
 }

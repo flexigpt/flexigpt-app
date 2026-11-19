@@ -55,6 +55,7 @@ type SessionDefaults struct {
 	Metadata             jsonutil.CanonicalValue     `json:"metadata,omitempty"`
 	History              HistorySelection            `json:"history"`
 	Tools                []ArtifactSelection         `json:"tools,omitempty"`
+	ToolSelections       []ToolSelection             `json:"toolSelections,omitempty"`
 	Skills               []ArtifactSelection         `json:"skills,omitempty"`
 	ActiveSkills         []ArtifactSelection         `json:"activeSkills,omitempty"`
 	MCP                  []MCPServerSelection        `json:"mcp,omitempty"`
@@ -78,6 +79,7 @@ type SessionDefaultsOverride struct {
 	Metadata             *jsonutil.CanonicalValue     `json:"metadata,omitempty"`
 	History              *HistorySelection            `json:"history,omitempty"`
 	Tools                *[]ArtifactSelection         `json:"tools,omitempty"`
+	ToolSelections       *[]ToolSelection             `json:"toolSelections,omitempty"`
 	Skills               *[]ArtifactSelection         `json:"skills,omitempty"`
 	ActiveSkills         *[]ArtifactSelection         `json:"activeSkills,omitempty"`
 	MCP                  *[]MCPServerSelection        `json:"mcp,omitempty"`
@@ -98,6 +100,7 @@ const (
 	SessionDefaultFieldMetadata             SessionDefaultField = "metadata"
 	SessionDefaultFieldHistory              SessionDefaultField = "history"
 	SessionDefaultFieldTools                SessionDefaultField = "tools"
+	SessionDefaultFieldToolSelections       SessionDefaultField = "toolSelections"
 	SessionDefaultFieldSkills               SessionDefaultField = "skills"
 	SessionDefaultFieldActiveSkills         SessionDefaultField = "activeSkills"
 	SessionDefaultFieldMCP                  SessionDefaultField = "mcp"
@@ -161,6 +164,14 @@ type ArtifactSelection struct {
 	ArtifactID       string `json:"artifactID"`
 	ExpectedRevision uint64 `json:"expectedRevision,omitempty"`
 	ExpectedDigest   string `json:"expectedDigest,omitempty"`
+}
+
+// ToolSelection is an Artifact-backed standalone Tool selection. It retains
+// optional typed provider SDK Tool configuration separately from model Tool
+// call arguments. Go Tools do not accept UserArguments.
+type ToolSelection struct {
+	Artifact      ArtifactSelection       `json:"artifact"`
+	UserArguments jsonutil.CanonicalValue `json:"userArguments,omitempty"`
 }
 
 type ArtifactPin struct {
@@ -613,6 +624,23 @@ const (
 	ChildFrameLifetimeIndependent ChildFrameLifetime = "independent"
 )
 
+// FramePortDeliveryMode controls final-output port delivery by one child
+// frame. Forward-only frames retain port ownership for descendants but do not
+// duplicate a descendant's final-output delivery.
+type FramePortDeliveryMode string
+
+const (
+	FramePortDeliveryModeDeliver     FramePortDeliveryMode = "deliver"
+	FramePortDeliveryModeForwardOnly FramePortDeliveryMode = "forwardOnly"
+)
+
+type ProgramFramePortBoundary string
+
+const (
+	ProgramFramePortBoundaryNone              ProgramFramePortBoundary = ""
+	ProgramFramePortBoundaryPublishedWorkflow ProgramFramePortBoundary = "publishedWorkflow"
+)
+
 type ProgramFrame struct {
 	ID                ProgramFrameID          `json:"id"`
 	ParentFrameID     ProgramFrameID          `json:"parentFrameID,omitempty"`
@@ -632,6 +660,7 @@ type ProgramFrame struct {
 	WorkItemIDs       []WorkItemID            `json:"workItemIDs,omitempty"`
 	Ports             []PortPlan              `json:"ports,omitempty"`
 	PortInputs        []PortInput             `json:"portInputs,omitempty"`
+	PortDelivery      FramePortDeliveryMode   `json:"portDelivery,omitempty"`
 	Output            jsonutil.CanonicalValue `json:"output,omitempty"`
 	Receipt           *ExternalReceipt        `json:"receipt,omitempty"`
 	Error             *SanitizedError         `json:"error,omitempty"`
@@ -1020,13 +1049,10 @@ const (
 	ToolCallSourceApp   ToolCallSource = "app"
 )
 
-// MCPToolTarget is the semantic Workflow target for an MCP Tool. MCP Runtime
-// discovers the current provider Tool and creates the executable MCP binding
-// immediately before dispatch.
-type MCPToolTarget struct {
-	Server   ArtifactPin `json:"server"`
-	ToolName string      `json:"toolName"`
-}
+// MCPToolTarget retains the prepared MCP Tool identity produced by Workflow
+// setup. It is an alias so local Tool binding receives the same immutable
+// server, discovery, policy, and provider Tool facts as Workflow planning.
+type MCPToolTarget = WorkflowMCP
 
 type ToolCall struct {
 	ID             string                  `json:"id"`
@@ -1519,6 +1545,8 @@ type ProgramFrameIntent struct {
 	Ownership       *ChildExecutionOwnership   `json:"ownership,omitempty"`
 	Claims          []ResourceClaim            `json:"claims,omitempty"`
 	Ports           []PortPlan                 `json:"ports,omitempty"`
+	PortDelivery    FramePortDeliveryMode      `json:"portDelivery,omitempty"`
+	PortBoundary    ProgramFramePortBoundary   `json:"portBoundary,omitempty"`
 	Handoff         *ConversationHandoffIntent `json:"handoff,omitempty"`
 }
 

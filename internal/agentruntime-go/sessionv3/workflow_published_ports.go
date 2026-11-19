@@ -5,6 +5,8 @@ import (
 	"fmt"
 )
 
+const workflowTargetPublishesNoPortsMessage = "workflow target publishes no ports"
+
 // validateWorkflowFramePortBoundary gives root Workflow ports their durable
 // parent-child boundary behavior. A Workflow with no root port declarations
 // remains compatible with callers that declare no child port mapping.
@@ -21,7 +23,7 @@ func validateWorkflowFramePortBoundary(
 		return err
 	}
 	if len(program.Ports) == 0 {
-		return nil
+		return errors.New(workflowTargetPublishesNoPortsMessage)
 	}
 
 	published := make(map[string]WorkflowPort, len(program.Ports))

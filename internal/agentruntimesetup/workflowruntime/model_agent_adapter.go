@@ -108,15 +108,26 @@ func (a *ModelAgentInvocationAdapter) AdmitWorkflowAgentTarget(
 	ctx context.Context,
 	pin sessionv3Runtime.ArtifactPin,
 ) error {
+	_, err := a.ResolveWorkflowAgentOwnerModel(ctx, pin)
+	return err
+}
+
+// ResolveWorkflowAgentOwnerModel resolves and pins the Model selected by an
+// Artifact-backed Agent. Provider SDK Tools use this owner when a Workflow
+// invocation supplies an Agent but no explicit Model.
+func (a *ModelAgentInvocationAdapter) ResolveWorkflowAgentOwnerModel(
+	ctx context.Context,
+	pin sessionv3Runtime.ArtifactPin,
+) (sessionv3Runtime.ArtifactPin, error) {
 	ref := workflowInvocationArtifactRef(pin)
 	resolution, err := a.agents.ResolveAgent(ctx, ref)
 	if err != nil {
-		return err
+		return sessionv3Runtime.ArtifactPin{}, err
 	}
 	if resolution.Agent.Ref != ref ||
 		resolution.Agent.Revision != pin.Revision ||
 		string(resolution.Agent.DefinitionDigest) != pin.Digest {
-		return errors.New(
+		return sessionv3Runtime.ArtifactPin{}, errors.New(
 			"workflow agent target changed during invocation admission",
 		)
 	}
@@ -130,32 +141,57 @@ func (a *ModelAgentInvocationAdapter) AdmitWorkflowAgentTarget(
 			occurrence.Target == nil {
 			if occurrence.Required {
 				if occurrence.Message != "" {
-					return errors.New(occurrence.Message)
+					return sessionv3Runtime.ArtifactPin{}, errors.New(occurrence.Message)
 				}
-				return errors.New(
+				return sessionv3Runtime.ArtifactPin{}, errors.New(
 					"required agent model capability is unavailable",
 				)
 			}
 			continue
 		}
 
-		if _, err := a.models.ResolveRuntimeModelTarget(
-			ctx,
-			*occurrence.Target,
-		); err != nil {
-			unavailable = err
+		if occurrence.Target.Form != composition.TargetFormArtifact ||
+			occurrence.Target.Artifact == nil {
+			unavailable = errors.New(
+				"workflow agent model capability is not artifact-backed",
+			)
 			if occurrence.Required {
-				return err
+				return sessionv3Runtime.ArtifactPin{}, unavailable
 			}
 			continue
 		}
-		return nil
+
+		_, use, resolveErr := a.models.ResolveRuntimeModelWithRequestPatch(
+			ctx,
+			*occurrence.Target.Artifact,
+			nil,
+		)
+		if resolveErr != nil {
+			unavailable = resolveErr
+
+			if occurrence.Required {
+				return sessionv3Runtime.ArtifactPin{}, resolveErr
+			}
+			continue
+		}
+		if use == nil || use.RootID == "" || use.ArtifactID == "" ||
+			use.Revision == 0 || use.Digest == "" {
+			return sessionv3Runtime.ArtifactPin{}, errors.New(
+				"workflow agent model resolution returned an incomplete Artifact pin",
+			)
+		}
+		return sessionv3Runtime.ArtifactPin{
+			RootID:     use.RootID,
+			ArtifactID: use.ArtifactID,
+			Revision:   use.Revision,
+			Digest:     use.Digest,
+		}, nil
 	}
 
 	if unavailable != nil {
-		return unavailable
+		return sessionv3Runtime.ArtifactPin{}, unavailable
 	}
-	return errors.New(
+	return sessionv3Runtime.ArtifactPin{}, errors.New(
 		"workflow agent target has no available model capability",
 	)
 }

@@ -207,6 +207,18 @@ func validateDefaults(value SessionDefaults) error {
 	if err := validateSelections("Tool", value.Tools); err != nil {
 		return err
 	}
+	toolSelections := make(map[string]struct{}, len(value.ToolSelections))
+	for index, selection := range value.ToolSelections {
+		if err := selection.Validate(); err != nil {
+			return fmt.Errorf("tool selection %d: %w", index, err)
+		}
+		key := selection.Artifact.RootID + "\x00" +
+			selection.Artifact.ArtifactID
+		if _, duplicate := toolSelections[key]; duplicate {
+			return fmt.Errorf("duplicate Tool selection %q", key)
+		}
+		toolSelections[key] = struct{}{}
+	}
 	if err := validateSelections("Skill", value.Skills); err != nil {
 		return err
 	}
@@ -341,6 +353,16 @@ func validateSelection(value ArtifactSelection) error {
 			!utf8.ValidString(value.ExpectedDigest) ||
 			strings.ContainsRune(value.ExpectedDigest, 0)) {
 		return errors.New("artifact expected digest is invalid")
+	}
+	return nil
+}
+
+func (s ToolSelection) Validate() error {
+	if err := validateSelection(s.Artifact); err != nil {
+		return err
+	}
+	if len(s.UserArguments) != 0 && !s.UserArguments.Valid() {
+		return errors.New("tool user arguments are not canonical json")
 	}
 	return nil
 }
@@ -736,6 +758,9 @@ func (p ProgramFrame) Validate() error {
 			return err
 		}
 	}
+	if err := p.PortDelivery.Validate(); err != nil {
+		return err
+	}
 	if err := validateUniquePortPlans(p.Ports); err != nil {
 		return err
 	}
@@ -815,6 +840,16 @@ func validateDeferredFrameIntent(value ProgramFrameIntent) error {
 		if err := value.Budget.Validate(); err != nil {
 			return err
 		}
+	}
+	if err := value.PortDelivery.Validate(); err != nil {
+		return err
+	}
+	if err := value.PortBoundary.Validate(); err != nil {
+		return err
+	}
+	if value.PortBoundary == ProgramFramePortBoundaryPublishedWorkflow &&
+		value.Program.InterpreterID != WorkflowInterpreterID {
+		return errors.New("published workflow port boundary requires a workflow program")
 	}
 	for _, claim := range value.Claims {
 		if err := claim.Validate(); err != nil {
@@ -1209,13 +1244,7 @@ func (p WorkItemPayload) Validate(kind WorkItemType) error {
 			}
 		}
 		if p.Tool.MCP != nil {
-			if err := validatePin(p.Tool.MCP.Server); err != nil {
-				return err
-			}
-			if err := validateID(
-				"MCP Tool target name",
-				p.Tool.MCP.ToolName,
-			); err != nil {
+			if err := p.Tool.MCP.Validate(); err != nil {
 				return err
 			}
 		}

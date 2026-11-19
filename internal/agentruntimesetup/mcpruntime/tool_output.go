@@ -142,32 +142,42 @@ func ToolOutputItemsFromMCPContents(
 func MCPContentsText(contents []mcpServer.MCPContent) string {
 	parts := make([]string, 0, len(contents))
 	for _, content := range contents {
-		switch content.Type {
-		case mcpServer.MCPContentTypeText:
-			if strings.TrimSpace(content.Text) != "" {
-				parts = append(parts, content.Text)
-			}
-		case mcpServer.MCPContentTypeResource:
-			if content.Resource == nil {
-				continue
-			}
-			if strings.TrimSpace(content.Resource.Text) != "" {
-				parts = append(parts, content.Resource.Text)
-			} else if strings.TrimSpace(content.Resource.URI) != "" {
-				parts = append(parts, "[MCP resource omitted: "+content.Resource.URI+"]")
-			}
-		case mcpServer.MCPContentTypeResourceLink:
-			if value := strings.TrimSpace(content.Name + " " + content.URI); value != "" {
-				parts = append(parts, value)
-			}
-		case mcpServer.MCPContentTypeImage:
-			parts = append(parts, "[MCP image content]")
-		case mcpServer.MCPContentTypeAudio:
-			parts = append(parts, "[MCP audio content]")
-		default:
+		if value := MCPContentText(content); value != "" {
+			parts = append(parts, value)
 		}
 	}
 	return strings.Join(parts, "\n\n")
+}
+
+func MCPContentText(content mcpServer.MCPContent) string {
+	switch content.Type {
+	case mcpServer.MCPContentTypeText:
+		return strings.TrimSpace(content.Text)
+
+	case mcpServer.MCPContentTypeResource:
+		if content.Resource == nil {
+			return ""
+		}
+		if strings.TrimSpace(content.Resource.Text) != "" {
+			return content.Resource.Text
+		}
+		if strings.TrimSpace(content.Resource.URI) != "" {
+			return "[MCP resource omitted: " + content.Resource.URI + "]"
+		}
+		return ""
+
+	case mcpServer.MCPContentTypeResourceLink:
+		return strings.TrimSpace(content.Name + " " + content.URI)
+
+	case mcpServer.MCPContentTypeImage:
+		return "[MCP image content omitted]"
+
+	case mcpServer.MCPContentTypeAudio:
+		return "[MCP audio content omitted]"
+
+	default:
+		return ""
+	}
 }
 
 func firstToolOutputName(values ...string) string {

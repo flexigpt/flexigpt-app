@@ -196,6 +196,59 @@ func workflowInvocationOverridesTarget(
 		slices.Contains(value.Clear, SessionDefaultFieldAgent)
 }
 
+func configuredProviderManagedToolChoice(
+	value ProviderManagedToolChoice,
+	defaults SessionDefaults,
+) (ProviderManagedToolChoice, error) {
+	for _, selection := range EffectiveToolSelections(defaults) {
+		if selection.Artifact.RootID != value.Artifact.RootID ||
+			selection.Artifact.ArtifactID != value.Artifact.ArtifactID {
+			continue
+		}
+		value.Configuration = selection.UserArguments.Clone()
+		break
+	}
+	if err := value.Validate(); err != nil {
+		return ProviderManagedToolChoice{}, err
+	}
+	return value, nil
+}
+
+func withoutProviderManagedToolSelection(
+	input SessionDefaults,
+	target ArtifactPin,
+) SessionDefaults {
+	output := cloneSessionDefaults(input)
+
+	output.Tools = output.Tools[:0]
+	for _, selection := range input.Tools {
+		if selection.RootID == target.RootID &&
+			selection.ArtifactID == target.ArtifactID {
+			continue
+		}
+		output.Tools = append(output.Tools, selection)
+	}
+
+	output.ToolSelections = output.ToolSelections[:0]
+	for _, selection := range input.ToolSelections {
+		if selection.Artifact.RootID == target.RootID &&
+			selection.Artifact.ArtifactID == target.ArtifactID {
+			continue
+		}
+		output.ToolSelections = append(
+			output.ToolSelections,
+			cloneToolSelection(selection),
+		)
+	}
+	if len(output.Tools) == 0 {
+		output.Tools = nil
+	}
+	if len(output.ToolSelections) == 0 {
+		output.ToolSelections = nil
+	}
+	return output
+}
+
 func (i *WorkflowInterpreter) invokeWorkflowLLMTarget(
 	frame ProgramFrame,
 	state WorkflowState,
@@ -279,6 +332,7 @@ func (i *WorkflowInterpreter) invokeWorkflowLLMTarget(
 		child,
 		ports,
 		budget,
+		ProgramFramePortBoundaryNone,
 		handoff,
 	)
 	if err != nil {

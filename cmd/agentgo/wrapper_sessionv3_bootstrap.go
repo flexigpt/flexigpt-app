@@ -10,6 +10,7 @@ import (
 	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 	skillRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/skill"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/attachmentruntime"
+	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/mcpruntime"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/modelruntime"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/sessionv3runtime"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/skillruntime"
@@ -87,6 +88,7 @@ func newSessionV3WorkflowAdmission(
 	toolCaller toolruntime.GoToolCaller,
 	models *modelruntime.SourceResolver,
 	agents *agentAPI.Service,
+	mcpRuntime *mcpConnection.MCPRuntimeManager,
 ) (
 	*workflowruntime.Admission,
 	*workflowruntime.BindingRegistry,
@@ -97,7 +99,8 @@ func newSessionV3WorkflowAdmission(
 		tools == nil ||
 		toolCaller == nil ||
 		models == nil ||
-		agents == nil {
+		agents == nil ||
+		mcpRuntime == nil {
 		return nil, nil, errSessionV3Deps
 	}
 
@@ -117,12 +120,20 @@ func newSessionV3WorkflowAdmission(
 		return nil, nil, err
 	}
 
+	mcpPreparer, err := mcpruntime.NewWorkflowTargetPreparer(
+		mcpRuntime,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	bindings := workflowruntime.NewBindingRegistry()
 	admission, err := workflowruntime.NewAdmission(
 		workflows,
 		artifacts,
 		bindings,
 		toolInspector,
+		mcpPreparer,
 		invocations,
 	)
 	if err != nil {

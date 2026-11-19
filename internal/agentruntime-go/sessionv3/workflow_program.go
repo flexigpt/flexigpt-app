@@ -23,6 +23,7 @@ const (
 
 	workflowChildCallFramePrefix = "workflow-child-frame"
 	workflowChildCallWorkPrefix  = "workflow-child-call"
+	workflowChildCallIDSeparator = ":"
 
 	maxWorkflowProgramJSONBytes = 2 << 20
 )
@@ -263,8 +264,14 @@ type WorkflowTarget struct {
 }
 
 type WorkflowMCP struct {
-	Server   ArtifactPin `json:"server"`
-	ToolName string      `json:"toolName"`
+	Server           ArtifactPin `json:"server"`
+	ToolName         string      `json:"toolName"`
+	ProviderToolName string      `json:"providerToolName"`
+	ChoiceID         string      `json:"choiceID"`
+	ToolDigest       string      `json:"toolDigest"`
+	ApprovalRule     string      `json:"approvalRule"`
+	ExecutionMode    string      `json:"executionMode"`
+	DiscoveryDigest  string      `json:"discoveryDigest"`
 }
 
 type WorkflowStepOutcomeStatus string
@@ -1456,8 +1463,14 @@ func (i *WorkflowInterpreter) call(
 							},
 						},
 						MCP: &MCPToolTarget{
-							Server:   target.MCP.Server,
-							ToolName: target.MCP.ToolName,
+							Server:           target.MCP.Server,
+							ToolName:         target.MCP.ToolName,
+							ProviderToolName: target.MCP.ProviderToolName,
+							ChoiceID:         target.MCP.ChoiceID,
+							ToolDigest:       target.MCP.ToolDigest,
+							ApprovalRule:     target.MCP.ApprovalRule,
+							ExecutionMode:    target.MCP.ExecutionMode,
+							DiscoveryDigest:  target.MCP.DiscoveryDigest,
 						},
 					},
 				},
@@ -1567,6 +1580,7 @@ func (i *WorkflowInterpreter) call(
 			nested,
 			ports,
 			childBudget,
+			ProgramFramePortBoundaryPublishedWorkflow,
 			nil,
 		)
 
@@ -1625,11 +1639,26 @@ func (i *WorkflowInterpreter) call(
 				invokeErr.Error(),
 			)
 		}
+		choice, choiceErr := configuredProviderManagedToolChoice(
+			target.ProviderTool.Choice,
+			invocation.Defaults,
+		)
+		if choiceErr != nil {
+			return workflowFailure(
+				state,
+				"workflow_provider_tool_configuration_invalid",
+				choiceErr.Error(),
+			)
+		}
+		invocation.Defaults = withoutProviderManagedToolSelection(
+			invocation.Defaults,
+			choice.Artifact,
+		)
 		child, childErr := NewSingleModelWorkflowInvocationProgram(
 			invocation.Defaults,
 			invocation.InputActivityID,
 			invocation.HistoryActivityIDs,
-			[]ProviderManagedToolChoice{target.ProviderTool.Choice},
+			[]ProviderManagedToolChoice{choice},
 		)
 		if childErr != nil {
 			return workflowFailure(
@@ -1651,6 +1680,7 @@ func (i *WorkflowInterpreter) call(
 			child,
 			ports,
 			childBudget,
+			ProgramFramePortBoundaryNone,
 			nil,
 		)
 		if transitionErr != nil {
@@ -2180,6 +2210,7 @@ func (i *WorkflowInterpreter) startWorkflowChildCall(
 	child ProgramSnapshot,
 	ports []PortPlan,
 	budget *ExecutionBudget,
+	portBoundary ProgramFramePortBoundary,
 	handoff *ConversationHandoffIntent,
 ) (ProgramTransition, error) {
 	claims, err := i.workflowResourceClaims(
@@ -2198,6 +2229,7 @@ func (i *WorkflowInterpreter) startWorkflowChildCall(
 	childFrameID := workflowChildCallFrameID(frame.ID, path)
 	completion := CompletionHandle{FrameID: childFrameID}
 	boundary, err := i.workflowChildCallBoundary(
+		frame.ID,
 		program,
 		state,
 		path,
@@ -2237,12 +2269,14 @@ func (i *WorkflowInterpreter) startWorkflowChildCall(
 		Budget:          cloneBudget(budget),
 		Claims:          claims,
 		Ports:           clonePortPlans(ports),
+		PortBoundary:    portBoundary,
 		Handoff:         handoff,
 	}}
 	return transition, nil
 }
 
 func (i *WorkflowInterpreter) workflowChildCallBoundary(
+	frameID ProgramFrameID,
 	program WorkflowProgram,
 	state WorkflowState,
 	path string,
@@ -2261,7 +2295,7 @@ func (i *WorkflowInterpreter) workflowChildCallBoundary(
 	}
 
 	intent := WorkItemIntent{
-		ID:              workflowChildCallWorkID(path),
+		ID:              workflowChildCallWorkID(frameID, path),
 		ProgramPath:     path,
 		DeclarationPath: state.PendingDeclarationPath,
 		Type:            WorkItemTypeChildCall,
@@ -2297,8 +2331,16 @@ func workflowChildCallFrameID(
 	)
 }
 
-func workflowChildCallWorkID(path string) WorkItemID {
-	return WorkItemID(workflowChildCallWorkPrefix + ":" + path)
+func workflowChildCallWorkID(frameID ProgramFrameID,
+	path string,
+) WorkItemID {
+	return WorkItemID(
+		workflowChildCallWorkPrefix +
+			workflowChildCallIDSeparator +
+			string(frameID) +
+			workflowChildCallIDSeparator +
+			path,
+	)
 }
 
 func (i *WorkflowInterpreter) evaluate(
@@ -2923,7 +2965,22 @@ func (m WorkflowMCP) Validate() error {
 	if strings.TrimSpace(m.ToolName) == "" {
 		return errors.New("Workflow MCP Tool name is required")
 	}
-	return validatePin(m.Server)
+	if err := validatePin(m.Server); err != nil {
+		return err
+	}
+	return ToolBinding{
+		Kind: ToolBindingKindMCP,
+		MCP: &MCPToolBinding{
+			ServerArtifact:   &m.Server,
+			ServerID:         m.Server.RootID + ":" + m.Server.ArtifactID,
+			ProviderToolName: m.ProviderToolName,
+			ChoiceID:         m.ChoiceID,
+			ToolName:         m.ToolName,
+			ToolDigest:       m.ToolDigest,
+			ApprovalRule:     m.ApprovalRule,
+			ExecutionMode:    m.ExecutionMode,
+		},
+	}.Validate()
 }
 
 func workflowProgramFromSnapshot(

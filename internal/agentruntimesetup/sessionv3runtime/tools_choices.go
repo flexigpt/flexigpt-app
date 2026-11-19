@@ -16,9 +16,15 @@ func (b *Binder) toolChoices(
 	req sessionv3Runtime.WorkDispatchRequest,
 	defaults sessionv3Runtime.SessionDefaults,
 	skillChoices []toolruntime.V3PreparedChoice,
-) ([]inferenceSpec.ToolChoice, map[string]sessionv3Runtime.ToolCall, error) {
+) (
+	[]inferenceSpec.ToolChoice,
+	map[string]sessionv3Runtime.ToolCall,
+	[]preparedChoice,
+	error,
+) {
 	choices := []inferenceSpec.ToolChoice{}
 	bindings := map[string]sessionv3Runtime.ToolCall{}
+	prepared := []preparedChoice{}
 
 	register := func(value preparedChoice) error {
 		if value.Choice.ID == "" || value.Choice.Name == "" {
@@ -34,77 +40,77 @@ func (b *Binder) toolChoices(
 		choices = append(choices, value.Choice)
 		bindings[value.Choice.ID] = value.Call
 		bindings[value.Choice.Name] = value.Call
+		prepared = append(prepared, value)
 		return nil
 	}
 
 	if len(defaults.Skills) != 0 {
 		if len(skillChoices) == 0 {
-			return nil, nil, errors.New(
+			return nil, nil, nil, errors.New(
 				"enabled Skills produced no lifecycle Tool choices",
 			)
 		}
 		for _, c := range preparedChoicesFromDomain(skillChoices) {
 			if err := register(c); err != nil {
-				return nil, nil, err
+				return nil, nil, nil, err
 			}
 		}
 	}
 	if payload := req.WorkItem.Input.LLM; payload != nil {
 		for _, providerTool := range payload.ProviderTools {
-			arguments, err := jsonutil.DecodeCanonicalValue[map[string]any](
-				providerTool.InputSchema,
+			choice, err := toolruntime.ProviderManagedToolChoiceToInference(
+				providerTool,
 			)
 			if err != nil {
-				return nil, nil, err
+				return nil, nil, nil, err
 			}
 			if err := register(preparedChoice{
-				Choice: inferenceSpec.ToolChoice{
-					Type:        inferenceSpec.ToolType(providerTool.Type),
-					ID:          providerTool.Call.ChoiceID,
-					Name:        providerTool.Call.Name,
-					Description: providerTool.Call.Description,
-					Arguments:   arguments,
-				},
-				Call: providerTool.Call,
+				Choice:                choice,
+				Call:                  providerTool.Call,
+				ProviderConfiguration: providerTool.Configuration.Clone(),
 			}); err != nil {
-				return nil, nil, err
+				return nil, nil, nil, err
 			}
 		}
 	}
 	if b.goTools == nil {
-		return nil, nil, errors.New(
+		return nil, nil, nil, errors.New(
 			"session v3 Tool runtime is unavailable",
 		)
 	}
-	goChoices, err := b.goTools.Choices(ctx, defaults.Tools)
+	goChoices, err := b.goTools.Choices(
+		ctx,
+		sessionv3Runtime.EffectiveToolSelections(defaults),
+	)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	for _, c := range preparedChoicesFromDomain(goChoices) {
 		if err := register(c); err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 	}
 	if b.mcpTools == nil {
-		return nil, nil, errors.New(
+		return nil, nil, nil, errors.New(
 			"session v3 MCP runtime is unavailable",
 		)
 	}
 	mcpChoices, err := b.mcpTools.Choices(ctx, defaults.MCP)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	for _, c := range preparedChoicesFromDomain(mcpChoices) {
 		if err := register(c); err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 	}
-	return choices, bindings, nil
+	return choices, bindings, prepared, nil
 }
 
 type preparedChoice struct {
-	Choice inferenceSpec.ToolChoice
-	Call   sessionv3Runtime.ToolCall
+	Choice                inferenceSpec.ToolChoice
+	Call                  sessionv3Runtime.ToolCall
+	ProviderConfiguration jsonutil.CanonicalValue
 }
 
 func preparedChoicesFromDomain(
@@ -113,6 +119,7 @@ func preparedChoicesFromDomain(
 	output := make([]preparedChoice, len(values))
 	for index := range values {
 		output[index] = preparedChoice(values[index])
+		output[index].ProviderConfiguration = values[index].ProviderConfiguration.Clone()
 	}
 	return output
 }

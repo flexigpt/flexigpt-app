@@ -198,6 +198,25 @@ as unsupported. Workflow planning must not fabricate an Artifact, Source,
 Definition, revision, local-state record, lifecycle record, or direct-target
 runtime representation for it.
 
+### 3.2.1 Direct Tool identity boundary
+
+`CapabilityTargetForm.Direct` has no source-backed Artifact identity. It
+therefore cannot enter a Workflow Artifact closure, Inventory target plan,
+resolved Artifact reference, Definition identity, revision, or static source
+relationship.
+
+Built-in Go Tool and provider SDK Tool declarations are ordinary Tool
+Artifacts. They remain source-backed closure members. An MCP Server is also an
+Artifact closure member, but a discovered MCP Tool operation is not an
+individual Tool Artifact. A Skill declaration is an Artifact; Skill Runtime
+lifecycle operations are not Artifact declarations.
+
+This document does not define consumer compatibility representations such as
+`session.DirectCapabilitySelection`. It makes no claim that an application
+deployment has a direct-capability provider. Consumer compatibility, current
+provider registration, and SessionV2 retirement are outside this Artifact
+planning boundary.
+
 ## 4. Architecture
 
 ```mermaid
@@ -1888,10 +1907,11 @@ Workflow Artifact completion includes:
 
 ## 23. Direct-capability and generic-callable-capability cleanup
 
-| Cleanup task                                                                     | Status      | Required result                                                                                                                                                                                                      |
-| -------------------------------------------------------------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Reject direct composition results for Workflow callable targets and requirements | Implemented | `internal/llmartifactory-go/workflow/closure.go` returns `UnsupportedDirectCapabilityError` for Model, Agent, Tool, MCP, Skill, Service, Activity, and Nested Workflow direct composition.                           |
-| Remove Workflow direct-capability closure data                                   | Implemented | `internal/llmartifactory-go/workflow/closure.go` has no `DirectCapabilityEvidence`, direct sorting, direct fingerprint input, or direct closure field. Generic `composition.CapabilityPlan` remains diagnostic only. |
-| Preserve Service and Activity binding targets                                    | Implemented | `internal/llmartifactory-go/workflow/contract/v1/validation.go` keeps them as typed non-Artifact declarations and prevents synthetic Artifact composition.                                                           |
-| Preserve inline text as declaration data                                         | Implemented | `internal/llmartifactory-go/workflow/contract/v1/workflow-v1.schema.json` retains ordinary `value` grammar. It adds no direct target form.                                                                           |
-| Remove generic callable capability runtime semantics                             | Implemented | `internal/llmartifactory-go/workflow/contract/v1/types.go` and `workflow-v1.schema.json` remove `CallableInterface.capabilities`. The closed schema rejects the former field at admission.                           |
+| Cleanup task                                                                     | Status      | Required result                                                                                                                                                                                                                |
+| -------------------------------------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Reject direct composition results for Workflow callable targets and requirements | Implemented | `internal/llmartifactory-go/workflow/closure.go` returns `UnsupportedDirectCapabilityError` for Model, Agent, Tool, MCP, Skill, Service, Activity, and Nested Workflow direct composition.                                     |
+| Remove Workflow direct-capability closure data                                   | Implemented | `internal/llmartifactory-go/workflow/closure.go` has no `DirectCapabilityEvidence`, direct sorting, direct fingerprint input, or direct closure field. Generic `composition.CapabilityPlan` remains diagnostic only.           |
+| Preserve Service and Activity binding targets                                    | Implemented | `internal/llmartifactory-go/workflow/contract/v1/validation.go` keeps them as typed non-Artifact declarations and prevents synthetic Artifact composition.                                                                     |
+| Preserve inline text as declaration data                                         | Implemented | `internal/llmartifactory-go/workflow/contract/v1/workflow-v1.schema.json` retains ordinary `value` grammar. It adds no direct target form.                                                                                     |
+| Remove generic callable capability runtime semantics                             | Implemented | `internal/llmartifactory-go/workflow/contract/v1/types.go` and `workflow-v1.schema.json` remove `CallableInterface.capabilities`. The closed schema rejects the former field at admission.                                     |
+| Keep direct Tool identity outside Artifact facts                                 | Implemented | A direct target has no Artifact identity and is rejected before closure construction. Built-in Go and SDK Tools remain Tool Artifacts; MCP Server and Skill Artifact identities remain separate from their runtime operations. |

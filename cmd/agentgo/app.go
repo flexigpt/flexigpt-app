@@ -724,6 +724,7 @@ func (a *App) initManagers() {
 		toolAdapter,
 		modelRuntime,
 		a.agentStoreAPI.api,
+		a.mcpRuntimeAPI.runtime,
 	)
 	if err != nil {
 		panic(

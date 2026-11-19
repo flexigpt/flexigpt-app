@@ -248,11 +248,13 @@ func (r *Runtime) createIndependentChildExecutionLocked(
 	}
 
 	ports := bindFramePortPlans(intent.Ports, parentFrame.ID, frameID)
-	if err := validateWorkflowFramePortBoundary(
-		intent.Program,
-		ports,
-	); err != nil {
-		return nil, err
+	if intent.PortBoundary == ProgramFramePortBoundaryPublishedWorkflow {
+		if err := validateWorkflowFramePortBoundary(
+			intent.Program,
+			ports,
+		); err != nil {
+			return nil, err
+		}
 	}
 
 	child := Execution{
@@ -288,6 +290,7 @@ func (r *Runtime) createIndependentChildExecutionLocked(
 			Budget:          cloneBudget(&effectiveBudget),
 			HandoffID:       handoffID,
 			Ports:           ports,
+			PortDelivery:    intent.PortDelivery,
 		}},
 		WorkItems:      []WorkItem{},
 		Attempts:       []Attempt{},
@@ -301,24 +304,26 @@ func (r *Runtime) createIndependentChildExecutionLocked(
 	parentFrame.ChildExecutionIDs = append(parentFrame.ChildExecutionIDs, child.ID)
 	session.Executions = append(session.Executions, child)
 	created := &session.Executions[len(session.Executions)-1]
-	if err := r.stageFramePortInputsLocked(
-		session,
-		created,
-		&created.ProgramFrames[0],
-	); err != nil {
-		return nil, err
-	}
-	if inputs := created.ProgramFrames[0].PortInputs; len(inputs) != 0 &&
-		created.ProgramFrames[0].Program.InterpreterID ==
-			WorkflowInterpreterID {
-		next, inputErr := workflowProgramWithPortInputs(
-			created.ProgramFrames[0].Program,
-			inputs,
-		)
-		if inputErr != nil {
-			return nil, inputErr
+	if created.ProgramFrames[0].PortDelivery.DeliversFinalOutput() {
+		if err := r.stageFramePortInputsLocked(
+			session,
+			created,
+			&created.ProgramFrames[0],
+		); err != nil {
+			return nil, err
 		}
-		created.ProgramFrames[0].Program = next
+		if inputs := created.ProgramFrames[0].PortInputs; len(inputs) != 0 &&
+			created.ProgramFrames[0].Program.InterpreterID ==
+				WorkflowInterpreterID {
+			next, inputErr := workflowProgramWithPortInputs(
+				created.ProgramFrames[0].Program,
+				inputs,
+			)
+			if inputErr != nil {
+				return nil, inputErr
+			}
+			created.ProgramFrames[0].Program = next
+		}
 	}
 
 	if intent.Handoff != nil {

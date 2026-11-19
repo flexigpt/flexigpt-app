@@ -264,6 +264,16 @@ func validateDispatchTools(
 		if provider != value.ProviderManaged {
 			return errors.New("tool dispatch plan provider ownership differs from its binding")
 		}
+		if len(value.ProviderConfiguration) != 0 &&
+			!value.ProviderConfiguration.Valid() {
+			return errors.New("tool dispatch plan provider configuration is invalid")
+		}
+		if !value.ProviderManaged &&
+			len(value.ProviderConfiguration) != 0 {
+			return errors.New(
+				"local tool dispatch plan contains provider configuration",
+			)
+		}
 	}
 	return nil
 }

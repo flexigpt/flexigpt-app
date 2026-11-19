@@ -26,6 +26,7 @@ const (
 	triggerInputFailureCode                                 = "trigger_input_invalid"
 	triggerEventSchemaFailureMessage                        = "trigger event does not satisfy the declared contract"
 	triggerInputFailureMessage                              = "trigger input could not be prepared"
+	workflowLocalOccurrenceLayout                           = "2006-01-02T15:04"
 )
 
 type TriggerRegistrationState string
@@ -47,6 +48,7 @@ type TriggerRegistration struct {
 	NextOccurrence      *time.Time               `json:"nextOccurrence,omitempty"`
 	LastOccurrence      *time.Time               `json:"lastOccurrence,omitempty"`
 	LastLocalOccurrence string                   `json:"lastLocalOccurrence,omitempty"`
+	NextLocalOccurrence string                   `json:"nextLocalOccurrence,omitempty"`
 	Occurrences         []TriggerOccurrence      `json:"occurrences,omitempty"`
 	Queue               []TriggerOccurrenceID    `json:"queue,omitempty"`
 	CreatedAt           time.Time                `json:"createdAt"`
@@ -107,6 +109,10 @@ func (r TriggerRegistration) Validate() error {
 	}
 	if r.NextOccurrence != nil && r.Kind != WorkflowTriggerKindSchedule {
 		return errors.New("event trigger registration has a schedule occurrence")
+	}
+	if r.NextLocalOccurrence != "" &&
+		r.Kind != WorkflowTriggerKindSchedule {
+		return errors.New("event trigger registration has a local occurrence")
 	}
 	if r.LastOccurrence != nil && r.LastOccurrence.IsZero() {
 		return errors.New("trigger registration last occurrence is invalid")
@@ -347,7 +353,7 @@ func (r *Runtime) registerWorkflowTriggersLocked(
 			UpdatedAt:   now,
 		}
 		if trigger.Schedule != nil {
-			next, _, nextErr := workflowTriggerNextOccurrence(
+			next, local, nextErr := workflowTriggerNextOccurrence(
 				*trigger.Schedule,
 				now,
 				"",
@@ -356,6 +362,7 @@ func (r *Runtime) registerWorkflowTriggersLocked(
 				return nextErr
 			}
 			registration.NextOccurrence = &next
+			registration.NextLocalOccurrence = local
 		}
 		if err := registration.Validate(); err != nil {
 			return err
@@ -535,17 +542,13 @@ func (r *Runtime) fireScheduledTriggerLocked(
 	}
 
 	if advanceSchedule {
-		next, local, nextErr := workflowTriggerNextOccurrence(
+		if err := advanceWorkflowTriggerSchedule(
+			registration,
 			*trigger.Schedule,
 			at,
-			registration.LastLocalOccurrence,
-		)
-		if nextErr != nil {
-			return nil, false, nextErr
+		); err != nil {
+			return nil, false, err
 		}
-		registration.LastOccurrence = cloneTime(&at)
-		registration.LastLocalOccurrence = local
-		registration.NextOccurrence = &next
 	}
 	registration.UpdatedAt = r.now()
 
@@ -1288,17 +1291,13 @@ func (r *Runtime) recoverSessionTriggersLocked(
 		for registration.NextOccurrence != nil &&
 			!registration.NextOccurrence.After(now) {
 			at := registration.NextOccurrence.UTC()
-			next, local, nextErr := workflowTriggerNextOccurrence(
+			if err := advanceWorkflowTriggerSchedule(
+				registration,
 				*trigger.Schedule,
 				at,
-				registration.LastLocalOccurrence,
-			)
-			if nextErr != nil {
-				return changed, nextErr
+			); err != nil {
+				return changed, err
 			}
-			registration.LastOccurrence = &at
-			registration.LastLocalOccurrence = local
-			registration.NextOccurrence = &next
 			registration.UpdatedAt = now
 			changed = true
 			switch mode {
@@ -1355,6 +1354,55 @@ func (r *Runtime) recoverSessionTriggersLocked(
 	return changed, nil
 }
 
+func advanceWorkflowTriggerSchedule(
+	registration *TriggerRegistration,
+	schedule WorkflowScheduleTrigger,
+	at time.Time,
+) error {
+	if registration == nil {
+		return errors.New("scheduled trigger registration is unavailable")
+	}
+
+	firedLocal, err := workflowTriggerLocalOccurrence(
+		schedule,
+		at,
+	)
+	if err != nil {
+		return err
+	}
+	next, nextLocal, err := workflowTriggerNextOccurrence(
+		schedule,
+		at,
+		firedLocal,
+	)
+	if err != nil {
+		return err
+	}
+
+	firedAt := at.UTC()
+	registration.LastOccurrence = &firedAt
+	registration.LastLocalOccurrence = firedLocal
+	registration.NextOccurrence = &next
+	registration.NextLocalOccurrence = nextLocal
+	return nil
+}
+
+func workflowTriggerLocalOccurrence(
+	schedule WorkflowScheduleTrigger,
+	at time.Time,
+) (string, error) {
+	if schedule.Calendar == "" {
+		return "", nil
+	}
+	location, err := time.LoadLocation(schedule.TimeZone)
+	if err != nil {
+		return "", err
+	}
+	return at.UTC().In(location).Format(
+		workflowLocalOccurrenceLayout,
+	), nil
+}
+
 func workflowTriggerNextOccurrence(
 	schedule WorkflowScheduleTrigger,
 	after time.Time,
@@ -1376,7 +1424,7 @@ func workflowTriggerNextOccurrence(
 	for range maximumTriggerCalendarSearch {
 		local := cursor.In(location)
 		if cron.matches(local) {
-			localKey := local.Format("2006-01-02T15:04")
+			localKey := local.Format(workflowLocalOccurrenceLayout)
 			if localKey != lastLocal {
 				return cursor.UTC(), localKey, nil
 			}

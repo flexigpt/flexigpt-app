@@ -231,6 +231,7 @@ func (i *WorkflowInterpreter) startCall(
 		Lifetime:        intentLifetime,
 		Ownership:       &ownership,
 		Ports:           clonePortPlans(ports),
+		PortDelivery:    FramePortDeliveryModeForwardOnly,
 	}}
 	transition.ContinueParent = true
 	return transition, nil

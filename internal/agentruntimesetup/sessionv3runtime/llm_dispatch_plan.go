@@ -109,9 +109,9 @@ func (b *Binder) durableLLMDispatchPlan(
 		output.Tools = append(
 			output.Tools,
 			sessionv3Runtime.ToolDispatchPlan{
-				Call: choice.Call,
-				ProviderManaged: choice.Call.Binding.Kind ==
-					sessionv3Runtime.ToolBindingKindProvider,
+				Call:                  choice.Call,
+				ProviderManaged:       choice.Call.Binding.Kind == sessionv3Runtime.ToolBindingKindProvider,
+				ProviderConfiguration: choice.ProviderConfiguration.Clone(),
 			},
 		)
 	}

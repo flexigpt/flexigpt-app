@@ -22,8 +22,9 @@ import (
 // V3PreparedChoice is a provider Tool choice paired with its immutable v3
 // semantic call binding.
 type V3PreparedChoice struct {
-	Choice inferenceSpec.ToolChoice
-	Call   sessionv3Runtime.ToolCall
+	Choice                inferenceSpec.ToolChoice
+	Call                  sessionv3Runtime.ToolCall
+	ProviderConfiguration jsonutil.CanonicalValue
 }
 
 // V3Executor owns v3 source-backed Go and provider Tool preparation and Go
@@ -93,6 +94,10 @@ func (e *V3Executor) PrepareProviderManagedWorkflowTool(
 	if err != nil {
 		return sessionv3Runtime.ProviderManagedToolChoice{}, err
 	}
+	userArgumentSchema, err := providerToolUserArgumentSchema(resolved)
+	if err != nil {
+		return sessionv3Runtime.ProviderManagedToolChoice{}, err
+	}
 	if call.Binding.Kind != sessionv3Runtime.ToolBindingKindProvider {
 		return sessionv3Runtime.ProviderManagedToolChoice{}, ErrProviderManagedWorkflowTool
 	}
@@ -108,10 +113,11 @@ func (e *V3Executor) PrepareProviderManagedWorkflowTool(
 		return sessionv3Runtime.ProviderManagedToolChoice{}, err
 	}
 	value := sessionv3Runtime.ProviderManagedToolChoice{
-		Artifact:    pin,
-		Type:        string(choice.Type),
-		InputSchema: schema,
-		Call:        call,
+		Artifact:           pin,
+		Type:               string(choice.Type),
+		InputSchema:        schema,
+		UserArgumentSchema: userArgumentSchema,
+		Call:               call,
 	}
 	if err := value.Validate(); err != nil {
 		return sessionv3Runtime.ProviderManagedToolChoice{}, err
@@ -123,7 +129,7 @@ func (e *V3Executor) PrepareProviderManagedWorkflowTool(
 // creates provider choices plus durable v3 bindings.
 func (e *V3Executor) Choices(
 	ctx context.Context,
-	selections []sessionv3Runtime.ArtifactSelection,
+	selections []sessionv3Runtime.ToolSelection,
 ) ([]V3PreparedChoice, error) {
 	if len(selections) == 0 {
 		return nil, nil
@@ -140,8 +146,8 @@ func (e *V3Executor) Choices(
 
 		selection := selections[index]
 		ref := artifactModel.ArtifactRef{
-			RootID:     rootModel.RootID(selection.RootID),
-			ArtifactID: artifactModel.ArtifactID(selection.ArtifactID),
+			RootID:     rootModel.RootID(selection.Artifact.RootID),
+			ArtifactID: artifactModel.ArtifactID(selection.Artifact.ArtifactID),
 		}
 		if err := ref.Validate(); err != nil {
 			return nil, fmt.Errorf("selected Tool %d: %w", index, err)
@@ -165,17 +171,21 @@ func (e *V3Executor) Choices(
 				err,
 			)
 		}
-		if err := validateV3Selection(selection, resolved); err != nil {
+		if err := validateV3Selection(selection.Artifact, resolved); err != nil {
 			return nil, err
 		}
 
-		choice, call, err := v3ChoiceForResolvedTool(resolved)
+		choice, call, configuration, err := v3ChoiceForResolvedToolWithConfiguration(
+			resolved,
+			selection.UserArguments,
+		)
 		if err != nil {
 			return nil, err
 		}
 		output = append(output, V3PreparedChoice{
-			Choice: choice,
-			Call:   call,
+			Choice:                choice,
+			Call:                  call,
+			ProviderConfiguration: configuration,
 		})
 	}
 	return output, nil

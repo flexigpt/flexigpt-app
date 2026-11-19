@@ -20,10 +20,12 @@ type WorkflowTargetTransport struct {
 // ProviderManagedToolChoice is one SDK Tool choice owned by a typed Model
 // request plan. It cannot be lowered to a local Tool WorkItem.
 type ProviderManagedToolChoice struct {
-	Artifact    ArtifactPin             `json:"artifact"`
-	Type        string                  `json:"type"`
-	InputSchema jsonutil.CanonicalValue `json:"inputSchema"`
-	Call        ToolCall                `json:"call"`
+	Artifact           ArtifactPin             `json:"artifact"`
+	Type               string                  `json:"type"`
+	InputSchema        jsonutil.CanonicalValue `json:"inputSchema"`
+	UserArgumentSchema jsonutil.CanonicalValue `json:"userArgumentSchema,omitempty"`
+	Configuration      jsonutil.CanonicalValue `json:"configuration,omitempty"`
+	Call               ToolCall                `json:"call"`
 }
 
 // ProviderManagedToolTarget identifies the typed Model child plan that owns a
@@ -61,6 +63,20 @@ func (v ProviderManagedToolChoice) Validate() error {
 	}
 	if len(v.InputSchema) == 0 || !v.InputSchema.Valid() {
 		return errors.New("provider-managed tool input schema is invalid")
+	}
+	if len(v.UserArgumentSchema) != 0 &&
+		!v.UserArgumentSchema.Valid() {
+		return errors.New(
+			"provider-managed tool user argument schema is invalid",
+		)
+	}
+	if len(v.Configuration) != 0 && !v.Configuration.Valid() {
+		return errors.New("provider-managed tool configuration is invalid")
+	}
+	if len(v.Configuration) != 0 && len(v.UserArgumentSchema) == 0 {
+		return errors.New(
+			"provider-managed tool configuration has no user argument schema",
+		)
 	}
 	if err := v.Call.Validate(); err != nil {
 		return err

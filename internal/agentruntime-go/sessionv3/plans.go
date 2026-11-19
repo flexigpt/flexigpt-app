@@ -78,8 +78,9 @@ type TextDispatchPlan struct {
 }
 
 type ToolDispatchPlan struct {
-	Call            ToolCall `json:"call"`
-	ProviderManaged bool     `json:"providerManaged,omitempty"`
+	Call                  ToolCall                `json:"call"`
+	ProviderManaged       bool                    `json:"providerManaged,omitempty"`
+	ProviderConfiguration jsonutil.CanonicalValue `json:"providerConfiguration,omitempty"`
 }
 
 type SkillDispatchPlan struct {

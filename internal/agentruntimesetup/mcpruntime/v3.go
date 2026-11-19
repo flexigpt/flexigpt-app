@@ -277,48 +277,18 @@ func (e *V3Executor) BindWorkflowTool(
 			err,
 		)
 	}
-
-	ref := artifactModel.ArtifactRef{
-		RootID:     rootModel.RootID(payload.MCP.Server.RootID),
-		ArtifactID: artifactModel.ArtifactID(payload.MCP.Server.ArtifactID),
-	}
-	if err := ref.Validate(); err != nil {
-		return sessionv3Runtime.ToolCall{}, err
-	}
-
-	serverID, err := ServerIDForArtifact(ref)
+	current, err := prepareWorkflowMCPTool(
+		ctx,
+		e.runtime,
+		payload.MCP.Server,
+		payload.MCP.ToolName,
+	)
 	if err != nil {
 		return sessionv3Runtime.ToolCall{}, err
 	}
-	status, err := e.runtime.Status(ctx, serverID)
-	if err != nil {
-		return sessionv3Runtime.ToolCall{}, err
-	}
-	if status == nil || status.Status != mcpServer.MCPServerStatusReady {
-		return sessionv3Runtime.ToolCall{}, fmt.Errorf(
-			"workflow MCP server %q is not connected",
-			serverID,
-		)
-	}
-
-	tools, err := e.runtime.ListTools(ctx, serverID)
-	if err != nil {
-		return sessionv3Runtime.ToolCall{}, err
-	}
-
-	var selected *mcpServer.MCPToolCapability
-	for index := range tools {
-		if tools[index].ToolName == payload.MCP.ToolName {
-			selected = &tools[index]
-			break
-		}
-	}
-	if selected == nil ||
-		selected.Server != serverID ||
-		!v3MCPToolAvailable(*selected) {
-		return sessionv3Runtime.ToolCall{}, fmt.Errorf(
-			"workflow MCP tool %q is unavailable",
-			payload.MCP.ToolName,
+	if current != *payload.MCP {
+		return sessionv3Runtime.ToolCall{}, errors.New(
+			"workflow MCP tool changed since preparation",
 		)
 	}
 
@@ -328,29 +298,36 @@ func (e *V3Executor) BindWorkflowTool(
 			"workflow MCP tool name changed since Workflow admission",
 		)
 	}
+	serverID, serverIDErr := workflowMCPServerID(
+		payload.MCP.Server,
+	)
+	if serverIDErr != nil {
+		return sessionv3Runtime.ToolCall{}, serverIDErr
+	}
+
 	serverPin := payload.MCP.Server
-	call.Name = selected.ProviderToolName
+	call.Name = payload.MCP.ProviderToolName
 	call.Type = inferenceSpec.ToolTypeFunction
-	call.ChoiceID = selected.ChoiceID
+	call.ChoiceID = payload.MCP.ChoiceID
 	call.DisplayName = firstNonBlank(
-		selected.DisplayName,
-		selected.ToolName,
+		payload.MCP.ToolName,
 		"MCP Tool",
 	)
-	call.Description = strings.TrimSpace(selected.Description)
-	call.Automatic = selected.ExecutionMode ==
+	call.Automatic = mcppolicy.MCPExecutionMode(
+		payload.MCP.ExecutionMode,
+	) ==
 		mcppolicy.MCPExecutionModeAuto
 	call.Binding = sessionv3Runtime.ToolBinding{
 		Kind: sessionv3Runtime.ToolBindingKindMCP,
 		MCP: &sessionv3Runtime.MCPToolBinding{
 			ServerArtifact:   &serverPin,
 			ServerID:         string(serverID),
-			ProviderToolName: selected.ProviderToolName,
-			ChoiceID:         selected.ChoiceID,
-			ToolName:         selected.ToolName,
-			ToolDigest:       selected.Digest,
-			ApprovalRule:     string(selected.ApprovalRule),
-			ExecutionMode:    string(selected.ExecutionMode),
+			ProviderToolName: payload.MCP.ProviderToolName,
+			ChoiceID:         payload.MCP.ChoiceID,
+			ToolName:         payload.MCP.ToolName,
+			ToolDigest:       payload.MCP.ToolDigest,
+			ApprovalRule:     payload.MCP.ApprovalRule,
+			ExecutionMode:    payload.MCP.ExecutionMode,
 		},
 	}
 	return call, nil
@@ -1364,6 +1341,19 @@ func v3MappedMCPRequest(
 	}, nil
 }
 
+func workflowMCPServerID(
+	pin sessionv3Runtime.ArtifactPin,
+) (mcpServer.ServerID, error) {
+	ref := artifactModel.ArtifactRef{
+		RootID:     rootModel.RootID(pin.RootID),
+		ArtifactID: artifactModel.ArtifactID(pin.ArtifactID),
+	}
+	if err := ref.Validate(); err != nil {
+		return "", err
+	}
+	return ServerIDForArtifact(ref)
+}
+
 func canonicalV3MCPValue(
 	value any,
 ) (jsonutil.CanonicalValue, error) {
@@ -1422,68 +1412,9 @@ func v3MCPFailureText(reason string) string {
 func v3MCPContentsText(
 	contents []mcpServer.MCPContent,
 ) string {
-	parts := make([]string, 0, len(contents))
-	for _, content := range contents {
-		switch content.Type {
-		case mcpServer.MCPContentTypeText:
-			if strings.TrimSpace(content.Text) != "" {
-				parts = append(parts, content.Text)
-			}
-
-		case mcpServer.MCPContentTypeResource:
-			if content.Resource == nil {
-				continue
-			}
-			if strings.TrimSpace(content.Resource.Text) != "" {
-				parts = append(parts, content.Resource.Text)
-			} else if strings.TrimSpace(content.Resource.URI) != "" {
-				parts = append(
-					parts,
-					"[MCP resource omitted: "+content.Resource.URI+"]",
-				)
-			}
-
-		case mcpServer.MCPContentTypeResourceLink:
-			if value := strings.TrimSpace(
-				content.Name + " " + content.URI,
-			); value != "" {
-				parts = append(parts, value)
-			}
-
-		case mcpServer.MCPContentTypeImage:
-			parts = append(parts, "[MCP image content omitted]")
-
-		case mcpServer.MCPContentTypeAudio:
-			parts = append(parts, "[MCP audio content omitted]")
-		}
-	}
-	return strings.Join(parts, "\n\n")
+	return MCPContentsText(contents)
 }
 
 func v3MCPContentText(content mcpServer.MCPContent) string {
-	switch content.Type {
-	case mcpServer.MCPContentTypeText:
-		return content.Text
-
-	case mcpServer.MCPContentTypeResource:
-		if content.Resource == nil {
-			return ""
-		}
-		if strings.TrimSpace(content.Resource.Text) != "" {
-			return content.Resource.Text
-		}
-		if strings.TrimSpace(content.Resource.URI) != "" {
-			return "[mcp resource omitted: " + content.Resource.URI + "]"
-		}
-
-	case mcpServer.MCPContentTypeResourceLink:
-		return strings.TrimSpace(content.Name + " " + content.URI)
-
-	case mcpServer.MCPContentTypeImage:
-		return "[mcp image content omitted]"
-
-	case mcpServer.MCPContentTypeAudio:
-		return "[mcp audio content omitted]"
-	}
-	return ""
+	return MCPContentText(content)
 }

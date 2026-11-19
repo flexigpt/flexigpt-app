@@ -147,7 +147,7 @@ func (b *Binder) bindLLM(
 		)
 	}
 
-	choices, bindings, err := b.toolChoices(
+	choices, bindings, preparedChoices, err := b.toolChoices(
 		ctx,
 		req,
 		plan.defaults,
@@ -199,7 +199,7 @@ func (b *Binder) bindLLM(
 		req,
 		plan,
 		modelPin,
-		preparedChoicesFromBindings(choices, bindings),
+		preparedChoices,
 	)
 	if err != nil {
 		return sessionv3Runtime.BindResult{}, err
@@ -456,24 +456,6 @@ func unresolvedProviderToolCall(
 		},
 		Source: sessionv3Runtime.ToolCallSourceModel,
 	}
-}
-
-func preparedChoicesFromBindings(
-	choices []inferenceSpec.ToolChoice,
-	bindings map[string]sessionv3Runtime.ToolCall,
-) []preparedChoice {
-	output := make([]preparedChoice, 0, len(choices))
-	for _, choice := range choices {
-		call, found := bindings[choice.ID]
-		if !found {
-			continue
-		}
-		output = append(output, preparedChoice{
-			Choice: choice,
-			Call:   call,
-		})
-	}
-	return output
 }
 
 func firstText(values ...string) string {

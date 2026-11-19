@@ -62,6 +62,31 @@ type PortStream struct {
 	NextSequence uint64 `json:"nextSequence"`
 }
 
+func (m FramePortDeliveryMode) Validate() error {
+	switch m {
+	case "",
+		FramePortDeliveryModeDeliver,
+		FramePortDeliveryModeForwardOnly:
+		return nil
+	default:
+		return errors.New("frame port delivery mode is invalid")
+	}
+}
+
+func (m ProgramFramePortBoundary) Validate() error {
+	switch m {
+	case ProgramFramePortBoundaryNone,
+		ProgramFramePortBoundaryPublishedWorkflow:
+		return nil
+	default:
+		return errors.New("program frame port boundary is invalid")
+	}
+}
+
+func (m FramePortDeliveryMode) DeliversFinalOutput() bool {
+	return m != FramePortDeliveryModeForwardOnly
+}
+
 type PortPlanValidator interface {
 	ValidatePortPlans(
 		ctx context.Context,

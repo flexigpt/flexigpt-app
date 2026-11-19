@@ -38,6 +38,17 @@ type ToolTargetInspector interface {
 	) (bool, error)
 }
 
+// WorkflowMCPToolPreparer owns setup-time MCP Tool discovery and readiness
+// preparation. It returns semantic facts only and never exposes a client or
+// private connection handle to Workflow Runtime.
+type WorkflowMCPToolPreparer interface {
+	PrepareWorkflowMCPTool(
+		ctx context.Context,
+		server sessionv3Runtime.ArtifactPin,
+		toolName string,
+	) (sessionv3Runtime.WorkflowMCP, error)
+}
+
 // WorkflowInvocationTargetCapabilities describe the current typed Workflow
 // transport that a Model or Agent adapter can bind. These are setup-owned
 // adapter facts, not a Model or Agent domain contract.
@@ -62,6 +73,10 @@ type WorkflowInvocationTargetAdapter interface {
 	) error
 	ModelInvocationCapabilities() WorkflowInvocationTargetCapabilities
 	AgentInvocationCapabilities() WorkflowInvocationTargetCapabilities
+	ResolveWorkflowAgentOwnerModel(
+		ctx context.Context,
+		agent sessionv3Runtime.ArtifactPin,
+	) (sessionv3Runtime.ArtifactPin, error)
 }
 
 // WorkBindingRequest is the typed application-domain boundary for a Workflow
@@ -207,6 +222,7 @@ type Admission struct {
 	artifacts   artifact.API
 	bindings    *BindingRegistry
 	tools       ToolTargetInspector
+	mcpTools    WorkflowMCPToolPreparer
 	invocations WorkflowInvocationTargetAdapter
 }
 
@@ -215,12 +231,14 @@ func NewAdmission(
 	artifacts artifact.API,
 	bindings *BindingRegistry,
 	tools ToolTargetInspector,
+	mcpTools WorkflowMCPToolPreparer,
 	invocationAdapters ...WorkflowInvocationTargetAdapter,
 ) (*Admission, error) {
 	if workflows == nil ||
 		artifacts == nil ||
 		bindings == nil ||
-		tools == nil {
+		tools == nil ||
+		mcpTools == nil {
 		return nil, errors.New(
 			"workflow admission dependencies are incomplete",
 		)
@@ -239,6 +257,7 @@ func NewAdmission(
 		artifacts:   artifacts,
 		bindings:    bindings,
 		tools:       tools,
+		mcpTools:    mcpTools,
 		invocations: invocations,
 	}, nil
 }
@@ -772,15 +791,23 @@ func (a *Admission) bindTarget(
 			return sessionv3Runtime.WorkflowTarget{}, err
 		}
 		if target.Server != nil {
+			if a.mcpTools == nil {
+				return sessionv3Runtime.WorkflowTarget{}, ErrBindingUnavailable
+			}
+			prepared, prepareErr := a.mcpTools.PrepareWorkflowMCPTool(
+				ctx,
+				pin,
+				target.Ref,
+			)
+			if prepareErr != nil {
+				return sessionv3Runtime.WorkflowTarget{}, prepareErr
+			}
 			return finalizeWorkflowTarget(
 				document,
 				target,
 				sessionv3Runtime.WorkflowTarget{
 					Kind: sessionv3Runtime.WorkflowTargetMCPTool,
-					MCP: &sessionv3Runtime.WorkflowMCP{
-						Server:   pin,
-						ToolName: target.Ref,
-					},
+					MCP:  &prepared,
 					Effect: sessionv3Runtime.EffectContract{
 						Kind: sessionv3Runtime.EffectKindNonIdempotent,
 					},
