@@ -19,6 +19,10 @@ Execution preparation, runtime interpretation, persistence, scheduling, and
 frontend behavior are outside this document. Their status belongs in
 `workflow_runtime.md`.
 
+This Artifact HLD records source admission, retrieval, static relationships,
+and read-only planning only. It does not describe consumer setup,
+consumer execution, or consumer-private representations.
+
 ## 2. Version contract
 
 Workflow declarations use:
@@ -102,8 +106,9 @@ definitions, relationships, identity facts, and static planning facts. It does
 not prepare, schedule, bind, dispatch, recover, or otherwise participate in
 Workflow execution.
 
-Setup can read generic Artifact facts when it needs a current pin. The store
-does not receive execution-specific requests or expose execution-specific APIs.
+Consumers can read generic Artifact facts when they need current source
+identity. The store does not receive consumer-specific execution requests or
+expose consumer-specific execution APIs.
 
 ### 3.3 Agent responsibilities
 
@@ -184,10 +189,9 @@ step is `root/steps/<step-id>`. The Artifact plan does not define runtime
 frame identities or runtime delivery behavior.
 
 Workflow plan resolution is valid for an available Workflow Artifact regardless
-of local enablement. Runtime setup checks root and selected-target enablement
-when it creates an execution pin. Plan resolution does not establish provider,
-credential, policy, Tool, MCP, Skill, Workspace, Service, or Activity
-readiness.
+of consumer-local enablement state. A consumer can apply its own enablement,
+binding, credential, policy, and domain-readiness rules after it receives the
+read-only plan. Those rules are not Artifact planning behavior.
 
 A direct composition result for a Workflow-relevant target family is rejected
 as unsupported. Workflow planning must not fabricate an Artifact, Source,
@@ -241,8 +245,8 @@ LLM declaration-family registration is also split by ownership:
   such as candidate filenames and package document layouts.
 
 Generic schema type-overlap checks are domain-neutral JSON utility behavior.
-They have one implementation in `internal/jsonutil`, used by both declaration
-and runtime boundaries.
+They have one implementation in `internal/jsonutil`, used by declaration and
+consumer boundaries without giving Artifact Store an execution role.
 
 ## 5. Root declaration
 
@@ -1880,7 +1884,7 @@ Workflow Artifact completion includes:
 | Publish a deterministic complete static Artifact closure  | Implemented | `internal/llmartifactory-go/workflow/closure.go` publishes sorted nodes, edges, paths, and refresh checks                                                                |
 | Include nested Workflow plan nodes in the closure         | Implemented | `ArtifactClosureNode.Workflow` contains admitted nested Workflow document, inventory, and composition facts                                                              |
 | Publish one canonical declaration-path model              | Implemented | Contract admission, Inventory, and closure paths retain the canonical `root/...` declaration identity                                                                    |
-| Keep runtime interpretation outside Artifact planning     | Implemented | `internal/llmartifactory-go/workflow/` imports Artifact and declaration planning contracts only                                                                          |
+| Keep consumer execution interpretation outside planning   | Implemented | `internal/llmartifactory-go/workflow/` contains source planning facts and has no consumer execution dependency                                                           |
 
 ## 23. Direct-capability and generic-callable-capability cleanup
 
@@ -1888,6 +1892,6 @@ Workflow Artifact completion includes:
 | -------------------------------------------------------------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Reject direct composition results for Workflow callable targets and requirements | Implemented | `internal/llmartifactory-go/workflow/closure.go` returns `UnsupportedDirectCapabilityError` for Model, Agent, Tool, MCP, Skill, Service, Activity, and Nested Workflow direct composition.                           |
 | Remove Workflow direct-capability closure data                                   | Implemented | `internal/llmartifactory-go/workflow/closure.go` has no `DirectCapabilityEvidence`, direct sorting, direct fingerprint input, or direct closure field. Generic `composition.CapabilityPlan` remains diagnostic only. |
-| Preserve Service and Activity binding targets                                    | Implemented | `internal/llmartifactory-go/workflow/contract/v1/validation.go` keeps them non-Artifact declarations. `internal/agentruntimesetup/workflowruntime/admission.go` resolves them only through registered bindings.      |
+| Preserve Service and Activity binding targets                                    | Implemented | `internal/llmartifactory-go/workflow/contract/v1/validation.go` keeps them as typed non-Artifact declarations and prevents synthetic Artifact composition.                                                           |
 | Preserve inline text as declaration data                                         | Implemented | `internal/llmartifactory-go/workflow/contract/v1/workflow-v1.schema.json` retains ordinary `value` grammar. It adds no direct target form.                                                                           |
 | Remove generic callable capability runtime semantics                             | Implemented | `internal/llmartifactory-go/workflow/contract/v1/types.go` and `workflow-v1.schema.json` remove `CallableInterface.capabilities`. The closed schema rejects the former field at admission.                           |
