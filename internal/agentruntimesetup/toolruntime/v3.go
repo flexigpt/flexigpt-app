@@ -362,6 +362,7 @@ func (e *V3Executor) ExecuteGo(
 		if strings.TrimSpace(adapted.Text) == "" {
 			adapted.Text = invokeErr.Error()
 		}
+		effect := sessionv3Runtime.EffectStateUncertain
 		return sessionv3Runtime.WorkExecutionResult{
 			Output: &sessionv3Runtime.WorkItemOutput{
 				Value: structured,
@@ -372,17 +373,14 @@ func (e *V3Executor) ExecuteGo(
 					Structured: structured,
 					Error:      invokeErr.Error(),
 				},
-				Receipt: &sessionv3Runtime.ExternalReceipt{
-					System:      "go-tool",
-					Reference:   resolved.Tool.Implementation.Function,
-					ConfirmedAt: time.Now().UTC(),
-				},
 			},
 			Error: &sessionv3Runtime.SanitizedError{
-				Code:    "go_tool_failed",
-				Message: invokeErr.Error(),
+				Code:     "go_tool_failed",
+				Category: sessionv3Runtime.ErrorCategoryUncertainty,
+				Message:  invokeErr.Error(),
 			},
-			Confirmed: true,
+			Confirmed:   false,
+			EffectState: &effect,
 		}, nil
 	}
 

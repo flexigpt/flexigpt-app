@@ -577,15 +577,11 @@ func (e *V3Executor) Bind(
 
 	case mcpServer.MCPApprovalDecisionDenied:
 		message := v3MCPFailureText(evaluation.Reason)
+		effect := sessionv3Runtime.EffectStateConfirmedNotApplied
 		return sessionv3Runtime.BindResult{
-			SemanticBinding: semantic,
-			ImmediateOutput: &sessionv3Runtime.WorkItemOutput{
-				Tool: &sessionv3Runtime.ToolOutput{
-					Kind:  sessionv3Runtime.ToolOutputKindError,
-					Text:  message,
-					Error: message,
-				},
-			},
+			SemanticBinding:      semantic,
+			ImmediateOutput:      v3MCPToolErrorOutput(message),
+			ImmediateEffectState: &effect,
 		}, true, nil
 
 	case mcpServer.MCPApprovalDecisionApprovalRequired:
@@ -742,6 +738,10 @@ func (e *V3Executor) Execute(
 			App: app,
 		},
 		Confirmed: true,
+		EffectState: func() *sessionv3Runtime.EffectState {
+			effect := sessionv3Runtime.EffectStateUncertain
+			return &effect
+		}(),
 	}, true, nil
 }
 
@@ -769,15 +769,11 @@ func (e *V3Executor) ResolveWait(
 		if errors.Is(err, mcpServer.ErrMCPInvalidRuntimeRequest) ||
 			errors.Is(err, mcpServer.ErrMCPApprovalNeeded) {
 			message := "MCP approval expired or is no longer valid"
+			effect := sessionv3Runtime.EffectStateConfirmedNotApplied
 			return sessionv3Runtime.WaitResolutionResult{
-				Output: &sessionv3Runtime.WorkItemOutput{
-					Tool: &sessionv3Runtime.ToolOutput{
-						Kind:  sessionv3Runtime.ToolOutputKindError,
-						Text:  message,
-						Error: message,
-					},
-				},
-				Confirmed: true,
+				Output:      v3MCPToolErrorOutput(message),
+				Confirmed:   true,
+				EffectState: &effect,
 			}, true, nil
 		}
 		return sessionv3Runtime.WaitResolutionResult{}, true, err
@@ -785,15 +781,11 @@ func (e *V3Executor) ResolveWait(
 
 	switch result.Decision {
 	case mcpServer.MCPApprovalDecisionDenied:
+		effect := sessionv3Runtime.EffectStateConfirmedNotApplied
 		return sessionv3Runtime.WaitResolutionResult{
-			Output: &sessionv3Runtime.WorkItemOutput{
-				Tool: &sessionv3Runtime.ToolOutput{
-					Kind:  sessionv3Runtime.ToolOutputKindError,
-					Text:  toolCallDenied,
-					Error: toolCallDenied,
-				},
-			},
-			Confirmed: true,
+			Output:      v3MCPToolErrorOutput(toolCallDenied),
+			Confirmed:   true,
+			EffectState: &effect,
 		}, true, nil
 
 	case mcpServer.MCPApprovalDecisionAllowed:
@@ -834,6 +826,27 @@ func (e *V3Executor) ResolveWait(
 			"unsupported MCP approval resolution decision %q",
 			result.Decision,
 		)
+	}
+}
+
+func v3MCPToolErrorOutput(
+	message string,
+) *sessionv3Runtime.WorkItemOutput {
+	value := jsonutil.MustCanonicalValue(struct {
+		Kind    sessionv3Runtime.ToolOutputKind `json:"kind"`
+		Message string                          `json:"message"`
+	}{
+		Kind:    sessionv3Runtime.ToolOutputKindError,
+		Message: message,
+	})
+	return &sessionv3Runtime.WorkItemOutput{
+		Value: value,
+		Tool: &sessionv3Runtime.ToolOutput{
+			Kind:       sessionv3Runtime.ToolOutputKindError,
+			Text:       message,
+			Structured: value.Clone(),
+			Error:      message,
+		},
 	}
 }
 

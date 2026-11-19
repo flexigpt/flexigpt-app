@@ -1451,10 +1451,10 @@ func workflowTriggerNextOccurrence(
 }
 
 func (r *TriggerRegistration) localOccurrenceSet() map[string]struct{} {
-	output := make(map[string]struct{}, len(r.LocalOccurrenceSlots))
 	if r == nil {
-		return output
+		return map[string]struct{}{}
 	}
+	output := make(map[string]struct{}, len(r.LocalOccurrenceSlots))
 	for _, value := range r.LocalOccurrenceSlots {
 		output[value] = struct{}{}
 	}

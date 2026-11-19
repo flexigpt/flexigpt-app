@@ -337,26 +337,103 @@ func (r *Runtime) checkDispatchBudgetLocked(
 			}
 		}
 	}
-	if execution.Budget.Concurrency > 0 &&
-		!item.Cleanup &&
-		activeBudgetWork(execution) >= execution.Budget.Concurrency {
-		return &SanitizedError{
-			Code:     budgetErrorCode,
-			Category: ErrorCategoryLimit,
-			Message:  "execution concurrency budget is exhausted",
-		}
-	}
+
 	return nil
 }
 
 func activeBudgetWork(execution Execution) int {
 	count := 0
 	for _, item := range execution.WorkItems {
-		if item.State == WorkItemStateDispatched {
+		switch item.State {
+		case WorkItemStateBinding, WorkItemStateDispatched:
+			count++
+		default:
+		}
+	}
+	return count
+}
+
+func activeFrameBudgetWork(
+	execution Execution,
+	frameID ProgramFrameID,
+) int {
+	count := 0
+	for _, item := range execution.WorkItems {
+		switch item.State {
+		case WorkItemStateBinding, WorkItemStateDispatched:
+		default:
+			continue
+		}
+		if item.FrameID == frameID ||
+			isDescendantFrame(execution, frameID, item.FrameID) {
 			count++
 		}
 	}
 	return count
+}
+
+func (r *Runtime) workConcurrencyAvailableLocked(
+	execution Execution,
+	item WorkItem,
+) bool {
+	if item.Cleanup {
+		return true
+	}
+	if execution.Budget.Concurrency > 0 &&
+		activeBudgetWork(execution) >= execution.Budget.Concurrency {
+		return false
+	}
+
+	frame := mutableFrame(&execution, item.FrameID)
+	if frame == nil || frame.Budget == nil ||
+		frame.Budget.Concurrency == 0 {
+		return true
+	}
+	return activeFrameBudgetWork(execution, frame.ID) <
+		frame.Budget.Concurrency
+}
+
+func (r *Runtime) setBudgetConcurrencyWaitingLocked(
+	item *WorkItem,
+) {
+	if r == nil || item == nil {
+		return
+	}
+	r.resourceWaitSequence++
+	item.State = WorkItemStateResourceWaiting
+	item.BudgetConcurrencyWait = true
+	item.ResourceWait = &ResourceWaitState{
+		Reason:     ResourceWaitReasonConcurrency,
+		Generation: r.resourceWaitSequence,
+	}
+	item.UpdatedAt = r.now()
+}
+
+func (r *Runtime) wakeBudgetConcurrencyWaitersLocked(
+	execution *Execution,
+) {
+	if r == nil || execution == nil {
+		return
+	}
+	for index := range execution.WorkItems {
+		item := &execution.WorkItems[index]
+		if item.State != WorkItemStateResourceWaiting ||
+			!item.BudgetConcurrencyWait ||
+			item.ResourceWait == nil {
+			continue
+		}
+		if item.ResourceWait.Reason != ResourceWaitReasonConcurrency {
+			continue
+		}
+		if !r.workConcurrencyAvailableLocked(*execution, *item) {
+			continue
+		}
+		r.cancelResourceWaitLocked(item.ID)
+		item.State = WorkItemStateReady
+		item.BudgetConcurrencyWait = false
+		item.ResourceWait = nil
+		item.UpdatedAt = r.now()
+	}
 }
 
 func (r *Runtime) reserveActivityBudgetLocked(

@@ -8,7 +8,6 @@ import (
 
 	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/workbinding"
-	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/workflowruntime"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
@@ -52,7 +51,7 @@ func (normalizeURLServiceBinding) Effect() sessionv3Runtime.EffectContract {
 	}
 }
 
-func (normalizeURLServiceBinding) WorkflowPortCapabilities() workflowruntime.WorkBindingPortCapabilities {
+func (normalizeURLServiceBinding) WorkflowPortCapabilities() workbinding.PortCapabilities {
 	return workbinding.PortCapabilities{
 		Context:          false,
 		InputPorts:       false,

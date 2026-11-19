@@ -509,6 +509,7 @@ type ConversationHandoffIntent struct {
 type Execution struct {
 	ID                ExecutionID                  `json:"id"`
 	SessionID         SessionID                    `json:"sessionID"`
+	ConversationID    string                       `json:"conversationID,omitempty"`
 	Revision          Revision                     `json:"revision"`
 	State             ExecutionState               `json:"state"`
 	CreatedAt         time.Time                    `json:"createdAt"`
@@ -978,6 +979,7 @@ type WorkItem struct {
 	StepExecutionReserved  bool                    `json:"stepExecutionReserved,omitempty"`
 	Claims                 []ResourceClaim         `json:"claims,omitempty"`
 	ResourceWait           *ResourceWaitState      `json:"resourceWait,omitempty"`
+	BudgetConcurrencyWait  bool                    `json:"budgetConcurrencyWait,omitempty"`
 	Ports                  []PortPlan              `json:"ports,omitempty"`
 	PortInputs             []PortInput             `json:"portInputs,omitempty"`
 	PortStreams            []PortStream            `json:"portStreams,omitempty"`
@@ -1624,11 +1626,12 @@ type WorkStream struct {
 }
 
 type BindResult struct {
-	SemanticBinding SemanticBinding
-	Wait            *WaitRequest
-	ImmediateOutput *WorkItemOutput
-	BoundToolCall   *ToolCall `json:"-"`
-	Private         any       `json:"-"`
+	SemanticBinding      SemanticBinding
+	Wait                 *WaitRequest
+	ImmediateOutput      *WorkItemOutput
+	ImmediateEffectState *EffectState `json:"-"`
+	BoundToolCall        *ToolCall    `json:"-"`
+	Private              any          `json:"-"`
 }
 
 type BoundWork struct {
@@ -1637,9 +1640,10 @@ type BoundWork struct {
 }
 
 type WorkExecutionResult struct {
-	Output    *WorkItemOutput
-	Error     *SanitizedError
-	Confirmed bool
+	Output      *WorkItemOutput
+	Error       *SanitizedError
+	Confirmed   bool
+	EffectState *EffectState
 }
 
 type WaitResolutionRequest struct {
@@ -1653,11 +1657,12 @@ type WaitResolutionRequest struct {
 }
 
 type WaitResolutionResult struct {
-	Resume    bool
-	Bound     *BoundWork
-	Output    *WorkItemOutput
-	Error     *SanitizedError
-	Confirmed bool
+	Resume      bool
+	Bound       *BoundWork
+	Output      *WorkItemOutput
+	Error       *SanitizedError
+	Confirmed   bool
+	EffectState *EffectState
 }
 
 type WorkBinder interface {

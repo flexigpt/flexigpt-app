@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"maps"
-	"slices"
 	"strings"
 
 	"github.com/flexigpt/agentskills-go/provider"
@@ -40,14 +39,29 @@ func (e *V3Executor) EffectiveActiveSelections(
 	enabled []sessionv3Runtime.ArtifactSelection,
 	active []sessionv3Runtime.ArtifactSelection,
 ) ([]sessionv3Runtime.ArtifactSelection, error) {
+	return e.effectiveActiveSelections(
+		execution,
+		"",
+		enabled,
+		active,
+	)
+}
+
+func (e *V3Executor) effectiveActiveSelections(
+	execution sessionv3Runtime.Execution,
+	frameID sessionv3Runtime.ProgramFrameID,
+	enabled []sessionv3Runtime.ArtifactSelection,
+	active []sessionv3Runtime.ArtifactSelection,
+) ([]sessionv3Runtime.ArtifactSelection, error) {
 	output := append([]sessionv3Runtime.ArtifactSelection(nil), active...)
 	if len(enabled) == 0 {
 		return nil, nil
 	}
 
-	for _, item := range slices.Backward(execution.WorkItems) {
+	var latest *sessionv3Runtime.WorkItem
+	for index := range execution.WorkItems {
+		item := execution.WorkItems[index]
 		if item.Type != sessionv3Runtime.WorkItemTypeTool ||
-			item.State != sessionv3Runtime.WorkItemStateCompleted ||
 			item.Input.Tool == nil ||
 			item.Input.Tool.Call.Binding.Kind != sessionv3Runtime.ToolBindingKindSkill ||
 			item.Output == nil ||
@@ -55,18 +69,40 @@ func (e *V3Executor) EffectiveActiveSelections(
 			item.Output.Tool.SkillState == nil {
 			continue
 		}
-
-		state := *item.Output.Tool.SkillState
-		if err := state.Validate(); err != nil {
-			return nil, err
-		}
-		if !v3SkillStateMatchesEnabledSelections(state, enabled) {
+		if frameID != "" && item.FrameID != frameID {
 			continue
 		}
-		return v3SkillActiveSelections(state, enabled)
+		switch item.State {
+		case sessionv3Runtime.WorkItemStateCompleted,
+			sessionv3Runtime.WorkItemStateFailed:
+		default:
+			continue
+		}
+		if item.EffectState == sessionv3Runtime.EffectStateUncertain {
+			continue
+		}
+		if latest == nil ||
+			latest.CompletedAt == nil ||
+			(item.CompletedAt != nil &&
+				(item.CompletedAt.After(*latest.CompletedAt) ||
+					(item.CompletedAt.Equal(*latest.CompletedAt) &&
+						item.ID > latest.ID))) {
+			copyValue := item
+			latest = &copyValue
+		}
+	}
+	if latest == nil {
+		return output, nil
 	}
 
-	return output, nil
+	state := *latest.Output.Tool.SkillState
+	if err := state.Validate(); err != nil {
+		return nil, err
+	}
+	if !v3SkillStateMatchesEnabledSelections(state, enabled) {
+		return output, nil
+	}
+	return v3SkillActiveSelections(state, enabled)
 }
 
 // HydrateLLM creates or reuses the process-private Skill Runtime session for
@@ -75,6 +111,7 @@ func (e *V3Executor) EffectiveActiveSelections(
 func (e *V3Executor) HydrateLLM(
 	ctx context.Context,
 	executionID sessionv3Runtime.ExecutionID,
+	frameID sessionv3Runtime.ProgramFrameID,
 	enabled []sessionv3Runtime.ArtifactSelection,
 	active []sessionv3Runtime.ArtifactSelection,
 ) (V3LLMSkillHydration, error) {
@@ -91,9 +128,13 @@ func (e *V3Executor) HydrateLLM(
 	if err != nil {
 		return V3LLMSkillHydration{}, err
 	}
+	key := V3SkillSessionKey{
+		ExecutionID: executionID,
+		FrameID:     frameID,
+	}
 	runtimeSession, err := e.ensureResolvedSkillSession(
 		ctx,
-		executionID,
+		key,
 		resolved,
 	)
 	if err != nil {
@@ -121,7 +162,7 @@ func (e *V3Executor) HydrateLLM(
 			"private Skill Runtime active selection differs from durable Skill state",
 		)
 	}
-	e.storeV3SkillSession(executionID, runtimeSession, actual)
+	e.storeV3SkillSession(key, runtimeSession, actual)
 
 	choices, err := v3SkillChoices(
 		len(actual.Active) != 0,
@@ -317,15 +358,15 @@ func (e *V3Executor) resolveV3Selections(
 
 func (e *V3Executor) ensureResolvedSkillSession(
 	ctx context.Context,
-	executionID sessionv3Runtime.ExecutionID,
+	key V3SkillSessionKey,
 	resolved v3ResolvedSkillSelections,
 ) (v3SkillSession, error) {
-	if executionID == "" {
+	if key.ExecutionID == "" || key.FrameID == "" {
 		return v3SkillSession{}, errors.New(
-			"skill Runtime session requires an Execution identity",
+			"skill runtime session requires an invocation identity",
 		)
 	}
-	if current := e.executionSession(executionID); current.id != "" &&
+	if current := e.executionSession(key); current.id != "" &&
 		sameV3SkillState(current.state, resolved.state) {
 		return current, nil
 	}
@@ -370,7 +411,7 @@ func (e *V3Executor) ensureResolvedSkillSession(
 	}
 
 	e.mu.Lock()
-	current, found := e.sessions[executionID]
+	current, found := e.sessions[key]
 	if found && sameV3SkillState(current.state, resolved.state) {
 		e.mu.Unlock()
 		_ = e.runtime.CloseSession(
@@ -379,7 +420,7 @@ func (e *V3Executor) ensureResolvedSkillSession(
 		)
 		return cloneV3SkillSession(current), nil
 	}
-	e.sessions[executionID] = next
+	e.sessions[key] = next
 	e.mu.Unlock()
 
 	if found && current.id != "" {
@@ -393,7 +434,7 @@ func (e *V3Executor) ensureResolvedSkillSession(
 
 func (e *V3Executor) activeSkillSelectionState(
 	ctx context.Context,
-	executionID sessionv3Runtime.ExecutionID,
+	key V3SkillSessionKey,
 	session v3SkillSession,
 ) (sessionv3Runtime.SkillSelectionState, error) {
 	records, err := e.runtime.ListAgentSkills(
@@ -416,23 +457,23 @@ func (e *V3Executor) activeSkillSelectionState(
 	if err != nil {
 		return sessionv3Runtime.SkillSelectionState{}, err
 	}
-	e.storeV3SkillSession(executionID, session, state)
+	e.storeV3SkillSession(key, session, state)
 	return state, nil
 }
 
 func (e *V3Executor) storeV3SkillSession(
-	executionID sessionv3Runtime.ExecutionID,
+	key V3SkillSessionKey,
 	session v3SkillSession,
 	state sessionv3Runtime.SkillSelectionState,
 ) {
-	if e == nil || executionID == "" {
+	if e == nil || key.ExecutionID == "" || key.FrameID == "" {
 		return
 	}
 	e.mu.Lock()
-	current, found := e.sessions[executionID]
+	current, found := e.sessions[key]
 	if found && current.id == session.id {
 		current.state = cloneV3SkillState(state)
-		e.sessions[executionID] = current
+		e.sessions[key] = current
 	}
 	e.mu.Unlock()
 }

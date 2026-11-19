@@ -699,6 +699,15 @@ func (r *Runtime) appendPortMessageLocked(
 		return err
 	}
 	r.touchExecutionLocked(session, channelExecution)
+
+	// The receiver can belong to another independent Execution. Launching
+	// ready work here keeps stream and final-port delivery reactive instead
+	// of waiting for the sending child to settle.
+	r.launchReadyWork(
+		context.Background(),
+		session.ID,
+		r.readyWorkForSessionLocked(session),
+	)
 	return nil
 }
 

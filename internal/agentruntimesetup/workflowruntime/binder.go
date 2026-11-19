@@ -61,8 +61,7 @@ func (b *Binder) ExecuteWork(
 	switch value := bound.Private.(type) {
 	case boundExternal:
 		domainRequest, err := externalWorkRequest(
-			request.WorkItem,
-			request.PortStream,
+			request,
 		)
 		if err != nil {
 			return sessionv3Runtime.WorkExecutionResult{}, err
@@ -224,8 +223,7 @@ func bindExternal(
 	}
 
 	domainRequest, err := externalWorkRequest(
-		request.WorkItem,
-		request.PortStream,
+		request,
 	)
 	if err != nil {
 		return sessionv3Runtime.BindResult{}, err
@@ -282,9 +280,9 @@ func wrapExternalWaitResolution(
 }
 
 func externalWorkRequest(
-	item sessionv3Runtime.WorkItem,
-	stream sessionv3Runtime.WorkPortStream,
+	request sessionv3Runtime.WorkDispatchRequest,
 ) (WorkBindingRequest, error) {
+	item := request.WorkItem
 	input, err := externalWorkInput(item)
 	if err != nil {
 		return WorkBindingRequest{}, err
@@ -297,7 +295,7 @@ func externalWorkRequest(
 		Input:   input,
 		Context: contextValue,
 		Ports:   cloneExternalPortInputs(item.PortInputs),
-		Stream:  stream,
+		Stream:  request.PortStream,
 	}, nil
 }
 
@@ -521,8 +519,7 @@ func (b *Binder) validateExternalPortPlans(
 			return ErrBindingUnavailable
 		}
 		domainRequest, err := externalWorkRequest(
-			request.WorkItem,
-			request.PortStream,
+			request,
 		)
 		if err != nil {
 			return err
@@ -544,8 +541,7 @@ func (b *Binder) validateExternalPortPlans(
 			return ErrBindingUnavailable
 		}
 		domainRequest, err := externalWorkRequest(
-			request.WorkItem,
-			request.PortStream,
+			request,
 		)
 		if err != nil {
 			return err

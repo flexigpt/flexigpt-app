@@ -37,9 +37,30 @@ func effectStateForSettlement(
 	if item.Effect.Kind == EffectKindRead {
 		return EffectStateNotApplicable
 	}
+	if result.EffectState != nil {
+		if err := result.EffectState.Validate(); err == nil {
+			return *result.EffectState
+		}
+		return EffectStateUncertain
+	}
 
 	switch item.State {
 	case WorkItemStateCompleted:
+		if result.Output != nil &&
+			result.Output.Receipt != nil {
+			return EffectStateConfirmedApplied
+		}
+		if result.Output != nil &&
+			result.Output.Tool != nil {
+			switch result.Output.Tool.Kind {
+			case ToolOutputKindError, ToolOutputKindSkipped:
+				return EffectStateConfirmedNotApplied
+			case ToolOutputKindSuccess:
+				return EffectStateConfirmedApplied
+			default:
+				return EffectStateUncertain
+			}
+		}
 		return EffectStateConfirmedApplied
 
 	case WorkItemStateCancelled:

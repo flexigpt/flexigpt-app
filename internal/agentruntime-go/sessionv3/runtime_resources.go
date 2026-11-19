@@ -335,6 +335,7 @@ func (r *Runtime) setResourceWaitingLocked(
 	}
 	r.resourceWaitSequence++
 	item.State = WorkItemStateResourceWaiting
+	item.BudgetConcurrencyWait = false
 	item.ResourceWait = &ResourceWaitState{
 		Reason:     reason,
 		WakeAt:     cloneTime(wakeAt),
@@ -416,14 +417,19 @@ func (r *Runtime) wakeResourceWaitersLocked(
 	execution *Execution,
 	released []string,
 ) {
-	if execution == nil || len(released) == 0 {
+	if execution == nil {
+		return
+	}
+	r.wakeBudgetConcurrencyWaitersLocked(execution)
+	if len(released) == 0 {
 		return
 	}
 	for index := range execution.WorkItems {
 		item := &execution.WorkItems[index]
 		if item.State != WorkItemStateResourceWaiting ||
 			item.ResourceWait == nil ||
-			item.ResourceWait.WakeAt != nil {
+			item.ResourceWait.WakeAt != nil ||
+			item.BudgetConcurrencyWait {
 			continue
 		}
 		if !workItemUsesResource(*item, released) {

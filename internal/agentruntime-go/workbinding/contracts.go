@@ -45,10 +45,11 @@ type WaitRequest struct {
 // BindResult allows a domain to prepare immediate work, a durable Runtime
 // wait, or executable private state through one typed binding result.
 type BindResult struct {
-	SemanticBinding sessionv3Runtime.SemanticBinding
-	Wait            *sessionv3Runtime.WaitRequest
-	ImmediateOutput *sessionv3Runtime.WorkItemOutput
-	Private         any
+	SemanticBinding      sessionv3Runtime.SemanticBinding
+	Wait                 *sessionv3Runtime.WaitRequest
+	ImmediateOutput      *sessionv3Runtime.WorkItemOutput
+	ImmediateEffectState *sessionv3Runtime.EffectState
+	Private              any
 }
 
 // Binding is implemented by owning Service and Activity domains. Runtime owns

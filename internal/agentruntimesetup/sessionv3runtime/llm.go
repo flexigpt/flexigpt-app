@@ -124,9 +124,14 @@ func (b *Binder) bindLLM(
 				"session v3 Skill runtime is unavailable",
 			)
 		}
+		key := skillruntime.V3SkillSessionKey{
+			ExecutionID: req.Execution.ID,
+			FrameID:     req.WorkItem.FrameID,
+		}
 		skillHydration, err = b.skillTools.HydrateLLM(
 			ctx,
-			req.Execution.ID,
+			key.ExecutionID,
+			key.FrameID,
 			plan.defaults.Skills,
 			plan.defaults.ActiveSkills,
 		)
@@ -239,7 +244,12 @@ func (b *Binder) executeLLM(
 			OnStreamThinking: req.Stream.OnThinking,
 		},
 	)
-	if err != nil {
+	if resp == nil || resp.Body == nil ||
+		resp.Body.InferenceResponse == nil {
+		message := "empty provider response"
+		if err != nil {
+			message = err.Error()
+		}
 		var typed *sessionv3Runtime.SanitizedError
 		if errors.As(err, &typed) && typed != nil {
 			value := *typed
@@ -253,12 +263,10 @@ func (b *Binder) executeLLM(
 			}, nil
 		}
 		return sessionv3Runtime.WorkExecutionResult{
-			Error: &sessionv3Runtime.SanitizedError{Code: "completion_failed", Message: err.Error()},
-		}, nil
-	}
-	if resp == nil || resp.Body == nil || resp.Body.InferenceResponse == nil {
-		return sessionv3Runtime.WorkExecutionResult{
-			Error: &sessionv3Runtime.SanitizedError{Code: "empty_completion", Message: "empty provider response"},
+			Error: &sessionv3Runtime.SanitizedError{
+				Code:    "empty_completion",
+				Message: message,
+			},
 		}, nil
 	}
 	out := resp.Body.InferenceResponse
@@ -294,21 +302,42 @@ func (b *Binder) executeLLM(
 		ProtocolOutputs: protocolOutputs,
 		DebugDetails:    debugDetails,
 	}
+	value := jsonutil.MustCanonicalValue(llmOutput)
+	output := &sessionv3Runtime.WorkItemOutput{
+		Value: value,
+		LLM:   llmOutput,
+		Receipt: &sessionv3Runtime.ExternalReceipt{
+			System:      "inference",
+			Reference:   private.Fingerprint,
+			ConfirmedAt: time.Now().UTC(),
+		},
+	}
 	if out.Error != nil {
 		return sessionv3Runtime.WorkExecutionResult{
-			Output: &sessionv3Runtime.WorkItemOutput{
-				LLM: llmOutput,
+			Output: output,
+			Error: &sessionv3Runtime.SanitizedError{
+				Code:    out.Error.Code,
+				Message: out.Error.Message,
 			},
-			Error:     &sessionv3Runtime.SanitizedError{Code: out.Error.Code, Message: out.Error.Message},
 			Confirmed: true,
 		}, nil
 	}
 	confirmed := strings.TrimSpace(text) != "" ||
 		len(calls) != 0 ||
 		len(protocolOutputs) != 0
+	if err != nil {
+		return sessionv3Runtime.WorkExecutionResult{
+			Output: output,
+			Error: &sessionv3Runtime.SanitizedError{
+				Code:    "completion_failed",
+				Message: err.Error(),
+			},
+			Confirmed: confirmed,
+		}, nil
+	}
 	if !confirmed {
 		return sessionv3Runtime.WorkExecutionResult{
-			Output: &sessionv3Runtime.WorkItemOutput{LLM: llmOutput},
+			Output: output,
 			Error: &sessionv3Runtime.SanitizedError{
 				Code:    "empty_completion",
 				Message: "provider returned no text or executable Tool call",
@@ -316,14 +345,7 @@ func (b *Binder) executeLLM(
 		}, nil
 	}
 	return sessionv3Runtime.WorkExecutionResult{
-		Output: &sessionv3Runtime.WorkItemOutput{
-			LLM: llmOutput,
-			Receipt: &sessionv3Runtime.ExternalReceipt{
-				System:      "inference",
-				Reference:   private.Fingerprint,
-				ConfirmedAt: time.Now().UTC(),
-			},
-		},
+		Output:    output,
 		Confirmed: true,
 	}, nil
 }

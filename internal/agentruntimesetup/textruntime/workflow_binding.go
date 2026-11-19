@@ -8,7 +8,6 @@ import (
 
 	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/workbinding"
-	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/workflowruntime"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
 	"github.com/flexigpt/llmtools-go/texttool"
@@ -51,7 +50,7 @@ func (applyUnifiedDiffActivityBinding) Effect() sessionv3Runtime.EffectContract 
 	}
 }
 
-func (applyUnifiedDiffActivityBinding) WorkflowPortCapabilities() workflowruntime.WorkBindingPortCapabilities {
+func (applyUnifiedDiffActivityBinding) WorkflowPortCapabilities() workbinding.PortCapabilities {
 	return workbinding.PortCapabilities{
 		Context:          false,
 		InputPorts:       false,

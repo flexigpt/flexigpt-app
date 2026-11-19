@@ -296,20 +296,23 @@ func (r *Runtime) DeleteSession(ctx context.Context, command DeleteSessionComman
 	}
 	session := r.sessions[command.SessionID]
 	if session == nil {
-		if tombstone, found := r.retired[command.SessionID]; found {
-			receipt, duplicate, err := commandReceiptFromRecords(
+		tombstone, found := r.retired[command.SessionID]
+		if found {
+			receipt, duplicate, receiptErr := commandReceiptFromRecords(
 				tombstone.Commands,
 				command.Meta,
 				command,
 			)
 			r.mu.Unlock()
-			if err != nil {
-				return nil, err
+			if receiptErr != nil {
+				return nil, receiptErr
 			}
 			if duplicate {
 				return receipt, nil
 			}
+			return nil, ErrSessionNotFound
 		}
+		r.mu.Unlock()
 		return nil, ErrSessionNotFound
 	}
 	if receipt, found, receiptErr := r.commandReceiptLocked(
@@ -421,6 +424,10 @@ func (r *Runtime) SubmitMessage(ctx context.Context, command SubmitMessageComman
 		admittedAttachments,
 	)
 	input.AttachmentSources = nil
+	input.ConversationID = effectiveConversationID(
+		session,
+		input.ConversationID,
+	)
 	resolvedDefaults, defaultsErr := resolveSessionInvocationDefaults(
 		session.Defaults,
 		input.Defaults,
@@ -437,7 +444,10 @@ func (r *Runtime) SubmitMessage(ctx context.Context, command SubmitMessageComman
 	}
 
 	previous := cloneSession(*session)
-	execution, err := r.conversationExecutionLocked(session)
+	execution, err := r.conversationExecutionLocked(
+		session,
+		input.ConversationID,
+	)
 	if err != nil {
 		*session = previous
 		r.mu.Unlock()
@@ -479,6 +489,10 @@ func (r *Runtime) SubmitMessage(ctx context.Context, command SubmitMessageComman
 		r.mu.Unlock()
 		return nil, err
 	}
+	r.armSessionExecutionTimersLocked(
+		ctx,
+		session,
+	)
 	ready := r.readyWorkLocked(*current)
 	r.publishLocked(ctx, session, current.ID, RuntimeEventExecutionChanged)
 	r.mu.Unlock()
@@ -1218,7 +1232,12 @@ func (r *Runtime) ResolveWait(ctx context.Context, command ResolveWaitCommand) (
 			execution,
 			item,
 			activeAttempt(execution, item.ID),
-			WorkExecutionResult{Output: result.Output, Error: result.Error, Confirmed: result.Confirmed},
+			WorkExecutionResult{
+				Output:      result.Output,
+				Error:       result.Error,
+				Confirmed:   result.Confirmed,
+				EffectState: result.EffectState,
+			},
 		)
 	case result.Resume && result.Bound != nil:
 		r.privateBindings[item.ID] = *result.Bound
@@ -1652,11 +1671,13 @@ func (r *Runtime) changeExecution(
 	return receipt, nil
 }
 
-func (r *Runtime) conversationExecutionLocked(session *Session) (*Execution, error) {
+func (r *Runtime) conversationExecutionLocked(session *Session, conversationID string) (*Execution, error) {
 	for index := range session.Executions {
 		execution := &session.Executions[index]
 		if !execution.State.Terminal() && len(execution.ProgramFrames) != 0 &&
-			execution.ProgramFrames[0].Program.InterpreterID == BuiltinConversationInterpreterID {
+			execution.ProgramFrames[0].Program.InterpreterID ==
+				BuiltinConversationInterpreterID &&
+			execution.ConversationID == conversationID {
 			return execution, nil
 		}
 	}
@@ -1687,17 +1708,18 @@ func (r *Runtime) conversationExecutionLocked(session *Session) (*Execution, err
 		return nil, err
 	}
 	execution := Execution{
-		ID:        ExecutionID(r.newID()),
-		SessionID: session.ID,
-		Lifetime:  ExecutionChildLifetimeRoot,
-		Revision:  1,
-		State:     ExecutionStateWaiting,
-		CreatedAt: now,
-		UpdatedAt: now,
-		Deadline:  deadline,
-		Budget:    budget,
-		Usage:     ExecutionBudgetUsage{},
-		Cleanup:   CleanupState{},
+		ID:             ExecutionID(r.newID()),
+		SessionID:      session.ID,
+		ConversationID: conversationID,
+		Lifetime:       ExecutionChildLifetimeRoot,
+		Revision:       1,
+		State:          ExecutionStateWaiting,
+		CreatedAt:      now,
+		UpdatedAt:      now,
+		Deadline:       deadline,
+		Budget:         budget,
+		Usage:          ExecutionBudgetUsage{},
+		Cleanup:        CleanupState{},
 		ProgramFrames: []ProgramFrame{
 			{
 				ID:        ProgramFrameID(r.newID()),
@@ -2093,6 +2115,32 @@ func (r *Runtime) dispatchOne(ctx context.Context, sessionID SessionID, executio
 		r.mu.Unlock()
 		return
 	}
+	if !item.Cleanup &&
+		!r.workConcurrencyAvailableLocked(
+			*execution,
+			*item,
+		) {
+		previous := cloneSession(*session)
+		r.setBudgetConcurrencyWaitingLocked(item)
+		r.touchExecutionLocked(session, execution)
+		if err := r.persistLocked(
+			ctx,
+			"workConcurrencyWaiting",
+			session,
+		); err != nil {
+			*session = previous
+			r.mu.Unlock()
+			return
+		}
+		r.publishLocked(
+			ctx,
+			session,
+			execution.ID,
+			RuntimeEventWorkChanged,
+		)
+		r.mu.Unlock()
+		return
+	}
 	if budgetErr := r.checkDispatchBudgetLocked(*execution, *item); budgetErr != nil {
 		failure, found := budgetFailure(budgetErr)
 		if !found {
@@ -2304,7 +2352,11 @@ func (r *Runtime) dispatchOne(ctx context.Context, sessionID SessionID, executio
 			execution,
 			item,
 			activeAttempt(execution, item.ID),
-			WorkExecutionResult{Output: bound.ImmediateOutput, Confirmed: true},
+			WorkExecutionResult{
+				Output:      bound.ImmediateOutput,
+				Confirmed:   true,
+				EffectState: bound.ImmediateEffectState,
+			},
 		)
 		if err := r.persistLocked(ctx, "workFinished", session); err != nil {
 			return
@@ -3854,6 +3906,9 @@ func (r *Runtime) recoverLocked(session *Session) bool {
 			}
 		}
 		normalizeRecoveredResources(execution)
+		r.wakeBudgetConcurrencyWaitersLocked(
+			execution,
+		)
 		for waitIndex := range execution.Waits {
 			wait := &execution.Waits[waitIndex]
 			if !wait.Request.RuntimeBound && wait.Status == WaitStatusResolving {

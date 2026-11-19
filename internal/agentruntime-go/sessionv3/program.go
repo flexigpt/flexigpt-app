@@ -458,21 +458,38 @@ func (agentLoopInterpreter) Advance(
 					originErr.Error(),
 				)
 			}
-			for _, call := range executable {
-				work = append(
-					work,
-					WorkItemIntent{
-						ProgramPath:      "tools/" + call.ID,
-						Type:             WorkItemTypeTool,
-						OriginWorkItemID: item.ID,
-						Automatic:        call.Automatic,
-						Effect:           EffectContract{Kind: EffectKindNonIdempotent},
-						Input: WorkItemPayload{Tool: &ToolWork{
-							Call:   call,
-							Origin: cloneLLMToolOrigin(origin),
-						}},
-					},
-				)
+			var previousSkillWork WorkItemID
+			for callIndex, call := range executable {
+				intent := WorkItemIntent{
+					ProgramPath:      "tools/" + call.ID,
+					Type:             WorkItemTypeTool,
+					OriginWorkItemID: item.ID,
+					Automatic:        call.Automatic,
+					Effect:           EffectContract{Kind: EffectKindNonIdempotent},
+					Input: WorkItemPayload{Tool: &ToolWork{
+						Call:   call,
+						Origin: cloneLLMToolOrigin(origin),
+					}},
+				}
+				if call.Binding.Kind == ToolBindingKindSkill {
+					callIdentity := call.ID
+					if callIdentity == "" {
+						callIdentity = strconv.Itoa(callIndex)
+					}
+					intent.ID = WorkItemID(
+						"skill-lifecycle:" +
+							string(item.ID) +
+							":" +
+							callIdentity,
+					)
+					if previousSkillWork != "" {
+						intent.Dependencies = []WorkItemID{
+							previousSkillWork,
+						}
+					}
+					previousSkillWork = intent.ID
+				}
+				work = append(work, intent)
 			}
 			status := ProgramFrameStateWaiting
 			return ProgramTransition{

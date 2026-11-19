@@ -36,7 +36,12 @@ type V3Executor struct {
 	runtime  *skillRuntime.Service
 
 	mu       sync.Mutex
-	sessions map[sessionv3Runtime.ExecutionID]v3SkillSession
+	sessions map[V3SkillSessionKey]v3SkillSession
+}
+
+type V3SkillSessionKey struct {
+	ExecutionID sessionv3Runtime.ExecutionID
+	FrameID     sessionv3Runtime.ProgramFrameID
 }
 
 type v3SkillSession struct {
@@ -57,7 +62,7 @@ func NewV3Executor(
 	return &V3Executor{
 		resolver: resolver,
 		runtime:  runtime,
-		sessions: make(map[sessionv3Runtime.ExecutionID]v3SkillSession),
+		sessions: make(map[V3SkillSessionKey]v3SkillSession),
 	}, nil
 }
 
@@ -68,6 +73,7 @@ func (e *V3Executor) Choices(
 	ctx context.Context,
 	request sessionv3Runtime.WorkDispatchRequest,
 ) ([]toolruntime.V3PreparedChoice, error) {
+	owner := v3SkillOwnerKey(request, nil)
 	active, err := e.EffectiveActiveSelections(
 		request.Execution,
 		request.Session.Defaults.Skills,
@@ -78,7 +84,8 @@ func (e *V3Executor) Choices(
 	}
 	hydrated, err := e.HydrateLLM(
 		ctx,
-		request.Execution.ID,
+		owner.ExecutionID,
+		owner.FrameID,
 		request.Session.Defaults.Skills,
 		active,
 	)
@@ -179,6 +186,16 @@ func (e *V3Executor) Bind(
 			"skill tool was requested without enabled Skills",
 		)
 	}
+	owner := v3SkillOwnerKey(request, payload)
+	active, err := e.effectiveActiveSelections(
+		request.Execution,
+		owner.FrameID,
+		skills,
+		active,
+	)
+	if err != nil {
+		return sessionv3Runtime.SemanticBinding{}, err
+	}
 	resolved, err := e.resolveV3Selections(
 		ctx,
 		skills,
@@ -223,6 +240,16 @@ func (e *V3Executor) Execute(
 	if err != nil {
 		return sessionv3Runtime.WorkExecutionResult{}, true, err
 	}
+	owner := v3SkillOwnerKey(request, payload)
+	activeSelections, err = e.effectiveActiveSelections(
+		request.Execution,
+		owner.FrameID,
+		skills,
+		activeSelections,
+	)
+	if err != nil {
+		return sessionv3Runtime.WorkExecutionResult{}, true, err
+	}
 	resolved, err := e.resolveV3Selections(ctx, skills, activeSelections)
 	if err != nil {
 		return sessionv3Runtime.WorkExecutionResult{
@@ -234,7 +261,7 @@ func (e *V3Executor) Execute(
 	}
 	runtimeSession, err := e.ensureResolvedSkillSession(
 		ctx,
-		request.Execution.ID,
+		owner,
 		resolved,
 	)
 	if err != nil {
@@ -298,7 +325,7 @@ func (e *V3Executor) Execute(
 	}
 	activeState, stateErr := e.activeSkillSelectionState(
 		ctx,
-		request.Execution.ID,
+		owner,
 		runtimeSession,
 	)
 	if stateErr != nil {
@@ -362,17 +389,27 @@ func (e *V3Executor) CloseExecution(
 	}
 
 	e.mu.Lock()
-	session, found := e.sessions[executionID]
-	delete(e.sessions, executionID)
+	sessions := make([]v3SkillSession, 0)
+	for key, value := range e.sessions {
+		if key.ExecutionID != executionID {
+			continue
+		}
+		delete(e.sessions, key)
+		sessions = append(sessions, value)
+	}
 	e.mu.Unlock()
 
-	if !found || session.id == "" {
-		return nil
+	var output error
+	for _, session := range sessions {
+		if session.id == "" {
+			continue
+		}
+		output = errors.Join(output, e.runtime.CloseSession(
+			ctx,
+			agentskillsRuntimeSpec.SessionID(session.id),
+		))
 	}
-	return e.runtime.CloseSession(
-		ctx,
-		agentskillsRuntimeSpec.SessionID(session.id),
-	)
+	return output
 }
 
 func (e *V3Executor) renderSelectedSkill(
@@ -494,14 +531,14 @@ func cloneV3SkillArguments(
 }
 
 func (e *V3Executor) executionSession(
-	executionID sessionv3Runtime.ExecutionID,
+	key V3SkillSessionKey,
 ) v3SkillSession {
-	if e == nil || executionID == "" {
+	if e == nil || key.ExecutionID == "" || key.FrameID == "" {
 		return v3SkillSession{}
 	}
 
 	e.mu.Lock()
-	value := e.sessions[executionID]
+	value := e.sessions[key]
 	e.mu.Unlock()
 	return cloneV3SkillSession(value)
 }
@@ -554,6 +591,27 @@ func v3SkillToolDisplayName(name string) string {
 		return "Run Skill script"
 	default:
 		return "Skill Tool"
+	}
+}
+
+func v3SkillOwnerKey(
+	request sessionv3Runtime.WorkDispatchRequest,
+	payload *sessionv3Runtime.ToolWork,
+) V3SkillSessionKey {
+	frameID := request.WorkItem.FrameID
+	if payload != nil && payload.Origin != nil &&
+		payload.Origin.OriginWorkItemID != "" {
+		for _, item := range request.Execution.WorkItems {
+			if item.ID != payload.Origin.OriginWorkItemID {
+				continue
+			}
+			frameID = item.FrameID
+			break
+		}
+	}
+	return V3SkillSessionKey{
+		ExecutionID: request.Execution.ID,
+		FrameID:     frameID,
 	}
 }
 

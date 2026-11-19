@@ -500,7 +500,14 @@ func (r *Runtime) EditAndResend(
 		session.Timeline[:index]...,
 	)
 
-	execution, executionErr := r.conversationExecutionLocked(session)
+	input.ConversationID = effectiveConversationID(
+		session,
+		input.ConversationID,
+	)
+	execution, executionErr := r.conversationExecutionLocked(
+		session,
+		input.ConversationID,
+	)
 	if executionErr != nil {
 		*session = previous
 		r.mu.Unlock()
@@ -674,6 +681,14 @@ func (r *Runtime) submitNormalMessageWithDefaultsLocked(
 		&resolvedValue,
 	); err != nil {
 		return Activity{}, err
+	}
+	if execution.ConversationID == "" {
+		execution.ConversationID = conversationID
+	}
+	if execution.ConversationID != conversationID {
+		return Activity{}, errors.New(
+			"conversation execution does not own the submitted conversation",
+		)
 	}
 	resolvedDefaults = &resolvedValue
 

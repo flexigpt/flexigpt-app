@@ -54,6 +54,7 @@ type Store struct {
 	ftsMu             sync.RWMutex
 	maintenanceCancel context.CancelFunc
 	maintenanceWG     sync.WaitGroup
+	repairPending     bool
 }
 
 func New(baseDir string) (*Store, error) {
@@ -225,6 +226,7 @@ func (s *Store) HandleCheckpoint(_ context.Context, view sessionv3Runtime.Checkp
 		return err
 	}
 	if err := s.writeIndex(incoming); err != nil {
+		s.scheduleDerivedRepairLocked()
 		return &DerivedIndexError{Cause: err}
 	}
 	return nil
@@ -546,6 +548,35 @@ func (s *Store) RebuildDerived(ctx context.Context) error {
 	defer s.mu.Unlock()
 
 	return s.rebuildDerivedLocked(ctx)
+}
+
+func (s *Store) scheduleDerivedRepairLocked() {
+	if s == nil || s.closed || s.repairPending {
+		return
+	}
+	s.repairPending = true
+	backgroundutil.Launch(
+		nil,
+		"SessionStoreV3 derived index repair",
+		func() {
+			s.mu.Lock()
+			defer s.mu.Unlock()
+			defer func() {
+				s.repairPending = false
+			}()
+			if s.closed {
+				return
+			}
+			if err := s.rebuildDerivedLocked(context.Background()); err != nil {
+				slog.Error(
+					"sessionstorev3 derived index repair failed",
+					"error",
+					err,
+				)
+			}
+		},
+		nil,
+	)
 }
 
 func (s *Store) rebuildDerivedLocked(ctx context.Context) error {

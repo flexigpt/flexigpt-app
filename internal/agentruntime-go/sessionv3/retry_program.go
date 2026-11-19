@@ -3,6 +3,7 @@ package sessionv3
 import (
 	"encoding/json"
 	"errors"
+	"slices"
 	"strconv"
 	"time"
 
@@ -37,6 +38,7 @@ type retryProgramState struct {
 	LastError       *SanitizedError          `json:"lastError,omitempty"`
 	Attempts        []retryProgramAttempt    `json:"attempts,omitempty"`
 	TargetSets      []WorkflowTargetSetState `json:"targetSets,omitempty"`
+	CapturedChild   *ProgramSnapshot         `json:"capturedChild,omitempty"`
 }
 
 func NewRetryBoundaryProgram(
@@ -202,8 +204,14 @@ func (i retryBoundaryInterpreter) startChild(
 			string(frame.ID) + ":" +
 			strconv.Itoa(state.Attempt),
 	)
+	childSnapshot := payload.Child
+	if state.CapturedChild != nil {
+		childSnapshot = cloneRetryProgramSnapshot(
+			*state.CapturedChild,
+		)
+	}
 	child, err := retryProgramChildSnapshot(
-		payload.Child,
+		childSnapshot,
 		state.TargetSets,
 	)
 	if err != nil {
@@ -267,6 +275,17 @@ func (i retryBoundaryInterpreter) settleChild(
 
 	failure := retryBoundaryFrameFailure(*child)
 	retryCaptureTargetSets(*child, &state)
+	if state.CapturedChild == nil {
+		captured, captureErr := retryCaptureChildCall(
+			execution,
+			*child,
+			payload.Child,
+		)
+		if captureErr != nil {
+			return ProgramTransition{}, captureErr
+		}
+		state.CapturedChild = &captured
+	}
 	retryFinishAttempt(&state, child.ID, now, failure)
 	state.ChildFrameID = ""
 
@@ -509,6 +528,137 @@ func retryProgramChildSnapshot(
 	return snapshot, nil
 }
 
+func retryCaptureChildCall(
+	execution Execution,
+	frame ProgramFrame,
+	snapshot ProgramSnapshot,
+) (ProgramSnapshot, error) {
+	program, err := workflowProgramFromSnapshot(snapshot)
+	if err != nil {
+		return ProgramSnapshot{}, err
+	}
+	if len(program.Root.Steps) != 1 ||
+		program.Root.Steps[0].Call == nil {
+		return cloneRetryProgramSnapshot(snapshot), nil
+	}
+
+	_, state, err := decodeWorkflowProgram(frame)
+	if err != nil {
+		return ProgramSnapshot{}, err
+	}
+	step := program.Root.Steps[0]
+	item, found := retryAttemptCallWorkItem(
+		execution,
+		frame.ID,
+		"step/"+step.ID,
+	)
+	if !found {
+		return cloneRetryProgramSnapshot(snapshot), nil
+	}
+
+	input, contextValue, found := retryCapturedCallValues(item)
+	if !found {
+		return cloneRetryProgramSnapshot(snapshot), nil
+	}
+
+	call := *step.Call
+	if state.PendingTarget != "" {
+		call.Target = WorkflowValue{
+			Kind:    WorkflowValueLiteral,
+			Literal: jsonutil.MustCanonicalValue(state.PendingTarget),
+		}
+	}
+	call.Input = WorkflowValue{
+		Kind:    WorkflowValueLiteral,
+		Literal: input.Clone(),
+	}
+	call.Context = WorkflowValue{
+		Kind:    WorkflowValueLiteral,
+		Literal: contextValue.Clone(),
+	}
+	if step.Effect != nil &&
+		item.Effect.Kind == EffectKindKeyed {
+		key := WorkflowValue{
+			Kind:    WorkflowValueLiteral,
+			Literal: jsonutil.MustCanonicalValue(item.Effect.IdempotencyKey),
+		}
+		step.Effect = cloneWorkflowStepEffect(step.Effect)
+		step.Effect.Key = &key
+	}
+	step.Call = &call
+	program.Root.Steps[0] = step
+
+	payload, err := canonicalWorkflowValue(program)
+	if err != nil {
+		return ProgramSnapshot{}, err
+	}
+	output := cloneRetryProgramSnapshot(snapshot)
+	output.Payload = payload
+	return output, nil
+}
+
+func retryAttemptCallWorkItem(
+	execution Execution,
+	root ProgramFrameID,
+	path string,
+) (WorkItem, bool) {
+	for _, item := range slices.Backward(execution.WorkItems) {
+		if item.ProgramPath != path {
+			continue
+		}
+		if item.FrameID == root ||
+			isDescendantFrame(execution, root, item.FrameID) {
+			return item, true
+		}
+	}
+	return WorkItem{}, false
+}
+
+func retryCapturedCallValues(
+	item WorkItem,
+) (input, contextValue jsonutil.CanonicalValue, found bool) {
+	switch item.Type {
+	case WorkItemTypeTool:
+		if item.Input.Tool != nil {
+			return item.Input.Tool.Call.Arguments.Clone(),
+				jsonutil.MustCanonicalValue(map[string]any{}),
+				true
+		}
+	case WorkItemTypeService:
+		if item.Input.Service != nil {
+			return item.Input.Service.Input.Clone(),
+				item.Input.Service.Context.Clone(),
+				true
+		}
+	case WorkItemTypeActivity:
+		if item.Input.Activity != nil {
+			return item.Input.Activity.Input.Clone(),
+				item.Input.Activity.Context.Clone(),
+				true
+		}
+	case WorkItemTypeChildCall:
+		if item.Input.ChildCall != nil {
+			return item.Input.ChildCall.Input.Clone(),
+				item.Input.ChildCall.Context.Clone(),
+				true
+		}
+	default:
+	}
+	return nil, nil, false
+}
+
+func cloneRetryProgramSnapshot(
+	value ProgramSnapshot,
+) ProgramSnapshot {
+	output := value
+	output.Payload = value.Payload.Clone()
+	if value.Artifact != nil {
+		artifact := *value.Artifact
+		output.Artifact = &artifact
+	}
+	return output
+}
+
 func retryProgramEventTime(
 	frame ProgramFrame,
 	event ProgramEvent,
@@ -561,6 +711,15 @@ func (s retryProgramState) Validate() error {
 	if s.LastError != nil {
 		if err := validateReconciliationError(s.LastError); err != nil {
 			return err
+		}
+	}
+	if s.CapturedChild != nil {
+		if s.CapturedChild.InterpreterID == "" ||
+			s.CapturedChild.InterpreterVersion == 0 ||
+			!s.CapturedChild.Payload.Valid() {
+			return errors.New(
+				"retry boundary captured child program is invalid",
+			)
 		}
 	}
 

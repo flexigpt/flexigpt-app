@@ -167,7 +167,18 @@ func llmInputActivitySequence(
 			}
 			output = append(output, activity)
 		}
-		return append(output, current), nil
+		output = append(output, current)
+		for _, activity := range session.Timeline[currentIndex+1:] {
+			if activity.Kind != sessionv3Runtime.ActivityKindMessage ||
+				activity.Message == nil ||
+				activity.Message.Role != sessionv3Runtime.MessageRoleAssistant ||
+				activity.ExecutionID != execution.ID ||
+				activity.FrameID != workItem.FrameID {
+				continue
+			}
+			output = append(output, activity)
+		}
+		return output, nil
 	}
 
 	history := selectHistory(
@@ -197,35 +208,48 @@ func selectHistory(
 	if currentIndex <= 0 {
 		return nil
 	}
+	prefix := session.Timeline[:currentIndex]
+	if selection.All {
+		output := make([]sessionv3Runtime.Activity, 0, len(prefix))
+		for _, activity := range prefix {
+			if activity.Kind != sessionv3Runtime.ActivityKindMessage ||
+				activity.Message == nil ||
+				activity.Visibility == sessionv3Runtime.ActivityVisibilityAudit {
+				continue
+			}
+			output = append(output, activity)
+		}
+		return output
+	}
 
-	if !selection.All && selection.IncludePreviousUserTurns == 0 {
-		return durableSystemHistory(session.Timeline[:currentIndex])
+	requestedTurns := max(selection.IncludePreviousUserTurns, 0)
+	if requestedTurns == 0 {
+		return durableSystemHistory(prefix)
 	}
 
 	reversed := make([]sessionv3Runtime.Activity, 0)
-	countUser := 0
-	start := currentIndex
-	for _, activity := range slices.Backward(session.Timeline[:currentIndex]) {
+	selectedStart := len(prefix)
+	userTurns := 0
+	for index, activity := range slices.Backward(prefix) {
 		if activity.Kind != sessionv3Runtime.ActivityKindMessage ||
 			activity.Message == nil ||
 			activity.Visibility == sessionv3Runtime.ActivityVisibilityAudit {
 			continue
 		}
 		reversed = append(reversed, activity)
-		start--
-		if activity.Message.Role == sessionv3Runtime.MessageRoleUser {
-			countUser++
+		selectedStart = index
+		if activity.Message.Role != sessionv3Runtime.MessageRoleUser {
+			continue
 		}
-		if !selection.All &&
-			countUser >= selection.IncludePreviousUserTurns {
+		userTurns++
+		if userTurns >= requestedTurns {
 			break
 		}
 	}
 
-	output := durableSystemHistory(session.Timeline[:max(start, 0)])
-	output = append(output, make([]sessionv3Runtime.Activity, len(reversed))...)
-	for index := range reversed {
-		output[len(output)-1-index] = reversed[index]
+	output := durableSystemHistory(prefix[:selectedStart])
+	for _, r := range slices.Backward(reversed) {
+		output = append(output, r)
 	}
 	return output
 }
