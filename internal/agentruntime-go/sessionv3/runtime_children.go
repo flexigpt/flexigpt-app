@@ -452,7 +452,7 @@ func (r *Runtime) settleTerminalExecutionLocked(
 		}
 	}
 	r.wakeCompletionExecutionWaitsLocked(session, *execution)
-	r.drainTriggerQueuesLocked(context.Background(), session, execution.ID)
+	_ = r.drainTriggerQueuesLocked(context.Background(), session, execution.ID)
 }
 
 func completionExecutionResult(

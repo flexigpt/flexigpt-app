@@ -6,6 +6,20 @@ import (
 	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 )
 
+// DerivedIndexError reports a failure after the authoritative Session document
+// was committed. Runtime must not redispatch an already durable mutation, but
+// callers can surface and repair the derived read model separately.
+type DerivedIndexError struct {
+	Cause error
+}
+
+func (e *DerivedIndexError) Error() string {
+	return "Session Store v3 derived index update failed: " + e.Cause.Error()
+}
+
+func (e *DerivedIndexError) Unwrap() error           { return e.Cause }
+func (*DerivedIndexError) CheckpointCommitted() bool { return true }
+
 type ListSessionsRequest struct {
 	PageSize  int    `json:"pageSize,omitempty"`
 	PageToken string `json:"pageToken,omitempty"`

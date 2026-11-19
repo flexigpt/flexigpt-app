@@ -262,6 +262,7 @@ func (i *WorkflowInterpreter) settleTargetSetResolver(
 		state.TargetSetResolution = nil
 		return true, nil
 	}
+
 	state.TargetSets = append(state.TargetSets, WorkflowTargetSetState{
 		Name:       output.TargetSet,
 		Members:    append([]string(nil), output.Members...),

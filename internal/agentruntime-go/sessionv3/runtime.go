@@ -325,6 +325,7 @@ func (r *Runtime) DeleteSession(ctx context.Context, command DeleteSessionComman
 		r.mu.Unlock()
 		return receipt, nil
 	}
+
 	for _, execution := range session.Executions {
 		if !execution.State.Terminal() {
 			receipt := r.rejectLocked(
@@ -337,6 +338,8 @@ func (r *Runtime) DeleteSession(ctx context.Context, command DeleteSessionComman
 			return receipt, nil
 		}
 	}
+
+	previous := cloneSession(*session)
 	now := r.now()
 	receipt := CommandReceipt{
 		CommandID:       command.Meta.ID,
@@ -351,23 +354,19 @@ func (r *Runtime) DeleteSession(ctx context.Context, command DeleteSessionComman
 		DeletedAt: now,
 		Commands:  append([]CommandRecord(nil), session.Commands...),
 	}
+	if err := r.persistSessionTombstoneLocked(
+		context.WithoutCancel(ctx),
+		tombstone,
+	); err != nil {
+		*session = previous
+		r.mu.Unlock()
+		return nil, err
+	}
+
 	delete(r.sessions, session.ID)
 	r.retired[session.ID] = cloneSessionTombstone(tombstone)
 	r.mu.Unlock()
 
-	//nolint:gocritic // Need If.
-	if sink, ok := r.deps.Checkpoints.(SessionTombstoneDeletionSink); ok {
-		if err := sink.HandleSessionTombstone(
-			context.WithoutCancel(ctx),
-			tombstone,
-		); err != nil {
-			return nil, err
-		}
-	} else if sink, ok := r.deps.Checkpoints.(SessionDeletionSink); ok {
-		if err := sink.HandleSessionDeleted(context.WithoutCancel(ctx), command.SessionID); err != nil {
-			return nil, err
-		}
-	}
 	return &receipt, nil
 }
 
@@ -1373,6 +1372,19 @@ func (r *Runtime) Workflow(ctx context.Context, id SessionID) (WorkflowProjectio
 	return BuildWorkflowProjection(session), nil
 }
 
+func (r *Runtime) persistSessionTombstoneLocked(
+	ctx context.Context,
+	tombstone SessionTombstone,
+) error {
+	if sink, ok := r.deps.Checkpoints.(SessionTombstoneDeletionSink); ok {
+		return sink.HandleSessionTombstone(ctx, tombstone)
+	}
+	if sink, ok := r.deps.Checkpoints.(SessionDeletionSink); ok {
+		return sink.HandleSessionDeleted(ctx, tombstone.SessionID)
+	}
+	return errors.New("Session Runtime checkpoint sink cannot persist tombstones")
+}
+
 func (r *Runtime) admitMessageAttachments(
 	ctx context.Context,
 	sessionID SessionID,
@@ -1545,7 +1557,13 @@ func (r *Runtime) changeSession(
 		return nil, errors.New("command ID is required")
 	}
 	r.mu.Lock()
-	defer r.mu.Unlock()
+	var ready []readyExecutionWork
+	defer func() {
+		r.mu.Unlock()
+		if len(ready) != 0 {
+			r.launchReadyWork(context.WithoutCancel(ctx), id, ready)
+		}
+	}()
 	if r.closed {
 		return nil, ErrRuntimeClosed
 	}
@@ -1570,6 +1588,7 @@ func (r *Runtime) changeSession(
 		*session = previous
 		return nil, err
 	}
+	ready = r.readyWorkForSessionLocked(session)
 	r.armSessionExecutionTimersLocked(ctx, session)
 	r.publishLocked(ctx, session, "", RuntimeEventSessionChanged)
 	return receipt, nil
@@ -1889,7 +1908,9 @@ func (r *Runtime) advanceFrameLocked(
 		}
 		execution.WorkItems = append(execution.WorkItems, item)
 		stored := &execution.WorkItems[len(execution.WorkItems)-1]
-		r.markCompensationIntentLocked(execution, stored)
+		if err := r.markCompensationIntentLocked(execution, stored); err != nil {
+			return err
+		}
 		frame = mutableFrame(execution, frameID)
 		if frame == nil {
 			return errors.New("parent ProgramFrame disappeared while adding work")
@@ -2062,6 +2083,7 @@ func (r *Runtime) dispatchOne(ctx context.Context, sessionID SessionID, executio
 		!r.dispatchAllowedForWorkLocked(*execution, *item) ||
 		(!item.Automatic && !item.Requested) ||
 		(item.Type == WorkItemTypeTool && item.Automatic &&
+			!item.Requested &&
 			automationHoldApplies(execution.Controls.AutomaticTools, item.OriginWorkItemID)) ||
 		unresolvedDependencies(*execution, *item) {
 		r.mu.Unlock()
@@ -2103,11 +2125,6 @@ func (r *Runtime) dispatchOne(ctx context.Context, sessionID SessionID, executio
 		r.mu.Unlock()
 		return
 	}
-	if item.Type == WorkItemTypeEmit {
-		r.mu.Unlock()
-		r.dispatchEmit(ctx, sessionID, executionID, itemID)
-		return
-	}
 	previous := cloneSession(*session)
 	acquired, reason, wakeAt, resourceErr := r.acquireWorkResourcesLocked(
 		execution,
@@ -2143,6 +2160,11 @@ func (r *Runtime) dispatchOne(ctx context.Context, sessionID SessionID, executio
 		r.armResourceWaitLocked(ctx, session.ID, execution.ID, *item)
 		r.publishLocked(ctx, session, execution.ID, RuntimeEventWorkChanged)
 		r.mu.Unlock()
+		return
+	}
+	if item.Type == WorkItemTypeEmit {
+		r.mu.Unlock()
+		r.dispatchEmit(ctx, sessionID, executionID, itemID)
 		return
 	}
 	if err := r.persistLocked(ctx, "resourceAcquired", session); err != nil {
@@ -2214,6 +2236,23 @@ func (r *Runtime) dispatchOne(ctx context.Context, sessionID SessionID, executio
 	item = mutableWorkItem(execution, itemID)
 	if item == nil || item.State != WorkItemStateBinding {
 		return
+	}
+	if bound.BoundToolCall != nil {
+		if item.Input.Tool == nil {
+			now := r.now()
+			item.State = WorkItemStateBlocked
+			item.Error = &SanitizedError{
+				Code:     "bound_tool_payload_missing",
+				Category: ErrorCategoryExecution,
+				Message:  "resolved Tool binding has no Tool WorkItem payload",
+			}
+			item.CompletedAt = &now
+			item.UpdatedAt = now
+			r.touchExecutionLocked(session, execution)
+			_ = r.persistLocked(ctx, "workBindingInvalid", session)
+			return
+		}
+		item.Input.Tool.Call = jsonutil.CloneJSONInValue(*bound.BoundToolCall)
 	}
 	if !r.dispatchAllowedLocked(*execution) {
 		item.State = WorkItemStateReady
@@ -2512,6 +2551,7 @@ func (r *Runtime) startDispatchedLocked(
 		return err
 	}
 	now := r.now()
+
 	attemptDeadlineValue, err := attemptDeadline(*item, now)
 	if err != nil {
 		return err
@@ -2604,23 +2644,39 @@ func (r *Runtime) executeOne(
 		return
 	}
 	item := mutableWorkItem(execution, itemID)
-	if item != nil && item.State == WorkItemStateDispatched &&
-		(execution.Controls.CancellationRequested || execution.State.Terminal() ||
-			(item.Deadline != nil && !r.now().Before(*item.Deadline))) {
+	cleanupDispatch := item != nil &&
+		item.Cleanup &&
+		r.cleanupDispatchAllowedLocked(*execution, *item)
+	if item != nil &&
+		item.State == WorkItemStateDispatched &&
+		((execution.Controls.CancellationRequested && !cleanupDispatch) ||
+			execution.State.Terminal() ||
+			(!item.Cleanup &&
+				item.Deadline != nil &&
+				!r.now().Before(*item.Deadline))) {
 		r.settleUnstartedAttemptLocked(ctx, session, execution, item)
 		r.mu.Unlock()
 		cancel()
 		return
 	}
 	if item == nil || item.State != WorkItemStateDispatched ||
-		execution.Controls.CancellationRequested ||
+		(execution.Controls.CancellationRequested && !cleanupDispatch) ||
 		execution.State.Terminal() {
 		r.mu.Unlock()
 		cancel()
 		return
 	}
 	attempt := activeAttempt(execution, itemID)
-	if attempt != nil && attempt.Deadline != nil {
+	//nolint:gocritic // If else is ok.
+	if item.Cleanup &&
+		execution.Cleanup.Active &&
+		execution.Cleanup.Deadline != nil {
+		cancel()
+		executionCtx, cancel = context.WithDeadline(
+			r.lifecycleCtx,
+			execution.Cleanup.Deadline.UTC(),
+		)
+	} else if attempt != nil && attempt.Deadline != nil {
 		cancel()
 		executionCtx, cancel = context.WithDeadline(
 			r.lifecycleCtx,
@@ -2778,6 +2834,7 @@ func (r *Runtime) finishWorkLocked(
 	}
 
 	if execution.Controls.CancellationRequested &&
+		!item.Cleanup &&
 		(result.Confirmed || item.Effect.Kind == EffectKindRead) {
 		item.State = WorkItemStateCancelled
 		if attempt != nil {
@@ -3160,6 +3217,7 @@ func (r *Runtime) readyWorkLocked(execution Execution) []WorkItemID {
 			r.dispatchAllowedForWorkLocked(execution, item) {
 			if item.Type == WorkItemTypeTool &&
 				item.Automatic &&
+				!item.Requested &&
 				automationHoldApplies(
 					execution.Controls.AutomaticTools,
 					item.OriginWorkItemID,
@@ -3432,6 +3490,13 @@ func (r *Runtime) persistLocked(ctx context.Context, reason string, session *Ses
 		context.WithoutCancel(ctx),
 		CheckpointView{Reason: reason, Session: snapshot, CreatedAt: r.now()},
 	); err != nil {
+		var committed CheckpointCommitStatus
+		if errors.As(err, &committed) &&
+			committed != nil &&
+			committed.CheckpointCommitted() {
+			session.EventSequence = snapshot.EventSequence
+			return nil
+		}
 		return err
 	}
 	session.EventSequence = snapshot.EventSequence
@@ -3511,12 +3576,6 @@ func (r *Runtime) rememberCommandLocked(session *Session, meta CommandMeta, payl
 		session.Commands,
 		CommandRecord{ID: meta.ID, Fingerprint: fingerprint, Receipt: receipt, RecordedAt: r.now()},
 	)
-	if len(session.Commands) > maxDurableCommandRecords {
-		session.Commands = append(
-			[]CommandRecord(nil),
-			session.Commands[len(session.Commands)-maxDurableCommandRecords:]...,
-		)
-	}
 }
 
 func (r *Runtime) rejectLocked(session *Session, meta CommandMeta, payload any, message string) *CommandReceipt {
@@ -3744,6 +3803,9 @@ func (r *Runtime) recoverLocked(session *Session) bool {
 				item.State = WorkItemStateReady
 				item.Requested = false
 				item.UpdatedAt = now
+				if item.Cleanup {
+					item.Requested = true
+				}
 				changed = true
 			case WorkItemStateDispatched:
 				replaySafe := effectReplaySafe(item.Effect)

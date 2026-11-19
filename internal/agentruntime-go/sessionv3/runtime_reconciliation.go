@@ -103,6 +103,27 @@ func (r *Runtime) applyReconciliationSettlementsLocked(
 				attempt,
 				output,
 			)
+			if err := r.deliverWorkPortsLocked(
+				session,
+				execution,
+				item,
+			); err != nil {
+				return nil, err
+			}
+			if err := r.recordConfirmedEffectLocked(
+				execution,
+				item,
+			); err != nil {
+				return nil, err
+			}
+			if item.Output != nil && item.Output.App != nil {
+				r.recordAppInstanceLocked(execution, item)
+			}
+			r.wakeCompletionWorkWaitsLocked(
+				session,
+				execution,
+				*item,
+			)
 
 		case ReconciliationDecisionNotApplied:
 			if r.settleReconciledNotAppliedLocked(

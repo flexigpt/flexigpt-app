@@ -54,7 +54,11 @@ func (r *Runtime) resumeRestoredWork(ctx context.Context) {
 			ctx,
 			session,
 		)
-		if triggerErr == nil && triggerChanged {
+		queueChanged := false
+		if triggerErr == nil {
+			queueChanged = r.drainTriggerQueuesLocked(ctx, session, "")
+		}
+		if triggerErr == nil && (triggerChanged || queueChanged) {
 			if err := r.persistLocked(ctx, "triggerRecovery", session); err != nil {
 				continue
 			}

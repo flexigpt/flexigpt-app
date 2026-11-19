@@ -372,14 +372,33 @@ func compensationRecordsInReverseDependencyOrder(
 func (r *Runtime) markCompensationIntentLocked(
 	execution *Execution,
 	item *WorkItem,
-) {
+) error {
+	if execution == nil || item == nil ||
+		item.Type != WorkItemTypeCompensation {
+		return nil
+	}
+	if item.Input.Compensation == nil {
+		return errors.New("compensation WorkItem has no compensation payload")
+	}
+
 	intent := item.Input.Compensation
 	record := effectRecordByID(execution, intent.EffectID)
+	if record == nil {
+		return fmt.Errorf(
+			"compensation effect record %q is unavailable",
+			intent.EffectID,
+		)
+	}
+	original := mutableWorkItem(execution, record.OriginalWorkItemID)
+	if original == nil {
+		return errors.New("compensation original WorkItem is unavailable")
+	}
+
 	record.State = CompensationStateDispatching
 	record.CompensationWorkItemID = item.ID
-	original := mutableWorkItem(execution, record.OriginalWorkItemID)
 	original.EffectState = EffectStateCompensating
 	original.UpdatedAt = r.now()
+	return nil
 }
 
 func (r *Runtime) applyCompensationSettlementsLocked(

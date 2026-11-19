@@ -300,6 +300,13 @@ func (conversationInterpreter) Advance(frame ProgramFrame, _ Execution, event Pr
 		status := ProgramFrameStateCancelled
 		return ProgramTransition{State: encodeConversationState(state), Status: &status}, nil
 	}
+
+	// A durable Fork records child intent before child materialization. More
+	// user activities can arrive during that boundary, but the conversation
+	// must queue them until the current fork has produced its active child.
+	if frame.Fork != nil {
+		return ProgramTransition{State: encodeConversationState(state)}, nil
+	}
 	if len(state.QueuedActivities) == 0 &&
 		len(state.QueuedActivityIDs) != 0 {
 		for _, id := range state.QueuedActivityIDs {

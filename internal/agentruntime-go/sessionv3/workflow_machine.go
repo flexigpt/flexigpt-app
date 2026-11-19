@@ -63,6 +63,7 @@ type WorkflowMachineProgress struct {
 	Phase              WorkflowMachinePhase    `json:"phase"`
 	SelectedTransition int                     `json:"selectedTransition"`
 	Generation         uint64                  `json:"generation"`
+	WaitSequence       uint64                  `json:"waitSequence"`
 	EnteredAt          time.Time               `json:"enteredAt"`
 	Event              jsonutil.CanonicalValue `json:"event,omitempty"`
 	ChildPath          string                  `json:"childPath,omitempty"`
@@ -746,16 +747,13 @@ func (i *WorkflowInterpreter) armMachineWaits(
 	progress := pending.Machine
 
 	active := make([]WorkflowMachineWait, 0, len(progress.Waits))
+	activeByKey := make(map[string]WorkflowMachineWait, len(progress.Waits))
 	for _, wait := range progress.Waits {
 		item := executionWorkItem(execution, wait.WorkItemID)
 		if item != nil && !item.State.Terminal() {
 			active = append(active, wait)
+			activeByKey[wait.Key] = wait
 		}
-	}
-	if len(active) != 0 {
-		progress.Waits = active
-		progress.Phase = WorkflowMachinePhaseWaiting
-		return workflowTransition(state, nil, nil, nil)
 	}
 	progress.Waits = active
 
@@ -792,6 +790,10 @@ func (i *WorkflowInterpreter) armMachineWaits(
 
 	intents := make([]WorkItemIntent, 0, len(events)+len(timerIndexes))
 	for _, name := range events {
+		key := "event-" + name
+		if _, found := activeByKey[key]; found {
+			continue
+		}
 		subscription, found := workflowSubscriptionForName(
 			state,
 			name,
@@ -803,11 +805,12 @@ func (i *WorkflowInterpreter) armMachineWaits(
 				"workflow machine transition subscription is inactive",
 			)
 		}
-		key := "event-" + name
+		progress.WaitSequence++
 		id := machineWaitWorkItemID(
 			frame.ID,
 			pending.Path,
 			progress.Generation,
+			progress.WaitSequence,
 			key,
 		)
 		progress.Waits = append(progress.Waits, WorkflowMachineWait{
@@ -842,6 +845,10 @@ func (i *WorkflowInterpreter) armMachineWaits(
 
 	for _, index := range timerIndexes {
 		transition := current.Transitions[index]
+		key := "timer-" + strconv.Itoa(index)
+		if _, found := activeByKey[key]; found {
+			continue
+		}
 		fireAt, err := transition.After.Deadline(progress.EnteredAt)
 		if err != nil {
 			return workflowFailure(
@@ -850,11 +857,12 @@ func (i *WorkflowInterpreter) armMachineWaits(
 				err.Error(),
 			)
 		}
-		key := "timer-" + strconv.Itoa(index)
+		progress.WaitSequence++
 		id := machineWaitWorkItemID(
 			frame.ID,
 			pending.Path,
 			progress.Generation,
+			progress.WaitSequence,
 			key,
 		)
 		progress.Waits = append(progress.Waits, WorkflowMachineWait{
@@ -888,11 +896,13 @@ func machineWaitWorkItemID(
 	frameID ProgramFrameID,
 	path string,
 	generation uint64,
+	sequence uint64,
 	key string,
 ) WorkItemID {
 	return WorkItemID(
 		"machine:" + string(frameID) + ":" +
 			path + ":" + strconv.FormatUint(generation, 10) +
+			":" + strconv.FormatUint(sequence, 10) +
 			":" + key,
 	)
 }
@@ -984,7 +994,8 @@ func (i *WorkflowInterpreter) settleMachineWork(
 	}
 
 	// The accepted event was consumed by its subscription. Re-arm this state
-	// for a future event without re-reading the same retained signal.
+	// for a future event without re-reading the same retained signal. Existing timer and subscription waits remain
+	// active. "armMachineWaits" creates a new durable WorkItem identity for only the consumed wait occurrence.
 	progress.Phase = WorkflowMachinePhaseWaiting
 	return true, nil
 }

@@ -68,6 +68,8 @@ type WorkflowWaitFilter struct {
 	State    jsonutil.CanonicalValue `json:"state"`
 	Messages jsonutil.CanonicalValue `json:"messages,omitempty"`
 	Steps    []WorkflowStepOutcome   `json:"steps"`
+	Scope    WorkflowScopeContext    `json:"scope"`
+	Time     time.Time               `json:"time"`
 }
 
 type WorkflowEventWait struct {
@@ -323,6 +325,12 @@ func (f WorkflowWaitFilter) Validate() error {
 			return err
 		}
 	}
+	if err := f.Scope.Validate(); err != nil {
+		return err
+	}
+	if f.Time.IsZero() {
+		return errors.New("workflow wait filter has no logical time")
+	}
 	for _, outcome := range f.Steps {
 		if err := outcome.Validate(); err != nil {
 			return fmt.Errorf("workflow wait filter step outcome: %w", err)
@@ -344,13 +352,17 @@ func (f WorkflowWaitFilter) Matches(event jsonutil.CanonicalValue) (bool, error)
 		return false, err
 	}
 	activationState := WorkflowState{
-		Version:  WorkflowInterpreterVersion,
-		State:    f.State.Clone(),
-		Messages: f.Messages.Clone(),
-		Outcomes: cloneWorkflowStepOutcomes(f.Steps),
+		Version:     WorkflowInterpreterVersion,
+		State:       f.State.Clone(),
+		Messages:    f.Messages.Clone(),
+		Outcomes:    cloneWorkflowStepOutcomes(f.Steps),
+		LogicalTime: f.Time.UTC(),
 	}
 	activation, err := workflowActivation(
-		WorkflowProgram{Input: f.Input.Clone()},
+		WorkflowProgram{
+			Input: f.Input.Clone(),
+			Scope: cloneWorkflowScopeContext(f.Scope),
+		},
 		activationState,
 	)
 	if err != nil {
@@ -586,6 +598,8 @@ func (i *WorkflowInterpreter) workflowWaitFilter(
 		State:    state.State.Clone(),
 		Messages: state.Messages.Clone(),
 		Steps:    cloneWorkflowStepOutcomes(workflowScopeOutcomes(program, state)),
+		Scope:    cloneWorkflowScopeContext(program.Scope),
+		Time:     state.LogicalTime.UTC(),
 	}, nil
 }
 

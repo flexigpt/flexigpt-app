@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"strings"
 	"sync"
@@ -198,20 +199,35 @@ func (s *Store) HandleCheckpoint(_ context.Context, view sessionv3Runtime.Checkp
 	}
 
 	incoming := cloneSession(view.Session)
-	if found && current.Session != nil &&
-		(current.Session.Revision > incoming.Revision ||
-			(current.Session.Revision == incoming.Revision &&
-				!current.Session.UpdatedAt.Before(incoming.UpdatedAt))) {
-		// A later checkpoint is already durable. Rewriting it changes the
-		// document mtime and can regress derived index and FTS ordering even
-		// when semantic Session data remains unchanged.
-		return nil
+	if found && current.Session != nil {
+		switch {
+		case current.Session.Revision > incoming.Revision:
+			return fmt.Errorf(
+				"%w: stored Session revision %d is newer than checkpoint revision %d",
+				ErrInvalidDocument,
+				current.Session.Revision,
+				incoming.Revision,
+			)
+		case current.Session.Revision == incoming.Revision &&
+			current.Session.EventSequence > incoming.EventSequence:
+			return fmt.Errorf(
+				"%w: stored Session sequence %d is newer than checkpoint sequence %d",
+				ErrInvalidDocument,
+				current.Session.EventSequence,
+				incoming.EventSequence,
+			)
+		case reflect.DeepEqual(*current.Session, incoming):
+			return nil
+		}
 	}
 
 	if err := s.writeDocument(incoming); err != nil {
 		return err
 	}
-	return s.writeIndex(incoming)
+	if err := s.writeIndex(incoming); err != nil {
+		return &DerivedIndexError{Cause: err}
+	}
+	return nil
 }
 
 func (s *Store) HandleSessionDeleted(

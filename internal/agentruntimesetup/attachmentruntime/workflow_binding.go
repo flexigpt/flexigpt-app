@@ -7,6 +7,7 @@ import (
 	"time"
 
 	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
+	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/workbinding"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/workflowruntime"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
@@ -25,9 +26,7 @@ type normalizeURLInput struct {
 	URL string `json:"url"`
 }
 
-type normalizeURLServiceBinding struct {
-	workflowruntime.WorkBinding
-}
+type normalizeURLServiceBinding struct{}
 
 type boundNormalizeURL struct {
 	Input normalizeURLInput
@@ -35,7 +34,7 @@ type boundNormalizeURL struct {
 
 // NormalizeURLServiceBinding returns the attachment-domain Workflow binding.
 // Workflow composition registers it, but does not implement URL parsing.
-func NormalizeURLServiceBinding() workflowruntime.WorkBinding {
+func NormalizeURLServiceBinding() workbinding.Binding {
 	return normalizeURLServiceBinding{}
 }
 
@@ -54,7 +53,7 @@ func (normalizeURLServiceBinding) Effect() sessionv3Runtime.EffectContract {
 }
 
 func (normalizeURLServiceBinding) WorkflowPortCapabilities() workflowruntime.WorkBindingPortCapabilities {
-	return workflowruntime.WorkBindingPortCapabilities{
+	return workbinding.PortCapabilities{
 		Context:          false,
 		InputPorts:       false,
 		FinalOutputPorts: true,
@@ -64,23 +63,26 @@ func (normalizeURLServiceBinding) WorkflowPortCapabilities() workflowruntime.Wor
 
 func (normalizeURLServiceBinding) Bind(
 	_ context.Context,
-	request workflowruntime.WorkBindingRequest,
-) (sessionv3Runtime.SemanticBinding, any, error) {
+	request workbinding.Request,
+) (workbinding.BindResult, error) {
 	input, err := decodeNormalizeURLInput(request.Input)
 	if err != nil {
-		return sessionv3Runtime.SemanticBinding{}, nil, err
+		return workbinding.BindResult{}, err
 	}
 
-	return sessionv3Runtime.SemanticBinding{
-		Version:           normalizeURLBindingVersion,
-		TargetFingerprint: normalizeURLBindingFingerprint,
-		BoundAt:           time.Now().UTC(),
-	}, boundNormalizeURL{Input: input}, nil
+	return workbinding.BindResult{
+		SemanticBinding: sessionv3Runtime.SemanticBinding{
+			Version:           normalizeURLBindingVersion,
+			TargetFingerprint: normalizeURLBindingFingerprint,
+			BoundAt:           time.Now().UTC(),
+		},
+		Private: boundNormalizeURL{Input: input},
+	}, nil
 }
 
 func (normalizeURLServiceBinding) Execute(
 	ctx context.Context,
-	_ workflowruntime.WorkBindingRequest,
+	_ workbinding.Request,
 	private any,
 ) (sessionv3Runtime.WorkExecutionResult, error) {
 	bound, found := private.(boundNormalizeURL)
@@ -110,7 +112,7 @@ func (normalizeURLServiceBinding) Execute(
 
 func (normalizeURLServiceBinding) ResolveWait(
 	_ context.Context,
-	_ workflowruntime.WorkBindingWaitRequest,
+	_ workbinding.WaitRequest,
 	_ any,
 ) (sessionv3Runtime.WaitResolutionResult, error) {
 	return sessionv3Runtime.WaitResolutionResult{}, errors.New(

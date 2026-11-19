@@ -88,6 +88,7 @@ func (b *Binder) bindTool(
 		return sessionv3Runtime.BindResult{
 			SemanticBinding: semantic,
 			Private:         boundTool{Call: call},
+			BoundToolCall:   &call,
 		}, nil
 
 	case sessionv3Runtime.ToolBindingKindMCP:
@@ -124,6 +125,7 @@ func (b *Binder) bindTool(
 		return sessionv3Runtime.BindResult{
 			SemanticBinding: semantic,
 			Private:         boundTool{Call: call},
+			BoundToolCall:   &call,
 		}, nil
 
 	case sessionv3Runtime.ToolBindingKindProvider:
@@ -331,5 +333,7 @@ func wrapMCPBindResult(
 			DomainPrivate: result.Private,
 		}
 	}
+	boundCall := call
+	result.BoundToolCall = &boundCall
 	return result, nil
 }

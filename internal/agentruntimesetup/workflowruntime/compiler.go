@@ -525,9 +525,10 @@ func compileWorkflowCall(
 	if len(set.Members) == 0 && set.Resolved == nil {
 		return sessionv3Runtime.WorkflowCall{}, errors.New("workflow target set has no members")
 	}
-	output.AllowedTargetSet = input.Allowed
 	if set.Resolved == nil {
 		output.AllowedTargets = append([]string(nil), set.Members...)
+	} else {
+		output.AllowedTargetSet = input.Allowed
 	}
 	interfaceValue := set.Interface
 	if set.Resolved != nil {

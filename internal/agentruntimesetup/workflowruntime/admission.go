@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
+	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/workbinding"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
@@ -79,59 +80,17 @@ type WorkflowInvocationTargetAdapter interface {
 	) (sessionv3Runtime.ArtifactPin, error)
 }
 
-// WorkBindingRequest is the typed application-domain boundary for a Workflow
-// Service or Activity invocation. Ports are already durable Runtime facts.
-// Stream is process-private and can only emit to declared streamed ports.
-type WorkBindingRequest struct {
-	Input   jsonutil.CanonicalValue
-	Context jsonutil.CanonicalValue
-	Ports   []sessionv3Runtime.PortInput
-	Stream  sessionv3Runtime.WorkPortStream
-}
-
-// WorkBindingWaitRequest is the typed domain boundary for a Service or
-// Activity wait resolution. It contains no Runtime private handles.
-type WorkBindingWaitRequest struct {
-	Wait       sessionv3Runtime.Wait
-	Resolution sessionv3Runtime.WaitResolution
-	Response   jsonutil.CanonicalValue
-	Input      jsonutil.CanonicalValue
-	Context    jsonutil.CanonicalValue
-	Ports      []sessionv3Runtime.PortInput
-}
-
-// WorkBinding is an application-owned Service or Activity runtime binding.
-// Artifact Workflow declarations only persist its stable ID and version.
-type WorkBinding interface {
-	ID() string
-	Version() string
-	Effect() sessionv3Runtime.EffectContract
-	Bind(
-		ctx context.Context,
-		request WorkBindingRequest,
-	) (sessionv3Runtime.SemanticBinding, any, error)
-	Execute(
-		ctx context.Context,
-		request WorkBindingRequest,
-		state any,
-	) (sessionv3Runtime.WorkExecutionResult, error)
-	ResolveWait(
-		ctx context.Context,
-		request WorkBindingWaitRequest,
-		state any,
-	) (sessionv3Runtime.WaitResolutionResult, error)
-}
-
-type WorkBindingPortCapabilities struct {
-	Context          bool
-	InputPorts       bool
-	FinalOutputPorts bool
-	OutputStream     bool
-}
-
-type WorkBindingPortCapability interface {
-	WorkflowPortCapabilities() WorkBindingPortCapabilities
-}
+// Registered binding contracts are runtime-neutral. They are aliases here so
+// existing setup composition can register domains without making domains
+// import this Artifact-planning package.
+type (
+	WorkBinding                 = workbinding.Binding
+	WorkBindingRequest          = workbinding.Request
+	WorkBindingWaitRequest      = workbinding.WaitRequest
+	WorkBindingBindResult       = workbinding.BindResult
+	WorkBindingPortCapabilities = workbinding.PortCapabilities
+	WorkBindingPortCapability   = workbinding.PortCapability
+)
 
 type BindingRegistry struct {
 	mu       sync.RWMutex

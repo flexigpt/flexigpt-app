@@ -179,10 +179,11 @@ func (i *WorkflowInterpreter) startSaga(
 
 	bodyPath := path + "/saga/body"
 	state.Pending = &WorkflowPending{
-		Kind:   WorkflowPendingSaga,
-		StepID: step.ID,
-		Path:   path,
-		Claims: claims,
+		Kind:       WorkflowPendingSaga,
+		StepID:     step.ID,
+		Path:       path,
+		MergeState: step.Saga.Do.State == nil,
+		Claims:     claims,
 		Children: []WorkflowChild{{
 			Name:  "body",
 			Path:  bodyPath,

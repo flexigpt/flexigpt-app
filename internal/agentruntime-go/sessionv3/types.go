@@ -172,6 +172,7 @@ type ArtifactSelection struct {
 type ToolSelection struct {
 	Artifact      ArtifactSelection       `json:"artifact"`
 	UserArguments jsonutil.CanonicalValue `json:"userArguments,omitempty"`
+	AutoExecute   *bool                   `json:"autoExecute,omitempty"`
 }
 
 type ArtifactPin struct {
@@ -258,6 +259,7 @@ type MessageActivity struct {
 	Role               MessageRole             `json:"role"`
 	Status             string                  `json:"status,omitempty"`
 	Text               string                  `json:"text,omitempty"`
+	ConversationID     string                  `json:"conversationID,omitempty"`
 	Attachments        []Attachment            `json:"attachments,omitempty"`
 	ToolResults        []ToolResultActivity    `json:"toolResults,omitempty"`
 	AppContext         []AppContextUpdate      `json:"appContext,omitempty"`
@@ -1336,6 +1338,7 @@ type ContinuationInput struct {
 	Revision           Revision                `json:"revision"`
 	ConsumedRevision   Revision                `json:"consumedRevision,omitempty"`
 	Text               string                  `json:"text,omitempty"`
+	ConversationID     string                  `json:"conversationID,omitempty"`
 	Attachments        []Attachment            `json:"attachments,omitempty"`
 	AppContext         []AppContextUpdate      `json:"appContext,omitempty"`
 	Metadata           jsonutil.CanonicalValue `json:"metadata,omitempty"`
@@ -1624,7 +1627,8 @@ type BindResult struct {
 	SemanticBinding SemanticBinding
 	Wait            *WaitRequest
 	ImmediateOutput *WorkItemOutput
-	Private         any `json:"-"`
+	BoundToolCall   *ToolCall `json:"-"`
+	Private         any       `json:"-"`
 }
 
 type BoundWork struct {
@@ -1717,6 +1721,13 @@ type CheckpointView struct {
 
 type CheckpointSink interface {
 	HandleCheckpoint(ctx context.Context, checkpoint CheckpointView) error
+}
+
+// CheckpointCommitStatus permits a Store to report that the semantic document
+// was committed even though a derived read model could not be updated. Runtime
+// advances its durable event sequence only when this method returns true.
+type CheckpointCommitStatus interface {
+	CheckpointCommitted() bool
 }
 
 type SessionDeletionSink interface {
@@ -1892,6 +1903,7 @@ type SignalExecutionCommand struct {
 
 type MessageInput struct {
 	Text              string                   `json:"text,omitempty"`
+	ConversationID    string                   `json:"conversationID,omitempty"`
 	Attachments       []Attachment             `json:"attachments,omitempty"`
 	AttachmentSources []AttachmentSource       `json:"attachmentSources,omitempty"`
 	Metadata          jsonutil.CanonicalValue  `json:"metadata,omitempty"`

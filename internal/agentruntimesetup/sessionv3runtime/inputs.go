@@ -50,6 +50,7 @@ func (b *Binder) buildInputs(
 		}
 		inputs = append(inputs, value...)
 		for _, item := range completedToolResultItemsForAssistant(
+			req.Session,
 			execution,
 			activity,
 		) {
@@ -77,6 +78,22 @@ func (b *Binder) buildInputs(
 				))
 			}
 			contextInserted = true
+		}
+		if activity.ID != payload.InputActivityID {
+			contextValues, contextErr := durableActivityContext(
+				req.Session,
+				activity,
+			)
+			if contextErr != nil {
+				return nil, contextErr
+			}
+			for index, value := range contextValues {
+				inputs = append(inputs, injectedContextInput(
+					activity.ID,
+					index,
+					value,
+				))
+			}
 		}
 		if err := appendActivity(activity); err != nil {
 			return nil, err
@@ -140,6 +157,16 @@ func llmInputActivitySequence(
 			}
 			output = append(output, *activity)
 		}
+		for _, activity := range session.Timeline[currentIndex+1:] {
+			if activity.Kind != sessionv3Runtime.ActivityKindMessage ||
+				activity.Message == nil ||
+				activity.Message.Role != sessionv3Runtime.MessageRoleAssistant ||
+				activity.ExecutionID != execution.ID ||
+				activity.FrameID != workItem.FrameID {
+				continue
+			}
+			output = append(output, activity)
+		}
 		return append(output, current), nil
 	}
 
@@ -167,31 +194,64 @@ func selectHistory(
 	currentIndex int,
 	selection sessionv3Runtime.HistorySelection,
 ) []sessionv3Runtime.Activity {
+	if currentIndex <= 0 {
+		return nil
+	}
+
+	if !selection.All && selection.IncludePreviousUserTurns == 0 {
+		return durableSystemHistory(session.Timeline[:currentIndex])
+	}
+
 	reversed := make([]sessionv3Runtime.Activity, 0)
 	countUser := 0
+	start := currentIndex
 	for _, activity := range slices.Backward(session.Timeline[:currentIndex]) {
 		if activity.Kind != sessionv3Runtime.ActivityKindMessage ||
-			activity.Message == nil {
+			activity.Message == nil ||
+			activity.Visibility == sessionv3Runtime.ActivityVisibilityAudit {
 			continue
 		}
 		reversed = append(reversed, activity)
+		start--
 		if activity.Message.Role == sessionv3Runtime.MessageRoleUser {
 			countUser++
 		}
 		if !selection.All &&
-			countUser > selection.IncludePreviousUserTurns {
+			countUser >= selection.IncludePreviousUserTurns {
 			break
 		}
 	}
 
-	output := make([]sessionv3Runtime.Activity, len(reversed))
+	output := durableSystemHistory(session.Timeline[:max(start, 0)])
+	output = append(output, make([]sessionv3Runtime.Activity, len(reversed))...)
 	for index := range reversed {
-		output[len(reversed)-1-index] = reversed[index]
+		output[len(output)-1-index] = reversed[index]
+	}
+	return output
+}
+
+func durableSystemHistory(
+	activities []sessionv3Runtime.Activity,
+) []sessionv3Runtime.Activity {
+	output := make([]sessionv3Runtime.Activity, 0)
+	for _, activity := range activities {
+		if activity.Kind != sessionv3Runtime.ActivityKindMessage ||
+			activity.Message == nil ||
+			activity.Visibility == sessionv3Runtime.ActivityVisibilityAudit {
+			continue
+		}
+		switch activity.Message.Role {
+		case sessionv3Runtime.MessageRoleSystem,
+			sessionv3Runtime.MessageRoleDeveloper:
+			output = append(output, activity)
+		default:
+		}
 	}
 	return output
 }
 
 func completedToolResultItemsForAssistant(
+	session sessionv3Runtime.Session,
 	execution sessionv3Runtime.Execution,
 	activity sessionv3Runtime.Activity,
 ) []sessionv3Runtime.WorkItem {
@@ -201,7 +261,14 @@ func completedToolResultItemsForAssistant(
 		activity.WorkItemID == "" {
 		return nil
 	}
-	return completedToolResultItemsForOrigin(execution, activity.WorkItemID)
+	owner := execution
+	for _, candidate := range session.Executions {
+		if candidate.ID == activity.ExecutionID {
+			owner = candidate
+			break
+		}
+	}
+	return completedToolResultItemsForOrigin(owner, activity.WorkItemID)
 }
 
 func completedToolResultItemsForOrigin(
@@ -315,6 +382,42 @@ func findSessionWorkItem(
 		}
 	}
 	return nil
+}
+
+func durableActivityContext(
+	session sessionv3Runtime.Session,
+	activity sessionv3Runtime.Activity,
+) ([]string, error) {
+	if activity.Kind != sessionv3Runtime.ActivityKindMessage ||
+		activity.Message == nil ||
+		activity.Message.Role != sessionv3Runtime.MessageRoleUser {
+		return nil, nil
+	}
+
+	for _, execution := range session.Executions {
+		for _, item := range execution.WorkItems {
+			if item.Type != sessionv3Runtime.WorkItemTypeLLM ||
+				item.Input.LLM == nil ||
+				item.Input.LLM.InputActivityID != activity.ID ||
+				item.Binding == nil ||
+				item.Binding.Plan == nil {
+				continue
+			}
+			values := make([]string, 0, len(item.Binding.Plan.Context))
+			for _, value := range item.Binding.Plan.Context {
+				text, err := jsonutil.DecodeCanonicalValue[string](value.Value)
+				if err != nil {
+					text = string(value.Value)
+				}
+				text = strings.TrimSpace(text)
+				if text != "" {
+					values = append(values, text)
+				}
+			}
+			return values, nil
+		}
+	}
+	return nil, nil
 }
 
 func durableActivityInputs(

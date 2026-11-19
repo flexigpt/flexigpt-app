@@ -39,20 +39,21 @@ const (
 type TriggerOccurrenceState string
 
 type TriggerRegistration struct {
-	ID                  TriggerID                `json:"id"`
-	Workflow            ArtifactPin              `json:"workflow"`
-	Program             ProgramSnapshot          `json:"program"`
-	TriggerName         string                   `json:"triggerName"`
-	Kind                WorkflowTriggerKind      `json:"kind"`
-	State               TriggerRegistrationState `json:"state"`
-	NextOccurrence      *time.Time               `json:"nextOccurrence,omitempty"`
-	LastOccurrence      *time.Time               `json:"lastOccurrence,omitempty"`
-	LastLocalOccurrence string                   `json:"lastLocalOccurrence,omitempty"`
-	NextLocalOccurrence string                   `json:"nextLocalOccurrence,omitempty"`
-	Occurrences         []TriggerOccurrence      `json:"occurrences,omitempty"`
-	Queue               []TriggerOccurrenceID    `json:"queue,omitempty"`
-	CreatedAt           time.Time                `json:"createdAt"`
-	UpdatedAt           time.Time                `json:"updatedAt"`
+	ID                   TriggerID                `json:"id"`
+	Workflow             ArtifactPin              `json:"workflow"`
+	Program              ProgramSnapshot          `json:"program"`
+	TriggerName          string                   `json:"triggerName"`
+	Kind                 WorkflowTriggerKind      `json:"kind"`
+	State                TriggerRegistrationState `json:"state"`
+	NextOccurrence       *time.Time               `json:"nextOccurrence,omitempty"`
+	LastOccurrence       *time.Time               `json:"lastOccurrence,omitempty"`
+	LastLocalOccurrence  string                   `json:"lastLocalOccurrence,omitempty"`
+	NextLocalOccurrence  string                   `json:"nextLocalOccurrence,omitempty"`
+	LocalOccurrenceSlots []string                 `json:"localOccurrenceSlots,omitempty"`
+	Occurrences          []TriggerOccurrence      `json:"occurrences,omitempty"`
+	Queue                []TriggerOccurrenceID    `json:"queue,omitempty"`
+	CreatedAt            time.Time                `json:"createdAt"`
+	UpdatedAt            time.Time                `json:"updatedAt"`
 }
 
 type TriggerOccurrence struct {
@@ -81,7 +82,7 @@ type TriggerExecution struct {
 	OccurredAt     time.Time           `json:"occurredAt"`
 }
 
-func (r TriggerRegistration) Validate() error {
+func (r *TriggerRegistration) Validate() error {
 	if err := validateID("trigger registration ID", string(r.ID)); err != nil {
 		return err
 	}
@@ -117,6 +118,16 @@ func (r TriggerRegistration) Validate() error {
 	if r.LastOccurrence != nil && r.LastOccurrence.IsZero() {
 		return errors.New("trigger registration last occurrence is invalid")
 	}
+	seenSlots := make(map[string]struct{}, len(r.LocalOccurrenceSlots))
+	for _, slot := range r.LocalOccurrenceSlots {
+		if strings.TrimSpace(slot) == "" {
+			return errors.New("trigger registration local occurrence is invalid")
+		}
+		if _, duplicate := seenSlots[slot]; duplicate {
+			return errors.New("trigger registration local occurrence is duplicated")
+		}
+		seenSlots[slot] = struct{}{}
+	}
 
 	program, err := workflowProgramFromSnapshot(r.Program)
 	if err != nil {
@@ -143,7 +154,7 @@ func (r TriggerRegistration) Validate() error {
 			return errors.New("trigger queue identity is duplicated")
 		}
 		queued[id] = struct{}{}
-		occurrence, found := triggerOccurrenceByID(r, id)
+		occurrence, found := triggerOccurrenceByID(*r, id)
 		if !found || occurrence.State != triggerOccurrenceStateQueued {
 			return errors.New("trigger queue contains a non-queued occurrence")
 		}
@@ -356,7 +367,7 @@ func (r *Runtime) registerWorkflowTriggersLocked(
 			next, local, nextErr := workflowTriggerNextOccurrence(
 				*trigger.Schedule,
 				now,
-				"",
+				nil,
 			)
 			if nextErr != nil {
 				return nextErr
@@ -1205,11 +1216,12 @@ func (r *Runtime) drainTriggerQueuesLocked(
 	ctx context.Context,
 	session *Session,
 	terminalExecutionID ExecutionID,
-) {
+) bool {
 	_ = terminalExecutionID
-	if session == nil || terminalExecutionID == "" {
-		return
+	if session == nil {
+		return false
 	}
+	changed := false
 	for index := range session.Triggers {
 		registration := &session.Triggers[index]
 		if len(registration.Queue) == 0 ||
@@ -1219,6 +1231,7 @@ func (r *Runtime) drainTriggerQueuesLocked(
 
 		queued := append([]TriggerOccurrenceID(nil), registration.Queue...)
 		registration.Queue = registration.Queue[:0]
+		changed = true
 		for _, nextID := range queued {
 			occurrence := mutableTriggerOccurrence(registration, nextID)
 			if occurrence == nil || occurrence.State != triggerOccurrenceStateQueued {
@@ -1245,6 +1258,7 @@ func (r *Runtime) drainTriggerQueuesLocked(
 				}
 			}
 			registration.UpdatedAt = r.now()
+			changed = true
 		}
 		for queueIndex, occurrenceID := range registration.Queue {
 			occurrence := mutableTriggerOccurrence(registration, occurrenceID)
@@ -1253,6 +1267,7 @@ func (r *Runtime) drainTriggerQueuesLocked(
 			}
 		}
 	}
+	return changed
 }
 
 func (r *Runtime) recoverSessionTriggersLocked(
@@ -1370,10 +1385,11 @@ func advanceWorkflowTriggerSchedule(
 	if err != nil {
 		return err
 	}
+	registration.rememberLocalOccurrence(firedLocal)
 	next, nextLocal, err := workflowTriggerNextOccurrence(
 		schedule,
 		at,
-		firedLocal,
+		registration.localOccurrenceSet(),
 	)
 	if err != nil {
 		return err
@@ -1406,7 +1422,7 @@ func workflowTriggerLocalOccurrence(
 func workflowTriggerNextOccurrence(
 	schedule WorkflowScheduleTrigger,
 	after time.Time,
-	lastLocal string,
+	seenLocal map[string]struct{},
 ) (time.Time, string, error) {
 	if schedule.Interval != "" {
 		next, err := schedule.Interval.Deadline(after.UTC())
@@ -1425,13 +1441,55 @@ func workflowTriggerNextOccurrence(
 		local := cursor.In(location)
 		if cron.matches(local) {
 			localKey := local.Format(workflowLocalOccurrenceLayout)
-			if localKey != lastLocal {
+			if _, found := seenLocal[localKey]; !found {
 				return cursor.UTC(), localKey, nil
 			}
 		}
 		cursor = cursor.Add(time.Minute)
 	}
 	return time.Time{}, "", errors.New("workflow calendar trigger has no occurrence in the supported search horizon")
+}
+
+func (r *TriggerRegistration) localOccurrenceSet() map[string]struct{} {
+	output := make(map[string]struct{}, len(r.LocalOccurrenceSlots))
+	if r == nil {
+		return output
+	}
+	for _, value := range r.LocalOccurrenceSlots {
+		output[value] = struct{}{}
+	}
+	return output
+}
+
+func (r *TriggerRegistration) rememberLocalOccurrence(value string) {
+	if r == nil || value == "" {
+		return
+	}
+
+	// A repeated local timestamp can occur only on the same local calendar
+	// day. Retaining that day's full slot set prevents every-minute schedules
+	// from replaying an earlier fallback-hour slot, while keeping the durable
+	// registration bounded across an indefinitely running schedule.
+	day := value
+	if len(day) >= len("2006-01-02") {
+		day = day[:len("2006-01-02")]
+	}
+	next := make([]string, 0, len(r.LocalOccurrenceSlots)+1)
+	seen := make(map[string]struct{}, len(r.LocalOccurrenceSlots)+1)
+	for _, current := range r.LocalOccurrenceSlots {
+		if len(current) < len(day) || current[:len(day)] != day {
+			continue
+		}
+		if _, duplicate := seen[current]; duplicate {
+			continue
+		}
+		seen[current] = struct{}{}
+		next = append(next, current)
+	}
+	if _, found := seen[value]; !found {
+		next = append(next, value)
+	}
+	r.LocalOccurrenceSlots = next
 }
 
 type workflowCronField struct {

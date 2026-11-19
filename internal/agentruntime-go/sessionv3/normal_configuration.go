@@ -184,6 +184,10 @@ func cloneToolSelection(
 ) ToolSelection {
 	output := value
 	output.UserArguments = value.UserArguments.Clone()
+	if value.AutoExecute != nil {
+		autoExecute := *value.AutoExecute
+		output.AutoExecute = &autoExecute
+	}
 	return output
 }
 

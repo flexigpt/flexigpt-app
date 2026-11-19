@@ -271,6 +271,23 @@ func (i *WorkflowInterpreter) prepareWorkflowTerminal(
 		Value:  transition.Output.Clone(),
 		Error:  cloneWorkflowSanitizedError(transition.Error),
 	}
+	if program.Scope.Child &&
+		terminal.Status == ProgramFrameStateCompleted {
+		result, resultErr := jsonutil.DecodeCanonicalValue[WorkflowBlockResult](
+			transition.Output,
+		)
+		if resultErr != nil {
+			return ProgramTransition{}, fmt.Errorf(
+				"decode completed child workflow result: %w",
+				resultErr,
+			)
+		}
+		if resultErr := result.Validate(); resultErr != nil {
+			return ProgramTransition{}, resultErr
+		}
+		terminal.Exit = result.Exit
+		terminal.Value = result.Value.Clone()
+	}
 	if terminal.Status != ProgramFrameStateCompleted {
 		terminal.Error = workflowTerminalFailure(
 			terminal.Status,
@@ -487,6 +504,7 @@ func (i *WorkflowInterpreter) advanceWorkflowTerminal(
 		return i.settleWorkflowFinally(
 			program,
 			state,
+			result,
 			childErr,
 		)
 
@@ -565,6 +583,7 @@ func (i *WorkflowInterpreter) settleWorkflowCatch(
 func (i *WorkflowInterpreter) settleWorkflowFinally(
 	program WorkflowProgram,
 	state WorkflowState,
+	result WorkflowBlockResult,
 	childErr *SanitizedError,
 ) (ProgramTransition, error) {
 	if state.Terminal == nil {
@@ -574,6 +593,16 @@ func (i *WorkflowInterpreter) settleWorkflowFinally(
 	}
 
 	if childErr == nil {
+		if state.Terminal.MergeState {
+			switch result.Exit {
+			case WorkflowExitNormal, WorkflowExitReturnBlock:
+				state.State = result.State.Clone()
+			default:
+				return ProgramTransition{}, errors.New(
+					"workflow finally block returned unsupported control flow",
+				)
+			}
+		}
 		return i.finishWorkflowTerminal(program, state)
 	}
 

@@ -629,41 +629,18 @@ func (i *WorkflowInterpreter) childBlockProgram(
 	index *int,
 	result *jsonutil.CanonicalValue,
 ) (ProgramSnapshot, error) {
-	owner, err := workflowStateOwnerForFrame(frame, program)
-	if err != nil {
-		return ProgramSnapshot{}, err
-	}
-
-	child := program
-	child.Root = block
-	child.Scope = WorkflowScopeContext{
-		Child:              true,
-		MergeState:         mergeState,
-		OuterState:         state.State.Clone(),
-		OuterOutcomes:      workflowScopeOutcomes(program, state),
-		StateOwner:         owner,
-		OuterSubscriptions: cloneWorkflowSubscriptionStates(state.Subscriptions),
-		Context:            cloneWorkflowCanonicalPointer(program.Scope.Context),
-		Item:               item,
-		Index:              index,
-		Result:             result,
-		Cleanup:            program.Scope.Cleanup,
-	}
-	child.Input = program.Input.Clone()
-	child.InputBound = true
-
-	if err := child.Validate(); err != nil {
-		return ProgramSnapshot{}, err
-	}
-
-	payload, err := canonicalWorkflowValue(child)
-	if err != nil {
-		return ProgramSnapshot{}, err
-	}
-
-	snapshot := frame.Program
-	snapshot.Payload = payload
-	return snapshot, nil
+	return i.childBlockProgramWithScope(
+		frame,
+		program,
+		state,
+		block,
+		mergeState,
+		WorkflowScopeContext{
+			Item:   cloneWorkflowCanonicalPointer(item),
+			Index:  cloneWorkflowIndex(index),
+			Result: cloneWorkflowCanonicalPointer(result),
+		},
+	)
 }
 
 func (i *WorkflowInterpreter) startSingleChild(
@@ -1520,6 +1497,7 @@ func (i *WorkflowInterpreter) settleSingleStructuredChild(
 		state.Exit = result.Exit
 		state.ExitValue = result.Value.Clone()
 		state.Pending = nil
+		state.clearPendingStep()
 		return nil
 	case WorkflowExitNormal, WorkflowExitReturnBlock:
 	default:
@@ -2140,6 +2118,10 @@ func (i *WorkflowInterpreter) settleRepeatChild(
 	}
 
 	result := *child.Result
+	step, err := workflowStepForPath(program.Root, pending.Path)
+	if err != nil || step.Repeat == nil {
+		return errors.New("Workflow repeat step is unavailable")
+	}
 	switch result.Exit {
 	case WorkflowExitReturnWorkflow:
 		state.Exit = WorkflowExitReturnWorkflow
@@ -2149,10 +2131,11 @@ func (i *WorkflowInterpreter) settleRepeatChild(
 		return nil
 
 	case WorkflowExitBreak:
-		step, err := workflowStepForPath(program.Root, pending.Path)
-		if err != nil {
-			return err
+
+		if step.Repeat.Do.State == nil {
+			progress.State = result.State.Clone()
 		}
+
 		progress.Result = result.Value.Clone()
 		progress.Iterations++
 		return i.finishRepeat(state, program, step)
@@ -2167,10 +2150,6 @@ func (i *WorkflowInterpreter) settleRepeatChild(
 	progress.Result = result.Value.Clone()
 	progress.Iterations++
 
-	step, err := workflowStepForPath(program.Root, pending.Path)
-	if err != nil || step.Repeat == nil {
-		return errors.New("Workflow repeat step is unavailable")
-	}
 	if step.Repeat.Do.State == nil {
 		// The body inherits the repeat carried state when it has no local
 		// state declaration. Its completed state is the next iteration's
@@ -2319,31 +2298,19 @@ func (i *WorkflowInterpreter) childBlockProgramWithScope(
 	mergeState bool,
 	scope WorkflowScopeContext,
 ) (ProgramSnapshot, error) {
-	scope.Child = true
-	scope.MergeState = mergeState
-	scope.Cleanup = scope.Cleanup || program.Scope.Cleanup
-	if scope.Context == nil {
-		scope.Context = cloneWorkflowCanonicalPointer(program.Scope.Context)
+	inherited, err := workflowInheritedChildScope(
+		frame,
+		program,
+		state,
+		mergeState,
+		scope,
+	)
+	if err != nil {
+		return ProgramSnapshot{}, err
 	}
-	if len(scope.OuterState) == 0 {
-		scope.OuterState = state.State.Clone()
-	}
-	if scope.StateOwner == nil {
-		owner, err := workflowStateOwnerForFrame(frame, program)
-		if err != nil {
-			return ProgramSnapshot{}, err
-		}
-		scope.StateOwner = owner
-	}
-	scope.OuterOutcomes = workflowScopeOutcomes(program, state)
-	if state.Saga != nil && scope.Saga == nil {
-		value := *state.Saga
-		scope.Saga = &value
-	}
-	scope.OuterSubscriptions = cloneWorkflowSubscriptionStates(state.Subscriptions)
 	child := program
 	child.Root = block
-	child.Scope = scope
+	child.Scope = inherited
 	child.Input = program.Input.Clone()
 	child.InputBound = true
 	if err := child.Validate(); err != nil {
@@ -2356,6 +2323,143 @@ func (i *WorkflowInterpreter) childBlockProgramWithScope(
 	snapshot := frame.Program
 	snapshot.Payload = payload
 	return snapshot, nil
+}
+
+func workflowInheritedChildScope(
+	frame ProgramFrame,
+	program WorkflowProgram,
+	state WorkflowState,
+	mergeState bool,
+	override WorkflowScopeContext,
+) (WorkflowScopeContext, error) {
+	owner, err := workflowStateOwnerForFrame(frame, program)
+	if err != nil {
+		return WorkflowScopeContext{}, err
+	}
+
+	parent := cloneWorkflowScopeContext(program.Scope)
+	output := WorkflowScopeContext{
+		Child:              true,
+		MergeState:         mergeState,
+		OuterState:         state.State.Clone(),
+		StateOwner:         owner,
+		TargetSets:         cloneWorkflowTargetSetStates(state.TargetSets),
+		OuterOutcomes:      workflowScopeOutcomes(program, state),
+		OuterSubscriptions: cloneWorkflowSubscriptionStates(state.Subscriptions),
+		Context:            cloneWorkflowCanonicalPointer(parent.Context),
+		Item:               cloneWorkflowCanonicalPointer(parent.Item),
+		Index:              cloneWorkflowIndex(parent.Index),
+		Result:             cloneWorkflowCanonicalPointer(parent.Result),
+		Event:              cloneWorkflowCanonicalPointer(parent.Event),
+		Error:              cloneWorkflowCanonicalPointer(parent.Error),
+		Outcome:            cloneWorkflowCanonicalPointer(parent.Outcome),
+		Operation:          cloneWorkflowCanonicalPointer(parent.Operation),
+		Completed:          cloneWorkflowCanonicalPointer(parent.Completed),
+		Ports:              clonePortInputs(parent.Ports),
+		Saga:               cloneWorkflowSagaScope(parent.Saga),
+		Cleanup:            parent.Cleanup,
+	}
+
+	if len(override.OuterState) != 0 {
+		output.OuterState = override.OuterState.Clone()
+	}
+	if override.StateOwner != nil {
+		output.StateOwner = cloneWorkflowStateOwner(override.StateOwner)
+	}
+	if len(override.TargetSets) != 0 {
+		output.TargetSets = cloneWorkflowTargetSetStates(override.TargetSets)
+	}
+	if override.Context != nil {
+		output.Context = cloneWorkflowCanonicalPointer(override.Context)
+	}
+	if override.Item != nil {
+		output.Item = cloneWorkflowCanonicalPointer(override.Item)
+	}
+	if override.Index != nil {
+		output.Index = cloneWorkflowIndex(override.Index)
+	}
+	if override.Result != nil {
+		output.Result = cloneWorkflowCanonicalPointer(override.Result)
+	}
+	if override.Event != nil {
+		output.Event = cloneWorkflowCanonicalPointer(override.Event)
+	}
+	if override.Error != nil {
+		output.Error = cloneWorkflowCanonicalPointer(override.Error)
+	}
+	if override.Outcome != nil {
+		output.Outcome = cloneWorkflowCanonicalPointer(override.Outcome)
+	}
+	if override.Operation != nil {
+		output.Operation = cloneWorkflowCanonicalPointer(override.Operation)
+	}
+	if override.Completed != nil {
+		output.Completed = cloneWorkflowCanonicalPointer(override.Completed)
+	}
+	if len(override.Ports) != 0 {
+		output.Ports = clonePortInputs(override.Ports)
+	}
+	if override.Saga != nil {
+		output.Saga = cloneWorkflowSagaScope(override.Saga)
+	}
+	output.Cleanup = output.Cleanup || override.Cleanup
+	return output, output.Validate()
+}
+
+func cloneWorkflowScopeContext(value WorkflowScopeContext) WorkflowScopeContext {
+	output := value
+	output.OuterState = value.OuterState.Clone()
+	output.StateOwner = cloneWorkflowStateOwner(value.StateOwner)
+	output.TargetSets = cloneWorkflowTargetSetStates(value.TargetSets)
+	output.OuterOutcomes = cloneWorkflowStepOutcomes(value.OuterOutcomes)
+	output.OuterSubscriptions = cloneWorkflowSubscriptionStates(value.OuterSubscriptions)
+	output.Context = cloneWorkflowCanonicalPointer(value.Context)
+	output.Item = cloneWorkflowCanonicalPointer(value.Item)
+	output.Index = cloneWorkflowIndex(value.Index)
+	output.Result = cloneWorkflowCanonicalPointer(value.Result)
+	output.Event = cloneWorkflowCanonicalPointer(value.Event)
+	output.Error = cloneWorkflowCanonicalPointer(value.Error)
+	output.Outcome = cloneWorkflowCanonicalPointer(value.Outcome)
+	output.Operation = cloneWorkflowCanonicalPointer(value.Operation)
+	output.Completed = cloneWorkflowCanonicalPointer(value.Completed)
+	output.Ports = clonePortInputs(value.Ports)
+	output.Saga = cloneWorkflowSagaScope(value.Saga)
+	return output
+}
+
+func cloneWorkflowTargetSetStates(
+	values []WorkflowTargetSetState,
+) []WorkflowTargetSetState {
+	if len(values) == 0 {
+		return nil
+	}
+	output := make([]WorkflowTargetSetState, len(values))
+	for index := range values {
+		output[index] = values[index]
+		output[index].Members = append(
+			[]string(nil),
+			values[index].Members...,
+		)
+	}
+	return output
+}
+
+func cloneWorkflowIndex(value *int) *int {
+	if value == nil {
+		return nil
+	}
+	output := *value
+	return &output
+}
+
+func cloneWorkflowSagaScope(
+	value *WorkflowSagaScope,
+) *WorkflowSagaScope {
+	if value == nil {
+		return nil
+	}
+	output := *value
+	return &output
 }
 
 func (c WorkflowChoose) Validate() error {

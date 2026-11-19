@@ -24,7 +24,8 @@ func (i *WorkflowInterpreter) startWorkflowRetry(
 	childStep.Claims = nil
 
 	childBlock := WorkflowBlock{
-		Steps: []WorkflowStep{childStep},
+		DeclarationPath: step.DeclarationPath,
+		Steps:           []WorkflowStep{childStep},
 		Output: WorkflowValue{
 			Kind: WorkflowValueExpression,
 			Expression: "steps[" +

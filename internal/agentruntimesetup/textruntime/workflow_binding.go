@@ -7,6 +7,7 @@ import (
 	"time"
 
 	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
+	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/workbinding"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/workflowruntime"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
@@ -24,9 +25,7 @@ const (
 	applyUnifiedDiffMissingOutputCode  = "apply_unified_diff_missing_output"
 )
 
-type applyUnifiedDiffActivityBinding struct {
-	workflowruntime.WorkBinding
-}
+type applyUnifiedDiffActivityBinding struct{}
 
 type boundApplyUnifiedDiff struct {
 	Input texttool.ApplyUnifiedDiffArgs
@@ -34,7 +33,7 @@ type boundApplyUnifiedDiff struct {
 
 // ApplyUnifiedDiffActivityBinding returns the text-domain Workflow binding.
 // Workflow composition registers it, but does not own diff behavior.
-func ApplyUnifiedDiffActivityBinding() workflowruntime.WorkBinding {
+func ApplyUnifiedDiffActivityBinding() workbinding.Binding {
 	return applyUnifiedDiffActivityBinding{}
 }
 
@@ -53,7 +52,7 @@ func (applyUnifiedDiffActivityBinding) Effect() sessionv3Runtime.EffectContract 
 }
 
 func (applyUnifiedDiffActivityBinding) WorkflowPortCapabilities() workflowruntime.WorkBindingPortCapabilities {
-	return workflowruntime.WorkBindingPortCapabilities{
+	return workbinding.PortCapabilities{
 		Context:          false,
 		InputPorts:       false,
 		FinalOutputPorts: true,
@@ -63,25 +62,28 @@ func (applyUnifiedDiffActivityBinding) WorkflowPortCapabilities() workflowruntim
 
 func (applyUnifiedDiffActivityBinding) Bind(
 	_ context.Context,
-	request workflowruntime.WorkBindingRequest,
-) (sessionv3Runtime.SemanticBinding, any, error) {
+	request workbinding.Request,
+) (workbinding.BindResult, error) {
 	input, err := jsonutil.DecodeCanonicalValue[texttool.ApplyUnifiedDiffArgs](request.Input)
 	if err != nil {
-		return sessionv3Runtime.SemanticBinding{}, nil, errors.New(
+		return workbinding.BindResult{}, errors.New(
 			"apply unified diff input is invalid",
 		)
 	}
 
-	return sessionv3Runtime.SemanticBinding{
-		Version:           applyUnifiedDiffBindingVersion,
-		TargetFingerprint: applyUnifiedDiffBindingFingerprint,
-		BoundAt:           time.Now().UTC(),
-	}, boundApplyUnifiedDiff{Input: input}, nil
+	return workbinding.BindResult{
+		SemanticBinding: sessionv3Runtime.SemanticBinding{
+			Version:           applyUnifiedDiffBindingVersion,
+			TargetFingerprint: applyUnifiedDiffBindingFingerprint,
+			BoundAt:           time.Now().UTC(),
+		},
+		Private: boundApplyUnifiedDiff{Input: input},
+	}, nil
 }
 
 func (applyUnifiedDiffActivityBinding) Execute(
 	ctx context.Context,
-	_ workflowruntime.WorkBindingRequest,
+	_ workbinding.Request,
 	private any,
 ) (sessionv3Runtime.WorkExecutionResult, error) {
 	bound, found := private.(boundApplyUnifiedDiff)
@@ -130,7 +132,7 @@ func (applyUnifiedDiffActivityBinding) Execute(
 
 func (applyUnifiedDiffActivityBinding) ResolveWait(
 	_ context.Context,
-	_ workflowruntime.WorkBindingWaitRequest,
+	_ workbinding.WaitRequest,
 	_ any,
 ) (sessionv3Runtime.WaitResolutionResult, error) {
 	return sessionv3Runtime.WaitResolutionResult{}, errors.New(

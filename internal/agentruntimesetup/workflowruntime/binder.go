@@ -233,20 +233,20 @@ func bindExternal(
 	if err := requireExternalPortCapabilities(binding, request.WorkItem, domainRequest); err != nil {
 		return sessionv3Runtime.BindResult{}, err
 	}
-	semantic, private, err := binding.Bind(ctx, domainRequest)
+	rb, err := binding.Bind(ctx, domainRequest)
 	if err != nil {
 		return sessionv3Runtime.BindResult{}, err
 	}
-	semantic, err = externalSemanticBinding(
+	semantic, err := externalSemanticBinding(
 		request.WorkItem,
-		semantic,
+		rb.SemanticBinding,
 	)
 	if err != nil {
 		return sessionv3Runtime.BindResult{}, err
 	}
 	return sessionv3Runtime.BindResult{
 		SemanticBinding: semantic,
-		Private:         boundExternal{binding: binding, private: private},
+		Private:         boundExternal{binding: binding, private: rb.Private},
 	}, nil
 }
 

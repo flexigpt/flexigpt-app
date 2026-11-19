@@ -33,9 +33,7 @@ func captureWorkflowMessages(
 		path = program.Root.Steps[state.Index].DeclarationPath
 	}
 	if path == "" {
-		return errors.New(
-			"workflow message capture has no declaration path",
-		)
+		path = program.Root.DeclarationPath
 	}
 
 	output := make(map[string][]WorkflowChannelMessageSnapshot)

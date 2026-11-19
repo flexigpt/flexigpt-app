@@ -809,9 +809,8 @@ func (b *inventoryBuilder) callPortFacts(
 func workflowLiteralTargetName(
 	value workflowv1.Value,
 ) (name string, lit bool, err error) {
-	var decoded any
 	v := json.RawMessage(value)
-	decoded, err = jsonutil.DecodeJSONRawNumbers[json.RawMessage](v)
+	decoded, err := jsonutil.DecodeJSONRawNumbers[any](v)
 	if err != nil {
 		return "", false, err
 	}

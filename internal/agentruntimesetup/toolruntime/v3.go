@@ -182,6 +182,10 @@ func (e *V3Executor) Choices(
 		if err != nil {
 			return nil, err
 		}
+		if selection.AutoExecute != nil {
+			autoExecute := *selection.AutoExecute
+			call.Automatic = autoExecute
+		}
 		output = append(output, V3PreparedChoice{
 			Choice:                choice,
 			Call:                  call,

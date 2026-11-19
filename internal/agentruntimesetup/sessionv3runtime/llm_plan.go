@@ -57,12 +57,14 @@ func (b *Binder) prepareLLMPlan(
 		model:    cloneLLMArtifactSelection(defaults.Model),
 		defaults: defaults,
 	}
-	for _, instruction := range defaults.SystemInstructions {
-		plan.addInstruction(instruction)
-	}
-	for _, instruction := range payload.SystemInstructions {
-		plan.addInstruction(instruction)
-	}
+	sessionInstructions := append(
+		[]sessionv3Runtime.Instruction(nil),
+		defaults.SystemInstructions...,
+	)
+	workflowInstructions := append(
+		[]sessionv3Runtime.Instruction(nil),
+		payload.SystemInstructions...,
+	)
 
 	normalizedMCP, err := normalizeMCPSelections(defaults.MCP)
 	if err != nil {
@@ -84,6 +86,12 @@ func (b *Binder) prepareLLMPlan(
 		); err != nil {
 			return llmExecutionPlan{}, err
 		}
+	}
+	for _, instruction := range sessionInstructions {
+		plan.addInstruction(instruction)
+	}
+	for _, instruction := range workflowInstructions {
+		plan.addInstruction(instruction)
 	}
 
 	if plan.model == nil {
@@ -324,9 +332,12 @@ func (b *Binder) applyAgentPlan(
 				}
 				continue
 			}
-			plan.defaults.Tools = appendUniqueLLMSelection(
-				plan.defaults.Tools,
-				value,
+			plan.defaults.ToolSelections = append(
+				plan.defaults.ToolSelections,
+				sessionv3Runtime.ToolSelection{
+					Artifact:    value,
+					AutoExecute: cloneBool(occurrence.AutoExecute),
+				},
 			)
 			if err := plan.addArtifact(toolPin); err != nil {
 				return err
@@ -658,6 +669,16 @@ func (b *Binder) applyWorkspacePlan(
 		return err
 	}
 
+	mcpSelectionsByArtifact := make(
+		map[string]sessionv3Runtime.MCPServerSelection,
+		len(mcpSelections),
+	)
+	for _, current := range mcpSelections {
+		mcpSelectionsByArtifact[current.Server.RootID+"\x00"+current.Server.ArtifactID] = cloneWorkspaceMCPSelection(
+			current,
+		)
+	}
+
 	for _, contribution := range runtimePlan.Prompt.Contributions {
 		selection, pin, selectionErr := b.selectionForWorkspaceArtifact(
 			ctx,
@@ -716,13 +737,16 @@ func (b *Binder) applyWorkspacePlan(
 		if selectionErr != nil {
 			return selectionErr
 		}
+		selected, found := mcpSelectionsByArtifact[value.RootID+"\x00"+value.ArtifactID]
+		if !found {
+			return errors.New(
+				"workspace runtime plan returned an MCP server outside the selected workspace capability set",
+			)
+		}
+		selected.Server = value
 		plan.defaults.MCP = appendUniqueMCPSelection(
 			plan.defaults.MCP,
-			sessionv3Runtime.MCPServerSelection{
-				Server:                    value,
-				IncludeServerInstructions: true,
-				ToolExposure:              sessionv3Runtime.MCPToolExposureAll,
-			},
+			selected,
 		)
 		if err := plan.addArtifact(pin); err != nil {
 			return err

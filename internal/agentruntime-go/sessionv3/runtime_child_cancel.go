@@ -361,7 +361,8 @@ func (r *Runtime) cancelIndependentExecutionLocked(
 			return
 		}
 	}
-	if hasDispatched(*execution) {
+	if hasDispatched(*execution) ||
+		hasOutstandingCleanup(*execution) {
 		r.touchExecutionLocked(session, execution)
 		return
 	}

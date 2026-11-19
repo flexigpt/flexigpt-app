@@ -679,7 +679,7 @@ func (i *WorkflowInterpreter) Advance(
 			}
 			break
 		}
-		if _, handled, settleErr := i.settleReconciliationIntent(
+		if reconciliationTransition, handled, settleErr := i.settleReconciliationIntent(
 			frame,
 			execution,
 			program,
@@ -693,7 +693,7 @@ func (i *WorkflowInterpreter) Advance(
 					settleErr.Error(),
 				)
 			} else {
-				err = nil
+				transition = reconciliationTransition
 			}
 			break
 		}
@@ -746,7 +746,12 @@ func (i *WorkflowInterpreter) Advance(
 			break
 		}
 		if handled {
-			transition, err = i.drive(frame, execution, program, state)
+			transition, err = i.resumeResolvedTargetSetCall(
+				frame,
+				execution,
+				program,
+				state,
+			)
 			break
 		}
 		if item != nil &&
@@ -754,7 +759,7 @@ func (i *WorkflowInterpreter) Advance(
 			item.State == WorkItemStateReconciling &&
 			state.PendingPath != "" &&
 			item.ProgramPath == state.PendingPath {
-			_, handled, reconcileErr := i.beginReconciliation(
+			reconcileTransition, handled, reconcileErr := i.beginReconciliation(
 				frame,
 				execution,
 				program,
@@ -762,6 +767,7 @@ func (i *WorkflowInterpreter) Advance(
 				*item,
 			)
 			if handled {
+				transition = reconcileTransition
 				err = reconcileErr
 				break
 			}
@@ -810,7 +816,7 @@ func (i *WorkflowInterpreter) Advance(
 		transition, err = i.drive(frame, execution, program, state)
 
 	case ProgramEventChildSettled:
-		if _, handled, settleErr := i.settleReconciliationChild(
+		if reconciliationTransition, handled, settleErr := i.settleReconciliationChild(
 			frame,
 			execution,
 			program,
@@ -824,7 +830,7 @@ func (i *WorkflowInterpreter) Advance(
 					settleErr.Error(),
 				)
 			} else {
-				err = nil
+				transition = reconciliationTransition
 			}
 			break
 		}
@@ -893,6 +899,34 @@ func (i *WorkflowInterpreter) Advance(
 	)
 }
 
+func (i *WorkflowInterpreter) resumeResolvedTargetSetCall(
+	frame ProgramFrame,
+	execution Execution,
+	program WorkflowProgram,
+	state WorkflowState,
+) (ProgramTransition, error) {
+	if state.PendingPath == "" {
+		return i.drive(frame, execution, program, state)
+	}
+	step, err := workflowStepForPath(program.Root, state.PendingPath)
+	if err != nil {
+		return ProgramTransition{}, err
+	}
+	if step.Call == nil {
+		return ProgramTransition{}, errors.New(
+			"resolved workflow target set does not belong to a call step",
+		)
+	}
+	return i.call(
+		frame,
+		program,
+		state,
+		state.PendingPath,
+		step,
+		*step.Call,
+	)
+}
+
 func (i *WorkflowInterpreter) drive(
 	frame ProgramFrame,
 	execution Execution,
@@ -918,6 +952,14 @@ func (i *WorkflowInterpreter) drive(
 	}
 
 	for {
+		if state.Exit != "" {
+			return i.completeWorkflowBlock(
+				program,
+				state,
+				state.ExitValue,
+				state.Exit,
+			)
+		}
 		if state.PendingPath != "" {
 			return workflowTransition(state, nil, nil, nil)
 		}
@@ -2300,7 +2342,7 @@ func (i *WorkflowInterpreter) workflowChildCallBoundary(
 		DeclarationPath: state.PendingDeclarationPath,
 		Type:            WorkItemTypeChildCall,
 		Automatic:       true,
-		Cleanup:         true,
+		Cleanup:         false,
 		Effect:          effect,
 		Input: WorkItemPayload{
 			ChildCall: &ChildCallWork{
