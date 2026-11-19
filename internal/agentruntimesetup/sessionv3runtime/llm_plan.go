@@ -127,9 +127,6 @@ func (b *Binder) prepareLLMPlan(
 		}
 	}
 	plan.defaults.ToolSelections = toolSelections
-	plan.defaults.Tools = artifactSelectionsForToolSelections(
-		toolSelections,
-	)
 
 	plan.defaults.Skills, pins, err = b.pinSelections(
 		ctx,
@@ -332,7 +329,7 @@ func (b *Binder) applyAgentPlan(
 				}
 				continue
 			}
-			plan.defaults.ToolSelections = append(
+			plan.defaults.ToolSelections = appendUniqueLLMToolSelection(
 				plan.defaults.ToolSelections,
 				sessionv3Runtime.ToolSelection{
 					Artifact:    value,
@@ -761,9 +758,11 @@ func (b *Binder) applyWorkspacePlan(
 		if selectionErr != nil {
 			return selectionErr
 		}
-		plan.defaults.Tools = appendUniqueLLMSelection(
-			plan.defaults.Tools,
-			value,
+		plan.defaults.ToolSelections = appendUniqueLLMToolSelection(
+			plan.defaults.ToolSelections,
+			sessionv3Runtime.ToolSelection{
+				Artifact: value,
+			},
 		)
 		if err := plan.addArtifact(pin); err != nil {
 			return err
@@ -926,6 +925,7 @@ func (b *Binder) pinToolSelections(
 				ExpectedDigest:   pin.Digest,
 			},
 			UserArguments: selection.UserArguments.Clone(),
+			AutoExecute:   cloneBool(selection.AutoExecute),
 		})
 		pins = append(pins, pin)
 	}
@@ -1181,6 +1181,25 @@ func appendUniqueLLMSelection(
 	return append(values, value)
 }
 
+func appendUniqueLLMToolSelection(
+	values []sessionv3Runtime.ToolSelection,
+	value sessionv3Runtime.ToolSelection,
+) []sessionv3Runtime.ToolSelection {
+	for index := range values {
+		current := values[index]
+		if current.Artifact.RootID != value.Artifact.RootID ||
+			current.Artifact.ArtifactID != value.Artifact.ArtifactID {
+			continue
+		}
+
+		// Earlier effective values are more specific. A Session or invocation
+		// selection must not be overwritten by an inherited Agent or Workspace
+		// contribution.
+		return values
+	}
+	return append(values, sessionv3Runtime.CloneToolSelection(value))
+}
+
 func appendUniqueMCPSelection(
 	values []sessionv3Runtime.MCPServerSelection,
 	value sessionv3Runtime.MCPServerSelection,
@@ -1218,19 +1237,6 @@ func v3ArtifactRefsForCapabilities(
 		}
 		seen[ref] = struct{}{}
 		output = append(output, ref)
-	}
-	return output
-}
-
-func artifactSelectionsForToolSelections(
-	values []sessionv3Runtime.ToolSelection,
-) []sessionv3Runtime.ArtifactSelection {
-	if len(values) == 0 {
-		return nil
-	}
-	output := make([]sessionv3Runtime.ArtifactSelection, 0, len(values))
-	for _, value := range values {
-		output = append(output, value.Artifact)
 	}
 	return output
 }

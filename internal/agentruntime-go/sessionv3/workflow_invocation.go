@@ -220,15 +220,6 @@ func withoutProviderManagedToolSelection(
 ) SessionDefaults {
 	output := cloneSessionDefaults(input)
 
-	output.Tools = output.Tools[:0]
-	for _, selection := range input.Tools {
-		if selection.RootID == target.RootID &&
-			selection.ArtifactID == target.ArtifactID {
-			continue
-		}
-		output.Tools = append(output.Tools, selection)
-	}
-
 	output.ToolSelections = output.ToolSelections[:0]
 	for _, selection := range input.ToolSelections {
 		if selection.Artifact.RootID == target.RootID &&
@@ -237,11 +228,8 @@ func withoutProviderManagedToolSelection(
 		}
 		output.ToolSelections = append(
 			output.ToolSelections,
-			cloneToolSelection(selection),
+			CloneToolSelection(selection),
 		)
-	}
-	if len(output.Tools) == 0 {
-		output.Tools = nil
 	}
 	if len(output.ToolSelections) == 0 {
 		output.ToolSelections = nil

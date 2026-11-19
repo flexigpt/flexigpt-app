@@ -54,7 +54,6 @@ type SessionDefaults struct {
 	Temperature          *float64                    `json:"temperature,omitempty"`
 	Metadata             jsonutil.CanonicalValue     `json:"metadata,omitempty"`
 	History              HistorySelection            `json:"history"`
-	Tools                []ArtifactSelection         `json:"tools,omitempty"`
 	ToolSelections       []ToolSelection             `json:"toolSelections,omitempty"`
 	Skills               []ArtifactSelection         `json:"skills,omitempty"`
 	ActiveSkills         []ArtifactSelection         `json:"activeSkills,omitempty"`
@@ -78,7 +77,6 @@ type SessionDefaultsOverride struct {
 	Temperature          *float64                     `json:"temperature,omitempty"`
 	Metadata             *jsonutil.CanonicalValue     `json:"metadata,omitempty"`
 	History              *HistorySelection            `json:"history,omitempty"`
-	Tools                *[]ArtifactSelection         `json:"tools,omitempty"`
 	ToolSelections       *[]ToolSelection             `json:"toolSelections,omitempty"`
 	Skills               *[]ArtifactSelection         `json:"skills,omitempty"`
 	ActiveSkills         *[]ArtifactSelection         `json:"activeSkills,omitempty"`
@@ -99,7 +97,6 @@ const (
 	SessionDefaultFieldTemperature          SessionDefaultField = "temperature"
 	SessionDefaultFieldMetadata             SessionDefaultField = "metadata"
 	SessionDefaultFieldHistory              SessionDefaultField = "history"
-	SessionDefaultFieldTools                SessionDefaultField = "tools"
 	SessionDefaultFieldToolSelections       SessionDefaultField = "toolSelections"
 	SessionDefaultFieldSkills               SessionDefaultField = "skills"
 	SessionDefaultFieldActiveSkills         SessionDefaultField = "activeSkills"
@@ -166,9 +163,9 @@ type ArtifactSelection struct {
 	ExpectedDigest   string `json:"expectedDigest,omitempty"`
 }
 
-// ToolSelection is an Artifact-backed standalone Tool selection. It retains
-// optional typed provider SDK Tool configuration separately from model Tool
-// call arguments. Go Tools do not accept UserArguments.
+// ToolSelection is the only Session V3 Tool-selection representation.
+// ArtifactSelection remains generic and must not acquire Tool-specific
+// configuration or automatic-execution fields.
 type ToolSelection struct {
 	Artifact      ArtifactSelection       `json:"artifact"`
 	UserArguments jsonutil.CanonicalValue `json:"userArguments,omitempty"`
@@ -259,7 +256,6 @@ type MessageActivity struct {
 	Role               MessageRole             `json:"role"`
 	Status             string                  `json:"status,omitempty"`
 	Text               string                  `json:"text,omitempty"`
-	ConversationID     string                  `json:"conversationID,omitempty"`
 	Attachments        []Attachment            `json:"attachments,omitempty"`
 	ToolResults        []ToolResultActivity    `json:"toolResults,omitempty"`
 	AppContext         []AppContextUpdate      `json:"appContext,omitempty"`
@@ -509,7 +505,6 @@ type ConversationHandoffIntent struct {
 type Execution struct {
 	ID                ExecutionID                  `json:"id"`
 	SessionID         SessionID                    `json:"sessionID"`
-	ConversationID    string                       `json:"conversationID,omitempty"`
 	Revision          Revision                     `json:"revision"`
 	State             ExecutionState               `json:"state"`
 	CreatedAt         time.Time                    `json:"createdAt"`
@@ -1340,7 +1335,6 @@ type ContinuationInput struct {
 	Revision           Revision                `json:"revision"`
 	ConsumedRevision   Revision                `json:"consumedRevision,omitempty"`
 	Text               string                  `json:"text,omitempty"`
-	ConversationID     string                  `json:"conversationID,omitempty"`
 	Attachments        []Attachment            `json:"attachments,omitempty"`
 	AppContext         []AppContextUpdate      `json:"appContext,omitempty"`
 	Metadata           jsonutil.CanonicalValue `json:"metadata,omitempty"`
@@ -1908,7 +1902,6 @@ type SignalExecutionCommand struct {
 
 type MessageInput struct {
 	Text              string                   `json:"text,omitempty"`
-	ConversationID    string                   `json:"conversationID,omitempty"`
 	Attachments       []Attachment             `json:"attachments,omitempty"`
 	AttachmentSources []AttachmentSource       `json:"attachmentSources,omitempty"`
 	Metadata          jsonutil.CanonicalValue  `json:"metadata,omitempty"`

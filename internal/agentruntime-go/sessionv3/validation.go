@@ -204,9 +204,6 @@ func validateDefaults(value SessionDefaults) error {
 		return nil
 	}
 
-	if err := validateSelections("Tool", value.Tools); err != nil {
-		return err
-	}
 	toolSelections := make(map[string]struct{}, len(value.ToolSelections))
 	for index, selection := range value.ToolSelections {
 		if err := selection.Validate(); err != nil {

@@ -11,8 +11,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
-const defaultConversationID = "default"
-
 func (r *Runtime) UpdateContinuationInput(
 	ctx context.Context,
 	command UpdateContinuationInputCommand,
@@ -500,14 +498,7 @@ func (r *Runtime) EditAndResend(
 		session.Timeline[:index]...,
 	)
 
-	input.ConversationID = effectiveConversationID(
-		session,
-		input.ConversationID,
-	)
-	execution, executionErr := r.conversationExecutionLocked(
-		session,
-		input.ConversationID,
-	)
+	execution, executionErr := r.conversationExecutionLocked(session)
 	if executionErr != nil {
 		*session = previous
 		r.mu.Unlock()
@@ -568,7 +559,6 @@ func continuationFromMessageInput(
 		Revision:           previous.Revision + 1,
 		ConsumedRevision:   previous.ConsumedRevision,
 		Text:               input.Text,
-		ConversationID:     input.ConversationID,
 		Attachments:        append([]Attachment(nil), input.Attachments...),
 		AppContext:         cloneAppContextUpdates(previous.AppContext),
 		Metadata:           input.Metadata.Clone(),
@@ -598,7 +588,6 @@ func (r *Runtime) consumeContinuationLocked(
 	input := MessageInput{
 		Text:             staged.Text,
 		Attachments:      append([]Attachment(nil), staged.Attachments...),
-		ConversationID:   staged.ConversationID,
 		Metadata:         staged.Metadata.Clone(),
 		InvocationBudget: cloneBudget(staged.InvocationBudget),
 	}
@@ -621,7 +610,6 @@ func (r *Runtime) consumeContinuationLocked(
 	execution.Continuation.ConsumedRevision = staged.Revision
 	execution.Continuation.Text = ""
 	execution.Continuation.Attachments = nil
-	execution.Continuation.ConversationID = ""
 	execution.Continuation.AppContext = nil
 	execution.Continuation.Metadata = nil
 	execution.Continuation.InvocationDefaults = nil
@@ -671,25 +659,10 @@ func (r *Runtime) submitNormalMessageWithDefaultsLocked(
 	}
 
 	resolvedValue := cloneSessionDefaults(*resolvedDefaults)
-	conversationID := effectiveConversationID(
+	applySessionConversationOwnerDefaults(
 		session,
-		input.ConversationID,
-	)
-	if err := applyConversationOwnerDefaults(
-		session,
-		conversationID,
 		&resolvedValue,
-	); err != nil {
-		return Activity{}, err
-	}
-	if execution.ConversationID == "" {
-		execution.ConversationID = conversationID
-	}
-	if execution.ConversationID != conversationID {
-		return Activity{}, errors.New(
-			"conversation execution does not own the submitted conversation",
-		)
-	}
+	)
 	resolvedDefaults = &resolvedValue
 
 	now := r.now()
@@ -703,7 +676,6 @@ func (r *Runtime) submitNormalMessageWithDefaultsLocked(
 		Message: &MessageActivity{
 			Role:               MessageRoleUser,
 			Status:             "accepted",
-			ConversationID:     conversationID,
 			Text:               input.Text,
 			Attachments:        append([]Attachment(nil), input.Attachments...),
 			ToolResults:        append([]ToolResultActivity(nil), carried...),
@@ -905,44 +877,15 @@ func normalConversationFrame(execution *Execution) *ProgramFrame {
 	return nil
 }
 
-func effectiveConversationID(
+func applySessionConversationOwnerDefaults(
 	session *Session,
-	requested string,
-) string {
-	requested = strings.TrimSpace(requested)
-	if requested != "" {
-		return requested
-	}
-	if session == nil {
-		return defaultConversationID
-	}
-
-	active := ""
-	for _, value := range session.ConversationOwnership {
-		if value.ActiveHandoffID == "" {
-			continue
-		}
-		if active != "" {
-			return defaultConversationID
-		}
-		active = value.ConversationID
-	}
-	if active != "" {
-		return active
-	}
-	return defaultConversationID
-}
-
-func applyConversationOwnerDefaults(
-	session *Session,
-	conversationID string,
 	defaults *SessionDefaults,
-) error {
-	if session == nil || defaults == nil || conversationID == "" {
-		return nil
+) {
+	if session == nil || defaults == nil {
+		return
 	}
 	for _, ownership := range session.ConversationOwnership {
-		if ownership.ConversationID != conversationID ||
+		if ownership.ConversationID != string(session.ID) ||
 			ownership.Owner.Agent == nil {
 			continue
 		}
@@ -953,9 +896,8 @@ func applyConversationOwnerDefaults(
 			ExpectedRevision: agent.Revision,
 			ExpectedDigest:   agent.Digest,
 		}
-		return nil
+		return
 	}
-	return nil
 }
 
 func manualToolRetryAllowed(item WorkItem) bool {

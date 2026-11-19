@@ -424,10 +424,6 @@ func (r *Runtime) SubmitMessage(ctx context.Context, command SubmitMessageComman
 		admittedAttachments,
 	)
 	input.AttachmentSources = nil
-	input.ConversationID = effectiveConversationID(
-		session,
-		input.ConversationID,
-	)
 	resolvedDefaults, defaultsErr := resolveSessionInvocationDefaults(
 		session.Defaults,
 		input.Defaults,
@@ -444,10 +440,7 @@ func (r *Runtime) SubmitMessage(ctx context.Context, command SubmitMessageComman
 	}
 
 	previous := cloneSession(*session)
-	execution, err := r.conversationExecutionLocked(
-		session,
-		input.ConversationID,
-	)
+	execution, err := r.conversationExecutionLocked(session)
 	if err != nil {
 		*session = previous
 		r.mu.Unlock()
@@ -1671,13 +1664,12 @@ func (r *Runtime) changeExecution(
 	return receipt, nil
 }
 
-func (r *Runtime) conversationExecutionLocked(session *Session, conversationID string) (*Execution, error) {
+func (r *Runtime) conversationExecutionLocked(session *Session) (*Execution, error) {
 	for index := range session.Executions {
 		execution := &session.Executions[index]
 		if !execution.State.Terminal() && len(execution.ProgramFrames) != 0 &&
 			execution.ProgramFrames[0].Program.InterpreterID ==
-				BuiltinConversationInterpreterID &&
-			execution.ConversationID == conversationID {
+				BuiltinConversationInterpreterID {
 			return execution, nil
 		}
 	}
@@ -1708,18 +1700,17 @@ func (r *Runtime) conversationExecutionLocked(session *Session, conversationID s
 		return nil, err
 	}
 	execution := Execution{
-		ID:             ExecutionID(r.newID()),
-		SessionID:      session.ID,
-		ConversationID: conversationID,
-		Lifetime:       ExecutionChildLifetimeRoot,
-		Revision:       1,
-		State:          ExecutionStateWaiting,
-		CreatedAt:      now,
-		UpdatedAt:      now,
-		Deadline:       deadline,
-		Budget:         budget,
-		Usage:          ExecutionBudgetUsage{},
-		Cleanup:        CleanupState{},
+		ID:        ExecutionID(r.newID()),
+		SessionID: session.ID,
+		Lifetime:  ExecutionChildLifetimeRoot,
+		Revision:  1,
+		State:     ExecutionStateWaiting,
+		CreatedAt: now,
+		UpdatedAt: now,
+		Deadline:  deadline,
+		Budget:    budget,
+		Usage:     ExecutionBudgetUsage{},
+		Cleanup:   CleanupState{},
 		ProgramFrames: []ProgramFrame{
 			{
 				ID:        ProgramFrameID(r.newID()),

@@ -2,8 +2,6 @@ package sessionv3
 
 import "errors"
 
-const toolSelectionIdentitySeparator = "\x00"
-
 func resolveSessionInvocationDefaults(
 	base SessionDefaults,
 	override *SessionDefaultsOverride,
@@ -54,12 +52,6 @@ func resolveSessionInvocationDefaults(
 		value := *override.History
 		output.History = value
 	}
-	if override.Tools != nil {
-		output.Tools = append(
-			[]ArtifactSelection(nil),
-			(*override.Tools)...,
-		)
-	}
 	if override.ToolSelections != nil {
 		output.ToolSelections = cloneToolSelections(
 			*override.ToolSelections,
@@ -105,8 +97,6 @@ func resolveSessionInvocationDefaults(
 			output.Metadata = nil
 		case SessionDefaultFieldHistory:
 			output.History = HistorySelection{}
-		case SessionDefaultFieldTools:
-			output.Tools = nil
 		case SessionDefaultFieldToolSelections:
 			output.ToolSelections = nil
 		case SessionDefaultFieldSkills:
@@ -133,37 +123,11 @@ func resolveSessionInvocationDefaults(
 	return output, nil
 }
 
-// EffectiveToolSelections merges the original Artifact-only Tool list with
-// optional typed Tool selections. A typed selection replaces the legacy
-// Artifact-only entry for the same Tool and can also select a Tool itself.
+// EffectiveToolSelections returns the one canonical typed Tool collection.
 func EffectiveToolSelections(
 	defaults SessionDefaults,
 ) []ToolSelection {
-	output := make([]ToolSelection, 0, len(defaults.Tools)+len(defaults.ToolSelections))
-	indexes := make(map[string]int, len(defaults.Tools)+len(defaults.ToolSelections))
-
-	appendSelection := func(value ToolSelection) {
-		key := value.Artifact.RootID +
-			toolSelectionIdentitySeparator +
-			value.Artifact.ArtifactID
-		if index, found := indexes[key]; found {
-			output[index] = cloneToolSelection(value)
-			return
-		}
-		indexes[key] = len(output)
-		output = append(output, cloneToolSelection(value))
-	}
-
-	for _, artifact := range defaults.Tools {
-		appendSelection(ToolSelection{Artifact: artifact})
-	}
-	for _, selection := range defaults.ToolSelections {
-		appendSelection(selection)
-	}
-	if len(output) == 0 {
-		return nil
-	}
-	return output
+	return cloneToolSelections(defaults.ToolSelections)
 }
 
 func cloneToolSelections(
@@ -174,12 +138,12 @@ func cloneToolSelections(
 	}
 	output := make([]ToolSelection, len(values))
 	for index := range values {
-		output[index] = cloneToolSelection(values[index])
+		output[index] = CloneToolSelection(values[index])
 	}
 	return output
 }
 
-func cloneToolSelection(
+func CloneToolSelection(
 	value ToolSelection,
 ) ToolSelection {
 	output := value
