@@ -21,6 +21,9 @@ const (
 	// development payload in place and intentionally remains version 1.
 	WorkflowInterpreterVersion = uint32(1)
 
+	workflowChildCallFramePrefix = "workflow-child-frame"
+	workflowChildCallWorkPrefix  = "workflow-child-call"
+
 	maxWorkflowProgramJSONBytes = 2 << 20
 )
 
@@ -322,6 +325,7 @@ type WorkflowState struct {
 	Saga                   *WorkflowSagaScope           `json:"saga,omitempty"`
 	TargetSets             []WorkflowTargetSetState     `json:"targetSets,omitempty"`
 	TargetSetResolution    *WorkflowTargetSetResolution `json:"targetSetResolution,omitempty"`
+	ChildCallWorkItemID    WorkItemID                   `json:"childCallWorkItemID,omitempty"`
 }
 
 // WorkflowResourceClaim is a declaration-level resource claim template. Key
@@ -369,6 +373,14 @@ func (s *WorkflowState) Validate() error {
 	}
 	if s.TargetSetResolution != nil {
 		if err := s.TargetSetResolution.Validate(); err != nil {
+			return err
+		}
+	}
+	if s.ChildCallWorkItemID != "" {
+		if err := validateID(
+			"workflow child call WorkItem ID",
+			string(s.ChildCallWorkItemID),
+		); err != nil {
 			return err
 		}
 	}
@@ -433,6 +445,7 @@ func (s *WorkflowState) clearPendingStep() {
 	s.PendingDeclarationPath = ""
 	s.PendingTarget = ""
 	s.Deadline = nil
+	s.ChildCallWorkItemID = ""
 }
 
 func NewWorkflowInterpreter() (*WorkflowInterpreter, error) {
@@ -1362,6 +1375,9 @@ func (i *WorkflowInterpreter) call(
 			targetName,
 			target,
 			call,
+			input,
+			contextValue,
+			effect,
 			ports,
 			childBudget,
 		)
@@ -1525,7 +1541,7 @@ func (i *WorkflowInterpreter) call(
 				err.Error(),
 			)
 		}
-		claims, claimErr := i.workflowResourceClaims(
+		_, claimErr := i.workflowResourceClaims(
 			program,
 			state,
 			step,
@@ -1538,24 +1554,21 @@ func (i *WorkflowInterpreter) call(
 			)
 		}
 
-		next := state
-		next.PendingPath = path
-		nextState, err := encodeWorkflowProgramState(next)
-		if err != nil {
-			return ProgramTransition{}, err
-		}
-		return ProgramTransition{
-			State: nextState,
-			Frames: []ProgramFrameIntent{{
-				Path:            path,
-				DeclarationPath: state.PendingDeclarationPath,
-				Deadline:        cloneTime(state.Deadline),
-				Budget:          cloneBudget(childBudget),
-				Claims:          claims,
-				Program:         nested,
-				Ports:           ports,
-			}},
-		}, nil
+		return i.startWorkflowChildCall(
+			frame,
+			program,
+			state,
+			path,
+			step,
+			targetName,
+			effect,
+			input,
+			contextValue,
+			nested,
+			ports,
+			childBudget,
+			nil,
+		)
 
 	case WorkflowTargetAgent,
 		WorkflowTargetModel:
@@ -1568,6 +1581,9 @@ func (i *WorkflowInterpreter) call(
 			targetName,
 			target,
 			call,
+			input,
+			contextValue,
+			effect,
 			nil,
 			ports,
 			childBudget,
@@ -1622,34 +1638,28 @@ func (i *WorkflowInterpreter) call(
 				childErr.Error(),
 			)
 		}
-		claims, claimErr := i.workflowResourceClaims(
+		transition, transitionErr := i.startWorkflowChildCall(
+			frame,
 			program,
 			state,
+			path,
 			step,
+			targetName,
+			effect,
+			input,
+			contextValue,
+			child,
+			ports,
+			childBudget,
+			nil,
 		)
-		if claimErr != nil {
-			return workflowFailure(
-				state,
-				"workflow_resource_claim_invalid",
-				claimErr.Error(),
-			)
-		}
-		state.PendingPath = path
-		state.PendingTarget = targetName
-		transition, transitionErr := workflowTransition(state, nil, nil, nil)
 		if transitionErr != nil {
 			return ProgramTransition{}, transitionErr
 		}
-		transition.Activities = invocation.Activities
-		transition.Frames = []ProgramFrameIntent{{
-			Path:            path,
-			DeclarationPath: state.PendingDeclarationPath,
-			Program:         child,
-			Deadline:        cloneTime(state.Deadline),
-			Budget:          cloneBudget(childBudget),
-			Claims:          claims,
-			Ports:           clonePortPlans(ports),
-		}}
+		transition.Activities = append(
+			[]Activity(nil),
+			invocation.Activities...,
+		)
 		return transition, nil
 
 	default:
@@ -1968,6 +1978,12 @@ func (i *WorkflowInterpreter) settleChild(
 	if state == nil {
 		return errors.New("Workflow state is unavailable")
 	}
+	if state.ChildCallWorkItemID != "" {
+		// The durable child-call WorkItem is the authoritative outer call
+		// boundary. Its completion wait settles the parent step with the
+		// child output and effect facts.
+		return nil
+	}
 	if state.Pending != nil {
 		return i.settleStructuredChild(
 			state,
@@ -2149,6 +2165,140 @@ func workflowChildCallBudget(
 		return nil, err
 	}
 	return &value, nil
+}
+
+func (i *WorkflowInterpreter) startWorkflowChildCall(
+	frame ProgramFrame,
+	program WorkflowProgram,
+	state WorkflowState,
+	path string,
+	step WorkflowStep,
+	targetName string,
+	effect EffectContract,
+	input jsonutil.CanonicalValue,
+	contextValue jsonutil.CanonicalValue,
+	child ProgramSnapshot,
+	ports []PortPlan,
+	budget *ExecutionBudget,
+	handoff *ConversationHandoffIntent,
+) (ProgramTransition, error) {
+	claims, err := i.workflowResourceClaims(
+		program,
+		state,
+		step,
+	)
+	if err != nil {
+		return workflowFailure(
+			state,
+			"workflow_resource_claim_invalid",
+			err.Error(),
+		)
+	}
+
+	childFrameID := workflowChildCallFrameID(frame.ID, path)
+	completion := CompletionHandle{FrameID: childFrameID}
+	boundary, err := i.workflowChildCallBoundary(
+		program,
+		state,
+		path,
+		step,
+		targetName,
+		effect,
+		input,
+		contextValue,
+		completion,
+	)
+	if err != nil {
+		return workflowFailure(
+			state,
+			"workflow_child_call_invalid",
+			err.Error(),
+		)
+	}
+
+	state.PendingPath = path
+	state.PendingTarget = targetName
+	state.ChildCallWorkItemID = boundary.ID
+	transition, err := workflowTransition(
+		state,
+		nil,
+		nil,
+		[]WorkItemIntent{boundary},
+	)
+	if err != nil {
+		return ProgramTransition{}, err
+	}
+	transition.Frames = []ProgramFrameIntent{{
+		ID:              childFrameID,
+		Path:            path,
+		DeclarationPath: state.PendingDeclarationPath,
+		Program:         child,
+		Deadline:        cloneTime(state.Deadline),
+		Budget:          cloneBudget(budget),
+		Claims:          claims,
+		Ports:           clonePortPlans(ports),
+		Handoff:         handoff,
+	}}
+	return transition, nil
+}
+
+func (i *WorkflowInterpreter) workflowChildCallBoundary(
+	program WorkflowProgram,
+	state WorkflowState,
+	path string,
+	step WorkflowStep,
+	targetName string,
+	effect EffectContract,
+	input jsonutil.CanonicalValue,
+	contextValue jsonutil.CanonicalValue,
+	completion CompletionHandle,
+) (WorkItemIntent, error) {
+	if err := completion.Validate(); err != nil {
+		return WorkItemIntent{}, err
+	}
+	if err := validateID("workflow child call target", targetName); err != nil {
+		return WorkItemIntent{}, err
+	}
+
+	intent := WorkItemIntent{
+		ID:              workflowChildCallWorkID(path),
+		ProgramPath:     path,
+		DeclarationPath: state.PendingDeclarationPath,
+		Type:            WorkItemTypeChildCall,
+		Automatic:       true,
+		Cleanup:         true,
+		Effect:          effect,
+		Input: WorkItemPayload{
+			ChildCall: &ChildCallWork{
+				Target:     targetName,
+				Input:      input.Clone(),
+				Context:    contextValue.Clone(),
+				Completion: completion,
+			},
+		},
+	}
+	if err := i.applyWorkflowStepEffectPolicy(
+		program,
+		state,
+		step,
+		&intent,
+	); err != nil {
+		return WorkItemIntent{}, err
+	}
+	return intent, nil
+}
+
+func workflowChildCallFrameID(
+	frameID ProgramFrameID,
+	path string,
+) ProgramFrameID {
+	return ProgramFrameID(
+		workflowChildCallFramePrefix + ":" + string(frameID) + ":" + path,
+	)
+}
+
+func workflowChildCallWorkID(path string) WorkItemID {
+	return WorkItemID(workflowChildCallWorkPrefix + ":" + path)
 }
 
 func (i *WorkflowInterpreter) evaluate(

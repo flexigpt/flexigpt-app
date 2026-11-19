@@ -664,6 +664,14 @@ func reconciliationInput(item WorkItem) (jsonutil.CanonicalValue, error) {
 		}
 		return item.Input.Activity.Input.Clone(), nil
 
+	case WorkItemTypeChildCall:
+		if item.Input.ChildCall == nil {
+			return nil, errors.New(
+				"reconciliation child call input is unavailable",
+			)
+		}
+		return item.Input.ChildCall.Input.Clone(), nil
+
 	default:
 		return nil, errors.New(
 			"reconciliation is unavailable for this work item type",

@@ -13,6 +13,20 @@ import (
 	workflowv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workflow/contract/v1"
 )
 
+const (
+	workflowLLMContextDefaults     = "defaults"
+	workflowLLMContextInstructions = "instructions"
+	workflowLLMContextMessages     = "messages"
+
+	workflowLLMFieldAttachments = "attachments"
+	workflowLLMFieldContent     = "content"
+	workflowLLMFieldID          = "id"
+	workflowLLMFieldLabel       = "label"
+	workflowLLMFieldMessages    = "messages"
+	workflowLLMFieldRole        = "role"
+	workflowLLMFieldText        = "text"
+)
+
 // compileWorkflowLLMInvocation converts the supported explicit Workflow
 // Model and Agent invocation form into typed runtime templates. It is called
 // only after setup determines that a call can select a Model, Agent, or
@@ -30,16 +44,18 @@ func compileWorkflowLLMInvocation(
 	}
 	for name := range call.Context {
 		switch name {
-		case "instructions", "messages", "defaults":
+		case workflowLLMContextInstructions,
+			workflowLLMContextMessages,
+			workflowLLMContextDefaults:
 		default:
 			return nil, fmt.Errorf(
-				"workflow Model or Agent context form %q is unsupported",
+				"workflow model or agent context form %q is unsupported",
 				name,
 			)
 		}
 	}
 
-	if value, found := call.Context["instructions"]; found {
+	if value, found := call.Context[workflowLLMContextInstructions]; found {
 		instructions, instructionErr := compileWorkflowLLMInstructions(
 			value,
 		)
@@ -48,17 +64,17 @@ func compileWorkflowLLMInvocation(
 		}
 		output.Instructions = instructions
 	}
-	if value, found := call.Context["messages"]; found {
+	if value, found := call.Context[workflowLLMContextMessages]; found {
 		contextMessages, messageErr := compileWorkflowLLMMessageList(
 			value,
-			"workflow Model or Agent context messages",
+			"workflow model or agent context messages",
 		)
 		if messageErr != nil {
 			return nil, messageErr
 		}
 		output.Messages = append(contextMessages, output.Messages...)
 	}
-	if value, found := call.Context["defaults"]; found {
+	if value, found := call.Context[workflowLLMContextDefaults]; found {
 		defaults, defaultsErr := compileWorkflowLLMDefaults(value)
 		if defaultsErr != nil {
 			return nil, defaultsErr
@@ -81,18 +97,18 @@ func compileWorkflowLLMInputMessages(
 	}
 	if len(object) != 1 {
 		return nil, errors.New(
-			"workflow Model or Agent input must contain only messages",
+			"workflow model or agent input must contain only messages",
 		)
 	}
-	raw, found := object["messages"]
+	raw, found := object[workflowLLMFieldMessages]
 	if !found {
 		return nil, errors.New(
-			"workflow Model or Agent input requires messages",
+			"workflow model or agent input requires messages",
 		)
 	}
 	return compileWorkflowLLMMessageList(
 		workflowv1.Value(raw),
-		"workflow Model or Agent input messages",
+		"workflow model or agent input messages",
 	)
 }
 
@@ -132,7 +148,7 @@ func compileWorkflowLLMMessage(
 	}
 	for name := range object {
 		switch name {
-		case "role", "text", "attachments":
+		case workflowLLMFieldRole, workflowLLMFieldText, workflowLLMFieldAttachments:
 		default:
 			return sessionv3Runtime.WorkflowLLMMessage{}, fmt.Errorf(
 				"%s item has unsupported field %q",
@@ -142,7 +158,7 @@ func compileWorkflowLLMMessage(
 		}
 	}
 
-	roleRaw, found := object["role"]
+	roleRaw, found := object[workflowLLMFieldRole]
 	if !found {
 		return sessionv3Runtime.WorkflowLLMMessage{}, fmt.Errorf(
 			"%s item requires role",
@@ -152,23 +168,23 @@ func compileWorkflowLLMMessage(
 	var role sessionv3Runtime.MessageRole
 	if err := json.Unmarshal(roleRaw, &role); err != nil {
 		return sessionv3Runtime.WorkflowLLMMessage{}, errors.New(
-			"workflow Model or Agent message role must be a string",
+			"workflow model or agent message role must be a string",
 		)
 	}
 
 	output := sessionv3Runtime.WorkflowLLMMessage{Role: role}
-	if textRaw, found := object["text"]; found {
+	if textRaw, found := object[workflowLLMFieldText]; found {
 		value, err := compileWorkflowValue(workflowv1.Value(textRaw))
 		if err != nil {
 			return sessionv3Runtime.WorkflowLLMMessage{}, err
 		}
 		output.Text = &value
 	}
-	if attachmentsRaw, found := object["attachments"]; found {
+	if attachmentsRaw, found := object[workflowLLMFieldAttachments]; found {
 		var attachments []sessionv3Runtime.Attachment
 		if err := json.Unmarshal(attachmentsRaw, &attachments); err != nil {
 			return sessionv3Runtime.WorkflowLLMMessage{}, errors.New(
-				"workflow Model or Agent message attachments are invalid",
+				"workflow model or agent message attachments are invalid",
 			)
 		}
 		output.Attachments = attachments
@@ -204,20 +220,22 @@ func compileWorkflowLLMInstructions(
 		}
 		for name := range object {
 			switch name {
-			case "id", "label", "content":
+			case workflowLLMFieldID,
+				workflowLLMFieldLabel,
+				workflowLLMFieldContent:
 			default:
 				return nil, fmt.Errorf(
-					"workflow Model or Agent instruction %d has unsupported field %q",
+					"workflow model or agent instruction %d has unsupported field %q",
 					index,
 					name,
 				)
 			}
 		}
 
-		contentRaw, found := object["content"]
+		contentRaw, found := object[workflowLLMFieldContent]
 		if !found {
 			return nil, fmt.Errorf(
-				"workflow Model or Agent instruction %d requires content",
+				"workflow model or agent instruction %d requires content",
 				index,
 			)
 		}
@@ -231,17 +249,17 @@ func compileWorkflowLLMInstructions(
 		instruction := sessionv3Runtime.WorkflowLLMInstruction{
 			Content: content,
 		}
-		if idRaw, found := object["id"]; found {
+		if idRaw, found := object[workflowLLMFieldID]; found {
 			if err := json.Unmarshal(idRaw, &instruction.ID); err != nil {
 				return nil, errors.New(
-					"workflow Model or Agent instruction ID must be a string",
+					"workflow model or agent instruction ID must be a string",
 				)
 			}
 		}
-		if labelRaw, found := object["label"]; found {
+		if labelRaw, found := object[workflowLLMFieldLabel]; found {
 			if err := json.Unmarshal(labelRaw, &instruction.Label); err != nil {
 				return nil, errors.New(
-					"workflow Model or Agent instruction label must be a string",
+					"workflow model or agent instruction label must be a string",
 				)
 			}
 		}
@@ -266,19 +284,19 @@ func compileWorkflowLLMDefaults(
 	var output sessionv3Runtime.SessionDefaultsOverride
 	if err := decoder.Decode(&output); err != nil {
 		return nil, errors.New(
-			"workflow Model or Agent defaults must be a typed defaults object",
+			"workflow model or agent defaults must be a typed defaults object",
 		)
 	}
 	var extra any
 	if err := decoder.Decode(&extra); err != io.EOF {
 		return nil, errors.New(
-			"workflow Model or Agent defaults contain more than one value",
+			"workflow model or agent defaults contain more than one value",
 		)
 	}
 	if output.Model != nil || output.Agent != nil ||
 		slicesContainTargetClear(output.Clear) {
 		return nil, errors.New(
-			"workflow Model or Agent defaults cannot replace the selected target",
+			"workflow model or agent defaults cannot replace the selected target",
 		)
 	}
 	return &output, nil

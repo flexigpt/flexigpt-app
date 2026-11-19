@@ -967,6 +967,7 @@ func (o WorkflowOperationTargetFacts) Validate() error {
 	}
 	switch o.WorkItemType {
 	case WorkItemTypeTool, WorkItemTypeService, WorkItemTypeActivity:
+	case WorkItemTypeChildCall:
 	default:
 		return errors.New("reconciliation target work item type is invalid")
 	}
@@ -1153,6 +1154,7 @@ func (p WorkItemPayload) Validate(kind WorkItemType) error {
 		{WorkItemTypeTool, p.Tool != nil},
 		{WorkItemTypeService, p.Service != nil},
 		{WorkItemTypeActivity, p.Activity != nil},
+		{WorkItemTypeChildCall, p.ChildCall != nil},
 		{WorkItemTypeTransform, p.Transform != nil},
 		{WorkItemTypeCondition, p.Condition != nil},
 		{WorkItemTypeStateUpdate, p.StateUpdate != nil},
@@ -1231,6 +1233,10 @@ func (p WorkItemPayload) Validate(kind WorkItemType) error {
 			!p.Activity.Context.Valid() {
 			return errors.New("invalid activity WorkItem")
 		}
+	case WorkItemTypeChildCall:
+		if err := p.ChildCall.Validate(); err != nil {
+			return err
+		}
 	case WorkItemTypeTransform:
 		if !p.Transform.Input.Valid() ||
 			!p.Transform.OutputSchema.Valid() {
@@ -1292,6 +1298,8 @@ func (p WorkItemPayload) Validate(kind WorkItemType) error {
 		if err := p.Reconciliation.Validate(); err != nil {
 			return err
 		}
+	default:
+		return errors.New("unsupported WorkItem payload type")
 	}
 	return nil
 }
@@ -1326,6 +1334,16 @@ func (w StateUpdateWork) Validate() error {
 		seen[path] = struct{}{}
 	}
 	return nil
+}
+
+func (w ChildCallWork) Validate() error {
+	if err := validateID("child call target", w.Target); err != nil {
+		return err
+	}
+	if !w.Input.Valid() || !w.Context.Valid() {
+		return errors.New("child call input or context is invalid")
+	}
+	return w.Completion.Validate()
 }
 
 func (c ToolCall) Validate() error {

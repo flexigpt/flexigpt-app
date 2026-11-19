@@ -853,38 +853,44 @@ func (i *WorkflowInterpreter) workflowStepWork(
 		)
 	}
 	intent.Claims = claims
+	if err := i.applyWorkflowStepEffectPolicy(
+		program,
+		state,
+		step,
+		&intent,
+	); err != nil {
+		return workflowFailure(
+			state,
+			"workflow_effect_invalid",
+			err.Error(),
+		)
+	}
+	return i.finalizeWorkflowStepWork(
+		program,
+		state,
+		path,
+		step,
+		intent,
+	)
+}
+
+func (i *WorkflowInterpreter) applyWorkflowStepEffectPolicy(
+	program WorkflowProgram,
+	state WorkflowState,
+	step WorkflowStep,
+	intent *WorkItemIntent,
+) error {
+	if intent == nil {
+		return errors.New("workflow WorkItem intent is unavailable")
+	}
 	if step.Effect != nil && step.Effect.Reconcile != nil {
 		plan := WorkflowEffectPlan{
 			Reconcile: step.Effect.Reconcile,
 		}
 		if err := plan.Validate(); err != nil {
-			return workflowFailure(
-				state,
-				"workflow_reconciliation_invalid",
-				err.Error(),
-			)
+			return err
 		}
 		intent.EffectPlan = &plan
-	}
-	intent.Retry = cloneWorkflowRetryPolicy(step.Retry)
-	if step.Limits != nil {
-		if intent.Budget == nil {
-			budget := cloneExecutionBudget(*step.Limits)
-			intent.Budget = &budget
-		} else {
-			budget, err := narrowExecutionBudget(
-				*intent.Budget,
-				*step.Limits,
-			)
-			if err != nil {
-				return workflowFailure(
-					state,
-					"workflow_limit_invalid",
-					err.Error(),
-				)
-			}
-			intent.Budget = &budget
-		}
 	}
 	if program.Scope.Cleanup {
 		intent.Cleanup = true
@@ -897,6 +903,47 @@ func (i *WorkflowInterpreter) workflowStepWork(
 			intent.EffectPlan = &WorkflowEffectPlan{}
 		}
 		intent.EffectPlan.Compensate = cloneWorkflowBlock(step.Effect.Compensate)
+	}
+
+	return nil
+}
+
+func (i *WorkflowInterpreter) applyWorkflowStepWorkBudget(
+	step WorkflowStep,
+	intent *WorkItemIntent,
+) error {
+	if intent == nil {
+		return errors.New("workflow WorkItem intent is unavailable")
+	}
+	intent.Retry = cloneWorkflowRetryPolicy(step.Retry)
+	if step.Limits == nil {
+		return nil
+	}
+	if intent.Budget == nil {
+		budget := cloneExecutionBudget(*step.Limits)
+		intent.Budget = &budget
+		return nil
+	}
+	budget, err := narrowExecutionBudget(
+		*intent.Budget,
+		*step.Limits,
+	)
+	if err != nil {
+		return err
+	}
+	intent.Budget = &budget
+	return nil
+}
+
+func (i *WorkflowInterpreter) finalizeWorkflowStepWork(
+	program WorkflowProgram,
+	state WorkflowState,
+	path string,
+	step WorkflowStep,
+	intent WorkItemIntent,
+) (ProgramTransition, error) {
+	if err := i.applyWorkflowStepWorkBudget(step, &intent); err != nil {
+		return workflowFailure(state, "workflow_limit_invalid", err.Error())
 	}
 	return workflowWork(state, path, intent)
 }

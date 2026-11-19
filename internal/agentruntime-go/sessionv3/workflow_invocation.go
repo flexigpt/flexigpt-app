@@ -205,6 +205,9 @@ func (i *WorkflowInterpreter) invokeWorkflowLLMTarget(
 	targetName string,
 	target WorkflowTarget,
 	call WorkflowCall,
+	input jsonutil.CanonicalValue,
+	contextValue jsonutil.CanonicalValue,
+	effect EffectContract,
 	handoff *ConversationHandoffIntent,
 	ports []PortPlan,
 	budget *ExecutionBudget,
@@ -228,18 +231,6 @@ func (i *WorkflowInterpreter) invokeWorkflowLLMTarget(
 		return workflowFailure(
 			state,
 			"workflow_invocation_input_invalid",
-			err.Error(),
-		)
-	}
-	claims, err := i.workflowResourceClaims(
-		program,
-		state,
-		step,
-	)
-	if err != nil {
-		return workflowFailure(
-			state,
-			"workflow_resource_claim_invalid",
 			err.Error(),
 		)
 	}
@@ -275,23 +266,25 @@ func (i *WorkflowInterpreter) invokeWorkflowLLMTarget(
 		)
 	}
 
-	state.PendingPath = path
-	state.PendingTarget = targetName
-	transition, err := workflowTransition(state, nil, nil, nil)
+	transition, err := i.startWorkflowChildCall(
+		frame,
+		program,
+		state,
+		path,
+		step,
+		targetName,
+		effect,
+		input,
+		contextValue,
+		child,
+		ports,
+		budget,
+		handoff,
+	)
 	if err != nil {
 		return ProgramTransition{}, err
 	}
-	transition.Activities = invocation.Activities
-	transition.Frames = []ProgramFrameIntent{{
-		Path:            path,
-		DeclarationPath: state.PendingDeclarationPath,
-		Program:         child,
-		Deadline:        cloneTime(state.Deadline),
-		Budget:          cloneBudget(budget),
-		Claims:          claims,
-		Ports:           clonePortPlans(ports),
-		Handoff:         handoff,
-	}}
+	transition.Activities = append([]Activity(nil), invocation.Activities...)
 	return transition, nil
 }
 
@@ -304,6 +297,9 @@ func (i *WorkflowInterpreter) handoffWorkflowAgentTarget(
 	targetName string,
 	target WorkflowTarget,
 	call WorkflowCall,
+	input jsonutil.CanonicalValue,
+	contextValue jsonutil.CanonicalValue,
+	effect EffectContract,
 	ports []PortPlan,
 	budget *ExecutionBudget,
 ) (ProgramTransition, error) {
@@ -361,6 +357,9 @@ func (i *WorkflowInterpreter) handoffWorkflowAgentTarget(
 		targetName,
 		target,
 		call,
+		input,
+		contextValue,
+		effect,
 		&ConversationHandoffIntent{
 			ID:                  "workflow-handoff:" + string(frame.ID) + ":" + path,
 			ConversationID:      conversationID,

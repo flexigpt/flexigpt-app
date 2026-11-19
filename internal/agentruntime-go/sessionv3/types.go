@@ -664,6 +664,7 @@ const (
 	WorkItemTypeTool           WorkItemType = "tool"
 	WorkItemTypeService        WorkItemType = "service"
 	WorkItemTypeActivity       WorkItemType = "activity"
+	WorkItemTypeChildCall      WorkItemType = "childCall"
 	WorkItemTypeTransform      WorkItemType = "transform"
 	WorkItemTypeCondition      WorkItemType = "condition"
 	WorkItemTypeStateUpdate    WorkItemType = "stateUpdate"
@@ -968,6 +969,7 @@ type WorkItemPayload struct {
 	Tool           *ToolWork           `json:"tool,omitempty"`
 	Service        *ServiceWork        `json:"service,omitempty"`
 	Activity       *ActivityWork       `json:"activity,omitempty"`
+	ChildCall      *ChildCallWork      `json:"childCall,omitempty"`
 	Transform      *TransformWork      `json:"transform,omitempty"`
 	Condition      *ConditionWork      `json:"condition,omitempty"`
 	StateUpdate    *StateUpdateWork    `json:"stateUpdate,omitempty"`
@@ -1104,6 +1106,17 @@ type ActivityWork struct {
 	BindingVersion string                  `json:"bindingVersion"`
 	Input          jsonutil.CanonicalValue `json:"input"`
 	Context        jsonutil.CanonicalValue `json:"context,omitempty"`
+}
+
+// ChildCallWork is the durable outer Workflow call boundary for a child
+// ProgramFrame. It records orchestration facts only. Native Model, Agent,
+// Tool, MCP, and Workflow execution remains inside the child frame and its
+// owning setup-domain binder.
+type ChildCallWork struct {
+	Target     string                  `json:"target"`
+	Input      jsonutil.CanonicalValue `json:"input"`
+	Context    jsonutil.CanonicalValue `json:"context,omitempty"`
+	Completion CompletionHandle        `json:"completion"`
 }
 
 type TransformWork struct {

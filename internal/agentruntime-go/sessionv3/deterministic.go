@@ -52,6 +52,25 @@ func (DeterministicExecutor) Bind(
 			Private:         deterministicBinding{},
 		}, true, nil
 
+	case WorkItemTypeChildCall:
+		if item.Input.ChildCall == nil {
+			return BindResult{}, true, errors.New(
+				"child call WorkItem has no payload",
+			)
+		}
+		completion := item.Input.ChildCall.Completion
+		if err := completion.Validate(); err != nil {
+			return BindResult{}, true, err
+		}
+		return BindResult{
+			SemanticBinding: binding,
+			Wait: &WaitRequest{
+				Kind:       WaitKindChild,
+				Completion: &completion,
+			},
+			Private: deterministicBinding{},
+		}, true, nil
+
 	case WorkItemTypeWait:
 		if item.Input.Wait == nil {
 			return BindResult{}, true, errors.New(
@@ -90,6 +109,11 @@ func (DeterministicExecutor) Execute(
 	switch item.Type {
 	case WorkItemTypeFork:
 		return deterministicForkResult(item)
+
+	case WorkItemTypeChildCall:
+		return WorkExecutionResult{}, true, errors.New(
+			"child call WorkItem must settle from child completion",
+		)
 
 	case WorkItemTypeReconciliation:
 		return deterministicReconciliationResult(item)

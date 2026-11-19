@@ -772,6 +772,32 @@ func (r *Runtime) wakeCompletionFrameWaitsLocked(
 			continue
 		}
 
+		item := mutableWorkItem(execution, wait.WorkItemID)
+		if item != nil && item.Type == WorkItemTypeChildCall {
+			value, errorValue, confirmed := childCallFrameResult(frame)
+			var receipt *ExternalReceipt
+			if confirmed {
+				receipt = cloneReconciliationReceipt(frame.Receipt)
+				if receipt == nil {
+					receipt = &ExternalReceipt{
+						System:      sessionV3Completion,
+						Reference:   string(frame.ID),
+						ConfirmedAt: r.now(),
+					}
+				}
+			}
+			_ = r.resolveDurableWaitLocked(
+				session,
+				execution,
+				wait,
+				value,
+				receipt,
+				errorValue,
+				confirmed,
+			)
+			continue
+		}
+
 		value := jsonutil.MustCanonicalValue(completionWaitOutput{
 			FrameID: frame.ID,
 			Output:  frame.Output.Clone(),
@@ -807,6 +833,46 @@ func (r *Runtime) wakeCompletionFrameWaitsLocked(
 			errorValue,
 			confirmed,
 		)
+	}
+}
+
+func childCallFrameResult(
+	frame ProgramFrame,
+) (jsonutil.CanonicalValue, *SanitizedError, bool) {
+	value := frame.Output.Clone()
+	if len(value) == 0 {
+		value = jsonutil.MustCanonicalValue(nil)
+	}
+
+	switch frame.Status {
+	case ProgramFrameStateCompleted:
+		return value, nil, true
+
+	case ProgramFrameStateFailed:
+		if frame.Error == nil {
+			return value, &SanitizedError{
+				Code:     "child_call_failed",
+				Category: ErrorCategoryExecution,
+				Message:  "child call frame failed without an error",
+			}, false
+		}
+		errorValue := cloneWorkflowSanitizedError(frame.Error)
+		return value, errorValue,
+			errorValue.Effect == EffectStateConfirmedNotApplied
+
+	case ProgramFrameStateCancelled:
+		return value, &SanitizedError{
+			Code:     completionCancelled,
+			Category: ErrorCategoryCancellation,
+			Message:  "child call frame was cancelled",
+		}, false
+
+	default:
+		return value, &SanitizedError{
+			Code:     "child_call_not_terminal",
+			Category: ErrorCategoryExecution,
+			Message:  "child call frame did not reach a terminal state",
+		}, false
 	}
 }
 

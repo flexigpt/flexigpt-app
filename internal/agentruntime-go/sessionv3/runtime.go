@@ -2293,6 +2293,12 @@ func (r *Runtime) dispatchOne(ctx context.Context, sessionID SessionID, executio
 		return
 	}
 	if bound.Wait != nil {
+		if item.Type == WorkItemTypeChildCall {
+			r.beginChildCallAttemptLocked(
+				execution,
+				item,
+			)
+		}
 		bound.Wait.Deadline = earlierDeadline(bound.Wait.Deadline, item.Deadline)
 		now := r.now()
 		wait := Wait{
@@ -2542,6 +2548,38 @@ func (r *Runtime) startDispatchedLocked(
 	r.privateBindings[item.ID] = bound
 	r.touchExecutionLocked(session, execution)
 	return r.persistLocked(ctx, "workDispatched", session)
+}
+
+// beginChildCallAttemptLocked creates the durable outer call attempt before
+// the WorkItem waits for its child frame. The child frame owns native domain
+// execution. This boundary records orchestration effect facts only.
+func (r *Runtime) beginChildCallAttemptLocked(
+	execution *Execution,
+	item *WorkItem,
+) {
+	if execution == nil ||
+		item == nil ||
+		item.Type != WorkItemTypeChildCall ||
+		activeAttempt(execution, item.ID) != nil {
+		return
+	}
+
+	now := r.now()
+	attempt := Attempt{
+		ID:             AttemptID(r.newID()),
+		WorkItemID:     item.ID,
+		State:          AttemptStateDispatched,
+		Number:         nextAttempt(*execution, item.ID),
+		IdempotencyKey: item.Effect.IdempotencyKey,
+		EffectState:    effectStateForDispatch(item.Effect),
+		StartedAt:      now,
+		Deadline:       cloneTime(item.Deadline),
+	}
+	item.AttemptIDs = append(item.AttemptIDs, attempt.ID)
+	item.EffectState = effectStateForDispatch(item.Effect)
+	item.DispatchedAt = &now
+	item.UpdatedAt = now
+	execution.Attempts = append(execution.Attempts, attempt)
 }
 
 func (r *Runtime) executeOne(

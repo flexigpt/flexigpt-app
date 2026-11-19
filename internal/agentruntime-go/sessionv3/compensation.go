@@ -277,6 +277,13 @@ func compensationInput(item WorkItem) (jsonutil.CanonicalValue, error) {
 			return nil, errors.New("compensation activity input is unavailable")
 		}
 		return item.Input.Activity.Input.Clone(), nil
+	case WorkItemTypeChildCall:
+		if item.Input.ChildCall == nil {
+			return nil, errors.New(
+				"compensation child call input is unavailable",
+			)
+		}
+		return item.Input.ChildCall.Input.Clone(), nil
 	default:
 		return nil, errors.New("compensation is unavailable for this work item type")
 	}

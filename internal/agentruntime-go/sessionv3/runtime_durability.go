@@ -146,6 +146,27 @@ func (r *Runtime) resumeRestoredWork(ctx context.Context) {
 					break
 				}
 			}
+
+			waitChanged, waitErr := r.resolveRestoredDurableWaitsLocked(
+				session,
+				execution,
+			)
+			if waitErr == nil && waitChanged {
+				current := mutableSessionExecution(session, execution.ID)
+				if current == nil {
+					continue
+				}
+				r.touchExecutionLocked(session, current)
+				if err := r.persistLocked(
+					ctx,
+					"durableWaitRecovery",
+					session,
+				); err != nil {
+					continue
+				}
+				execution = current
+			}
+
 			r.armExecutionDueTimesLocked(
 				ctx,
 				session.ID,
@@ -155,6 +176,43 @@ func (r *Runtime) resumeRestoredWork(ctx context.Context) {
 			r.launchWork(ctx, session.ID, execution.ID, r.readyWorkLocked(*execution))
 		}
 	}
+}
+
+func (r *Runtime) resolveRestoredDurableWaitsLocked(
+	session *Session,
+	execution *Execution,
+) (bool, error) {
+	if session == nil || execution == nil {
+		return false, errors.New("restored durable wait owner is unavailable")
+	}
+
+	ids := make([]WaitID, 0)
+	for _, wait := range execution.Waits {
+		if wait.Status != WaitStatusPending || wait.Request.RuntimeBound {
+			continue
+		}
+		switch wait.Request.Kind {
+		case WaitKindEvent, WaitKindChannel, WaitKindChild:
+			ids = append(ids, wait.ID)
+		default:
+		}
+	}
+
+	changed := false
+	for _, id := range ids {
+		before := mutableWait(execution, id)
+		if before == nil || before.Status != WaitStatusPending {
+			continue
+		}
+		if err := r.resolveReadyWaitLocked(session, execution, id); err != nil {
+			return changed, err
+		}
+		after := mutableWait(execution, id)
+		if after != nil && after.Status != WaitStatusPending {
+			changed = true
+		}
+	}
+	return changed, nil
 }
 
 func validateWaitResponse(wait Wait, response jsonutil.CanonicalValue) error {
