@@ -264,9 +264,10 @@ func (i *WorkflowInterpreter) settleReconciliationIntent(
 	t, err := workflowStructuredTransition(
 		state,
 		[]ProgramFrameIntent{{
-			Path:     childPath,
-			Program:  snapshot,
-			Deadline: cloneTime(state.Deadline),
+			Path:            childPath,
+			DeclarationPath: firstText(step.Effect.Reconcile.DeclarationPath, state.PendingDeclarationPath),
+			Program:         snapshot,
+			Deadline:        cloneTime(state.Deadline),
 		}},
 	)
 	if err != nil {
@@ -396,19 +397,18 @@ func (i *WorkflowInterpreter) settleReconciliationChild(
 			return ProgramTransition{}, true, err
 		}
 		if err := state.recordOutcome(WorkflowStepOutcome{
-			ID:     step.ID,
-			Status: WorkflowStepOutcomeSucceeded,
-			Output: reconciled.Output.Clone(),
-			Target: state.PendingTarget,
+			ID:              step.ID,
+			Status:          WorkflowStepOutcomeSucceeded,
+			Output:          reconciled.Output.Clone(),
+			Target:          state.PendingTarget,
+			DeclarationPath: state.PendingDeclarationPath,
 		}); err != nil {
 			return ProgramTransition{}, true, err
 		}
 
 		state.Pending = nil
-		state.PendingPath = ""
-		state.PendingTarget = ""
-		state.Deadline = nil
 		state.Index++
+		state.clearPendingStep()
 
 		transition, err := i.drive(frame, execution, program, state)
 		if err != nil {
@@ -528,12 +528,13 @@ func (i *WorkflowInterpreter) driveReconciliation(
 			nil,
 			nil,
 			[]WorkItemIntent{{
-				ID:          progress.IntentWorkItemID,
-				ProgramPath: pending.Path + "/reconciliation",
-				Cleanup:     true,
-				Type:        WorkItemTypeReconciliation,
-				Automatic:   true,
-				Effect:      EffectContract{Kind: EffectKindRead},
+				ID:              progress.IntentWorkItemID,
+				ProgramPath:     pending.Path + "/reconciliation",
+				DeclarationPath: state.PendingDeclarationPath,
+				Cleanup:         true,
+				Type:            WorkItemTypeReconciliation,
+				Automatic:       true,
+				Effect:          EffectContract{Kind: EffectKindRead},
 				Input: WorkItemPayload{
 					Reconciliation: &ReconciliationWork{
 						OriginalWorkItemID: progress.OriginalWorkItemID,
@@ -568,12 +569,13 @@ func (i *WorkflowInterpreter) driveReconciliation(
 			nil,
 			nil,
 			[]WorkItemIntent{{
-				ID:          reviewID,
-				ProgramPath: pending.Path + "/reconciliation/review",
-				Cleanup:     true,
-				Type:        WorkItemTypeWait,
-				Automatic:   true,
-				Effect:      EffectContract{Kind: EffectKindRead},
+				ID:              reviewID,
+				ProgramPath:     pending.Path + "/reconciliation/review",
+				DeclarationPath: state.PendingDeclarationPath,
+				Cleanup:         true,
+				Type:            WorkItemTypeWait,
+				Automatic:       true,
+				Effect:          EffectContract{Kind: EffectKindRead},
 				Input: WorkItemPayload{
 					Wait: &WaitWork{
 						Request: WaitRequest{

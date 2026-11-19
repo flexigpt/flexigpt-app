@@ -360,9 +360,10 @@ func (i *WorkflowInterpreter) startWorkflowTerminalChild(
 	return workflowStructuredTransition(
 		state,
 		[]ProgramFrameIntent{{
-			Path:     path,
-			Program:  snapshot,
-			Deadline: cloneTime(frame.Deadline),
+			Path:            path,
+			DeclarationPath: firstText(block.DeclarationPath, state.PendingDeclarationPath),
+			Program:         snapshot,
+			Deadline:        cloneTime(frame.Deadline),
 		}},
 	)
 }

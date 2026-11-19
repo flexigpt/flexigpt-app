@@ -30,6 +30,9 @@ func (r *Runtime) deferFrameForkLocked(
 	childIDs := make([]ProgramFrameID, 0, len(intents))
 	seen := make(map[ProgramFrameID]struct{}, len(intents))
 	cleanup := false
+	forkClaims := append([]ResourceClaim(nil), claims...)
+	claimOwner := ProgramFrameID("")
+
 	for _, input := range intents {
 		intent, err := cloneForkIntent(input)
 		if err != nil {
@@ -43,6 +46,25 @@ func (r *Runtime) deferFrameForkLocked(
 		}
 		if mutableFrame(execution, intent.ID) != nil {
 			return fmt.Errorf("fork boundary child ProgramFrame %q already exists", intent.ID)
+		}
+		if len(intent.Claims) != 0 {
+			if len(intents) != 1 {
+				return errors.New(
+					"child-frame resource claims require one child ProgramFrame",
+				)
+			}
+			if intent.Lifetime == ChildFrameLifetimeIndependent {
+				return errors.New(
+					"independent child-frame resource claims must be lowered inside the child execution",
+				)
+			}
+			if len(forkClaims) != 0 {
+				return errors.New(
+					"fork boundary has parent and child resource claims",
+				)
+			}
+			forkClaims = append([]ResourceClaim(nil), intent.Claims...)
+			claimOwner = intent.ID
 		}
 		if intent.Lifetime == ChildFrameLifetimeIndependent &&
 			intent.ExecutionID == "" {
@@ -62,16 +84,18 @@ func (r *Runtime) deferFrameForkLocked(
 	workID := WorkItemID(r.newID())
 	now := r.now()
 	work := WorkItem{
-		ID:                   workID,
-		FrameID:              frame.ID,
-		Type:                 WorkItemTypeFork,
-		State:                WorkItemStateReady,
-		Claims:               append([]ResourceClaim(nil), claims...),
-		ProgramPath:          frame.Path + "/fork",
-		Effect:               EffectContract{Kind: EffectKindRead},
-		Automatic:            true,
-		Cleanup:              cleanup,
-		RetainClaimsForFrame: len(claims) != 0,
+		ID:                     workID,
+		FrameID:                frame.ID,
+		Type:                   WorkItemTypeFork,
+		State:                  WorkItemStateReady,
+		Claims:                 forkClaims,
+		ProgramPath:            frame.Path + "/fork",
+		DeclarationPath:        frame.DeclarationPath,
+		Effect:                 EffectContract{Kind: EffectKindRead},
+		Automatic:              true,
+		Cleanup:                cleanup,
+		RetainClaimsForFrame:   len(forkClaims) != 0,
+		RetainClaimsForFrameID: claimOwner,
 		Input: WorkItemPayload{
 			Fork: &ForkWork{
 				ChildFrames: append([]ProgramFrameID(nil), childIDs...),
@@ -99,6 +123,7 @@ func cloneForkIntent(value ProgramFrameIntent) (ProgramFrameIntent, error) {
 	output.Deadline = cloneTime(value.Deadline)
 	output.Program.Payload = value.Program.Payload.Clone()
 	output.Budget = cloneBudget(value.Budget)
+	output.Claims = append([]ResourceClaim(nil), value.Claims...)
 	if value.Program.Artifact != nil {
 		pin := *value.Program.Artifact
 		output.Program.Artifact = &pin
@@ -111,6 +136,11 @@ func cloneForkIntent(value ProgramFrameIntent) (ProgramFrameIntent, error) {
 	if value.Handoff != nil {
 		handoff := *value.Handoff
 		output.Handoff = &handoff
+	}
+	for _, claim := range output.Claims {
+		if err := claim.Validate(); err != nil {
+			return ProgramFrameIntent{}, err
+		}
 	}
 	if err := validateDeferredFrameIntent(output); err != nil {
 		return ProgramFrameIntent{}, err
@@ -427,14 +457,15 @@ func (r *Runtime) queueChildJoinLocked(
 	now := r.now()
 	workID := WorkItemID(r.newID())
 	work := WorkItem{
-		ID:          workID,
-		FrameID:     parent.ID,
-		Type:        WorkItemTypeJoin,
-		State:       WorkItemStateReady,
-		ProgramPath: parent.Path + "/join/" + string(childID),
-		Effect:      EffectContract{Kind: EffectKindRead},
-		Automatic:   true,
-		Cleanup:     workflowFrameRunsCleanup(*child),
+		ID:              workID,
+		FrameID:         parent.ID,
+		Type:            WorkItemTypeJoin,
+		State:           WorkItemStateReady,
+		ProgramPath:     parent.Path + "/join/" + string(childID),
+		DeclarationPath: parent.DeclarationPath,
+		Effect:          EffectContract{Kind: EffectKindRead},
+		Automatic:       true,
+		Cleanup:         workflowFrameRunsCleanup(*child),
 		Input: WorkItemPayload{
 			Join: &JoinWork{
 				ChildFrames: []ProgramFrameID{childID},

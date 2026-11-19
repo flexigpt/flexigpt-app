@@ -616,7 +616,16 @@ func (a *Admission) admitPlanned(
 	); err != nil {
 		return sessionv3Runtime.WorkflowAdmissionResult{}, err
 	}
-	if err := validatePreparedTargetTransport(plan.facts.Inventory, program.Targets); err != nil {
+	if err := prepareWorkflowLLMInvocations(
+		plan.facts.Inventory,
+		&program,
+	); err != nil {
+		return sessionv3Runtime.WorkflowAdmissionResult{}, err
+	}
+	if err := validatePreparedTargetTransport(
+		plan.facts.Inventory,
+		&program,
+	); err != nil {
 		return sessionv3Runtime.WorkflowAdmissionResult{}, err
 	}
 

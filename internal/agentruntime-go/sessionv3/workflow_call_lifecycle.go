@@ -121,14 +121,19 @@ func (i *WorkflowInterpreter) startCall(
 	)
 
 	childStep := WorkflowStep{
-		ID:           "invoke",
-		Timeout:      step.Timeout,
-		Retry:        cloneWorkflowRetryPolicy(step.Retry),
-		OutputSchema: step.OutputSchema.Clone(),
-		Call:         &childCall,
+		ID:              "invoke",
+		DeclarationPath: step.DeclarationPath,
+		Timeout:         step.Timeout,
+		Retry:           cloneWorkflowRetryPolicy(step.Retry),
+		Effect:          cloneWorkflowStepEffect(step.Effect),
+		Claims:          append([]WorkflowResourceClaim(nil), step.Claims...),
+		Limits:          cloneBudget(step.Limits),
+		OutputSchema:    step.OutputSchema.Clone(),
+		Call:            &childCall,
 	}
 	childBlock := WorkflowBlock{
-		Steps: []WorkflowStep{childStep},
+		DeclarationPath: step.DeclarationPath,
+		Steps:           []WorkflowStep{childStep},
 		Output: WorkflowValue{
 			Kind:       WorkflowValueExpression,
 			Expression: "steps.invoke.output",
@@ -204,10 +209,7 @@ func (i *WorkflowInterpreter) startCall(
 	}
 
 	state.Index++
-	state.PendingPath = ""
-	state.PendingDeclarationPath = ""
-	state.PendingTarget = ""
-	state.Deadline = nil
+	state.clearPendingStep()
 
 	transition, err := workflowTransition(
 		state,
@@ -326,9 +328,10 @@ func (i *WorkflowInterpreter) cancelCall(
 		)
 	}
 	if err := state.recordOutcome(WorkflowStepOutcome{
-		ID:     step.ID,
-		Status: WorkflowStepOutcomeSucceeded,
-		Output: output,
+		ID:              step.ID,
+		Status:          WorkflowStepOutcomeSucceeded,
+		Output:          output,
+		DeclarationPath: state.PendingDeclarationPath,
 	}); err != nil {
 		return workflowFailure(
 			state,
@@ -338,9 +341,7 @@ func (i *WorkflowInterpreter) cancelCall(
 	}
 
 	state.Index++
-	state.PendingPath = ""
-	state.PendingTarget = ""
-	state.Deadline = nil
+	state.clearPendingStep()
 
 	transition, err := workflowTransition(
 		state,
@@ -366,4 +367,21 @@ func (i *WorkflowInterpreter) cancelCall(
 	}
 	transition.ContinueParent = true
 	return transition, nil
+}
+
+func cloneWorkflowStepEffect(
+	value *WorkflowStepEffect,
+) *WorkflowStepEffect {
+	if value == nil {
+		return nil
+	}
+
+	output := *value
+	if value.Key != nil {
+		key := cloneWorkflowValue(*value.Key)
+		output.Key = &key
+	}
+	output.Reconcile = cloneWorkflowBlock(value.Reconcile)
+	output.Compensate = cloneWorkflowBlock(value.Compensate)
+	return &output
 }

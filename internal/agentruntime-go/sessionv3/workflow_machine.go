@@ -721,9 +721,10 @@ func (i *WorkflowInterpreter) startMachineChild(
 	return workflowStructuredTransition(
 		state,
 		[]ProgramFrameIntent{{
-			Path:     childPath,
-			Program:  snapshot,
-			Deadline: cloneTime(state.Deadline),
+			Path:            childPath,
+			DeclarationPath: firstText(block.DeclarationPath, state.PendingDeclarationPath),
+			Program:         snapshot,
+			Deadline:        cloneTime(state.Deadline),
 		}},
 	)
 }
@@ -1085,6 +1086,7 @@ func (i *WorkflowInterpreter) settleMachineChild(
 		state.Exit = result.Exit
 		state.ExitValue = result.Value.Clone()
 		state.Pending = nil
+		state.clearPendingStep()
 		return nil
 	default:
 		return errors.New(
@@ -1215,9 +1217,10 @@ func (i *WorkflowInterpreter) finishMachine(
 		)
 	}
 	if err := state.recordOutcome(WorkflowStepOutcome{
-		ID:     step.ID,
-		Status: WorkflowStepOutcomeSucceeded,
-		Output: value,
+		ID:              step.ID,
+		Status:          WorkflowStepOutcomeSucceeded,
+		Output:          value,
+		DeclarationPath: state.PendingDeclarationPath,
 	}); err != nil {
 		return workflowFailure(
 			state,
@@ -1240,9 +1243,7 @@ func (i *WorkflowInterpreter) finishMachine(
 	)
 	state.Pending = nil
 	state.Index++
-	state.PendingPath = ""
-	state.PendingTarget = ""
-	state.Deadline = nil
+	state.clearPendingStep()
 	return workflowTransition(state, nil, nil, nil)
 }
 

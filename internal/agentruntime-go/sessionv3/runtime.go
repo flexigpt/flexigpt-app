@@ -2811,10 +2811,14 @@ func (r *Runtime) finishWorkLocked(
 	if item.State.Terminal() {
 		if item.RetainClaimsForFrame &&
 			item.State == WorkItemStateCompleted {
+			owner := item.FrameID
+			if item.RetainClaimsForFrameID != "" {
+				owner = item.RetainClaimsForFrameID
+			}
 			r.transferWorkResourcesToFrameLocked(
 				execution,
 				item.ID,
-				item.FrameID,
+				owner,
 			)
 		} else {
 			released := r.releaseWorkResourcesLocked(execution, item.ID)

@@ -152,11 +152,12 @@ func (i *WorkflowInterpreter) driveParentStateMerge(
 			nil,
 			nil,
 			[]WorkItemIntent{{
-				ID:          progress.WorkItemID,
-				ProgramPath: state.Pending.Path + "/state-merge",
-				Type:        WorkItemTypeStateUpdate,
-				Automatic:   true,
-				Effect:      EffectContract{Kind: EffectKindRead},
+				ID:              progress.WorkItemID,
+				ProgramPath:     state.Pending.Path + "/state-merge",
+				DeclarationPath: state.PendingDeclarationPath,
+				Type:            WorkItemTypeStateUpdate,
+				Automatic:       true,
+				Effect:          EffectContract{Kind: EffectKindRead},
 				Input: WorkItemPayload{
 					StateUpdate: ptrWorkflowStateUpdate(progress.Update),
 				},

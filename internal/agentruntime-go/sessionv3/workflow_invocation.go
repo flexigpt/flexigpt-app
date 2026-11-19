@@ -1,37 +1,12 @@
 package sessionv3
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
-	"io"
 	"slices"
 	"strconv"
 
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
-
-// workflowInvocationMessage is a Workflow-owned explicit message transfer.
-// It is lowered to an existing Session Activity before a Model or Agent child
-// ProgramFrame starts. It is not a Model or Agent domain request envelope.
-//
-// Workflow values that do not use this typed transfer form cannot become
-// fallback chat text.
-type workflowInvocationMessage struct {
-	Role        MessageRole  `json:"role"`
-	Text        string       `json:"text,omitempty"`
-	Attachments []Attachment `json:"attachments,omitempty"`
-}
-
-type workflowInvocationInput struct {
-	Messages []workflowInvocationMessage `json:"messages"`
-}
-
-type workflowInvocationContext struct {
-	Instructions []Instruction               `json:"instructions,omitempty"`
-	Messages     []workflowInvocationMessage `json:"messages,omitempty"`
-	Defaults     *SessionDefaultsOverride    `json:"defaults,omitempty"`
-}
 
 type workflowLLMInvocation struct {
 	Activities         []Activity
@@ -40,78 +15,101 @@ type workflowLLMInvocation struct {
 	HistoryActivityIDs []ActivityID
 }
 
-func decodeWorkflowInvocationValue[T any](
-	value jsonutil.CanonicalValue,
-	label string,
-) (T, error) {
-	var output T
-	decoder := json.NewDecoder(bytes.NewReader(value))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&output); err != nil {
-		return output, errors.New(label + " has unsupported fields or an invalid shape")
+func (v WorkflowLLMInvocation) Validate() error {
+	if len(v.Messages) == 0 {
+		return errors.New("workflow model or agent invocation requires messages")
 	}
-	var extra any
-	if err := decoder.Decode(&extra); err != io.EOF {
-		return output, errors.New(label + " contains more than one value")
+	if workflowInvocationOverridesTarget(v.Defaults) {
+		return errors.New(
+			"workflow model or agent defaults cannot replace the selected target",
+		)
 	}
-	return output, nil
+	for index := range v.Messages {
+		if err := v.Messages[index].Validate(); err != nil {
+			return err
+		}
+	}
+	for index := range v.Instructions {
+		if err := v.Instructions[index].Validate(); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
-func prepareWorkflowLLMInvocation(
+func (v WorkflowLLMMessage) Validate() error {
+	switch v.Role {
+	case MessageRoleSystem,
+		MessageRoleDeveloper,
+		MessageRoleUser,
+		MessageRoleAssistant:
+	default:
+		return errors.New("workflow model or agent message role is unsupported")
+	}
+	if v.Text != nil {
+		if err := v.Text.Validate(); err != nil {
+			return err
+		}
+	}
+	for _, attachment := range v.Attachments {
+		if err := attachment.Validate(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (v WorkflowLLMInstruction) Validate() error {
+	if v.ID != "" {
+		if err := validateID("workflow instruction ID", v.ID); err != nil {
+			return err
+		}
+	}
+	return v.Content.Validate()
+}
+
+func (i *WorkflowInterpreter) prepareWorkflowLLMInvocation(
 	frame ProgramFrame,
 	path string,
 	target WorkflowTarget,
-	input jsonutil.CanonicalValue,
-	contextValue jsonutil.CanonicalValue,
+	template WorkflowLLMInvocation,
+	program WorkflowProgram,
+	state WorkflowState,
 ) (workflowLLMInvocation, error) {
-	request, err := decodeWorkflowInvocationValue[workflowInvocationInput](
-		input,
-		"workflow model or agent input",
-	)
-	if err != nil {
-		return workflowLLMInvocation{}, errors.New(
-			"workflow model or agent input must use the explicit messages form",
-		)
-	}
-	if len(request.Messages) == 0 {
-		return workflowLLMInvocation{}, errors.New(
-			"workflow model or agent input requires at least one message",
-		)
-	}
-
-	var context workflowInvocationContext
-	if len(contextValue) != 0 && string(contextValue) != "null" {
-		context, err = decodeWorkflowInvocationValue[workflowInvocationContext](
-			contextValue,
-			"workflow model or agent context",
-		)
-		if err != nil {
-			return workflowLLMInvocation{}, errors.New(
-				"workflow model or agent context must use the explicit instructions form",
-			)
-		}
-	}
-	if workflowInvocationOverridesTarget(context.Defaults) {
-		return workflowLLMInvocation{}, errors.New(
-			"workflow model or agent context cannot replace the selected target",
-		)
+	if err := template.Validate(); err != nil {
+		return workflowLLMInvocation{}, err
 	}
 
 	defaults := SessionDefaults{}
-	if context.Defaults != nil {
+	if template.Defaults != nil {
+		overrides := jsonutil.CloneJSONInValue(*template.Defaults)
 		resolved, err := resolveSessionInvocationDefaults(
 			defaults,
-			context.Defaults,
+			&overrides,
 		)
 		if err != nil {
 			return workflowLLMInvocation{}, err
 		}
 		defaults = resolved
 	}
-	defaults.SystemInstructions = append(
-		defaults.SystemInstructions,
-		context.Instructions...,
-	)
+	for _, instruction := range template.Instructions {
+		content, err := i.stringValue(
+			instruction.Content,
+			program,
+			state,
+		)
+		if err != nil {
+			return workflowLLMInvocation{}, err
+		}
+		defaults.SystemInstructions = append(
+			defaults.SystemInstructions,
+			Instruction{
+				ID:      instruction.ID,
+				Label:   instruction.Label,
+				Content: content,
+			},
+		)
+	}
 
 	if target.Artifact == nil {
 		return workflowLLMInvocation{}, errors.New(
@@ -138,25 +136,22 @@ func prepareWorkflowLLMInvocation(
 		}
 	}
 
-	messages := append(
-		append([]workflowInvocationMessage(nil), context.Messages...),
-		request.Messages...,
-	)
-	activities := make([]Activity, 0, len(messages))
-	activityIDs := make([]ActivityID, 0, len(messages))
-	for index := range messages {
-		message := messages[index]
-		switch message.Role {
-		case MessageRoleSystem,
-			MessageRoleDeveloper,
-			MessageRoleUser,
-			MessageRoleAssistant:
-		default:
-			return workflowLLMInvocation{}, errors.New(
-				"workflow model or agent message role is unsupported",
+	activities := make([]Activity, 0, len(template.Messages))
+	activityIDs := make([]ActivityID, 0, len(template.Messages))
+	for index := range template.Messages {
+		message := template.Messages[index]
+		text := ""
+		if message.Text != nil {
+			value, err := i.stringValue(
+				*message.Text,
+				program,
+				state,
 			)
+			if err != nil {
+				return workflowLLMInvocation{}, err
+			}
+			text = value
 		}
-
 		activityID := ActivityID(
 			"workflow-llm:" +
 				string(frame.ID) +
@@ -170,9 +165,11 @@ func prepareWorkflowLLMInvocation(
 			Kind:       ActivityKindMessage,
 			Visibility: ActivityVisibilityAudit,
 			Message: &MessageActivity{
-				Role:        message.Role,
-				Text:        message.Text,
-				Attachments: append([]Attachment(nil), message.Attachments...),
+				Role: message.Role,
+				Text: text,
+				Attachments: jsonutil.CloneJSONInValue(
+					message.Attachments,
+				),
 			},
 		})
 		activityIDs = append(activityIDs, activityID)
@@ -202,26 +199,47 @@ func workflowInvocationOverridesTarget(
 func (i *WorkflowInterpreter) invokeWorkflowLLMTarget(
 	frame ProgramFrame,
 	state WorkflowState,
+	program WorkflowProgram,
 	path string,
+	step WorkflowStep,
 	targetName string,
 	target WorkflowTarget,
-	input jsonutil.CanonicalValue,
-	contextValue jsonutil.CanonicalValue,
+	call WorkflowCall,
 	handoff *ConversationHandoffIntent,
 	ports []PortPlan,
 	budget *ExecutionBudget,
 ) (ProgramTransition, error) {
-	invocation, err := prepareWorkflowLLMInvocation(
+	if call.LLMInvocation == nil {
+		return workflowFailure(
+			state,
+			"workflow_invocation_input_invalid",
+			"workflow model or agent target requires a typed invocation",
+		)
+	}
+	invocation, err := i.prepareWorkflowLLMInvocation(
 		frame,
 		path,
 		target,
-		input,
-		contextValue,
+		*call.LLMInvocation,
+		program,
+		state,
 	)
 	if err != nil {
 		return workflowFailure(
 			state,
 			"workflow_invocation_input_invalid",
+			err.Error(),
+		)
+	}
+	claims, err := i.workflowResourceClaims(
+		program,
+		state,
+		step,
+	)
+	if err != nil {
+		return workflowFailure(
+			state,
+			"workflow_resource_claim_invalid",
 			err.Error(),
 		)
 	}
@@ -270,6 +288,7 @@ func (i *WorkflowInterpreter) invokeWorkflowLLMTarget(
 		Program:         child,
 		Deadline:        cloneTime(state.Deadline),
 		Budget:          cloneBudget(budget),
+		Claims:          claims,
 		Ports:           clonePortPlans(ports),
 		Handoff:         handoff,
 	}}
@@ -281,10 +300,9 @@ func (i *WorkflowInterpreter) handoffWorkflowAgentTarget(
 	program WorkflowProgram,
 	state WorkflowState,
 	path string,
+	step WorkflowStep,
 	targetName string,
 	target WorkflowTarget,
-	input jsonutil.CanonicalValue,
-	contextValue jsonutil.CanonicalValue,
 	call WorkflowCall,
 	ports []PortPlan,
 	budget *ExecutionBudget,
@@ -337,11 +355,12 @@ func (i *WorkflowInterpreter) handoffWorkflowAgentTarget(
 	return i.invokeWorkflowLLMTarget(
 		frame,
 		state,
+		program,
 		path,
+		step,
 		targetName,
 		target,
-		input,
-		contextValue,
+		call,
 		&ConversationHandoffIntent{
 			ID:                  "workflow-handoff:" + string(frame.ID) + ":" + path,
 			ConversationID:      conversationID,

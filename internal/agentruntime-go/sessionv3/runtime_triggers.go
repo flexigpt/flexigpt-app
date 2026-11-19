@@ -475,6 +475,7 @@ func (r *Runtime) waitForTrigger(
 			return
 		}
 	}
+	r.armSessionExecutionTimersLocked(persistContext, session)
 	r.armSessionTriggersLocked(persistContext, session)
 	r.publishLocked(
 		persistContext,

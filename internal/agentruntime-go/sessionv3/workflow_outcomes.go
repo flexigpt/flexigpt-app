@@ -183,12 +183,13 @@ func (r *Runtime) recordUncertainWorkflowStepOutcomeLocked(
 	}
 
 	if err := state.recordTerminalOutcome(WorkflowStepOutcome{
-		ID:      step.ID,
-		Status:  WorkflowStepOutcomeUncertain,
-		Target:  state.PendingTarget,
-		Receipt: receipt,
-		Error:   failure,
-		Effect:  item.EffectState,
+		ID:              step.ID,
+		Status:          WorkflowStepOutcomeUncertain,
+		Target:          state.PendingTarget,
+		Receipt:         receipt,
+		Error:           failure,
+		Effect:          item.EffectState,
+		DeclarationPath: firstText(item.DeclarationPath, step.DeclarationPath),
 	}); err != nil {
 		return err
 	}

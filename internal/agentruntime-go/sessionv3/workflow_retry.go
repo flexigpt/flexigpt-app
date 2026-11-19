@@ -64,5 +64,6 @@ func (i *WorkflowInterpreter) startWorkflowRetry(
 		return ProgramTransition{}, err
 	}
 	transition.Frames[0].Program = retryProgram
+	transition.Frames[0].DeclarationPath = state.PendingDeclarationPath
 	return transition, nil
 }

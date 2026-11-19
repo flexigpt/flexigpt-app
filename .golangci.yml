@@ -687,6 +687,9 @@ linters:
       - path: "internal/mcp/schema/*"
         linters:
           - goconst
+      - path: "internal/agentruntimesetup/workflowruntime/*"
+        linters:
+          - goconst
 
 issues:
   max-issues-per-linter: 0

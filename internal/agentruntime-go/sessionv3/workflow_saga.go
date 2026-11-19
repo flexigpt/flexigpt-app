@@ -200,9 +200,10 @@ func (i *WorkflowInterpreter) startSaga(
 	return workflowStructuredTransition(
 		state,
 		[]ProgramFrameIntent{{
-			Path:     bodyPath,
-			Program:  snapshot,
-			Deadline: cloneTime(state.Deadline),
+			Path:            bodyPath,
+			DeclarationPath: firstText(step.Saga.Do.DeclarationPath, state.PendingDeclarationPath),
+			Program:         snapshot,
+			Deadline:        cloneTime(state.Deadline),
 		}},
 	)
 }
@@ -461,9 +462,10 @@ func (i *WorkflowInterpreter) settleSagaWork(
 	t, err := workflowStructuredTransition(
 		state,
 		[]ProgramFrameIntent{{
-			Path:     childPath,
-			Program:  snapshot,
-			Deadline: cloneTime(state.Deadline),
+			Path:            childPath,
+			DeclarationPath: firstText(record.Compensation.DeclarationPath, state.PendingDeclarationPath),
+			Program:         snapshot,
+			Deadline:        cloneTime(state.Deadline),
 		}},
 	)
 	if err != nil {
@@ -624,9 +626,10 @@ func (i *WorkflowInterpreter) settleSagaBodySuccess(
 			return transition
 		}
 		if err := state.recordOutcome(WorkflowStepOutcome{
-			ID:     step.ID,
-			Status: WorkflowStepOutcomeSucceeded,
-			Output: result.Value.Clone(),
+			ID:              step.ID,
+			Status:          WorkflowStepOutcomeSucceeded,
+			Output:          result.Value.Clone(),
+			DeclarationPath: state.PendingDeclarationPath,
 		}); err != nil {
 			transition, _ := workflowFailure(
 				state,
@@ -638,8 +641,7 @@ func (i *WorkflowInterpreter) settleSagaBodySuccess(
 		workflowReleasePendingClaims(&state, pending)
 		state.Pending = nil
 		state.Index++
-		state.PendingPath = ""
-		state.Deadline = nil
+		state.clearPendingStep()
 		transition, _ := i.drive(frame, Execution{}, program, state)
 		return transition
 

@@ -816,6 +816,11 @@ func validateDeferredFrameIntent(value ProgramFrameIntent) error {
 			return err
 		}
 	}
+	for _, claim := range value.Claims {
+		if err := claim.Validate(); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -850,6 +855,19 @@ func (w WorkItem) Validate() error {
 			return err
 		}
 		if err := w.CompensationPolicy.Validate(); err != nil {
+			return err
+		}
+	}
+	if w.RetainClaimsForFrameID != "" {
+		if !w.RetainClaimsForFrame {
+			return errors.New(
+				"work item claim owner frame exists without retained claims",
+			)
+		}
+		if err := validateID(
+			"work item retained claim owner frame ID",
+			string(w.RetainClaimsForFrameID),
+		); err != nil {
 			return err
 		}
 	}

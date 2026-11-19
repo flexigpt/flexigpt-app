@@ -163,6 +163,29 @@ type WorkflowCall struct {
 	Ownership              *WorkflowChildOwnership    `json:"ownership,omitempty"`
 	OnCompletion           string                     `json:"onCompletion,omitempty"`
 	InternalLifecycleChild bool                       `json:"internalLifecycleChild,omitempty"`
+	LLMInvocation          *WorkflowLLMInvocation     `json:"llmInvocation,omitempty"`
+}
+
+// WorkflowLLMInvocation is the setup-lowered typed Model or Agent invocation
+// form. Workflow setup converts source data to this value before Runtime
+// receives a ProgramSnapshot. Runtime evaluates only typed templates and does
+// not decode a generic Workflow JSON request envelope.
+type WorkflowLLMInvocation struct {
+	Messages     []WorkflowLLMMessage     `json:"messages"`
+	Instructions []WorkflowLLMInstruction `json:"instructions,omitempty"`
+	Defaults     *SessionDefaultsOverride `json:"defaults,omitempty"`
+}
+
+type WorkflowLLMMessage struct {
+	Role        MessageRole    `json:"role"`
+	Text        *WorkflowValue `json:"text,omitempty"`
+	Attachments []Attachment   `json:"attachments,omitempty"`
+}
+
+type WorkflowLLMInstruction struct {
+	ID      string        `json:"id,omitempty"`
+	Label   string        `json:"label,omitempty"`
+	Content WorkflowValue `json:"content"`
 }
 
 type WorkflowTransform struct {
@@ -397,6 +420,19 @@ func (s *WorkflowState) recordOutcome(
 	}
 	s.Outcomes = append(s.Outcomes, cloneWorkflowStepOutcome(outcome))
 	return nil
+}
+
+// clearPendingStep clears the source-step boundary only after that step has
+// settled. Structured control flow retains the boundary while child work is
+// active, then calls this method before it asks drive to select the next step.
+func (s *WorkflowState) clearPendingStep() {
+	if s == nil {
+		return
+	}
+	s.PendingPath = ""
+	s.PendingDeclarationPath = ""
+	s.PendingTarget = ""
+	s.Deadline = nil
 }
 
 func NewWorkflowInterpreter() (*WorkflowInterpreter, error) {
@@ -920,8 +956,9 @@ func (i *WorkflowInterpreter) drive(
 			}
 			if !allowed {
 				if err := state.recordOutcome(WorkflowStepOutcome{
-					ID:     step.ID,
-					Status: WorkflowStepOutcomeSkipped,
+					ID:              step.ID,
+					Status:          WorkflowStepOutcomeSkipped,
+					DeclarationPath: step.DeclarationPath,
 				}); err != nil {
 					return workflowFailure(
 						state,
@@ -930,10 +967,7 @@ func (i *WorkflowInterpreter) drive(
 					)
 				}
 				state.Index++
-				state.PendingPath = ""
-				state.PendingDeclarationPath = ""
-				state.PendingTarget = ""
-				state.Deadline = nil
+				state.clearPendingStep()
 				continue
 			}
 		}
@@ -1279,6 +1313,13 @@ func (i *WorkflowInterpreter) call(
 	if err != nil {
 		return workflowFailure(state, "workflow_limit_invalid", err.Error())
 	}
+	childBudget, err := workflowChildCallBudget(
+		callBudget,
+		step.Limits,
+	)
+	if err != nil {
+		return workflowFailure(state, "workflow_limit_invalid", err.Error())
+	}
 
 	mode := call.Mode
 	if mode == "" {
@@ -1308,7 +1349,7 @@ func (i *WorkflowInterpreter) call(
 			contextValue,
 			call,
 			ports,
-			callBudget,
+			childBudget,
 		)
 	}
 	if mode == WorkflowCallModeHandoff {
@@ -1317,13 +1358,12 @@ func (i *WorkflowInterpreter) call(
 			program,
 			state,
 			path,
+			step,
 			targetName,
 			target,
-			input,
-			contextValue,
 			call,
 			ports,
-			callBudget,
+			childBudget,
 		)
 	}
 	state.PendingTarget = targetName
@@ -1485,6 +1525,18 @@ func (i *WorkflowInterpreter) call(
 				err.Error(),
 			)
 		}
+		claims, claimErr := i.workflowResourceClaims(
+			program,
+			state,
+			step,
+		)
+		if claimErr != nil {
+			return workflowFailure(
+				state,
+				"workflow_resource_claim_invalid",
+				claimErr.Error(),
+			)
+		}
 
 		next := state
 		next.PendingPath = path
@@ -1498,7 +1550,8 @@ func (i *WorkflowInterpreter) call(
 				Path:            path,
 				DeclarationPath: state.PendingDeclarationPath,
 				Deadline:        cloneTime(state.Deadline),
-				Budget:          cloneBudget(callBudget),
+				Budget:          cloneBudget(childBudget),
+				Claims:          claims,
 				Program:         nested,
 				Ports:           ports,
 			}},
@@ -1509,14 +1562,15 @@ func (i *WorkflowInterpreter) call(
 		return i.invokeWorkflowLLMTarget(
 			frame,
 			state,
+			program,
 			path,
+			step,
 			targetName,
 			target,
-			input,
-			contextValue,
+			call,
 			nil,
 			ports,
-			callBudget,
+			childBudget,
 		)
 
 	case WorkflowTargetProviderTool:
@@ -1527,18 +1581,26 @@ func (i *WorkflowInterpreter) call(
 				"provider-managed Tool target has no typed Model plan",
 			)
 		}
+		if call.LLMInvocation == nil {
+			return workflowFailure(
+				state,
+				"workflow_invocation_input_invalid",
+				"provider-managed Tool target requires a typed Model invocation",
+			)
+		}
 		modelTarget := WorkflowTarget{
 			Kind:      WorkflowTargetModel,
 			Artifact:  &target.ProviderTool.OwnerModel,
 			Transport: target.Transport,
 			Effect:    EffectContract{Kind: EffectKindRead},
 		}
-		invocation, invokeErr := prepareWorkflowLLMInvocation(
+		invocation, invokeErr := i.prepareWorkflowLLMInvocation(
 			frame,
 			path,
 			modelTarget,
-			input,
-			contextValue,
+			*call.LLMInvocation,
+			program,
+			state,
 		)
 		if invokeErr != nil {
 			return workflowFailure(
@@ -1560,6 +1622,18 @@ func (i *WorkflowInterpreter) call(
 				childErr.Error(),
 			)
 		}
+		claims, claimErr := i.workflowResourceClaims(
+			program,
+			state,
+			step,
+		)
+		if claimErr != nil {
+			return workflowFailure(
+				state,
+				"workflow_resource_claim_invalid",
+				claimErr.Error(),
+			)
+		}
 		state.PendingPath = path
 		state.PendingTarget = targetName
 		transition, transitionErr := workflowTransition(state, nil, nil, nil)
@@ -1572,7 +1646,8 @@ func (i *WorkflowInterpreter) call(
 			DeclarationPath: state.PendingDeclarationPath,
 			Program:         child,
 			Deadline:        cloneTime(state.Deadline),
-			Budget:          cloneBudget(callBudget),
+			Budget:          cloneBudget(childBudget),
+			Claims:          claims,
 			Ports:           clonePortPlans(ports),
 		}}
 		return transition, nil
@@ -1878,10 +1953,8 @@ func (i *WorkflowInterpreter) settleWork(
 	if err := state.recordOutcome(outcome); err != nil {
 		return err
 	}
-	state.PendingPath = ""
-	state.PendingTarget = ""
-	state.Deadline = nil
 	state.Index++
+	state.clearPendingStep()
 	return nil
 }
 
@@ -1950,10 +2023,8 @@ func (i *WorkflowInterpreter) settleChild(
 		if err := state.recordOutcome(outcome); err != nil {
 			return err
 		}
-		state.PendingPath = ""
-		state.PendingTarget = ""
-		state.Deadline = nil
 		state.Index++
+		state.clearPendingStep()
 		return nil
 	}
 	return errors.New("nested workflow ProgramFrame is unavailable")
@@ -2057,6 +2128,27 @@ func workflowCallableBudget(
 		output = &value
 	}
 	return output, nil
+}
+
+func workflowChildCallBudget(
+	callBudget *ExecutionBudget,
+	stepBudget *ExecutionBudget,
+) (*ExecutionBudget, error) {
+	switch {
+	case callBudget == nil:
+		return cloneBudget(stepBudget), nil
+	case stepBudget == nil:
+		return cloneBudget(callBudget), nil
+	}
+
+	value, err := narrowExecutionBudget(
+		*callBudget,
+		*stepBudget,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &value, nil
 }
 
 func (i *WorkflowInterpreter) evaluate(
@@ -2376,6 +2468,11 @@ func (c WorkflowCall) Validate() error {
 	}
 	if err := c.Context.Validate(); err != nil {
 		return err
+	}
+	if c.LLMInvocation != nil {
+		if err := c.LLMInvocation.Validate(); err != nil {
+			return err
+		}
 	}
 	if err := validateUniqueWorkflowPortBindings(c.Ports); err != nil {
 		return err

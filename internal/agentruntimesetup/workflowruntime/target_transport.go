@@ -2,6 +2,7 @@ package workflowruntime
 
 import (
 	"fmt"
+	"slices"
 
 	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 	workflowAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workflow"
@@ -9,8 +10,12 @@ import (
 
 func validatePreparedTargetTransport(
 	inventory workflowAPI.Inventory,
-	targets map[string]sessionv3Runtime.WorkflowTarget,
+	program *sessionv3Runtime.WorkflowProgram,
 ) error {
+	if program == nil {
+		return fmt.Errorf("%w: workflow program is unavailable", ErrBindingUnavailable)
+	}
+
 	portUses := make(map[string][]workflowAPI.PortUse)
 	for _, use := range inventory.PortUses {
 		if use.Kind != workflowAPI.PortUseKindCall {
@@ -18,14 +23,29 @@ func validatePreparedTargetTransport(
 		}
 		portUses[use.CallPath] = append(portUses[use.CallPath], use)
 	}
+	contextUses := make(map[string][]workflowAPI.ContextUse)
+	for _, use := range inventory.ContextUses {
+		contextUses[use.CallPath] = append(contextUses[use.CallPath], use)
+	}
 
 	for _, call := range inventory.Calls {
+		lowered := workflowCallAtDeclarationPath(
+			&program.Root,
+			call.Path,
+		)
+		if lowered == nil {
+			return fmt.Errorf(
+				"%w: call %q has no lowered runtime descriptor",
+				ErrBindingUnavailable,
+				call.Path,
+			)
+		}
 		mode := sessionv3Runtime.WorkflowCallMode(call.Mode)
 		if mode == "" {
 			mode = sessionv3Runtime.WorkflowCallModeInvoke
 		}
 		for _, use := range call.TargetUses {
-			target, found := targets[use.Name]
+			target, found := program.Targets[use.Name]
 			if !found {
 				return fmt.Errorf(
 					"%w: call %q target %q has no prepared target descriptor",
@@ -40,6 +60,30 @@ func validatePreparedTargetTransport(
 					ErrBindingUnavailable,
 					use.Name,
 					mode,
+				)
+			}
+
+			if workflowTargetRequiresTypedLLMInvocation(target) &&
+				lowered.LLMInvocation == nil {
+				return fmt.Errorf(
+					"%w: call %q target %q requires the explicit typed Model or Agent invocation form",
+					ErrBindingUnavailable,
+					call.Path,
+					use.Name,
+				)
+			}
+			for _, contextUse := range contextUses[call.Path] {
+				if workflowTransportAcceptsContext(
+					target.Transport,
+					contextUse.Name,
+				) {
+					continue
+				}
+				return fmt.Errorf(
+					"%w: target %q does not support workflow context form %q",
+					ErrBindingUnavailable,
+					use.Name,
+					contextUse.Name,
 				)
 			}
 
@@ -92,4 +136,25 @@ func validatePreparedTargetTransport(
 		}
 	}
 	return nil
+}
+
+func workflowTargetRequiresTypedLLMInvocation(
+	target sessionv3Runtime.WorkflowTarget,
+) bool {
+	switch target.Kind {
+	case sessionv3Runtime.WorkflowTargetModel,
+		sessionv3Runtime.WorkflowTargetAgent,
+		sessionv3Runtime.WorkflowTargetProviderTool:
+		return true
+	default:
+		return false
+	}
+}
+
+func workflowTransportAcceptsContext(
+	transport sessionv3Runtime.WorkflowTargetTransport,
+	name string,
+) bool {
+	return slices.Contains(transport.ContextForms, "*") ||
+		slices.Contains(transport.ContextForms, name)
 }

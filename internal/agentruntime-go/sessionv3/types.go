@@ -920,44 +920,45 @@ type ResourceWaitState struct {
 }
 
 type WorkItem struct {
-	ID                    WorkItemID              `json:"id"`
-	FrameID               ProgramFrameID          `json:"frameID"`
-	Type                  WorkItemType            `json:"type"`
-	OriginWorkItemID      WorkItemID              `json:"originWorkItemID,omitempty"`
-	State                 WorkItemState           `json:"state"`
-	ProgramPath           string                  `json:"programPath,omitempty"`
-	DeclarationPath       string                  `json:"declarationPath,omitempty"`
-	Dependencies          []WorkItemID            `json:"dependencies,omitempty"`
-	AttemptIDs            []AttemptID             `json:"attemptIDs,omitempty"`
-	Deadline              *time.Time              `json:"deadline,omitempty"`
-	Effect                EffectContract          `json:"effect"`
-	EffectState           EffectState             `json:"effectState,omitempty"`
-	EffectPlan            *WorkflowEffectPlan     `json:"effectPlan,omitempty"`
-	Automatic             bool                    `json:"automatic"`
-	Retry                 *RetryPolicy            `json:"retry,omitempty"`
-	RetryState            *RetryState             `json:"retryState,omitempty"`
-	Budget                *ExecutionBudget        `json:"budget,omitempty"`
-	Cleanup               bool                    `json:"cleanup,omitempty"`
-	SagaID                string                  `json:"sagaID,omitempty"`
-	CompensationPolicy    CompensationErrorPolicy `json:"compensationPolicy,omitempty"`
-	Requested             bool                    `json:"requested"`
-	RetainClaimsForFrame  bool                    `json:"retainClaimsForFrame,omitempty"`
-	StepExecutionReserved bool                    `json:"stepExecutionReserved,omitempty"`
-	Claims                []ResourceClaim         `json:"claims,omitempty"`
-	ResourceWait          *ResourceWaitState      `json:"resourceWait,omitempty"`
-	Ports                 []PortPlan              `json:"ports,omitempty"`
-	PortInputs            []PortInput             `json:"portInputs,omitempty"`
-	PortStreams           []PortStream            `json:"portStreams,omitempty"`
-	Input                 WorkItemPayload         `json:"input"`
-	Binding               *SemanticBinding        `json:"binding,omitempty"`
-	Output                *WorkItemOutput         `json:"output,omitempty"`
-	Error                 *SanitizedError         `json:"error,omitempty"`
-	LLMStream             *LLMStreamState         `json:"llmStream,omitempty"`
-	CreatedAt             time.Time               `json:"createdAt"`
-	UpdatedAt             time.Time               `json:"updatedAt"`
-	DispatchedAt          *time.Time              `json:"dispatchedAt,omitempty"`
-	CompletedAt           *time.Time              `json:"completedAt,omitempty"`
-	WaitID                WaitID                  `json:"waitID,omitempty"`
+	ID                     WorkItemID              `json:"id"`
+	FrameID                ProgramFrameID          `json:"frameID"`
+	Type                   WorkItemType            `json:"type"`
+	OriginWorkItemID       WorkItemID              `json:"originWorkItemID,omitempty"`
+	State                  WorkItemState           `json:"state"`
+	ProgramPath            string                  `json:"programPath,omitempty"`
+	DeclarationPath        string                  `json:"declarationPath,omitempty"`
+	Dependencies           []WorkItemID            `json:"dependencies,omitempty"`
+	AttemptIDs             []AttemptID             `json:"attemptIDs,omitempty"`
+	Deadline               *time.Time              `json:"deadline,omitempty"`
+	Effect                 EffectContract          `json:"effect"`
+	EffectState            EffectState             `json:"effectState,omitempty"`
+	EffectPlan             *WorkflowEffectPlan     `json:"effectPlan,omitempty"`
+	Automatic              bool                    `json:"automatic"`
+	Retry                  *RetryPolicy            `json:"retry,omitempty"`
+	RetryState             *RetryState             `json:"retryState,omitempty"`
+	Budget                 *ExecutionBudget        `json:"budget,omitempty"`
+	Cleanup                bool                    `json:"cleanup,omitempty"`
+	SagaID                 string                  `json:"sagaID,omitempty"`
+	CompensationPolicy     CompensationErrorPolicy `json:"compensationPolicy,omitempty"`
+	Requested              bool                    `json:"requested"`
+	RetainClaimsForFrame   bool                    `json:"retainClaimsForFrame,omitempty"`
+	RetainClaimsForFrameID ProgramFrameID          `json:"retainClaimsForFrameID,omitempty"`
+	StepExecutionReserved  bool                    `json:"stepExecutionReserved,omitempty"`
+	Claims                 []ResourceClaim         `json:"claims,omitempty"`
+	ResourceWait           *ResourceWaitState      `json:"resourceWait,omitempty"`
+	Ports                  []PortPlan              `json:"ports,omitempty"`
+	PortInputs             []PortInput             `json:"portInputs,omitempty"`
+	PortStreams            []PortStream            `json:"portStreams,omitempty"`
+	Input                  WorkItemPayload         `json:"input"`
+	Binding                *SemanticBinding        `json:"binding,omitempty"`
+	Output                 *WorkItemOutput         `json:"output,omitempty"`
+	Error                  *SanitizedError         `json:"error,omitempty"`
+	LLMStream              *LLMStreamState         `json:"llmStream,omitempty"`
+	CreatedAt              time.Time               `json:"createdAt"`
+	UpdatedAt              time.Time               `json:"updatedAt"`
+	DispatchedAt           *time.Time              `json:"dispatchedAt,omitempty"`
+	CompletedAt            *time.Time              `json:"completedAt,omitempty"`
+	WaitID                 WaitID                  `json:"waitID,omitempty"`
 }
 
 // WorkItemPayload is a closed tagged union. It must contain exactly one
@@ -1503,6 +1504,7 @@ type ProgramFrameIntent struct {
 	Budget          *ExecutionBudget           `json:"budget,omitempty"`
 	Lifetime        ChildFrameLifetime         `json:"lifetime,omitempty"`
 	Ownership       *ChildExecutionOwnership   `json:"ownership,omitempty"`
+	Claims          []ResourceClaim            `json:"claims,omitempty"`
 	Ports           []PortPlan                 `json:"ports,omitempty"`
 	Handoff         *ConversationHandoffIntent `json:"handoff,omitempty"`
 }

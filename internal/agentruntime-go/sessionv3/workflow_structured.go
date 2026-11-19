@@ -589,20 +589,10 @@ func workflowScopeOutcomes(
 		len(program.Scope.OuterOutcomes)+len(state.Outcomes),
 	)
 	for _, outcome := range program.Scope.OuterOutcomes {
-		values = append(values, WorkflowStepOutcome{
-			ID:     outcome.ID,
-			Status: outcome.Status,
-			Output: outcome.Output.Clone(),
-			Target: outcome.Target,
-		})
+		values = append(values, cloneWorkflowStepOutcome(outcome))
 	}
 	for _, outcome := range state.Outcomes {
-		values = append(values, WorkflowStepOutcome{
-			ID:     outcome.ID,
-			Status: outcome.Status,
-			Output: outcome.Output.Clone(),
-			Target: outcome.Target,
-		})
+		values = append(values, cloneWorkflowStepOutcome(outcome))
 	}
 	return values
 }
@@ -725,9 +715,10 @@ func (i *WorkflowInterpreter) startSingleChild(
 	return workflowStructuredTransition(
 		state,
 		[]ProgramFrameIntent{{
-			Path:     childPath,
-			Program:  snapshot,
-			Deadline: cloneTime(state.Deadline),
+			Path:            childPath,
+			DeclarationPath: firstText(block.DeclarationPath, state.PendingDeclarationPath),
+			Program:         snapshot,
+			Deadline:        cloneTime(state.Deadline),
 		}},
 	)
 }
@@ -917,9 +908,10 @@ func (i *WorkflowInterpreter) startParallel(
 			child.Path = path + "/branch/" + branch.Name
 			child.State = WorkflowChildStatePending
 			frames = append(frames, ProgramFrameIntent{
-				Path:     child.Path,
-				Program:  snapshot,
-				Deadline: cloneTime(state.Deadline),
+				Path:            child.Path,
+				DeclarationPath: firstText(branch.Do.DeclarationPath, state.PendingDeclarationPath),
+				Program:         snapshot,
+				Deadline:        cloneTime(state.Deadline),
 			})
 		}
 		pending.Children = append(pending.Children, child)
@@ -1195,9 +1187,10 @@ func (i *WorkflowInterpreter) launchForeachChildren(
 			State: WorkflowChildStatePending,
 		})
 		frames = append(frames, ProgramFrameIntent{
-			Path:     path,
-			Program:  snapshot,
-			Deadline: cloneTime(state.Deadline),
+			Path:            path,
+			DeclarationPath: firstText(step.Foreach.Do.DeclarationPath, state.PendingDeclarationPath),
+			Program:         snapshot,
+			Deadline:        cloneTime(state.Deadline),
 		})
 	}
 
@@ -1309,9 +1302,10 @@ func (i *WorkflowInterpreter) launchRepeatChild(
 	return workflowStructuredTransition(
 		state,
 		[]ProgramFrameIntent{{
-			Path:     path,
-			Program:  snapshot,
-			Deadline: cloneTime(state.Deadline),
+			Path:            path,
+			DeclarationPath: firstText(step.Repeat.Do.DeclarationPath, state.PendingDeclarationPath),
+			Program:         snapshot,
+			Deadline:        cloneTime(state.Deadline),
 		}},
 	)
 }
@@ -1543,15 +1537,17 @@ func (i *WorkflowInterpreter) settleSingleStructuredChild(
 		return err
 	}
 	if err := state.recordOutcome(WorkflowStepOutcome{
-		ID:     step.ID,
-		Status: WorkflowStepOutcomeSucceeded,
-		Output: result.Value,
+		ID:              step.ID,
+		Status:          WorkflowStepOutcomeSucceeded,
+		Output:          result.Value,
+		DeclarationPath: state.PendingDeclarationPath,
 	}); err != nil {
 		return err
 	}
 	workflowReleasePendingClaims(state, pending)
 	state.Pending = nil
 	state.Index++
+	state.clearPendingStep()
 	return nil
 }
 
@@ -1824,15 +1820,17 @@ func (i *WorkflowInterpreter) finishParallel(
 		return err
 	}
 	if err := state.recordOutcome(WorkflowStepOutcome{
-		ID:     step.ID,
-		Status: WorkflowStepOutcomeSucceeded,
-		Output: value,
+		ID:              step.ID,
+		Status:          WorkflowStepOutcomeSucceeded,
+		Output:          value,
+		DeclarationPath: state.PendingDeclarationPath,
 	}); err != nil {
 		return err
 	}
 	workflowReleasePendingClaims(state, pending)
 	state.Pending = nil
 	state.Index++
+	state.clearPendingStep()
 	return nil
 }
 
@@ -2077,15 +2075,17 @@ func (i *WorkflowInterpreter) finishForeach(
 		return err
 	}
 	if err := state.recordOutcome(WorkflowStepOutcome{
-		ID:     step.ID,
-		Status: WorkflowStepOutcomeSucceeded,
-		Output: value,
+		ID:              step.ID,
+		Status:          WorkflowStepOutcomeSucceeded,
+		Output:          value,
+		DeclarationPath: state.PendingDeclarationPath,
 	}); err != nil {
 		return err
 	}
 	workflowReleasePendingClaims(state, state.Pending)
 	state.Pending = nil
 	state.Index++
+	state.clearPendingStep()
 	return nil
 }
 
@@ -2145,6 +2145,7 @@ func (i *WorkflowInterpreter) settleRepeatChild(
 		state.Exit = WorkflowExitReturnWorkflow
 		state.ExitValue = result.Value.Clone()
 		state.Pending = nil
+		state.clearPendingStep()
 		return nil
 
 	case WorkflowExitBreak:
@@ -2233,15 +2234,17 @@ func (i *WorkflowInterpreter) finishRepeat(
 		return err
 	}
 	if err := state.recordOutcome(WorkflowStepOutcome{
-		ID:     step.ID,
-		Status: WorkflowStepOutcomeSucceeded,
-		Output: value,
+		ID:              step.ID,
+		Status:          WorkflowStepOutcomeSucceeded,
+		Output:          value,
+		DeclarationPath: state.PendingDeclarationPath,
 	}); err != nil {
 		return err
 	}
 	workflowReleasePendingClaims(state, state.Pending)
 	state.Pending = nil
 	state.Index++
+	state.clearPendingStep()
 	return nil
 }
 
