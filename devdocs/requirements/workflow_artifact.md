@@ -33,10 +33,15 @@ type: workflow
 ```
 
 `apiVersion: v1` identifies the declaration language.
-The declaration language version is separate from the durable ProgramFrame payload version.
-The current Workflow ProgramFrame payload is: `artifact.workflow.v1@1`.
-The payload remains `artifact.workflow.v1@1` during development. Workflow v1 remains `apiVersion: v1`.
+This source-family HLD is work in progress. Workflow v1 remains `apiVersion: v1`.
+No declaration, Artifact schema, Store schema, package, module, public API, or
+other version identifier is to be bumped in this implementation cycle.
+Interpreter and execution-payload contracts belong in `workflow_runtime.md`.
 A Workflow source document is stored as an Artifact definition. The standalone source field `apiVersion` is admission metadata and is not stored in the canonical definition body.
+
+This cycle excludes tests, all validation work, frontend integration, and
+SessionV2 migration, conversion, deletion, and replacement cleanup.
+Source-planning functional defects remain in scope.
 
 ## 3. Responsibility boundaries
 
@@ -381,19 +386,12 @@ A step identity is unique within its block.
 
 A nested step identity cannot shadow an enclosing visible step identity.
 
-A logical operation identity includes:
+Artifact planning identifies declared blocks, steps, calls, and relationships.
+It does not allocate execution or logical-operation identities.
 
-- Workflow definition identity.
-- ProgramFrame path.
-- Step identity.
-- Repeat iteration identity.
-- Foreach item index.
-- Target-set selection identity.
-- Retry attempt sequence.
-
-A retry retains one logical operation identity.
-
-A Repeat iteration and a Foreach item create new logical operation identities.
+The declaration distinguishes a retry from a new Repeat iteration or Foreach
+item. Execution identity, attempt identity, and persistence of those meanings
+belong in `workflow_runtime.md`.
 
 ### 6.3 Terminal step outcomes
 
@@ -520,20 +518,14 @@ Expressions do not:
 
 External behavior uses a typed callable target or a Workflow operation.
 
-### 7.4 Durable evaluation facts
+### 7.4 Expression planning facts
 
-The runtime persists evaluation facts that can affect a resumed expression:
+The admitted declaration retains expression templates and their source scope.
+Inventory retains the associated declaration paths and static call, context,
+port, retry, and effect facts.
 
-- Logical `context.time`.
-- Authorized retained channel snapshots.
-- Current invocation input.
-- Current scope state.
-- Visible completed step outcomes.
-- Active subscription facts.
-- Current event, result, error, operation, completed-operation, and outcome values where applicable.
-- Port input snapshots and cursors.
-
-The runtime does not persist compiled CEL programs or compiled JSON Schema programs.
+Evaluation snapshots, logical time, cursors, resumption, and compiled-program
+lifecycle are consumer execution concerns specified in `workflow_runtime.md`.
 
 ## 8. State
 
@@ -585,7 +577,8 @@ Their state cannot race with parent state.
 
 A parent state changes only through an explicit deterministic merge after child outcomes are available.
 
-The merge operation is represented by a typed StateUpdate WorkItem. It uses the captured parent state, selected child outcomes, the declared state schema, and a durable merge result.
+Artifact planning retains the declared merge expressions and state schema.
+Execution of the merge is specified in `workflow_runtime.md`.
 
 ## 9. Callable targets
 
@@ -630,9 +623,9 @@ Supported target kinds are:
 | `workflow` | Nested Workflow declaration.         |
 
 Agent and Model target declarations use typed Workflow adapters. Admission
-returns a typed pre-dispatch failure when an adapter is unavailable, the
-selected Artifact is disabled or stale, required domain readiness is absent,
-or the declaration requests unsupported transport.
+and planning retain their declared interfaces and source-backed relationships.
+Current adapter availability, enablement, domain readiness, and execution
+transport belong to consumer preparation, not Artifact admission or planning.
 
 An MCP Tool target declares a server:
 
@@ -666,7 +659,6 @@ interface:
     kind: keyed
     keyed: true
   limits: {}
-  capabilities: []
 ```
 
 A callable interface defines:
@@ -722,25 +714,14 @@ target and binding facts. Durable call handling is specified in
 | `attached`    | The child belongs to the parent scope.                  |
 | `independent` | The child is an Execution in the same Session document. |
 
-An independent child stores:
-
-- Parent Execution identity.
-- Root Execution identity.
-- Parent ProgramFrame identity.
-- Ownership facts.
-- Cancellation relationship.
-- Authorized child budget.
-- Completion handle.
+An independent-start declaration supplies ownership, cancellation relationship,
+and child-budget intent. Artifact planning retains this declaration data.
 
 `handoff` is valid only for an Agent target.
 
-A handoff stores:
-
-- Conversation identity.
-- Target Agent pin.
-- Ownership facts.
-- Saved conversation owner.
-- Completion behavior.
+A handoff declaration identifies the conversation, Agent target, ownership
+intent, and completion behavior. Runtime ownership records and message routing
+are specified in `workflow_runtime.md`.
 
 Completion behavior is:
 
@@ -1167,30 +1148,15 @@ A carried Repeat state initializes once for the Repeat.
 
 `continue` completes the current Repeat iteration.
 
-### 12.8 Durable Fork and Join
+### 12.8 Structured planning facts
 
-A child scheduling boundary uses a typed Fork WorkItem.
+The admitted declaration and Inventory retain structured child blocks,
+collection declarations, completion policies, merge declarations, and canonical
+declaration paths.
 
-A child settlement aggregation boundary uses a typed Join WorkItem.
-
-A Fork WorkItem persists:
-
-- Parent ProgramFrame identity.
-- Child ProgramFrame intents.
-- Child identities.
-- Child lifetimes.
-- Child ownership facts.
-- Child deadlines.
-- Child program snapshots.
-
-A Join WorkItem persists:
-
-- Parent ProgramFrame identity.
-- Child ProgramFrame identities.
-- Join policy.
-- Child terminal facts.
-
-A parent interpreter receives child settlement only after the Join WorkItem confirms the child terminal state.
+Artifact planning does not create child programs, Fork or Join work, execution
+identities, or settlement records. Their implementation belongs in
+`workflow_runtime.md`.
 
 ## 13. State machines
 
@@ -1232,21 +1198,12 @@ machine:
         status: expired
 ```
 
-A machine persists:
+Artifact planning retains the initial state name, declared states, state
+schema, subscriptions, transitions, entry and exit blocks, and final outputs.
+These are source facts, not a live machine instance.
 
-- Current state.
-- Carried state.
-- Local state ownership.
-- Entry time.
-- Transition generation.
-- Active subscriptions.
-- Active event waits.
-- Active timer waits.
-- Selected transition.
-- Current event.
-- Child block state.
-
-Machine behavior is serialized within the owning ProgramFrame.
+Machine state persistence, event arbitration, timer lifecycle, and serialized
+execution are specified in `workflow_runtime.md`.
 
 State entry completes before transition selection.
 
@@ -1320,16 +1277,10 @@ listen:
 
 A subscription becomes active when its scope begins, before its steps run.
 
-A subscription stores:
-
-- Event contract identity.
-- Correlation facts.
-- Filter facts.
-- Retention settings.
-- Capacity settings.
-- Byte settings.
-- Accepted event identities.
-- Consumption facts.
+A subscription declaration contains its event reference, correlation and
+filter templates, retention, capacity, and byte settings. Planning retains
+these static facts. Accepted events and consumption records are execution data
+specified in `workflow_runtime.md`.
 
 ### 14.3 Wait
 
@@ -1376,16 +1327,10 @@ wait:
     required: [approved]
 ```
 
-A human wait persists:
-
-- User assignments.
-- Role assignments.
-- Request value.
-- Response schema.
-- Response authorization requirements.
-- Deadline.
-- Resolution identity.
-- Typed response.
+A human-wait declaration contains assignee templates, a request template, and
+a response schema. Artifact planning retains those source facts.
+Assignment snapshots, deadlines, resolution identities, and received responses
+belong to the Runtime HLD.
 
 A response is accepted only when the response actor satisfies persisted assignment facts.
 
@@ -1397,12 +1342,8 @@ Durations use ISO 8601.
 
 Absolute times use RFC 3339.
 
-A timer preserves:
-
-- Scheduling time.
-- Intended fire time.
-- Actual fire time.
-- Enclosing step deadline.
+Planning retains timer and timeout declaration values. Scheduling, firing
+facts, and enclosing execution deadlines belong in `workflow_runtime.md`.
 
 A timer cannot be manually resolved.
 
@@ -1443,19 +1384,11 @@ Event trigger behavior:
 | `signal`          | Signal an active matching Execution.                               |
 | `start-or-signal` | Signal an active matching Execution or start one when none exists. |
 
-A trigger occurrence persists:
+Artifact planning retains event-trigger declarations, filters, input mappings,
+instance-key expressions, and behavior values.
 
-- Trigger identity.
-- Event source.
-- Event identity.
-- Occurrence time.
-- Accepted time.
-- Mapped invocation input.
-- Instance key.
-- Selected Execution.
-- Queue position.
-- State.
-- Failure facts.
+It does not create trigger registrations, occurrences, queues, or Executions.
+Those are specified in `workflow_runtime.md`.
 
 ### 15.2 Schedule trigger
 
@@ -1546,31 +1479,13 @@ The key remains unchanged through:
 
 A new Repeat iteration or Foreach item receives a new logical WorkItem identity and can have a new key.
 
-### 16.2 Effect state
+### 16.2 Effect planning facts
 
-Effect state is distinct from WorkItem state.
+Planning retains the declared effect kind, key template, reconciliation block,
+compensation block, and canonical source paths.
 
-| Effect state          | Meaning                                 |
-| --------------------- | --------------------------------------- |
-| `notApplicable`       | Read-only work.                         |
-| `notStarted`          | No external invocation started.         |
-| `dispatched`          | External invocation can be in progress. |
-| `confirmedApplied`    | Effect is confirmed.                    |
-| `confirmedNotApplied` | Non-application is confirmed.           |
-| `uncertain`           | Effect can have happened.               |
-| `compensating`        | Compensation is in progress.            |
-| `compensated`         | Compensation is confirmed.              |
-| `compensationFailed`  | Compensation failed or is uncertain.    |
-
-Effect state persists in:
-
-- WorkItems.
-- Attempts.
-- Receipts.
-- Errors.
-- Effect records.
-- Reconciliation facts.
-- Compensation facts.
+Effect state, confirmation, uncertainty, receipts, and recovery records are
+Runtime data specified in `workflow_runtime.md`.
 
 ### 16.3 Retry
 
@@ -1646,9 +1561,7 @@ Reconciliation behavior:
 | `notApplied` | Mark confirmed non-application and evaluate retry eligibility.    |
 | `unknown`    | Keep the original WorkItem uncertain and open recovery review.    |
 
-A reconciliation starts through a typed Reconciliation WorkItem.
-
-The Reconciliation WorkItem persists original operation facts before the reconciliation block starts.
+Reconciliation execution and persistence are specified in `workflow_runtime.md`.
 
 ### 16.5 Saga
 
@@ -1690,7 +1603,7 @@ A compensation operation receives typed `completed` facts.
 - Effect identity.
 - Compensation identity.
 
-A Compensation WorkItem persists compensation intent before a compensation child ProgramFrame starts.
+Compensation intent, execution ordering, and settlement are specified in `workflow_runtime.md`.
 
 Compensation policy:
 
@@ -1771,9 +1684,10 @@ claims:
       $expr: input.customerId
 ```
 
-A claim is acquired before owning WorkItem dispatch.
+A claim declaration associates a named resource, units, and optional key
+template with an operation or scope.
 
-A claim is released when its owner settles.
+Acquisition, retention, release, and resource-wait behavior belong in `workflow_runtime.md`.
 
 A claim can be retained by a scope.
 
@@ -1898,12 +1812,23 @@ Workflow Artifact completion includes:
 | Artifact planning task                                    | Status      | Evidence or required result                                                                                                                                              |
 | --------------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Decode and validate Workflow v1 declarations              | Implemented | `internal/llmartifactory-go/workflow/contract/v1/`                                                                                                                       |
-| Build callable-target and requirement inventory           | Implemented | `internal/llmartifactory-go/workflow/inventory.go`                                                                                                                       |
+| Build callable-target and requirement inventory           | Partial     | Target and requirement collections exist. Literal call target-use extraction remains incomplete; see `ART-INV-001`.                                                      |
 | Reject direct capability composition for Workflow targets | Implemented | `internal/llmartifactory-go/workflow/closure.go` rejects direct Model, Agent, Tool, MCP, Skill, Service, Activity, and Nested Workflow composition before a plan exists. |
 | Publish a deterministic complete static Artifact closure  | Implemented | `internal/llmartifactory-go/workflow/closure.go` publishes sorted nodes, edges, paths, and refresh checks                                                                |
 | Include nested Workflow plan nodes in the closure         | Implemented | `ArtifactClosureNode.Workflow` contains admitted nested Workflow document, inventory, and composition facts                                                              |
 | Publish one canonical declaration-path model              | Implemented | Contract admission, Inventory, and closure paths retain the canonical `root/...` declaration identity                                                                    |
 | Keep consumer execution interpretation outside planning   | Implemented | `internal/llmartifactory-go/workflow/` contains source planning facts and has no consumer execution dependency                                                           |
+
+### Open static-planning work
+
+This register concerns returned Artifact planning facts only. It creates no
+Artifact Store execution responsibility.
+
+| ID              | Functional task or subtask                                                                                                                             | Status  | Source evidence or completion requirement                                                                                                                                                                                                  |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `ART-INV-001`   | Publish complete static call target-use facts.                                                                                                         | Partial | `inventory.go`: `workflowLiteralTargetName` decodes `json.RawMessage` but switches on decoded string and object forms. Inspect the generic helper's return contract when implementing; the supplied caller does not construct those forms. |
+| `ART-INV-001.a` | Extract an ordinary literal target name and include it in `CallSite.TargetUses`, including calls without an allowed set.                               | Partial | Every literal call must publish its statically selected declaration and target family.                                                                                                                                                     |
+| `ART-INV-001.b` | Preserve expression-backed candidate sets and their static port and context-use facts without evaluating expressions or consulting execution adapters. | Partial | Keep this work in Inventory construction. Mark the parent and subtask rows `Implemented` only when the complete source-fact projection exists.                                                                                             |
 
 ## 23. Direct-capability and generic-callable-capability cleanup
 
