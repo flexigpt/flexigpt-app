@@ -113,11 +113,15 @@ func (b *Binder) bindRecoveredLLM(
 		}
 	}
 
+	activities, err := recoveredDispatchActivities(plan)
+	if err != nil {
+		return sessionv3Runtime.BindResult{}, err
+	}
 	inputs, err := b.buildInputs(
 		request,
 		defaults,
 		contextValues,
-		nil,
+		activities,
 	)
 	if err != nil {
 		return sessionv3Runtime.BindResult{}, err
@@ -170,6 +174,43 @@ func (b *Binder) bindRecoveredLLM(
 			Fingerprint:   configuration.Fingerprint,
 		},
 	}, nil
+}
+
+func recoveredDispatchActivities(
+	plan sessionv3Runtime.ModelDispatchPlan,
+) ([]sessionv3Runtime.Activity, error) {
+	if len(plan.Messages) == 0 {
+		return nil, errors.New(
+			"recovered llm dispatch plan has no captured message sequence",
+		)
+	}
+
+	output := make(
+		[]sessionv3Runtime.Activity,
+		0,
+		len(plan.Messages),
+	)
+	for _, message := range plan.Messages {
+		if message.ID == "" {
+			return nil, errors.New(
+				"recovered llm dispatch plan has a message without identity",
+			)
+		}
+		output = append(output, sessionv3Runtime.Activity{
+			ID:         sessionv3Runtime.ActivityID(message.ID),
+			Kind:       sessionv3Runtime.ActivityKindMessage,
+			Visibility: sessionv3Runtime.ActivityVisibilityBoth,
+			Message: &sessionv3Runtime.MessageActivity{
+				Role:        message.Role,
+				Text:        message.Text,
+				Attachments: jsonutil.CloneJSONInValue(message.Attachments),
+				ToolResults: jsonutil.CloneJSONInValue(message.ToolResults),
+				AppContext:  jsonutil.CloneJSONInValue(message.AppContext),
+				Metadata:    message.Metadata.Clone(),
+			},
+		})
+	}
+	return output, nil
 }
 
 func recoveredSessionDefaults(

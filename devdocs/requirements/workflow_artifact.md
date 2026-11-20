@@ -1,29 +1,42 @@
-# Workflow v1 Declaration Model
+# Workflow v1 Declaration and Artifact Planning High-Level Design
 
-## 1. Purpose
+## Purpose
 
 Workflow v1 is a typed declaration language for process orchestration.
 
-Agent = reusable reasoning and interaction configuration
-Workflow = typed process declaration
+```text
+Agent      = reusable reasoning and interaction configuration
+Workflow   = typed process declaration
 Invocation = one execution of a Workflow
+```
 
-An Agent owns reusable reasoning and interaction behavior.
-A Workflow owns declaration-level process behavior, target-selection rules, and portable orchestration semantics.
+An Agent owns reusable reasoning and interaction configuration.
 
-This document specifies the Workflow source Artifact family: declaration
-admission, canonical Definition construction, read-only plan resolution,
-static dependency closure, and source-backed identity facts.
+A Workflow owns declaration-level process behavior, target-selection rules, and
+portable orchestration semantics.
 
-Execution preparation, runtime interpretation, persistence, scheduling, and
-frontend behavior are outside this document. Their status belongs in
-`workflow_runtime.md`.
+This document specifies the Workflow source Artifact family:
 
-This Artifact HLD records source admission, retrieval, static relationships,
-and read-only planning only. It does not describe consumer setup,
-consumer execution, or consumer-private representations.
+- Declaration admission.
+- Canonical Definition construction.
+- Read-only plan resolution.
+- Static dependency closure.
+- Source-backed identity facts.
+- Callable-target and requirement inventory.
+- Canonical declaration paths.
+- Static source relationships.
 
-## 2. Version contract
+Execution preparation, Runtime interpretation, persistence, scheduling,
+recovery, domain binding, and frontend behavior are outside this document.
+Their behavior and completion status belong in `workflow_runtime.md`.
+
+This HLD describes Artifact admission, retrieval, static relationships, and
+read-only planning only. It does not describe consumer setup, consumer
+execution, or consumer-private representations.
+
+## Current implementation cycle
+
+Workflow v1 remains work in progress as a source-family HLD.
 
 Workflow declarations use:
 
@@ -33,54 +46,96 @@ type: workflow
 ```
 
 `apiVersion: v1` identifies the declaration language.
-This source-family HLD is work in progress. Workflow v1 remains `apiVersion: v1`.
-No declaration, Artifact schema, Store schema, package, module, public API, or
-other version identifier is to be bumped in this implementation cycle.
-Interpreter and execution-payload contracts belong in `workflow_runtime.md`.
-A Workflow source document is stored as an Artifact definition. The standalone source field `apiVersion` is admission metadata and is not stored in the canonical definition body.
 
-This cycle excludes tests, all validation work, frontend integration, SessionV2
-migration, conversion, deletion, and replacement cleanup.
+Workflow v1 remains `apiVersion: v1`. No declaration, Artifact schema, Store
+schema, package, module, public API, interpreter, execution payload, or other
+version identifier may change in this implementation cycle.
 
-Workflow declaration and static Artifact planning are accepted as complete for
-this audit. Runtime and consumer-execution gaps remain in
-`workflow_runtime.md`.
+A Workflow source document is stored as an Artifact Definition. The standalone
+source field `apiVersion` is admission metadata. It is not stored in the
+canonical Definition body.
 
-## 3. Responsibility boundaries
+### Source-planning assessment
 
-### 3.1 Workflow responsibilities
+The supplied source assessment accepts Workflow declaration admission and static
+Artifact planning as complete for this audit.
+
+This completion assessment covers:
+
+- Workflow v1 declaration decoding.
+- Source schema and static declaration validity.
+- Canonical Definition construction.
+- Callable-target and requirement inventory.
+- Static source-backed Artifact closure.
+- Nested Workflow plan nodes in closure.
+- Canonical declaration paths.
+- Unsupported direct-composition rejection.
+- Read-only source-planning boundaries.
+
+Runtime and consumer-execution gaps remain in `workflow_runtime.md`.
+
+The conclusions are source-based. Test execution and application execution were
+not reviewed.
+
+### Scope exclusions
+
+This cycle excludes:
+
+- Tests and validation reports.
+- Validation-only hardening and cleanup.
+- Frontend integration.
+- SessionV2 migration, conversion, deletion, and replacement cleanup.
+- Version changes and release work.
+- Consumer execution implementation in Artifact Store.
+- Cost metering.
+
+### Completion discipline
+
+The single current Artifact source-planning status authority is `Functional
+tasks` at the end of this document.
+
+It replaces former Artifact implementation tables, completion records, cleanup
+tables, and repeated static-planning status claims.
+
+The Runtime HLD has a separate Runtime and consumer-execution task ledger.
+Neither HLD creates work owned by the other boundary.
+
+A task can change to `Implemented` only when the complete listed Artifact
+behavior exists in source. A status change alone is not completion.
+
+## Source-planning ownership
+
+### Workflow declaration responsibilities
 
 A Workflow declaration owns source-level orchestration semantics:
 
 - Ordered work.
-- Typed callable orchestration declarations.
-- Target-selection rules and selection persistence requirements.
-- Structured control flow.
-- Typed state updates.
-- Parallel and collection execution.
-- Repeat behavior.
-- State machines.
-- Events, channels, ports, waits, and human work.
-- Timers and schedules.
-- Trigger behavior.
-- Retry, reconciliation, compensation, and saga behavior.
-- Resource claims and execution budgets.
-- Cancellation and cleanup behavior.
+- Typed callable declarations.
+- Target-selection declarations.
+- Structured control declarations.
+- Typed state declarations.
+- Parallel and collection declarations.
+- Repeat declarations.
+- State-machine declarations.
+- Event, channel, port, wait, and human-work declarations.
+- Timer and schedule declarations.
+- Trigger declarations.
+- Retry, reconciliation, compensation, and Saga declarations.
+- Resource-claim and execution-budget declarations.
+- Cancellation and cleanup declarations.
 
 Workflow Artifact planning exposes admitted static facts and deterministic
-source-backed relationships. These are declaration meanings and planning facts.
-Runtime persistence, frame construction, binding, dispatch, settlement,
-scheduling, recovery, and cancellation execution are not Artifact behavior.
+source-backed relationships.
 
-This document does not specify how a consumer
-lowers, binds, schedules, persists, or executes those facts.
+These are declaration meanings and planning facts. Runtime persistence, frame
+construction, binding, dispatch, settlement, scheduling, recovery, cancellation
+execution, and domain invocation are not Artifact behavior.
 
-A Workflow does not own:
+A Workflow declaration does not own:
 
-- Artifact source parsing.
-- Artifact storage.
-- Current execution Artifact pinning.
-- Local enablement decisions for execution.
+- Consumer execution preparation.
+- Runtime Artifact pinning.
+- Consumer-local enablement decisions.
 - Credentials.
 - Provider configuration.
 - Provider clients.
@@ -88,41 +143,81 @@ A Workflow does not own:
 - Target-domain invocation semantics.
 - Native file access.
 - MCP client sessions.
+- Consumer-private bindings.
 - Frontend state.
 - Wails transport behavior.
 - Browser state.
 
-### 3.2 Workflow Artifact plan boundary
+### Workflow Artifact plan boundary
 
-Workflow Artifact planning owns static source facts. It returns an admitted
-Workflow document, callable targets, requirements, source inventory, and a
-complete static Artifact dependency closure.
+Workflow Artifact planning owns static source facts.
+
+It returns:
+
+- The admitted Workflow declaration.
+- The root Workflow Artifact identity.
+- The complete static Artifact dependency closure.
+- Static dependency edges.
+- Callable target facts.
+- Requirement facts.
+- Unsupported direct-composition issue facts.
+- Source inventory facts for calls, contexts, ports, retries, effects, blocks,
+  triggers, and structured declarations.
+- Canonical declaration paths.
 
 The closure contains only source-backed Artifact identity facts and static
-relationships. It contains no direct-capability evidence, execution-private
-program, binding, timer, provider request, credential, client, callback, or
-native handle.
+relationships.
 
-Workflow does not support direct capabilities for Model, Agent, Tool, MCP,
-Skill, Service, or Activity. A direct composition result for one of those
-families, including Nested Workflow, is unsupported Workflow input. Planning
-returns an unsupported planning error before it creates a usable plan. It must
-not publish a direct target, fabricate an Artifact, Source, Definition,
-revision, pin, or binding.
+The closure does not contain:
+
+- ProgramFrames.
+- WorkItems.
+- Attempts.
+- Waits.
+- Timers.
+- Runtime semantic bindings.
+- Provider-ready requests.
+- Credentials.
+- Provider clients.
+- MCP sessions.
+- Approval tokens.
+- Native handles.
+- Callbacks.
+- Runtime-private state.
 
 Consumers can use the plan as a read-only source-fact projection. Consumer
-lowering and execution behavior are not specified in this document.
+lowering, binding, execution, persistence, scheduling, recovery, and transport
+are not specified in this document.
 
-Artifact Store is a passive source-fact provider. It admits and returns
-definitions, relationships, identity facts, and static planning facts. It does
-not prepare, schedule, bind, dispatch, recover, or otherwise participate in
-Workflow execution.
+### Artifact Store boundary
 
-Consumers can read generic Artifact facts when they need current source
-identity. The store does not receive consumer-specific execution requests or
-expose consumer-specific execution APIs.
+Artifact Store is a passive source-fact provider.
 
-### 3.3 Agent responsibilities
+It admits and returns:
+
+- Definitions.
+- Source identity.
+- Relationships.
+- Admitted source facts.
+- Static planning facts.
+- Read-only retrieval results.
+
+Artifact Store does not:
+
+- Prepare execution.
+- Construct bindings.
+- Schedule work.
+- Dispatch work.
+- Recover execution.
+- Persist Runtime execution state.
+- Retain consumer-private state.
+- Receive consumer-specific execution requests.
+- Expose consumer-specific execution APIs.
+
+Consumers can read generic Artifact facts when they need current source identity.
+The Store does not become an execution API.
+
+### Agent source relationships
 
 An Agent owns reusable reasoning and interaction configuration.
 
@@ -133,103 +228,171 @@ An Agent can contribute:
 - Tool capabilities.
 - Skill capabilities.
 - MCP capabilities.
-- Model system prompt behavior.
+- Model system-prompt behavior.
 - Agent-specific capability requirements.
 
-Workflow source can declare an Agent target. Artifact planning records the
-declared static relationship, callable interface, and source identity facts.
-Current capability readiness and native invocation behavior are outside this
-Artifact planning document.
+Workflow source can declare an Agent target.
 
-### 3.4 Workflow Artifact API
+Artifact planning records:
 
-Workflow is a source-backed Artifact family. Its current Artifact-facing API is
-read-only plan resolution through `workflow.Service.ResolvePlan`.
+- The declared static Agent relationship.
+- The callable interface.
+- Source identity facts.
+- Source-backed dependency relationships.
 
-The Artifact-facing plan contract must provide:
+Current capability readiness, selected contribution preparation, private
+resource construction, and native invocation are consumer behavior outside this
+document.
+
+## Workflow Artifact API
+
+Workflow is a source-backed Artifact family.
+
+Its Artifact-facing API is read-only plan resolution through
+`workflow.Service.ResolvePlan`.
+
+The plan contract provides:
 
 - The admitted Workflow declaration.
 - The root Workflow Artifact identity.
-- The complete static Artifact dependency closure.
+- The complete static Artifact closure.
 - Callable targets.
 - Requirements.
 - Source inventory facts.
+- Canonical declaration paths.
+- Static relationship status and issue facts.
 
-Current target readiness, runtime Artifact pin conversion, domain binding,
-runtime execution, persistence, recovery, and Wails behavior are outside this
-Artifact API.
+The plan contract returns:
 
-Inline Workflow text remains ordinary declaration data. It is not a direct capability.
-
-Workflow declarations are admitted through ordinary generic Source refresh and
-application-selected canonical declaration decoders. Built-in and Workspace
-Source configuration are application bootstrap choices. Workflow has no
-Workflow-specific source-origin, Source-driver, or package-publication policy.
-
-The completed plan contract returns:
-
-- the admitted Workflow document and current root Artifact identity facts;
-- `Inventory.CallableTargets`, containing only declarations that a Workflow
-  call can select;
-- `Inventory.Requirements`, containing only admission prerequisites;
-- source-backed `ResolvedArtifactRef` values for resolved Artifact targets;
-- call, context, port, retry, effect, and block planning facts;
-- detailed relationship status and issue facts.
-
-Generic Artifact, catalog, Definition, Resource, and enablement APIs provide
-the current entity-management operations. No Workflow-specific list, get,
-source export, enablement, Plugin, or managed package API is required until a
-concrete consumer requires one.
-
-Service and Activity remain typed registered binding prerequisites. They are
-not Artifacts and are not direct composition capabilities.
-
-An Artifact-backed requirement receives ordinary composition resolution. A
-Service or Activity requirement remains a typed registered-binding
-prerequisite. It does not receive a synthetic Artifact resolution.
-Requirements are static prerequisites, separate from the callable-target
-inventory and target-set membership facts.
-
-`Plan.Capabilities` remains a recursive composition and diagnostic projection.
-Consumers must use the separate callable-target and requirement collections.
-They must not rebuild callable target lookup by walking this diagnostic
-projection. It is not executable Workflow target data.
-
-`Inventory` source paths are the planning-owned canonical declaration paths for
-blocks, calls, ports, retries, and effects. The root block is `root`; a root
-step is `root/steps/<step-id>`. The Artifact plan does not define runtime
-frame identities or runtime delivery behavior.
+- The admitted Workflow document and current root Artifact identity facts.
+- `Inventory.CallableTargets`, containing only declarations that a Workflow call
+  can select.
+- `Inventory.Requirements`, containing only admission prerequisites.
+- Source-backed `ResolvedArtifactRef` values for resolved Artifact targets.
+- Call, context, port, retry, effect, block, trigger, and structured-operation
+  planning facts.
+- Detailed relationship status and issue facts.
 
 Workflow plan resolution is valid for an available Workflow Artifact regardless
-of consumer-local enablement state. A consumer can apply its own enablement,
-binding, credential, policy, and domain-readiness rules after it receives the
-read-only plan. Those rules are not Artifact planning behavior.
+of consumer-local enablement state. A consumer can apply enablement, binding,
+credential, policy, and domain-readiness rules only after it receives the
+read-only plan.
 
-A direct composition result for a Workflow-relevant target family is rejected
-as unsupported. Workflow planning must not fabricate an Artifact, Source,
-Definition, revision, local-state record, lifecycle record, or direct-target
-runtime representation for it.
+Current target readiness, Runtime Artifact pin conversion, domain binding,
+execution, persistence, recovery, and Wails behavior are outside this API.
 
-### 3.2.1 Direct Tool identity boundary
+Workflow declarations are admitted through generic Source refresh and
+application-selected canonical declaration decoders.
 
-`CapabilityTargetForm.Direct` has no source-backed Artifact identity. It
-therefore cannot enter a Workflow Artifact closure, Inventory target plan,
-resolved Artifact reference, Definition identity, revision, or static source
-relationship.
+Built-in and Workspace Source configuration are application bootstrap choices.
+Workflow has no Workflow-specific source-origin, Source-driver, or package
+publication policy.
 
-Built-in Go Tool and provider SDK Tool declarations are ordinary Tool
-Artifacts. They remain source-backed closure members. An MCP Server is also an
-Artifact closure member, but a discovered MCP Tool operation is not an
-individual Tool Artifact. A Skill declaration is an Artifact; Skill Runtime
-lifecycle operations are not Artifact declarations.
+Generic Artifact, catalog, Definition, Resource, and enablement APIs provide
+entity-management operations. No Workflow-specific list, get, source export,
+enablement, Plugin, or managed package API is required until a concrete
+consumer requires one.
+
+## Direct capabilities, requirements, and source identity
+
+### Direct capabilities are unsupported
+
+Workflow does not support direct capabilities for:
+
+- Model.
+- Agent.
+- Tool.
+- MCP Tool.
+- Skill Tool.
+- Service.
+- Activity.
+- Nested Workflow.
+
+A direct composition result for one of these families is unsupported Workflow
+input.
+
+Planning returns an unsupported planning error before it creates a usable plan.
+
+Planning must not publish or fabricate:
+
+- A direct callable target.
+- An Artifact.
+- A Source.
+- A Definition.
+- A revision.
+- A closure node.
+- A resolved Artifact reference.
+- A pin.
+- A binding.
+- A runtime direct-target representation.
+
+### Direct Tool identity boundary
+
+`CapabilityTargetForm.Direct` has no source-backed Artifact identity.
+
+It cannot enter:
+
+- A Workflow Artifact closure.
+- An Inventory target plan.
+- A resolved Artifact reference.
+- Definition identity.
+- Revision identity.
+- A static source relationship.
+
+Built-in Go Tool and provider SDK Tool declarations are ordinary Tool Artifacts.
+They remain source-backed closure members.
+
+An MCP Server is an Artifact closure member. A discovered MCP Tool operation is
+not an individual Tool Artifact.
+
+A Skill declaration is an Artifact. Skill Runtime lifecycle operations are not
+Artifact declarations.
 
 This document does not define consumer compatibility representations such as
-`session.DirectCapabilitySelection`. It makes no claim that an application
-deployment has a direct-capability provider. Consumer compatibility, current
-provider registration, and SessionV2 retirement are outside this Artifact
-planning boundary.
+`session.DirectCapabilitySelection`. Current provider registration, consumer
+compatibility, and SessionV2 retirement are outside this Artifact boundary.
 
-## 4. Architecture
+### Requirements are not callable targets
+
+Artifact-backed requirements receive ordinary composition resolution.
+
+Service and Activity requirements remain typed registered-binding prerequisites.
+They do not receive synthetic Artifact resolution.
+
+Requirements are static prerequisites. They are separate from:
+
+- Callable-target inventory.
+- Target-set membership.
+- Call selection.
+- Runtime target dispatch.
+
+`Plan.Capabilities` remains a recursive composition and diagnostic projection.
+
+Consumers must use separate callable-target and requirement collections.
+Consumers must not rebuild callable target lookup by walking
+`Plan.Capabilities`.
+
+`Plan.Capabilities` is not executable Workflow target data.
+
+Inventory paths are planning-owned canonical declaration paths. The root block
+path is `root`. A root step path is `root/steps/<step-id>`.
+
+Artifact planning does not define Runtime frame identities, WorkItem
+identities, delivery routes, or channel storage names.
+
+### Inline declaration data
+
+Inline Workflow Text, explicit Model and Agent messages, instructions, and
+defaults remain ordinary declaration data.
+
+They are not:
+
+- Direct capabilities.
+- Artifact pins.
+- Generic native request envelopes.
+- Consumer-private state.
+
+## Artifact architecture
 
 ```mermaid
 flowchart TD
@@ -240,46 +403,59 @@ flowchart TD
     E --> F[External consumer boundary]
 ```
 
-| Layer                      | Primary package area                               | Responsibilities                                                                                                                           |
-| -------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| Declaration language       | `internal/llmartifactory-go/workflow/contract/v1/` | Source grammar, source schema, static validation, JSON Schema validity, CEL scope validity, target and requirement declaration validity    |
-| Workflow planning          | `internal/llmartifactory-go/workflow/`             | Read-only Artifact-backed relationship resolution, callable-target and requirement inventory, source-backed references, and planning facts |
-| Artifact Store             | Generic Artifact Store packages                    | Passive Definition storage, identity, relationships, admitted source facts, and read-only retrieval                                        |
-| External consumer boundary | Outside this document                              | Consumer behavior is intentionally not specified here                                                                                      |
+Artifact ownership is:
 
-The Artifact Store has no execution role. It does not parse consumer intent,
-prepare bindings, schedule work, or retain consumer-private state.
+- Declaration language:
+  `internal/llmartifactory-go/workflow/contract/v1/`
+  - Source grammar.
+  - Source schema.
+  - Static validation.
+  - JSON Schema validity.
+  - CEL scope validity.
+  - Target and requirement declaration validity.
 
-The read-only plan and closure are the complete Artifact-facing output. This
-document makes no assertion about a consumer's runtime representation.
+- Workflow planning:
+  `internal/llmartifactory-go/workflow/`
+  - Read-only Artifact-backed relationship resolution.
+  - Callable-target and requirement inventory.
+  - Source-backed references.
+  - Static closure.
+  - Planning facts.
 
-### 4.1 Artifact interpretation boundary
+- Artifact Store:
+  - Passive Definition storage.
+  - Identity.
+  - Relationships.
+  - Admitted source facts.
+  - Read-only retrieval.
 
-This document defines only Artifact-side interpretation and read-only planning ownership.
+- External consumer boundary:
+  - Consumer behavior is intentionally outside this document.
 
-| Artifact concern                                                            | Owner                 | Artifact-facing result                                            |
-| --------------------------------------------------------------------------- | --------------------- | ----------------------------------------------------------------- |
-| Artifact envelope, Definition identity, and persistence identity            | Artifact Store        | Admitted immutable source facts                                   |
-| Workflow grammar, source schema, static CEL scope, and source relationships | Workflow contract v1  | Typed admitted Workflow declaration                               |
-| Artifact-backed target and requirement resolution                           | Workflow planning     | Read-only plan, inventory, closure, and unsupported-direct issues |
-| Consumer execution, binding, persistence, transport, and scheduling         | Outside this document | No Artifact HLD behavior is specified                             |
+Artifact planning ends when it returns admitted source facts.
 
-Artifact planning ends when it returns admitted source facts. Consumer-local
-representations and consumer behavior are not part of Artifact planning.
+Consumer-local representations, consumer-private bindings, execution
+preparation, transport, scheduling, and Runtime state are not part of Artifact
+planning.
 
-LLM declaration-family registration is also split by ownership:
+### Registration ownership
+
+LLM declaration-family registration is split by ownership:
 
 - `internal/llmartifactory-go/registration` assembles family interpretations,
   schema codecs, canonical declaration decoders, source-format decoders, and
   locator factories.
-- `internal/artifactsetup/registration` supplies application topology choices
+- `internal/artifactsetup/registration` supplies application topology choices,
   such as candidate filenames and package document layouts.
 
 Generic schema type-overlap checks are domain-neutral JSON utility behavior.
-They have one implementation in `internal/jsonutil`, used by declaration and
-consumer boundaries without giving Artifact Store an execution role.
+They have one implementation in `internal/jsonutil`. They can be used by
+declaration and consumer boundaries without giving Artifact Store an execution
+role.
 
-## 5. Root declaration
+## Declaration model
+
+### Root declaration
 
 A root Workflow declaration has this shape:
 
@@ -331,35 +507,34 @@ finally:
   steps: []
 ```
 
-| Field          |                 Required | Meaning                                             |
-| -------------- | -----------------------: | --------------------------------------------------- |
-| `apiVersion`   | Yes in standalone source | Must be `v1`.                                       |
-| `type`         |                      Yes | Must be `workflow`.                                 |
-| `name`         |                      Yes | Portable Workflow name.                             |
-| `inputSchema`  |                      Yes | JSON Schema for invocation input.                   |
-| `outputSchema` |                      Yes | JSON Schema for successful root output.             |
-| `schemas`      |                       No | Reusable JSON Schema definitions.                   |
-| `targets`      |                       No | Named callable targets.                             |
-| `targetSets`   |                       No | Static or resolver-backed target collections.       |
-| `events`       |                       No | Typed external event contracts.                     |
-| `channels`     |                       No | Invocation-local durable message logs.              |
-| `ports`        |                       No | Published typed port bindings.                      |
-| `triggers`     |                       No | Event and schedule entry points.                    |
-| `requirements` |                       No | Named Artifact or registered-binding prerequisites. |
-| `resources`    |                       No | Named claimable resource definitions.               |
-| `limits`       |                       No | Invocation limits and cleanup allowance.            |
-| `state`        |                       No | Root typed state declaration.                       |
-| `listen`       |                       No | Root subscriptions active before root work begins.  |
-| `steps`        |                      Yes | Ordered root steps.                                 |
-| `output`       |                      Yes | Explicit successful root output mapping.            |
-| `catch`        |                       No | Ordered root failure handlers.                      |
-| `finally`      |                       No | Root finalization block.                            |
+Root fields are:
 
-The root Workflow has no implicit output. The final successful value is the root `output` value or an explicit Workflow-level `return`.
+- `apiVersion`: required in standalone source; must be `v1`.
+- `type`: required; must be `workflow`.
+- `name`: required portable Workflow name.
+- `inputSchema`: required JSON Schema for invocation input.
+- `outputSchema`: required JSON Schema for successful root output.
+- `schemas`: optional reusable JSON Schema definitions.
+- `targets`: optional named callable targets.
+- `targetSets`: optional static or resolver-backed target collections.
+- `events`: optional typed external event contracts.
+- `channels`: optional invocation-local channel declarations.
+- `ports`: optional published typed port declarations.
+- `triggers`: optional event and schedule entry points.
+- `requirements`: optional named Artifact or registered-binding prerequisites.
+- `resources`: optional named claimable resource declarations.
+- `limits`: optional invocation-limit and cleanup-allowance declarations.
+- `state`: optional root typed state declaration.
+- `listen`: optional root subscription declarations.
+- `steps`: required ordered root steps.
+- `output`: required explicit successful root output mapping.
+- `catch`: optional ordered root failure handlers.
+- `finally`: optional root finalization block.
 
-## 6. Blocks, identities, and outcomes
+The root Workflow has no implicit output. The final successful value is the root
+`output` value or an explicit Workflow-level `return`.
 
-### 6.1 Blocks
+### Blocks
 
 A block contains:
 
@@ -383,24 +558,24 @@ output:
     $expr: steps.prepare.output
 ```
 
-A nested block can omit `output` only when its grammar permits omission. Its default output is `null`.
+A nested block can omit `output` only when its grammar permits omission. Its
+default output is `null`.
 
 The root output is always explicit.
 
-### 6.2 Step identity
+### Step identity and semantic outcomes
 
 A step identity is unique within its block.
 
 A nested step identity cannot shadow an enclosing visible step identity.
 
 Artifact planning identifies declared blocks, steps, calls, and relationships.
-It does not allocate execution or logical-operation identities.
+It does not allocate execution, WorkItem, Attempt, ProgramFrame, or logical
+operation identities.
 
 The declaration distinguishes a retry from a new Repeat iteration or Foreach
-item. Execution identity, attempt identity, and persistence of those meanings
-belong in `workflow_runtime.md`.
-
-### 6.3 Terminal step outcome vocabulary
+item. Runtime identity and persistence of those meanings belong in
+`workflow_runtime.md`.
 
 A Workflow step declares one semantic terminal outcome:
 
@@ -423,15 +598,15 @@ A false `when` condition produces `skipped`.
 
 A skipped outcome has no output.
 
-An uncertain outcome means an external effect can have happened but the runtime has no durable confirmation.
+An uncertain outcome means an external effect can have happened without durable
+confirmation.
 
-Runtime creation, persistence, settlement, and projection of terminal outcomes
-belong in `workflow_runtime.md`. Artifact planning retains only the source
-declaration and static outcome-related planning facts.
+Runtime creation, persistence, settlement, and projection of outcomes belong in
+`workflow_runtime.md`.
 
-## 7. Values, schemas, and expressions
+## Values, schemas, and expressions
 
-### 7.1 Canonical JSON values
+### Canonical JSON values
 
 Workflow values can be:
 
@@ -466,9 +641,9 @@ $literal:
 
 Ordinary strings are literal strings.
 
-### 7.2 Schema boundaries
+### Schema boundaries
 
-Workflow uses JSON Schema Draft 2020-12 at these boundaries:
+Workflow uses JSON Schema Draft 2020-12 for:
 
 - Invocation input.
 - Invocation output.
@@ -491,26 +666,25 @@ Schema validity and business success are separate concepts.
 
 A business decline can be valid output data.
 
-### 7.3 Expression scope
+### Expression scope
 
-Expressions can use these variables when the controlling construct provides them:
+Expressions can use these variables when the controlling declaration provides
+them:
 
-| Variable    | Meaning                                                       |
-| ----------- | ------------------------------------------------------------- |
-| `input`     | Immutable invocation input.                                   |
-| `state`     | Current state of the nearest state-owning scope.              |
-| `steps`     | Completed step outcomes visible in the current scope chain.   |
-| `item`      | Current Foreach item.                                         |
-| `index`     | Current Foreach or Repeat index.                              |
-| `result`    | Controlled-block result where defined.                        |
-| `event`     | Current matched event, trigger event, or machine event.       |
-| `messages`  | Authorized channel snapshot at the evaluation boundary.       |
-| `error`     | Error visible to a catch handler.                             |
-| `outcome`   | Scope outcome visible to finalization.                        |
-| `completed` | Confirmed operation facts visible to compensation.            |
-| `operation` | Original operation facts visible to reconciliation.           |
-| `context`   | Invocation metadata and logical evaluation time.              |
-| `ports`     | Authorized port input values for the current target boundary. |
+- `input`: immutable invocation input.
+- `state`: current state of the nearest state-owning scope.
+- `steps`: completed visible step outcomes.
+- `item`: current Foreach item.
+- `index`: current Foreach or Repeat index.
+- `result`: controlled-block result where defined.
+- `event`: current matched event, trigger event, or Machine event.
+- `messages`: authorized channel snapshot at the evaluation boundary.
+- `error`: error visible to a catch handler.
+- `outcome`: scope outcome visible to finalization.
+- `completed`: confirmed operation facts visible to compensation.
+- `operation`: original operation facts visible to reconciliation.
+- `context`: invocation metadata and logical evaluation time.
+- `ports`: authorized port input values for the current target boundary.
 
 Expressions are pure.
 
@@ -529,18 +703,19 @@ Expressions do not:
 
 External behavior uses a typed callable target or a Workflow operation.
 
-### 7.4 Expression planning facts
+### Expression planning facts
 
-The admitted declaration retains expression templates and their source scope.
-Inventory retains the associated declaration paths and static call, context,
-port, retry, and effect facts.
+The admitted declaration retains expression templates and source scope.
+
+Inventory retains associated declaration paths and static call, context, port,
+retry, effect, and block facts.
 
 Evaluation snapshots, logical time, cursors, resumption, and compiled-program
-lifecycle are consumer execution concerns specified in `workflow_runtime.md`.
+lifecycle are Runtime concerns.
 
-## 8. State
+## State declarations
 
-### 8.1 State declaration
+### State ownership
 
 ```yaml
 state:
@@ -558,11 +733,12 @@ state:
 
 A state declaration creates a state-owning scope.
 
-A nested block with local `state` initializes and owns its own state.
+A nested block with local `state` declares its own state scope.
 
-A nested block without local `state` reads and updates the closest enclosing state-owning scope.
+A nested block without local `state` refers to the closest enclosing
+state-owning scope.
 
-### 8.2 Atomic update
+### Atomic state update declaration
 
 ```yaml
 - id: record
@@ -574,26 +750,32 @@ A nested block without local `state` reads and updates the closest enclosing sta
       - obsoleteField
 ```
 
-All assignment expressions observe the same state snapshot.
+All assignment expressions observe one state snapshot.
 
-The complete result validates against the owning state schema.
+The complete resulting value validates against the owning state schema.
 
-`set` returns the resulting state.
+`set` declares the resulting state as its output.
 
-### 8.3 Concurrent state isolation
+### Concurrent state declaration semantics
 
-Parallel branches and Foreach items receive isolated state snapshots.
+Parallel branches and Foreach items declare isolated state snapshots.
 
-Their state cannot race with parent state.
+A parent-state change requires an explicit deterministic merge after child
+outcomes become available.
 
-A parent state changes only through an explicit deterministic merge after child outcomes are available.
+Artifact planning retains:
 
-Artifact planning retains the declared merge expressions and state schema.
-Execution of the merge is specified in `workflow_runtime.md`.
+- Declared state schemas.
+- Initial values.
+- Update expressions.
+- Merge expressions.
+- Canonical declaration paths.
 
-## 9. Callable targets
+Runtime executes merges and persists state changes.
 
-### 9.1 Target kinds
+## Callable targets and calls
+
+### Target kinds
 
 ```yaml
 targets:
@@ -622,21 +804,20 @@ targets:
     ref: review-process
 ```
 
-Supported target kinds are:
+Supported kinds are:
 
-| Kind       | Meaning                              |
-| ---------- | ------------------------------------ |
-| `agent`    | Reusable Agent capability.           |
-| `model`    | Direct Model request.                |
-| `tool`     | Tool Artifact or MCP Tool operation. |
-| `service`  | Registered typed Service binding.    |
-| `activity` | Registered typed Activity binding.   |
-| `workflow` | Nested Workflow declaration.         |
+- `agent`: reusable Agent capability.
+- `model`: direct Model request.
+- `tool`: Tool Artifact or MCP Tool operation.
+- `service`: registered typed Service binding.
+- `activity`: registered typed Activity binding.
+- `workflow`: nested Workflow declaration.
 
-Agent and Model target declarations use typed Workflow adapters. Admission
-and planning retain their declared interfaces and source-backed relationships.
-Current adapter availability, enablement, domain readiness, and execution
-transport belong to consumer preparation, not Artifact admission or planning.
+Agent and Model declarations use typed Workflow adapters.
+
+Admission and planning retain declared interfaces and source-backed
+relationships. Adapter availability, enablement, domain readiness, and
+execution transport belong to consumer preparation.
 
 An MCP Tool target declares a server:
 
@@ -649,7 +830,7 @@ targets:
     ref: publish_issue
 ```
 
-### 9.2 Callable interface
+### Callable interface
 
 A target, target set, or call can declare a callable interface.
 
@@ -684,9 +865,10 @@ A callable interface defines:
 - Effect capability.
 - Limits.
 
-A call-level interface can narrow a target interface. It cannot widen the target interface.
+A call-level interface can narrow a target interface. It cannot widen a target
+interface.
 
-### 9.3 Invocation
+### Calls
 
 ```yaml
 - id: research
@@ -700,48 +882,60 @@ A call-level interface can narrow a target interface. It cannot widen the target
         $expr: messages.research
 ```
 
-A call evaluates input and context once.
+A call declaration identifies:
 
-A call declaration identifies input, context, allowed target set, effect,
-retry, deadline, and port intent. Planning exposes their static forms through
-the admitted document and Inventory. Execution preparation captures current
-target and binding facts. Durable call handling is specified in
-`workflow_runtime.md`.
+- Target.
+- Input.
+- Context.
+- Allowed target set.
+- Effect declaration.
+- Retry declaration.
+- Deadline declaration.
+- Port intent.
 
-### 9.4 Call modes
+Planning exposes static call facts through the admitted document and Inventory.
 
-| Mode      | Meaning                                            |
-| --------- | -------------------------------------------------- |
-| `invoke`  | Typed call-return behavior.                        |
-| `start`   | Starts child work and returns a completion handle. |
-| `handoff` | Transfers conversation ownership to an Agent.      |
+Execution preparation captures current target and binding facts. Durable call
+handling belongs in `workflow_runtime.md`.
+
+### Call modes
+
+Call modes are:
+
+- `invoke`: typed call-return behavior.
+- `start`: starts declared child behavior and returns a completion handle.
+- `handoff`: declares transfer of conversation ownership to an Agent.
 
 `invoke` is the default.
 
-`start` supports:
+`start` lifetime values are:
 
-| Lifetime      | Meaning                                                 |
-| ------------- | ------------------------------------------------------- |
-| `attached`    | The child belongs to the parent scope.                  |
-| `independent` | The child is an Execution in the same Session document. |
+- `attached`: the declaration requests child behavior owned by the parent scope.
+- `independent`: the declaration requests child behavior in an Execution in the
+  same Session document.
 
 An independent-start declaration supplies ownership, cancellation relationship,
-and child-budget intent. Artifact planning retains this declaration data.
+and child-budget intent.
 
 `handoff` is valid only for an Agent target.
 
-A handoff declaration identifies the conversation, Agent target, ownership
-intent, and completion behavior. Runtime ownership records and message routing
-are specified in `workflow_runtime.md`.
+A handoff declaration identifies:
 
-Completion behavior is:
+- Conversation.
+- Agent target.
+- Ownership intent.
+- Completion behavior.
 
-| Value     | Meaning                                                                 |
-| --------- | ----------------------------------------------------------------------- |
-| `restore` | Restore the saved owner after child completion.                         |
-| `retain`  | Keep the target Agent as the conversation owner after child completion. |
+Handoff completion values are:
 
-### 9.5 Target sets
+- `restore`: restore the saved owner after child completion.
+- `retain`: retain the target Agent as conversation owner after child
+  completion.
+
+Runtime ownership records, message routing, completion, and relinquish behavior
+belong in `workflow_runtime.md`.
+
+### Target sets
 
 A target set restricts dynamic dispatch.
 
@@ -771,20 +965,31 @@ A resolver-backed target set has:
 - A callable interface.
 - Optional constraints.
 
-Planning records a resolver-backed target set as deferred selection work. It
-does not evaluate membership, select a target, or create runtime work.
-Durable resolver execution is specified in `workflow_runtime.md`.
+Planning records resolver-backed target sets as deferred selection facts.
 
-### 9.6 Provider-managed Tool Artifacts
+Planning does not:
+
+- Evaluate membership.
+- Select a target.
+- Create Runtime work.
+- Invoke an execution adapter.
+
+### Provider-managed Tool Artifacts
 
 A provider SDK Tool Artifact declares a provider-managed capability.
+
 Its admitted interface and source identity remain ordinary Artifact facts.
 
-Workflow Artifact planning records only the declared relationship, callable
-interface, and static source-backed dependency. It does not specify
-consumer request construction, execution representation, or invocation.
+Workflow Artifact planning records only:
 
-## 10. Declaration transport contract
+- The declared relationship.
+- The callable interface.
+- The static source-backed dependency.
+
+Planning does not specify consumer request construction, execution
+representation, or invocation.
+
+## Declaration transport contract
 
 Workflow source declares:
 
@@ -794,16 +999,18 @@ Workflow source declares:
 - Published Workflow ports.
 - Stream intent.
 
-Contract admission validates static declaration compatibility. Planning exposes
-immutable transport facts in Inventory. Current target capability, native
-request adaptation, port staging, port delivery, stream ordering, and target
-settlement are specified in `workflow_runtime.md`.
+Contract admission validates static declaration compatibility.
 
-## 11. Context, ports, and channels
+Planning exposes immutable transport facts in Inventory.
 
-### 11.1 Explicit context transfer
+Current target capability, native request adaptation, port staging, port
+delivery, stream ordering, and target settlement belong in
+`workflow_runtime.md`.
 
-Only mapped input, context, ports, and copied message values cross a target boundary.
+### Explicit context transfer
+
+Only mapped input, context, ports, and copied message values cross a target
+boundary.
 
 A target does not implicitly receive:
 
@@ -817,7 +1024,7 @@ A target does not implicitly receive:
 - Native paths.
 - Application state.
 
-### 11.2 Ports
+### Ports
 
 A port is a typed named boundary between caller and target.
 
@@ -841,30 +1048,31 @@ call:
       access: write
 ```
 
-Port validation checks:
+Static port compatibility includes:
 
 - Port name.
 - Port direction.
 - Stream capability.
-- Channel existence.
+- Channel declaration.
 - Channel read or write authorization.
 - Source schema.
 - Destination schema.
-- Parent-child ownership.
+- Parent-child declaration relationship.
 - Target interface compatibility.
 - Published root Workflow port compatibility for nested Workflow targets.
 
-Input ports transfer authorized retained channel values or explicit mapped values.
+A port declaration distinguishes:
 
-Output ports transfer final target values.
+- Input ports.
+- Final-output ports.
+- Streamed-output ports.
 
-A port declaration distinguishes input, final-output, and streamed-output
-contracts. Runtime staging, cursor handling, delivery, retention, and stream
-semantics are specified in `workflow_runtime.md`.
+Runtime stages values, maintains cursors, delivers output, retains records, and
+orders streams.
 
-### 11.3 Channels
+### Channels
 
-A channel is an invocation-local append-only durable message log.
+A channel declaration describes an invocation-local append-only message log.
 
 ```yaml
 channels:
@@ -884,14 +1092,19 @@ channels:
       - draft
 ```
 
-The declaration defines channel schema, retention limits, and reader and writer
-authorization. Artifact planning retains those static facts.
+Artifact planning retains:
 
-Runtime creates channel message records, sequence values, cursors,
-deduplication facts, and consumption records. Channel read and consumption
-behavior belongs in `workflow_runtime.md`.
+- Channel name.
+- Message schema.
+- Message and byte limits.
+- Reader authorization.
+- Writer authorization.
+- Canonical declaration path.
 
-### 11.4 Emit
+Runtime creates channel records, message identities, sequences, cursors,
+deduplication facts, and consumption records.
+
+### Emit
 
 ```yaml
 - id: publish-draft
@@ -906,40 +1119,42 @@ behavior belongs in `workflow_runtime.md`.
       $expr: input.requestId
 ```
 
-An emit can target:
+An emit declaration can target:
 
 - A local channel.
 - A Workflow event.
 
-An emit declaration identifies its destination, kind, data template, and
-deduplication-key template. Runtime receipt persistence and duplicate-key
-behavior belong in `workflow_runtime.md`.
+Artifact planning retains destination, kind, data template, deduplication-key
+template, and declaration path.
 
-## 12. Structured operations
+Runtime receipt persistence and duplicate-key behavior belong in
+`workflow_runtime.md`.
 
-### 12.1 Operation set
+## Structured declarations
 
-| Operation   | Purpose                                                 |
-| ----------- | ------------------------------------------------------- |
-| `call`      | Invoke, start, dispatch, or hand off to a typed target. |
-| `transform` | Construct a deterministic value.                        |
-| `set`       | Atomically update typed state.                          |
-| `scope`     | Create a nested block and lifecycle boundary.           |
-| `choose`    | Select one conditional block.                           |
-| `parallel`  | Run named branches.                                     |
-| `foreach`   | Process a captured collection.                          |
-| `repeat`    | Repeat a block with carried state.                      |
-| `machine`   | Run an explicit state lifecycle.                        |
-| `wait`      | Suspend for a typed condition.                          |
-| `emit`      | Publish a local channel message or event.               |
-| `saga`      | Define a compensation boundary.                         |
-| `cancel`    | Request cancellation of child work.                     |
-| `return`    | Complete a block or Workflow with an explicit value.    |
-| `fail`      | Produce a typed failure.                                |
-| `break`     | Exit the nearest Repeat.                                |
-| `continue`  | Complete the current Repeat iteration.                  |
+### Operation set
 
-### 12.2 Transform
+Workflow operations are:
+
+- `call`: invoke, start, dispatch, or hand off to a typed target.
+- `transform`: construct a deterministic value.
+- `set`: atomically update typed state.
+- `scope`: create a nested declaration and lifecycle boundary.
+- `choose`: select one conditional block.
+- `parallel`: declare named branches.
+- `foreach`: declare processing of a captured collection.
+- `repeat`: declare repeated behavior with carried state.
+- `machine`: declare a state lifecycle.
+- `wait`: declare suspension for a typed condition.
+- `emit`: declare a local channel message or event.
+- `saga`: declare a compensation boundary.
+- `cancel`: declare cancellation intent for child work.
+- `return`: complete a block or Workflow with an explicit value.
+- `fail`: produce a typed failure.
+- `break`: exit the nearest Repeat.
+- `continue`: complete the current Repeat iteration.
+
+### Transform
 
 ```yaml
 - id: prepare
@@ -955,9 +1170,9 @@ behavior belong in `workflow_runtime.md`.
 
 A transform is deterministic.
 
-A transform does not create an external effect.
+A transform does not declare an external effect.
 
-### 12.3 Scope
+### Scope
 
 ```yaml
 - id: protected
@@ -970,19 +1185,17 @@ A transform does not create an external effect.
     output: null
 ```
 
-A scope creates a lifecycle boundary.
-
-A scope can own:
+A scope declaration can own:
 
 - Local state.
 - Subscriptions.
 - Catch handlers.
 - Finalization.
-- Attached children.
-- Resource claims.
-- Cleanup work.
+- Attached-child declarations.
+- Resource-claim declarations.
+- Cleanup declarations.
 
-### 12.4 Choose
+### Choose
 
 ```yaml
 - id: route
@@ -1000,13 +1213,13 @@ A scope can own:
         queue: normal
 ```
 
-Cases evaluate in declaration order.
+Cases are declared in order.
 
-The first matching case executes.
+The first matching case is the selected source branch.
 
 No matching case without `default` produces `routing.no_match`.
 
-### 12.5 Parallel
+### Parallel
 
 ```yaml
 parallel:
@@ -1029,38 +1242,31 @@ parallel:
           approved: true
 ```
 
-All branch conditions evaluate from the same entry snapshot.
+All branch conditions use the same declared entry boundary.
 
 Only selected branches participate in completion.
 
-Completion modes:
+Completion modes are:
 
-| Mode              | Completion condition                             |
-| ----------------- | ------------------------------------------------ |
-| `all`             | Every selected branch succeeds.                  |
-| `first-completed` | The first terminal branch determines the result. |
-| `first-success`   | The first successful branch wins.                |
-| `quorum`          | A declared positive number of branches succeed.  |
+- `all`: every selected branch succeeds.
+- `first-completed`: the first terminal branch determines the result.
+- `first-success`: the first successful branch wins.
+- `quorum`: a declared positive number of branches succeed.
 
-`remaining` behavior:
+Remaining-branch behavior is:
 
-| Value    | Meaning                                              |
-| -------- | ---------------------------------------------------- |
-| `cancel` | Request cancellation of remaining selected branches. |
-| `wait`   | Wait for remaining selected branches to settle.      |
+- `cancel`: request cancellation of remaining selected branches.
+- `wait`: wait for remaining selected branches to settle.
 
-For `all`, `errors` behavior:
+For `all`, error behavior is:
 
-| Value       | Meaning                                                       |
-| ----------- | ------------------------------------------------------------- |
-| `fail-fast` | Request cancellation after a branch failure.                  |
-| `collect`   | Wait for all selected branches and return aggregate outcomes. |
+- `fail-fast`: request cancellation after branch failure.
+- `collect`: wait for all selected branches and return aggregate outcomes.
 
-Branch outcomes remain durable after another branch satisfies completion policy.
+Runtime preserves branch outcomes, including uncertainty, after another branch
+satisfies completion policy.
 
-An uncertain branch remains visible. It is not converted to success, skipped, or cancelled because another branch completes.
-
-### 12.6 Foreach
+### Foreach
 
 ```yaml
 foreach:
@@ -1083,24 +1289,31 @@ foreach:
         $expr: index
 ```
 
-Foreach:
+A Foreach declaration specifies:
 
-- Captures the source collection once.
-- Validates each item.
-- Creates isolated item state.
-- Preserves source-order outcomes.
-- Applies effective concurrency and resource limits.
-- Supports Parallel completion modes.
-- Supports cancellation.
-- Supports explicit parent-state merge.
-- Returns an empty ordered item list for an empty `all` collection.
+- Source collection expression.
+- Item schema.
+- Concurrency.
+- Optional maximum item count.
+- Completion policy.
+- Error policy.
+- Remaining-item behavior.
+- Child block.
+- Parent-state merge when declared.
 
-A Foreach item identity includes its captured source index.
+A Foreach item declaration has a captured source index.
 
-The admitted definition preserves omission separately from an explicit zero
-`maxItems` value. Planning does not normalize either form.
+The admitted definition preserves omission separately from explicit zero
+`maxItems`. Planning does not normalize either form.
 
-### 12.7 Repeat
+For `completion.mode: all`, an empty captured collection has an empty ordered
+item result. Runtime owns durable collection settlement and any declared parent
+state merge.
+
+Runtime captures collection values, creates item execution identities, applies
+effective limits, executes child work, and persists ordered item outcomes.
+
+### Repeat
 
 ```yaml
 repeat:
@@ -1119,16 +1332,14 @@ repeat:
     output: null
 ```
 
-Exactly one repeat control is selected:
+Exactly one Repeat control is selected:
 
-| Control                     | Meaning                          |
-| --------------------------- | -------------------------------- |
-| `count`                     | Fixed number of iterations.      |
-| `while`                     | Condition before each iteration. |
-| `until`                     | Condition after each iteration.  |
-| `lifetime: until-cancelled` | Ongoing lifecycle.               |
+- `count`: fixed number of iterations.
+- `while`: condition before each iteration.
+- `until`: condition after each iteration.
+- `lifetime: until-cancelled`: ongoing lifecycle.
 
-Repeat returns:
+Repeat declaration output has:
 
 ```text
 state
@@ -1137,30 +1348,36 @@ iterations
 exhausted
 ```
 
-The admitted definition preserves omission separately from an explicit zero
-`maxIterations` value. Planning does not normalize either form.
+The admitted definition preserves omission separately from explicit zero
+`maxIterations`. Planning does not normalize either form.
 
-A body-local state initializes once per iteration.
+A body-local state is declared per iteration.
 
-A carried Repeat state initializes once for the Repeat.
+A carried Repeat state is declared for the Repeat.
 
 `break` exits the nearest Repeat.
 
 `continue` completes the current Repeat iteration.
 
-### 12.8 Structured planning facts
+### Structured planning facts
 
-The admitted declaration and Inventory retain structured child blocks,
-collection declarations, completion policies, merge declarations, and canonical
-declaration paths.
+The admitted declaration and Inventory retain:
 
-Artifact planning does not create child programs, Fork or Join work, execution
-identities, or settlement records. Their implementation belongs in
-`workflow_runtime.md`.
+- Structured child blocks.
+- Collection declarations.
+- Completion policies.
+- Error policies.
+- Merge declarations.
+- Repeat controls.
+- Machine declarations.
+- Canonical declaration paths.
 
-## 13. State machines
+Artifact planning does not create child programs, Fork work, Join work,
+execution identities, or settlement records.
 
-A state machine models cyclic and event-driven lifecycle behavior.
+## State-machine declarations
+
+A state machine declares cyclic and event-driven lifecycle behavior.
 
 ```yaml
 machine:
@@ -1198,37 +1415,43 @@ machine:
         status: expired
 ```
 
-Artifact planning retains the initial state name, declared states, state
-schema, subscriptions, transitions, entry and exit blocks, and final outputs.
-These are source facts, not a live machine instance.
+Artifact planning retains:
 
-Machine state persistence, event arbitration, timer lifecycle, and serialized
-execution are specified in `workflow_runtime.md`.
+- Initial state name.
+- Declared states.
+- State schema.
+- Subscription declarations.
+- Transition declarations.
+- Entry and exit blocks.
+- Final outputs.
+- Canonical declaration paths.
 
-State entry completes before transition selection.
+The declaration semantic order is:
 
-Transition selection order is:
+1. State entry.
+2. Immediate transition selection.
+3. Event transition selection.
+4. Timer transition selection.
 
-1. Immediate transitions.
-2. Event transitions.
-3. Timer transitions.
+For one accepted event, the first matching declared transition wins.
 
-For one accepted event, the first matching transition wins.
+A declared transition contains:
 
-A transition performs:
-
-1. Current state exit block.
+1. Current-state exit block.
 2. Transition block.
-3. Target state entry block.
-4. Target state transition selection.
+3. Target-state entry block.
+4. Target-state transition selection.
 
-A state timer begins on entry and ends on exit.
+A state timer is declared to begin on entry and end on exit.
 
-A final state returns its explicit output.
+A final state has explicit output.
 
-## 14. Events, waits, and human work
+Runtime owns state persistence, event arbitration, timer lifecycle, transition
+execution, and serialization.
 
-### 14.1 Event contracts
+## Events, waits, human work, and triggers
+
+### Event contracts
 
 ```yaml
 events:
@@ -1240,7 +1463,7 @@ events:
       type: object
 ```
 
-An event envelope contains:
+An event envelope has:
 
 ```text
 id
@@ -1251,16 +1474,17 @@ correlation
 time
 ```
 
-The source event identity contract is `(source, id)`. Runtime event acceptance
-and deduplication belong in `workflow_runtime.md`.
+The source event identity contract is `(source, id)`.
 
-An event contract controls:
+An event contract declares:
 
 - Source.
 - Data schema.
 - Correlation schema.
 
-### 14.2 Subscriptions
+Runtime accepts and deduplicates events.
+
+### Subscriptions
 
 ```yaml
 listen:
@@ -1276,14 +1500,21 @@ listen:
     maxBytes: 262144
 ```
 
-A subscription becomes active when its scope begins, before its steps run.
+A subscription declaration contains:
 
-A subscription declaration contains its event reference, correlation and
-filter templates, retention, capacity, and byte settings. Planning retains
-these static facts. Accepted events and consumption records are execution data
-specified in `workflow_runtime.md`.
+- Event reference.
+- Correlation template.
+- Filter template.
+- Retention.
+- Capacity.
+- Byte limit.
 
-### 14.3 Wait
+Artifact planning retains these static facts.
+
+Runtime activates subscriptions, accepts events, retains consumption facts, and
+manages cursors.
+
+### Wait
 
 ```yaml
 wait:
@@ -1292,25 +1523,25 @@ wait:
   consume: true
 ```
 
-Supported wait forms:
+Supported wait forms are:
 
-| `for`        | Required fields                     | Successful output           |
-| ------------ | ----------------------------------- | --------------------------- |
-| `timer`      | `after` or `at`                     | Timer firing facts.         |
-| `event`      | `subscription`                      | Event envelope.             |
-| `channel`    | `channel`                           | Channel message and cursor. |
-| `completion` | `handle`                            | Child completion output.    |
-| `human`      | assignees, request, response schema | Validated human response.   |
+- `timer`: requires `after` or `at`; returns timer firing facts.
+- `event`: requires `subscription`; returns an event envelope.
+- `channel`: requires `channel`; returns a channel message and cursor.
+- `completion`: requires `handle`; returns child completion output.
+- `human`: requires assignees, request, and response schema; returns validated
+  human response.
 
-A completion handle can identify one:
+A completion handle declaration can identify one of:
 
 - WorkItem.
 - ProgramFrame.
 - Execution.
 
-A completion wait preserves success, failure, cancellation, and uncertainty semantics.
+Runtime preserves success, failure, cancellation, and uncertainty semantics for
+completion waits.
 
-### 14.4 Human wait
+### Human wait
 
 ```yaml
 wait:
@@ -1328,40 +1559,37 @@ wait:
     required: [approved]
 ```
 
-A human-wait declaration contains assignee templates, a request template, and
-a response schema. Artifact planning retains those source facts.
-Assignment snapshots, deadlines, resolution identities, and received responses
-belong to the Runtime HLD.
+A human-wait declaration contains:
 
-Runtime accepts a response only when the response actor satisfies persisted
+- Assignee templates.
+- Request template.
+- Response schema.
+
+Artifact planning retains those source facts.
+
+Runtime owns assignment snapshots, deadlines, resolution identities, received
+responses, and assignment authorization.
+
+Runtime accepts a human response only when its actor satisfies persisted
 assignment facts.
 
 A business rejection remains response data unless the Workflow explicitly fails.
 
-### 14.5 Timer behavior
+### Timer declarations
 
 Durations use ISO 8601.
 
 Absolute times use RFC 3339.
 
-Planning retains timer and timeout declaration values. Scheduling, firing
-facts, and enclosing execution deadlines belong in `workflow_runtime.md`.
+Planning retains timer, timeout, and schedule declaration values.
+
+Runtime owns scheduling, firing facts, and enclosing execution deadlines.
 
 A timer cannot be manually resolved.
 
-A timeout remains separate from a successful timer firing.
+A timeout remains distinct from a successful timer firing.
 
-## 15. Triggers
-
-Triggers create or address Workflow Executions.
-
-A trigger is not a subscription.
-
-A subscription receives an event inside an existing Invocation.
-
-A trigger creates or addresses an Invocation from outside the Workflow body.
-
-### 15.1 Event trigger
+### Event triggers
 
 ```yaml
 triggers:
@@ -1378,21 +1606,20 @@ triggers:
       behavior: start-or-signal
 ```
 
-Event trigger behavior:
+Event-trigger behavior values are:
 
-| Behavior          | Meaning                                                            |
-| ----------------- | ------------------------------------------------------------------ |
-| `start`           | Start a new Execution.                                             |
-| `signal`          | Signal an active matching Execution.                               |
-| `start-or-signal` | Signal an active matching Execution or start one when none exists. |
+- `start`: start a new Execution.
+- `signal`: signal an active matching Execution.
+- `start-or-signal`: signal an active matching Execution or start one when none
+  exists.
 
 Artifact planning retains event-trigger declarations, filters, input mappings,
 instance-key expressions, and behavior values.
 
-It does not create trigger registrations, occurrences, queues, or Executions.
-Those are specified in `workflow_runtime.md`.
+Artifact planning does not create trigger registrations, occurrences, queues,
+or Executions.
 
-### 15.2 Schedule trigger
+### Schedule triggers
 
 ```yaml
 triggers:
@@ -1411,29 +1638,23 @@ triggers:
 
 A schedule has exactly one of:
 
-| Field      | Meaning                             |
-| ---------- | ----------------------------------- |
-| `calendar` | Five-field numeric cron expression. |
-| `interval` | ISO 8601 interval.                  |
+- `calendar`: five-field numeric cron expression.
+- `interval`: ISO 8601 interval.
 
 A calendar schedule requires an IANA time zone.
 
-Schedule overlap policy:
+Overlap policy values are:
 
-| Policy    | Meaning                                                   |
-| --------- | --------------------------------------------------------- |
-| `allow`   | Start another Execution.                                  |
-| `skip`    | Record and skip while an instance is active.              |
-| `queue`   | Persist the occurrence until an active instance settles.  |
-| `replace` | Cancel matching active work and start the new occurrence. |
+- `allow`: start another Execution.
+- `skip`: record and skip while an instance is active.
+- `queue`: persist the occurrence until an active instance settles.
+- `replace`: cancel matching active work and start the new occurrence.
 
-Missed-occurrence policy:
+Missed-occurrence policy values are:
 
-| Policy     | Meaning                                             |
-| ---------- | --------------------------------------------------- |
-| `skip`     | Skip missed occurrences.                            |
-| `latest`   | Accept only the latest missed occurrence.           |
-| `catch-up` | Accept at most `maxOccurrences` missed occurrences. |
+- `skip`: skip missed occurrences.
+- `latest`: accept only the latest missed occurrence.
+- `catch-up`: accept at most `maxOccurrences` missed occurrences.
 
 Calendar gaps are skipped.
 
@@ -1441,9 +1662,12 @@ Repeated local times produce one occurrence for one scheduled local time.
 
 UTC schedules avoid local-time ambiguity.
 
-## 16. Effects, retries, reconciliation, compensation, and sagas
+Runtime owns registration state, occurrence persistence, queue draining,
+overlap execution, and local-slot deduplication.
 
-### 16.1 Effect contract
+## Effects, retries, reconciliation, compensation, and Sagas
+
+### Effect contract
 
 ```yaml
 effect:
@@ -1459,18 +1683,17 @@ effect:
     output: null
 ```
 
-Effect kinds:
+Effect kinds are:
 
-| Kind             | Meaning                                                    |
-| ---------------- | ---------------------------------------------------------- |
-| `read`           | No externally visible business mutation.                   |
-| `idempotent`     | Repeating has the same business effect.                    |
-| `keyed`          | Target deduplicates repeated requests with one stable key. |
-| `non-idempotent` | Repeating can create another business effect.              |
+- `read`: no externally visible business mutation.
+- `idempotent`: repeating has the same business effect.
+- `keyed`: target deduplicates repeated requests with one stable key.
+- `non-idempotent`: repeating can create another business effect.
 
-A keyed operation has one stable idempotency key per logical WorkItem.
+A keyed operation declaration has one stable idempotency-key expression per
+logical WorkItem declaration.
 
-The key remains unchanged through:
+The key semantic scope remains stable through:
 
 - Attempts.
 - Retry backoff.
@@ -1479,17 +1702,23 @@ The key remains unchanged through:
 - Reconciliation.
 - Resumption.
 
-A new Repeat iteration or Foreach item receives a new logical WorkItem identity and can have a new key.
+A new Repeat iteration or Foreach item has a distinct logical operation scope
+and can have a new key.
 
-### 16.2 Effect planning facts
+### Effect planning facts
 
-Planning retains the declared effect kind, key template, reconciliation block,
-compensation block, and canonical source paths.
+Planning retains:
+
+- Declared effect kind.
+- Key template.
+- Reconciliation block.
+- Compensation block.
+- Canonical declaration paths.
 
 Effect state, confirmation, uncertainty, receipts, and recovery records are
-Runtime data specified in `workflow_runtime.md`.
+Runtime data.
 
-### 16.3 Retry
+### Retry
 
 ```yaml
 retry:
@@ -1504,23 +1733,27 @@ retry:
   perAttemptTimeout: PT10S
 ```
 
-`match.schema`, when declared, is a source-level error-schema matcher. The
-admitted retry declaration and Inventory preserve it without evaluating error
-matching. Runtime evaluates matching behavior according to
-`workflow_runtime.md`.
+`match.schema`, when declared, is a source-level error-schema matcher.
 
-Automatic retry requires:
+The admitted retry declaration and Inventory preserve `match.schema` without
+evaluating error matching.
+
+Automatic retry declaration semantics require:
 
 1. A matching retry policy.
 2. A retry-safe effect contract.
 
-Read, idempotent, and keyed work can retry under the declared policy.
+Read, idempotent, and keyed work can retry under declared policy.
 
 A non-idempotent WorkItem does not retry after uncertainty.
 
-Confirmed non-application from reconciliation can enable retry for a non-idempotent WorkItem.
+Confirmed non-application from reconciliation can enable retry for a
+non-idempotent WorkItem.
 
-### 16.4 Reconciliation
+Runtime evaluates matching, captures logical call values, applies effect-safe
+replay, persists retry boundaries, and schedules backoff.
+
+### Reconciliation
 
 A reconciliation block receives typed `operation` facts.
 
@@ -1534,7 +1767,7 @@ A reconciliation block receives typed `operation` facts.
 - Receipt.
 - Uncertainty error.
 
-A reconciliation result distinguishes:
+A reconciliation result declares one of:
 
 ```json
 {
@@ -1560,11 +1793,16 @@ A reconciliation result distinguishes:
 }
 ```
 
-The declaration decision vocabulary is `applied`, `notApplied`, and `unknown`.
-Runtime maps those decisions to original WorkItem settlement, retry
-eligibility, or recovery review according to `workflow_runtime.md`.
+The declaration decision vocabulary is:
 
-### 16.5 Saga
+- `applied`
+- `notApplied`
+- `unknown`
+
+Runtime maps those decisions to original WorkItem settlement, retry eligibility,
+or recovery review.
+
+### Saga
 
 ```yaml
 saga:
@@ -1576,10 +1814,16 @@ saga:
     output: {}
 ```
 
-A Saga defines a business compensation boundary.
+A Saga declaration defines:
+
+- A compensation boundary.
+- Trigger terminal states.
+- Compensation error policy.
+- Compensation concurrency.
+- Child block.
 
 Runtime records confirmed compensatable effects in dependency and confirmation
-order. Artifact planning retains the declared Saga boundary and policy only.
+order.
 
 A Saga does not compensate:
 
@@ -1589,21 +1833,40 @@ A Saga does not compensate:
 - Effects without a compensation block.
 - Effects outside the Saga boundary.
 
-An uncertain effect enters automatic compensation only after reconciliation confirms application.
+An uncertain effect enters automatic compensation only after reconciliation
+confirms application.
 
-### 16.6 Compensation
+### Compensation
 
-Compensation declarations define reverse-dependency intent, a compensation
-block, concurrency intent, and error policy. A compensation expression can use
-typed `completed` facts supplied by Runtime.
+Compensation declarations define:
 
-Artifact planning retains the declared compensation facts and canonical source
-paths. Runtime supplies actual completed-operation facts, selects eligible
-effects, performs ordering, persists settlement, and retains primary failure or
-cancellation semantics. These behaviors are specified in
-`workflow_runtime.md`.
+- Reverse-dependency intent.
+- Compensation block.
+- Concurrency intent.
+- Error policy.
 
-### 16.7 Cleanup allowance
+A compensation expression can use typed `completed` facts supplied by Runtime.
+
+Compensation error-policy values are:
+
+- `continue`: record a compensation failure and continue eligible compensation.
+- `stop`: record a compensation failure and stop later compensation.
+
+Compensation failure does not replace primary failure or cancellation. Runtime
+retains compensation failures as typed causes.
+
+Artifact planning retains declared compensation facts and canonical source paths.
+
+Runtime:
+
+- Supplies completed-operation facts.
+- Selects eligible effects.
+- Applies dependency ordering.
+- Persists compensation settlement.
+- Preserves primary failure or cancellation.
+- Attaches compensation failures as typed causes.
+
+### Cleanup allowance
 
 Cleanup allowance is separate from normal work duration.
 
@@ -1615,24 +1878,37 @@ A normal deadline can stop ordinary work while allowing bounded:
 - Target cancellation acknowledgement.
 - Resource release.
 
-Cleanup work uses declared cleanup duration.
+Cleanup declarations use declared cleanup duration.
 
-## 17. Cancellation
+Runtime applies effective cleanup deadlines and cleanup dispatch behavior.
+
+## Cancellation, resources, and limits
+
+### Cancellation
 
 The `cancel` operation declares cancellation intent and its typed child-work
-relationship. Artifact planning retains the declaration, expression templates,
-and canonical declaration path. Runtime cancellation, target cancellation
-request, ordinary-wait settlement, child propagation, finalization, cleanup,
-uncertainty, reconciliation, compensation, and catch or finally execution are
-specified in `workflow_runtime.md`.
+relationship.
 
-Runtime cancellation, target cancellation request, ordinary-wait settlement,
-child propagation, finalization, cleanup allowance, uncertainty, reconciliation,
-compensation, and catch or fin
+Artifact planning retains:
 
-## 18. Resources and limits
+- Declaration form.
+- Expression templates.
+- Target relationship.
+- Canonical declaration path.
 
-### 18.1 Resources
+Runtime owns:
+
+- Target cancellation requests.
+- Ordinary-wait settlement.
+- Child propagation.
+- Finalization.
+- Cleanup allowance.
+- Uncertainty.
+- Reconciliation.
+- Compensation.
+- Catch and finally execution.
+
+### Resources
 
 ```yaml
 resources:
@@ -1646,14 +1922,14 @@ resources:
       burst: 10
 ```
 
-A resource can define:
+A resource declaration can define:
 
 - Concurrency.
 - Rate.
 - Burst.
 - Per-key serialization.
 
-### 18.2 Claims
+### Claims
 
 ```yaml
 claims:
@@ -1666,11 +1942,13 @@ claims:
 A claim declaration associates a named resource, units, and optional key
 template with an operation or scope.
 
-Acquisition, retention, release, and resource-wait behavior belong in `workflow_runtime.md`.
+Artifact planning retains claim declarations and canonical paths.
 
-A claim can be retained by a scope.
+A claim can be retained by its declared scope.
 
-### 18.3 Limits
+Runtime owns acquisition, retention, release, resource waits, and wakeup.
+
+### Limits
 
 ```yaml
 limits:
@@ -1692,15 +1970,19 @@ limits:
 
 A child limit can only narrow an inherited limit.
 
-Attached children share parent aggregate budget.
+Attached child declarations share parent aggregate budget.
 
-Independent children persist an authorized child budget.
+Independent child declarations carry authorized child-budget intent.
+
+Runtime owns counter accounting, child admission, claim handling, deadline
+enforcement, and budget-wait wakeup.
 
 Cost budgets are deferred.
 
-No cost meter, pricing model, currency model, or cost settlement behavior is to be implemented in this cycle.
+Do not implement a cost meter, pricing model, currency model, or cost
+settlement behavior in this cycle.
 
-## 19. Declaration validity
+## Declaration validity
 
 A valid Workflow declaration has:
 
@@ -1714,7 +1996,7 @@ A valid Workflow declaration has:
 - Valid callable interfaces.
 - Valid port bindings.
 - Valid channel permissions.
-- Valid machine state names and transitions.
+- Valid Machine state names and transitions.
 - Valid Repeat and Foreach controls.
 - Valid trigger schedules.
 - Valid event and correlation contracts.
@@ -1726,9 +2008,9 @@ Artifact planning resolves static declaration relationships and source-backed
 Artifact identity facts represented by the admitted plan and closure.
 
 Current execution pinning, binding availability, provider ownership, policy,
-and transport behavior are outside this document.
+transport, and Runtime behavior are outside this document.
 
-## 20. Artifact consumer boundary
+## Consumer handoff boundary
 
 ```text
 Workflow source v1
@@ -1758,64 +2040,270 @@ Workflow planning owns:
 
 - Read-only target and requirement resolution.
 - Callable-target and requirement inventory projection.
-- Direct source-backed Artifact reference projection.
+- Source-backed Artifact reference projection.
+- Static closure construction.
+- Canonical declaration paths.
 
 Canonical JSON values are used only at arbitrary JSON boundaries.
 
-External consumer representations, semantic bindings, and execution state are outside this document.
+External consumer representations, semantic bindings, execution preparation,
+and execution state are outside this document.
 
-## 21. Workflow Artifact completion criteria
+## Completion readiness
 
 Workflow Artifact completion requires every valid Workflow v1 source field to
 satisfy one result:
 
 - The field is represented in the typed declaration model and static plan.
 - The field is rejected by Workflow v1 language validation.
-- The field is represented as an explicit external-consumer handoff requirement.
+- The field is represented as an explicit external-consumer handoff
+  requirement.
 
 Workflow Artifact completion includes:
 
 - Typed declaration decoding.
-- Canonical definition construction.
+- Canonical Definition construction.
 - Static CEL scope validation.
 - Static target and requirement planning.
-- Deterministic source inventory construction.
+- Deterministic source Inventory construction.
 - Complete static source-backed Artifact closure construction.
-- Explicit rejection of unsupported direct composition results.
+- Explicit rejection of unsupported direct composition.
 - One canonical declaration-path model in contract admission and planning.
-- No runtime interpretation or runtime-private data.
+- No Runtime interpretation or Runtime-private data.
 - No Artifact Store execution role.
 
-## 22. Workflow Artifact implementation status
+Status meanings are:
 
-| Artifact planning task                                    | Status      | Evidence or required result                                                                                                                                              |
-| --------------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Decode and validate Workflow v1 declarations              | Implemented | `internal/llmartifactory-go/workflow/contract/v1/`                                                                                                                       |
-| Build callable-target and requirement inventory           | Implemented | `internal/llmartifactory-go/workflow/inventory.go` publishes deterministic target, requirement, call, context, port, retry, effect, and block source facts.              |
-| Reject direct capability composition for Workflow targets | Implemented | `internal/llmartifactory-go/workflow/closure.go` rejects direct Model, Agent, Tool, MCP, Skill, Service, Activity, and Nested Workflow composition before a plan exists. |
-| Publish a deterministic complete static Artifact closure  | Implemented | `internal/llmartifactory-go/workflow/closure.go` publishes sorted nodes, edges, paths, and refresh checks                                                                |
-| Include nested Workflow plan nodes in the closure         | Implemented | `ArtifactClosureNode.Workflow` contains admitted nested Workflow document, inventory, and composition facts                                                              |
-| Publish one canonical declaration-path model              | Implemented | Contract admission, Inventory, and closure paths retain the canonical `root/...` declaration identity                                                                    |
-| Keep consumer execution interpretation outside planning   | Implemented | `internal/llmartifactory-go/workflow/` contains source planning facts and has no consumer execution dependency                                                           |
+- `Implemented`: inspected source contains the complete listed Artifact
+  behavior. Test execution was not reviewed.
+- `Partial`: inspected source contains part of the behavior or has an
+  identified Artifact-planning gap.
+- `Not implemented`: required Artifact behavior is absent.
+- `Not applicable`: behavior is explicitly outside Artifact planning or
+  excluded from this cycle.
 
-### Static-planning completion record
+## Functional tasks
 
-This register concerns returned Artifact planning facts only. It creates no
-Artifact Store execution responsibility.
+This is the single current Workflow Artifact source-planning status ledger.
 
-| ID              | Functional task or subtask                                                                                                                             | Status      | Source evidence or completion requirement                                                                                                                                                   |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ART-INV-001`   | Publish complete static call target-use facts.                                                                                                         | Implemented | `inventory.go` builds deterministic `CallSite.TargetUses`, including literal targets, static allowed-set members, and resolver-backed candidate declarations.                               |
-| `ART-INV-001.a` | Extract an ordinary literal target name and include it in `CallSite.TargetUses`, including calls without an allowed set.                               | Implemented | `workflowLiteralTargetName` recognizes JSON string targets and valid `$literal` string forms. `inventoryBuilder.callTargetUses` records the corresponding named target and family.          |
-| `ART-INV-001.b` | Preserve expression-backed candidate sets and their static port and context-use facts without evaluating expressions or consulting execution adapters. | Implemented | `inventoryBuilder.callTargetUses`, `addCall`, `ContextUses`, and `PortUses` retain static target-set candidates and transport declarations without expression evaluation or adapter access. |
+It covers declaration admission, canonical Definitions, Inventory, static
+closure, source identity, direct-composition rejection, and consumer handoff
+boundaries.
 
-## 23. Direct-capability and generic-callable-capability cleanup
+It does not create Runtime, execution preparation, binding, persistence,
+scheduling, recovery, or frontend work. Those tasks belong only in
+`workflow_runtime.md`.
 
-| Cleanup task                                                                     | Status      | Required result                                                                                                                                                                                                                |
-| -------------------------------------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Reject direct composition results for Workflow callable targets and requirements | Implemented | `internal/llmartifactory-go/workflow/closure.go` returns `UnsupportedDirectCapabilityError` for Model, Agent, Tool, MCP, Skill, Service, Activity, and Nested Workflow direct composition.                                     |
-| Remove Workflow direct-capability closure data                                   | Implemented | `internal/llmartifactory-go/workflow/closure.go` has no `DirectCapabilityEvidence`, direct sorting, direct fingerprint input, or direct closure field. Generic `composition.CapabilityPlan` remains diagnostic only.           |
-| Preserve Service and Activity binding targets                                    | Implemented | `internal/llmartifactory-go/workflow/contract/v1/validation.go` keeps them as typed non-Artifact declarations and prevents synthetic Artifact composition.                                                                     |
-| Preserve inline text as declaration data                                         | Implemented | `internal/llmartifactory-go/workflow/contract/v1/workflow-v1.schema.json` retains ordinary `value` grammar. It adds no direct target form.                                                                                     |
-| Remove generic callable capability runtime semantics                             | Implemented | `internal/llmartifactory-go/workflow/contract/v1/types.go` and `workflow-v1.schema.json` remove `CallableInterface.capabilities`. The closed schema rejects the former field at admission.                                     |
-| Keep direct Tool identity outside Artifact facts                                 | Implemented | A direct target has no Artifact identity and is rejected before closure construction. Built-in Go and SDK Tools remain Tool Artifacts; MCP Server and Skill Artifact identities remain separate from their runtime operations. |
+The `Functional tasks` ledger records static source-planning completion only.
+It does not authorize changing source grammar, Artifact Store behavior, or
+version identifiers without a separately demonstrated source-planning defect
+and an approved implementation cycle.
+
+All current Artifact source-planning tasks are implemented. A later demonstrated
+source-planning defect must be added here. It must not be represented as
+Runtime work unless it affects consumer execution after a valid plan exists.
+
+### Declaration admission and canonical source model
+
+#### `ART-CONTRACT-001` Admit Workflow v1 declarations into canonical Definitions
+
+- Status: Implemented.
+- Source evidence:
+  - `internal/llmartifactory-go/workflow/contract/v1/` contains typed Workflow
+    v1 declaration decoding, source schema, static validation, and canonical
+    declaration modeling.
+  - The standalone `apiVersion` is admission metadata and is not retained in
+    the canonical Definition body.
+  - Closed declaration objects reject unsupported former
+    `CallableInterface.capabilities` input.
+- Completed behavior:
+  - Decode Workflow v1 source.
+  - Enforce source-level grammar and known fields.
+  - Construct canonical Definition content.
+  - Preserve declaration structure, source values, schemas, templates, and
+    canonical paths without Runtime-private data.
+
+##### `ART-CONTRACT-001.a` Preserve source-level schemas and CEL scope
+
+- Status: Implemented.
+- Source evidence:
+  - Workflow contract v1 validates source schema, JSON Schema boundaries,
+    target and requirement declaration forms, and static CEL scope.
+- Completed behavior:
+  - Retain typed source schema boundaries for inputs, outputs, state, targets,
+    events, channels, ports, human responses, and triggers.
+  - Retain expression templates and source scope without compiling or executing
+    consumer-private expression programs.
+
+##### `ART-CONTRACT-001.b` Preserve declaration distinctions needed by Runtime
+
+- Status: Implemented.
+- Source evidence:
+  - The admitted declaration distinguishes omitted and explicit zero
+    `maxItems` and `maxIterations`.
+  - Retry declarations retain `match.schema`.
+  - Effect declarations retain source `non-idempotent`.
+- Completed behavior:
+  - Preserve source distinctions required by consumer lowering.
+  - Do not normalize omitted values into explicit zero values.
+  - Do not translate source effect spelling into Runtime enum values inside
+    Artifact planning.
+
+### Static planning, closure, and declaration paths
+
+#### `ART-PLAN-001` Publish complete read-only Workflow planning facts
+
+- Status: Implemented.
+- Source evidence:
+  - `internal/llmartifactory-go/workflow/closure.go` publishes deterministic
+    closure nodes, edges, paths, and refresh checks.
+  - `ArtifactClosureNode.Workflow` retains admitted nested Workflow document,
+    Inventory, and composition facts.
+  - `workflow.Service.ResolvePlan` exposes the read-only plan contract.
+- Completed behavior:
+  - Return admitted Workflow document and root Artifact identity.
+  - Return complete static Artifact closure.
+  - Return static dependency edges and nested Workflow planning facts.
+  - Return callable targets, requirements, Inventory, and issue facts.
+  - Keep consumer execution preparation, binding, scheduling, recovery, and
+    private resources outside the plan.
+
+##### `ART-PLAN-001.a` Preserve callable targets separately from requirements
+
+- Status: Implemented.
+- Source evidence:
+  - `workflow.Plan.Inventory` separates `CallableTargets` and `Requirements`.
+  - Service and Activity remain typed registered-binding prerequisites.
+- Completed behavior:
+  - Keep requirements outside callable-target selection and target-set
+    membership.
+  - Do not fabricate synthetic Artifact resolution for Service or Activity
+    requirements.
+  - Prevent consumers from rebuilding target lookup through diagnostic
+    `Plan.Capabilities`.
+
+##### `ART-PLAN-001.b` Publish canonical declaration paths
+
+- Status: Implemented.
+- Source evidence:
+  - Contract admission, Inventory, and closure retain canonical `root/...`
+    declaration identity.
+  - `Inventory` paths cover blocks, calls, ports, retries, effects, and
+    structured declarations.
+- Completed behavior:
+  - Preserve planning-owned declaration paths separately from Runtime frame and
+    WorkItem identities.
+  - Expose source paths for consumer lowering without defining Runtime delivery
+    behavior.
+
+### Static call, target-set, context, and transport inventory
+
+#### `ART-INV-001` Publish complete static call target-use facts
+
+- Status: Implemented.
+- Source evidence:
+  - `internal/llmartifactory-go/workflow/inventory.go` builds deterministic
+    `CallSite.TargetUses`.
+  - Inventory retains deterministic target, requirement, call, context, port,
+    retry, effect, block, trigger, and structured source facts.
+- Completed behavior:
+  - Publish static call facts without evaluating expressions.
+  - Preserve static candidate relationships for consumer preparation.
+  - Do not consult execution adapters or current domain readiness.
+
+##### `ART-INV-001.a` Extract literal call target names
+
+- Status: Implemented.
+- Source evidence:
+  - `workflowLiteralTargetName` recognizes JSON string targets and valid
+    `$literal` string forms.
+  - `inventoryBuilder.callTargetUses` records corresponding named target and
+    target family.
+- Completed behavior:
+  - Include ordinary literal call targets in `CallSite.TargetUses`.
+  - Include calls without an allowed target set.
+
+##### `ART-INV-001.b` Preserve expression-backed candidate and transport facts
+
+- Status: Implemented.
+- Source evidence:
+  - `inventoryBuilder.callTargetUses`, `addCall`, `ContextUses`, and `PortUses`
+    retain static target-set candidates and transport declarations.
+- Completed behavior:
+  - Preserve expression-backed candidate sets without evaluating expressions.
+  - Preserve static context, port, stream, retry, effect, and target-interface
+    facts.
+  - Do not access execution adapters.
+
+### Unsupported direct composition and Artifact identity
+
+#### `ART-DIRECT-001` Reject unsupported direct Workflow composition
+
+- Status: Implemented.
+- Source evidence:
+  - `internal/llmartifactory-go/workflow/closure.go` returns
+    `UnsupportedDirectCapabilityError` for direct Model, Agent, Tool, MCP,
+    Skill, Service, Activity, and Nested Workflow composition before a usable
+    plan exists.
+  - `workflow/closure.go` contains no `DirectCapabilityEvidence`, direct
+    sorting, direct fingerprint input, or direct closure field.
+  - Generic `composition.CapabilityPlan` remains a diagnostic projection. It is
+    not callable target data or a direct-capability execution representation.
+- Completed behavior:
+  - Reject direct composition before plan publication.
+  - Do not create direct closure evidence, direct target facts, direct pins,
+    direct bindings, or direct Runtime representations.
+  - Keep direct target identity outside Artifact facts.
+
+##### `ART-DIRECT-001.a` Keep source-backed Artifact Tool identity distinct
+
+- Status: Implemented.
+- Source evidence:
+  - Built-in Go and provider SDK Tool declarations remain Tool Artifacts.
+  - MCP Server and Skill Artifact identity remain separate from discovered MCP
+    operations and Skill Runtime lifecycle operations.
+- Completed behavior:
+  - Preserve source-backed Artifact closure members.
+  - Do not manufacture individual Tool Artifacts for discovered MCP operations
+    or Skill lifecycle operations.
+
+##### `ART-DIRECT-001.b` Remove generic callable capability semantics
+
+- Status: Implemented.
+- Source evidence:
+  - `internal/llmartifactory-go/workflow/contract/v1/types.go` and
+    `workflow-v1.schema.json` remove `CallableInterface.capabilities`.
+  - The closed schema rejects the former field at admission.
+- Completed behavior:
+  - Do not expose generic callable capability facts in Workflow planning.
+  - Keep inline Text, messages, instructions, and defaults as declaration data.
+
+### Artifact Store and consumer boundary
+
+#### `ART-BOUNDARY-001` Keep Artifact Store and planning read-only
+
+- Status: Implemented.
+- Source evidence:
+  - `internal/llmartifactory-go/workflow/` contains source-planning facts and
+    no consumer-execution dependency.
+  - Generic Artifact Store provides source identity, Definitions,
+    relationships, and read-only retrieval.
+- Completed behavior:
+  - Keep Artifact Store passive.
+  - Keep consumer execution preparation outside Store and planning.
+  - Do not add execution, binding, dispatch, scheduling, recovery, or
+    consumer-private APIs to Artifact Store.
+  - Keep Runtime representation, persistence, and scheduling in
+    `workflow_runtime.md`.
+
+##### `ART-BOUNDARY-001.a` Preserve external consumer handoff
+
+- Status: Implemented.
+- Source evidence:
+  - `workflow.Service.ResolvePlan` returns read-only admitted source facts,
+    Inventory, closure, and source-backed references.
+- Completed behavior:
+  - Make plan facts sufficient for consumers to prepare execution without
+    reparsing Workflow source.
+  - Do not define consumer-local enablement, credentials, readiness, provider
+    configuration, clients, or native request behavior in Artifact planning.

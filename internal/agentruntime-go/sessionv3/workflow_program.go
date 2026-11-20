@@ -1443,6 +1443,7 @@ func (i *WorkflowInterpreter) call(
 			targetName,
 			target,
 			input,
+			effect,
 			contextValue,
 			call,
 			ports,

@@ -139,7 +139,10 @@ func appendDurableActivityMessageDispatchPlan(
 			ID:          string(activity.ID),
 			Role:        activity.Message.Role,
 			Text:        activity.Message.Text,
-			Attachments: append([]sessionv3Runtime.Attachment(nil), activity.Message.Attachments...),
+			Attachments: jsonutil.CloneJSONInValue(activity.Message.Attachments),
+			ToolResults: jsonutil.CloneJSONInValue(activity.Message.ToolResults),
+			AppContext:  jsonutil.CloneJSONInValue(activity.Message.AppContext),
+			Metadata:    activity.Message.Metadata.Clone(),
 		},
 	)
 }

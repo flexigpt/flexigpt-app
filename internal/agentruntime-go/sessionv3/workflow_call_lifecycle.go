@@ -35,6 +35,7 @@ func (i *WorkflowInterpreter) startCall(
 	targetName string,
 	target WorkflowTarget,
 	input jsonutil.CanonicalValue,
+	effect EffectContract,
 	contextValue jsonutil.CanonicalValue,
 	call WorkflowCall,
 	ports []PortPlan,
@@ -120,12 +121,36 @@ func (i *WorkflowInterpreter) startCall(
 		call.AllowedTargets...,
 	)
 
+	if childCall.LLMInvocation != nil {
+		invocation, invocationErr := retryCaptureLLMInvocation(
+			program,
+			state,
+			*childCall.LLMInvocation,
+		)
+		if invocationErr != nil {
+			return workflowFailure(
+				state,
+				"workflow_start_prepare_failed",
+				invocationErr.Error(),
+			)
+		}
+		childCall.LLMInvocation = invocation
+	}
+
+	childEffect := cloneWorkflowStepEffect(step.Effect)
+	if childEffect != nil && effect.Kind == EffectKindKeyed {
+		key := WorkflowValue{
+			Kind:    WorkflowValueLiteral,
+			Literal: jsonutil.MustCanonicalValue(effect.IdempotencyKey),
+		}
+		childEffect.Key = &key
+	}
 	childStep := WorkflowStep{
 		ID:              "invoke",
 		DeclarationPath: step.DeclarationPath,
 		Timeout:         step.Timeout,
 		Retry:           cloneWorkflowRetryPolicy(step.Retry),
-		Effect:          cloneWorkflowStepEffect(step.Effect),
+		Effect:          childEffect,
 		Claims:          append([]WorkflowResourceClaim(nil), step.Claims...),
 		Limits:          cloneBudget(step.Limits),
 		OutputSchema:    step.OutputSchema.Clone(),

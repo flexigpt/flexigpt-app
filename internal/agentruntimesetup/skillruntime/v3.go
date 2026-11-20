@@ -412,6 +412,38 @@ func (e *V3Executor) CloseExecution(
 	return output
 }
 
+// CloseProgramFrame closes the private Skill Runtime session owned by one
+// completed ProgramFrame. It is independent from whole-Execution cleanup so
+// long-lived conversation Executions do not retain completed Agent resources.
+func (e *V3Executor) CloseProgramFrame(
+	ctx context.Context,
+	executionID sessionv3Runtime.ExecutionID,
+	frameID sessionv3Runtime.ProgramFrameID,
+) error {
+	if e == nil || executionID == "" || frameID == "" {
+		return nil
+	}
+
+	key := V3SkillSessionKey{
+		ExecutionID: executionID,
+		FrameID:     frameID,
+	}
+	e.mu.Lock()
+	value, found := e.sessions[key]
+	if found {
+		delete(e.sessions, key)
+	}
+	e.mu.Unlock()
+
+	if !found || value.id == "" {
+		return nil
+	}
+	return e.runtime.CloseSession(
+		ctx,
+		agentskillsRuntimeSpec.SessionID(value.id),
+	)
+}
+
 func (e *V3Executor) renderSelectedSkill(
 	ctx context.Context,
 	selection sessionv3Runtime.ArtifactSelection,

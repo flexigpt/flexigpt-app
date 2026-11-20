@@ -47,6 +47,23 @@ func (e *V3Executor) EffectiveActiveSelections(
 	)
 }
 
+// EffectiveActiveSelectionsForFrame reconstructs semantic Skill state only
+// from terminal lifecycle Tool results owned by the specified ProgramFrame.
+// Parallel Agent invocations therefore cannot replace one another's state.
+func (e *V3Executor) EffectiveActiveSelectionsForFrame(
+	execution sessionv3Runtime.Execution,
+	frameID sessionv3Runtime.ProgramFrameID,
+	enabled []sessionv3Runtime.ArtifactSelection,
+	active []sessionv3Runtime.ArtifactSelection,
+) ([]sessionv3Runtime.ArtifactSelection, error) {
+	return e.effectiveActiveSelections(
+		execution,
+		frameID,
+		enabled,
+		active,
+	)
+}
+
 func (e *V3Executor) effectiveActiveSelections(
 	execution sessionv3Runtime.Execution,
 	frameID sessionv3Runtime.ProgramFrameID,
@@ -78,6 +95,13 @@ func (e *V3Executor) effectiveActiveSelections(
 		default:
 			continue
 		}
+		state := *item.Output.Tool.SkillState
+		if err := state.Validate(); err != nil {
+			return nil, err
+		}
+		if !v3SkillStateMatchesEnabledSelections(state, enabled) {
+			continue
+		}
 		if item.EffectState == sessionv3Runtime.EffectStateUncertain {
 			continue
 		}
@@ -96,12 +120,6 @@ func (e *V3Executor) effectiveActiveSelections(
 	}
 
 	state := *latest.Output.Tool.SkillState
-	if err := state.Validate(); err != nil {
-		return nil, err
-	}
-	if !v3SkillStateMatchesEnabledSelections(state, enabled) {
-		return output, nil
-	}
 	return v3SkillActiveSelections(state, enabled)
 }
 

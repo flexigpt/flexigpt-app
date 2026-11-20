@@ -171,6 +171,21 @@ func (b *Binder) CloseExecutionBinding(
 	return b.skillTools.CloseExecution(ctx, executionID)
 }
 
+func (b *Binder) CloseProgramFrameBinding(
+	ctx context.Context,
+	executionID sessionv3Runtime.ExecutionID,
+	frameID sessionv3Runtime.ProgramFrameID,
+) error {
+	if b == nil || b.skillTools == nil {
+		return nil
+	}
+	return b.skillTools.CloseProgramFrame(
+		ctx,
+		executionID,
+		frameID,
+	)
+}
+
 func (b *Binder) AdmitAttachments(
 	ctx context.Context,
 	request sessionv3Runtime.AttachmentAdmissionRequest,

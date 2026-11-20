@@ -106,10 +106,13 @@ type AttachmentDispatchPlan struct {
 }
 
 type MessageDispatchPlan struct {
-	ID          string       `json:"id,omitempty"`
-	Role        MessageRole  `json:"role"`
-	Text        string       `json:"text,omitempty"`
-	Attachments []Attachment `json:"attachments,omitempty"`
+	ID          string                  `json:"id,omitempty"`
+	Role        MessageRole             `json:"role"`
+	Text        string                  `json:"text,omitempty"`
+	Attachments []Attachment            `json:"attachments,omitempty"`
+	ToolResults []ToolResultActivity    `json:"toolResults,omitempty"`
+	AppContext  []AppContextUpdate      `json:"appContext,omitempty"`
+	Metadata    jsonutil.CanonicalValue `json:"metadata,omitempty"`
 }
 
 type ContextDispatchPlan struct {

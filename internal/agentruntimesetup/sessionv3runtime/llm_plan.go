@@ -77,12 +77,12 @@ func (b *Binder) prepareLLMPlan(
 			return llmExecutionPlan{}, err
 		}
 	}
-	if defaults.Workspace != nil {
+	if plan.defaults.Workspace != nil {
 		if err := b.applyWorkspacePlan(
 			ctx,
 			&plan,
-			*defaults.Workspace,
-			defaults.WorkspaceOverrides,
+			*plan.defaults.Workspace,
+			plan.defaults.WorkspaceOverrides,
 		); err != nil {
 			return llmExecutionPlan{}, err
 		}
@@ -159,8 +159,9 @@ func (b *Binder) prepareLLMPlan(
 				"session v3 Skill runtime is unavailable",
 			)
 		}
-		active, activeErr := b.skillTools.EffectiveActiveSelections(
+		active, activeErr := b.skillTools.EffectiveActiveSelectionsForFrame(
 			request.Execution,
+			request.WorkItem.FrameID,
 			plan.defaults.Skills,
 			plan.defaults.ActiveSkills,
 		)
@@ -1209,7 +1210,9 @@ func appendUniqueMCPSelection(
 			values[index].Server.ArtifactID != value.Server.ArtifactID {
 			continue
 		}
-		values[index] = value
+
+		// Earlier effective values are more specific. Invocation and Session
+		// selections must not be replaced by later Agent or Workspace defaults.
 		return values
 	}
 	return append(values, value)

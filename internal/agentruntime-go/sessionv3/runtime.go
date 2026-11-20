@@ -2176,6 +2176,9 @@ func (r *Runtime) advanceFrameLocked(
 		r.settleConversationHandoffLocked(session, frame.HandoffID)
 	}
 	if frame.Status.Terminal() {
+		r.closeProgramFrameBindingLocked(execution.ID, frame.ID)
+	}
+	if frame.Status.Terminal() {
 		released := r.releaseFrameResourcesLocked(execution, frame.ID)
 		r.wakeResourceWaitersLocked(execution, released)
 	}
@@ -3806,6 +3809,35 @@ func (r *Runtime) completeExecutionLocked(
 			_ = closer.CloseExecutionBinding(r.lifecycleCtx, id)
 		}, nil)
 	}
+}
+
+func (r *Runtime) closeProgramFrameBindingLocked(
+	executionID ExecutionID,
+	frameID ProgramFrameID,
+) {
+	if r == nil || executionID == "" || frameID == "" {
+		return
+	}
+	closer, found := r.deps.Binder.(ProgramFrameBindingCloser)
+	if !found || closer == nil {
+		return
+	}
+
+	ctx := r.lifecycleCtx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	r.launchAsync(
+		"session-v3 program frame binding cleanup",
+		func() {
+			_ = closer.CloseProgramFrameBinding(
+				context.WithoutCancel(ctx),
+				executionID,
+				frameID,
+			)
+		},
+		nil,
+	)
 }
 
 func (r *Runtime) executionLocked(sessionID SessionID, executionID ExecutionID) (*Session, *Execution, error) {

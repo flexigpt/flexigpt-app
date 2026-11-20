@@ -1716,6 +1716,16 @@ type ExecutionBindingCloser interface {
 	CloseExecutionBinding(ctx context.Context, executionID ExecutionID) error
 }
 
+// ProgramFrameBindingCloser releases process-private resources whose owner is
+// one ProgramFrame inside a still-live long-running Execution.
+type ProgramFrameBindingCloser interface {
+	CloseProgramFrameBinding(
+		ctx context.Context,
+		executionID ExecutionID,
+		frameID ProgramFrameID,
+	) error
+}
+
 type WorkflowAdmissionRequest struct {
 	SessionID   SessionID               `json:"sessionID"`
 	ExecutionID ExecutionID             `json:"executionID"`

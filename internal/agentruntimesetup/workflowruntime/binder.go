@@ -108,6 +108,17 @@ func (b *Binder) CloseExecutionBinding(ctx context.Context, executionID sessionv
 	return nil
 }
 
+func (b *Binder) CloseProgramFrameBinding(
+	ctx context.Context,
+	executionID sessionv3Runtime.ExecutionID,
+	frameID sessionv3Runtime.ProgramFrameID,
+) error {
+	if closer, ok := b.Base.(sessionv3Runtime.ProgramFrameBindingCloser); ok {
+		return closer.CloseProgramFrameBinding(ctx, executionID, frameID)
+	}
+	return nil
+}
+
 // PrepareUserMessageSkillTemplate forwards the optional Session capability to
 // the composed base binder. Workflow composition does not own Skill rendering.
 func (b *Binder) PrepareUserMessageSkillTemplate(

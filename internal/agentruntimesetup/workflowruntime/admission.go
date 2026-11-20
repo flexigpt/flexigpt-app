@@ -566,16 +566,13 @@ func (a *Admission) admitPlanned(
 	if err != nil {
 		return sessionv3Runtime.WorkflowAdmissionResult{}, err
 	}
+
 	ownerModel := inheritedOwnerModel
 	if ownerModel != nil {
 		copyValue := *ownerModel
 		ownerModel = &copyValue
-	} else {
-		ownerModel, err = a.workflowOwnerModel(ctx, defaults)
 	}
-	if err != nil {
-		return sessionv3Runtime.WorkflowAdmissionResult{}, err
-	}
+
 	requirements, err := a.prepareRequirements(
 		ctx,
 		plan,
@@ -590,10 +587,12 @@ func (a *Admission) admitPlanned(
 		plan,
 		&program,
 		closure,
-		ownerModel,
+		defaults,
+		&ownerModel,
 	); err != nil {
 		return sessionv3Runtime.WorkflowAdmissionResult{}, err
 	}
+
 	if err := prepareWorkflowLLMInvocations(
 		plan.facts.Inventory,
 		&program,
@@ -632,7 +631,8 @@ func (a *Admission) bindCallableTargets(
 	plan workflowAdmissionPlan,
 	program *sessionv3Runtime.WorkflowProgram,
 	closure *workflowAdmissionClosure,
-	ownerModel *sessionv3Runtime.ArtifactPin,
+	defaults *sessionv3Runtime.SessionDefaults,
+	ownerModel **sessionv3Runtime.ArtifactPin,
 ) error {
 	if program == nil {
 		return errors.New("workflow program is unavailable")
@@ -651,6 +651,7 @@ func (a *Admission) bindCallableTargets(
 			plan.facts.Document,
 			targetPlan,
 			closure,
+			defaults,
 			ownerModel,
 		)
 		if err != nil {
@@ -698,7 +699,8 @@ func (a *Admission) bindTarget(
 	document workflowv1.WorkflowDocument,
 	targetPlan workflowAPI.TargetPlan,
 	closure *workflowAdmissionClosure,
-	ownerModel *sessionv3Runtime.ArtifactPin,
+	defaults *sessionv3Runtime.SessionDefaults,
+	ownerModel **sessionv3Runtime.ArtifactPin,
 ) (sessionv3Runtime.WorkflowTarget, error) {
 	target := targetPlan.Target
 
@@ -797,6 +799,23 @@ func (a *Admission) bindTarget(
 					target.Ref,
 				)
 			}
+			if *ownerModel == nil {
+				selectedOwner, ownerErr := a.workflowOwnerModel(
+					ctx,
+					defaults,
+				)
+				if ownerErr != nil {
+					return sessionv3Runtime.WorkflowTarget{}, ownerErr
+				}
+				*ownerModel = selectedOwner
+			}
+			if *ownerModel == nil {
+				return sessionv3Runtime.WorkflowTarget{}, fmt.Errorf(
+					"%w: provider-managed tool target %q requires a prepared Model selection",
+					ErrBindingUnavailable,
+					target.Ref,
+				)
+			}
 			choice, prepareErr := planner.PrepareProviderManagedWorkflowTool(ctx, pin)
 			if prepareErr != nil {
 				return sessionv3Runtime.WorkflowTarget{}, prepareErr
@@ -804,7 +823,7 @@ func (a *Admission) bindTarget(
 			return finalizeWorkflowTarget(document, target, sessionv3Runtime.WorkflowTarget{
 				Kind: sessionv3Runtime.WorkflowTargetProviderTool,
 				ProviderTool: &sessionv3Runtime.ProviderManagedToolTarget{
-					OwnerModel: *ownerModel,
+					OwnerModel: **ownerModel,
 					Choice:     choice,
 				},
 				Effect: sessionv3Runtime.EffectContract{
@@ -842,6 +861,12 @@ func (a *Admission) bindTarget(
 				target.Ref,
 			)
 		}
+
+		var inheritedOwner *sessionv3Runtime.ArtifactPin
+		if ownerModel != nil && *ownerModel != nil {
+			value := **ownerModel
+			inheritedOwner = &value
+		}
 		nested, err := a.admitPlanned(
 			ctx,
 			nestedPlan,
@@ -849,8 +874,8 @@ func (a *Admission) bindTarget(
 			nil,
 			closure,
 			false,
-			nil,
-			ownerModel,
+			defaults,
+			inheritedOwner,
 		)
 		if err != nil {
 			return sessionv3Runtime.WorkflowTarget{}, err

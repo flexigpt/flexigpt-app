@@ -137,9 +137,17 @@ func (a *V3AttachmentAdmitter) admitDirectory(
 		childSource.Kind = sessionv3Runtime.AttachmentSourceKindFile
 		childSource.Path = walk.Files[index].Path
 		childSource.URL = ""
+
+		relativeName, relativeErr := filepath.Rel(
+			walk.DirPath,
+			walk.Files[index].Path,
+		)
+		if relativeErr != nil || strings.HasPrefix(relativeName, "..") {
+			relativeName = walk.Files[index].Name
+		}
 		childSource.Label = v3DirectoryChildLabel(
 			source.Label,
-			walk.Files[index].Name,
+			filepath.ToSlash(relativeName),
 		)
 
 		values, err := a.admitFile(ctx, childSource)

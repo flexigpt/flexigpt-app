@@ -1547,12 +1547,17 @@ required before the status can change.
 
 ##### `WF-PREPARE-003.b` Resolve an owner Model only where required
 
-- Status: Partial.
-- Current evidence: `workflowOwnerModel` runs eagerly from `admitPlanned`.
-- Required result:
-  - Resolve an owner Model only for provider-managed Tool lowering.
-  - Do not require unrelated conversation Model or Agent defaults for pure
-    Workflow execution.
+- Status: Implemented.
+- Implemented evidence:
+  - `S/workflowruntime/admission.go:admitPlanned` no longer eagerly resolves
+    an owner Model.
+  - `bindTarget` calls `workflowOwnerModel` only after Tool setup identifies a
+    provider-managed SDK Tool target.
+  - Nested Workflow preparation receives inherited owner Model and invocation
+    defaults only when provider-managed Tool lowering requires them.
+  - Pure deterministic, registered-binding, ordinary Tool, MCP, nested
+    Workflow, Model, and Agent Workflow programs no longer depend on unrelated
+    Session conversation Model defaults.
 
 #### `WF-RETRY-003` Preserve one captured logical call through retry and started execution
 
@@ -1580,6 +1585,13 @@ required before the status can change.
 ##### `WF-RETRY-003.a` Capture the original evaluation boundary
 
 - Status: Partial.
+- Current evidence:
+  - `R/workflow_call_lifecycle.go:startCall` now evaluates and freezes typed
+    Model or Agent invocation templates before it creates a started child.
+  - Keyed started calls freeze the evaluated idempotency key in their child
+    step effect.
+  - Retry-boundary capture for ordinary invoke calls and resolver-backed target
+    membership remains incomplete.
 - Required result:
   - Capture evaluated target, target-set membership, input, context, typed
     messages, instructions, relevant port inputs, key, effect policy, and
@@ -1838,8 +1850,9 @@ required before the status can change.
   - Model resolution uses current source and overlay-derived configuration.
   - Retaining only a Model Artifact pin does not retain all effective Provider,
     overlay, capability, instruction, and prompt facts.
-  - Private execution fingerprint can differ from retained semantic binding
-    fingerprint.
+  - The durable dispatch plan now retains complete message text, attachments,
+    carried Tool results, approved App context, and metadata for its selected
+    semantic message sequence.
 - Required result:
   - Retain immutable semantic dispatch facts while discarding private resources.
   - Preserve exact semantic message order.
@@ -1858,6 +1871,12 @@ required before the status can change.
 ##### `V3-REPLAY-003.b` Reproduce captured message order and configuration
 
 - Status: Partial.
+- Current evidence:
+  - `S/sessionv3runtime/llm_replay.go:recoveredDispatchActivities` reconstructs
+    the captured message sequence from immutable `ModelDispatchPlan.Messages`.
+  - Effective non-secret Provider and Model configuration still resolves from
+    current source facts and requires the remaining immutable configuration
+    snapshot work.
 - Required result:
   - Rebuild from captured message identities and causal order.
   - Retain effective Provider, Model, capability, instruction, context, and
@@ -1907,6 +1926,14 @@ required before the status can change.
 ##### `V3-CONFIG-003.b` Apply effective contribution precedence
 
 - Status: Partial.
+- Current evidence:
+  - `S/sessionv3runtime/llm_plan.go` now applies Workspace from the effective
+    `plan.defaults.Workspace`, including an Agent-contributed Workspace.
+  - `appendUniqueMCPSelection` retains an earlier Session or invocation
+    selection instead of replacing it with a later inherited Agent or Workspace
+    selection.
+  - Explicit empty collection policy and complete contribution provenance remain
+    open in `V3-CONFIG-003.a` and `V3-CONFIG-003.c`.
 - Required result:
   - Preserve specific explicit MCP selections over inherited selections.
   - Apply the effective selected Workspace.
@@ -1944,20 +1971,25 @@ required before the status can change.
 
 ##### `DOMAIN-SKILL-003.a` Select applicable active Skill state
 
-- Status: Partial.
-- Required result:
-  - Filter by semantic owner and enabled pin set before selecting the latest
-    result.
-  - Do not allow another frame or incompatible enabled set to hide an
-    applicable earlier state.
+- Status: Implemented.
+- Implemented evidence:
+  - `S/skillruntime/v3_hydration.go` exposes
+    `EffectiveActiveSelectionsForFrame`.
+  - `S/sessionv3runtime/llm_plan.go` requests Skill state using the current LLM
+    ProgramFrame identity.
+  - The Skill Runtime filters terminal lifecycle Tool outcomes by owner frame
+    and enabled Skill pins before it selects the latest applicable result.
 
 ##### `DOMAIN-SKILL-003.b` Release Skill sessions on natural completion
 
-- Status: Partial.
-- Required result:
-  - Runtime sends lifecycle notification at natural frame and Execution
-    termination.
-  - Skill Runtime releases the exact corresponding private session.
+- Status: Implemented.
+- Implemented evidence:
+  - `R/runtime.go:advanceFrameLocked` invokes the optional
+    `ProgramFrameBindingCloser` when a ProgramFrame reaches a terminal state.
+  - `S/sessionv3runtime.Binder` and `S/workflowruntime.Binder` forward the
+    frame lifecycle callback.
+  - `S/skillruntime.V3Executor.CloseProgramFrame` removes and closes the exact
+    Execution and ProgramFrame keyed private Skill session.
 
 #### `V3-CONTINUE-003` Complete active-operation continuation and manual Tool ownership
 
@@ -2111,11 +2143,15 @@ required before the status can change.
 
 ##### `DOMAIN-ATTACH-003.a` Carry labels and directory-relative names
 
-- Status: Partial.
-- Required result:
-  - Retain semantic display labels during provider conversion.
-  - Retain root-relative identity for directory children.
-  - Keep one authoritative admitted content snapshot.
+- Status: Implemented.
+- Implemented evidence:
+  - `S/sessionv3runtime/attachments.go:admitDirectory` records a stable
+    slash-normalized path relative to the admitted directory root in the
+    child attachment label.
+  - `S/sessionv3runtime/inputs.go:attachmentTextForProvider` emits text
+    attachment labels with the immutable admitted content snapshot.
+  - Images and files retain their existing admitted Label field through native
+    provider content conversion without reopening paths.
 
 #### `ARC-DUP-003` Remove replicated effective state and duplicated execution algorithms
 

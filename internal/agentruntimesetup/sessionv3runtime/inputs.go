@@ -680,7 +680,7 @@ func attachmentToContentItem(a sessionv3Runtime.Attachment) (inferenceSpec.Input
 		}
 		return inferenceSpec.InputOutputContentItemUnion{
 			Kind:     inferenceSpec.ContentItemKindText,
-			TextItem: &inferenceSpec.ContentItemText{Text: a.Text},
+			TextItem: &inferenceSpec.ContentItemText{Text: attachmentTextForProvider(a)},
 		}, true
 	case sessionv3Runtime.AttachmentKindImage:
 		image := &inferenceSpec.ContentItemImage{ImageMIME: "image/png"}
@@ -739,6 +739,19 @@ func attachmentToContentItem(a sessionv3Runtime.Attachment) (inferenceSpec.Input
 	default:
 		return inferenceSpec.InputOutputContentItemUnion{}, false
 	}
+}
+
+func attachmentTextForProvider(
+	attachment sessionv3Runtime.Attachment,
+) string {
+	if strings.TrimSpace(attachment.Label) == "" {
+		return attachment.Text
+	}
+	return fmt.Sprintf(
+		"<<<FILE name=%q>>>\n%s\n<<<END FILE>>>",
+		attachment.Label,
+		attachment.Text,
+	)
 }
 
 func toolResultToInput(item sessionv3Runtime.WorkItem) inferenceSpec.InputUnion {
