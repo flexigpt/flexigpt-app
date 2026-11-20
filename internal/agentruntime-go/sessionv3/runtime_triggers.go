@@ -682,16 +682,17 @@ func (r *Runtime) acceptTriggerEvent(
 	} else {
 		command.OccurredAt = command.OccurredAt.UTC()
 	}
+	identity := command
 
 	return r.changeSession(
 		ctx,
 		command.Meta,
 		command.SessionID,
-		command,
+		identity,
 		func(session *Session) (*CommandReceipt, error) {
 			event := TriggerEventEnvelope{
 				ID:          command.EventID,
-				Name:        command.Name,
+				Type:        command.Name,
 				Source:      command.Source,
 				Data:        command.Data.Clone(),
 				Correlation: command.Correlation.Clone(),
@@ -707,7 +708,7 @@ func (r *Runtime) acceptTriggerEvent(
 				if err != nil {
 					return nil, err
 				}
-				if trigger.Event == nil || trigger.Event.Event != event.Name {
+				if trigger.Event == nil || trigger.Event.Event != event.Type {
 					continue
 				}
 				if triggerOccurrenceBySource(*registration, event.Source, event.ID) {
@@ -1152,7 +1153,7 @@ func (r *Runtime) signalTriggerExecutionLocked(
 	}
 	signal := ExecutionSignal{
 		ID:          event.ID,
-		Name:        event.Name,
+		Name:        event.Type,
 		Source:      event.Source,
 		Data:        event.Data.Clone(),
 		Correlation: event.Correlation.Clone(),
@@ -1181,7 +1182,7 @@ func (r *Runtime) signalTriggerExecutionLocked(
 			FrameID:     frame.ID,
 			Workflow: &WorkflowActivity{
 				Phase:   "trigger-signal",
-				Summary: event.Name,
+				Summary: event.Type,
 				Output: jsonutil.MustCanonicalValue(struct {
 					Source      string                  `json:"source"`
 					ID          string                  `json:"id"`

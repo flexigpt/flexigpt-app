@@ -258,7 +258,7 @@ func compileWorkflowStep(
 		output.OutputSchema = schema
 	}
 	if input.Retry != nil {
-		retry, err := compileWorkflowRetry(*input.Retry)
+		retry, err := compileWorkflowRetry(document, *input.Retry)
 		if err != nil {
 			return sessionv3Runtime.WorkflowStep{}, err
 		}
@@ -607,27 +607,21 @@ func compileWorkflowEffect(
 			Kind: sessionv3Runtime.EffectKindNonIdempotent,
 		}, nil
 	}
+	sourceKind, err := compileWorkflowSourceEffectKind(input.Kind)
+	if err != nil {
+		return sessionv3Runtime.EffectContract{}, err
+	}
 
 	output := sessionv3Runtime.EffectContract{
 		Reconcile:  input.Reconcile,
 		Compensate: input.Compensate,
 	}
-	switch input.Kind {
-	case string(sessionv3Runtime.EffectKindRead):
-		output.Kind = sessionv3Runtime.EffectKindRead
-	case string(sessionv3Runtime.EffectKindIdempotent):
-		output.Kind = sessionv3Runtime.EffectKindIdempotent
-	case string(sessionv3Runtime.EffectKindNonIdempotent):
-		output.Kind = sessionv3Runtime.EffectKindNonIdempotent
-	case string(sessionv3Runtime.EffectKindKeyed):
+	if sourceKind == sessionv3Runtime.EffectKindKeyed {
 		// A declaration-level target contract describes capability. The
 		// concrete key is a call-level stable semantic value.
 		output.Kind = sessionv3Runtime.EffectKindIdempotent
-	default:
-		return sessionv3Runtime.EffectContract{}, unsupportedWorkflowOperation(
-			"target.interface.effect",
-			"unknown effect contract",
-		)
+	} else {
+		output.Kind = sourceKind
 	}
 	if err := output.Validate(); err != nil {
 		return sessionv3Runtime.EffectContract{}, err
@@ -635,27 +629,38 @@ func compileWorkflowEffect(
 	return output, nil
 }
 
+// compileWorkflowSourceEffectKind maps declaration vocabulary to Runtime
+// vocabulary. The source language deliberately retains `non-idempotent`,
+// while the durable Runtime enum uses `nonIdempotent`.
+func compileWorkflowSourceEffectKind(
+	value string,
+) (sessionv3Runtime.EffectKind, error) {
+	switch value {
+	case "read":
+		return sessionv3Runtime.EffectKindRead, nil
+	case "idempotent":
+		return sessionv3Runtime.EffectKindIdempotent, nil
+	case "keyed":
+		return sessionv3Runtime.EffectKindKeyed, nil
+	case "non-idempotent":
+		return sessionv3Runtime.EffectKindNonIdempotent, nil
+	default:
+		return "", unsupportedWorkflowOperation(
+			"effect.kind",
+			"unknown effect contract",
+		)
+	}
+}
+
 func compileWorkflowStepEffect(
 	document workflowv1.WorkflowDocument,
 	input workflowv1.Effect,
 ) (sessionv3Runtime.WorkflowStepEffect, error) {
-	output := sessionv3Runtime.WorkflowStepEffect{}
-	switch input.Kind {
-	case string(sessionv3Runtime.EffectKindRead):
-		output.Kind = sessionv3Runtime.EffectKindRead
-	case string(sessionv3Runtime.EffectKindIdempotent):
-		output.Kind = sessionv3Runtime.EffectKindIdempotent
-	case string(sessionv3Runtime.EffectKindKeyed):
-		output.Kind = sessionv3Runtime.EffectKindKeyed
-	case string(sessionv3Runtime.EffectKindNonIdempotent):
-		output.Kind = sessionv3Runtime.EffectKindNonIdempotent
-	default:
-		return sessionv3Runtime.WorkflowStepEffect{},
-			unsupportedWorkflowOperation(
-				"step.effect",
-				"unknown effect contract",
-			)
+	kind, err := compileWorkflowSourceEffectKind(input.Kind)
+	if err != nil {
+		return sessionv3Runtime.WorkflowStepEffect{}, err
 	}
+	output := sessionv3Runtime.WorkflowStepEffect{Kind: kind}
 
 	if len(input.Key) != 0 {
 		if output.Kind != sessionv3Runtime.EffectKindKeyed {

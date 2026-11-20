@@ -108,6 +108,46 @@ func (b *Binder) CloseExecutionBinding(ctx context.Context, executionID sessionv
 	return nil
 }
 
+// PrepareUserMessageSkillTemplate forwards the optional Session capability to
+// the composed base binder. Workflow composition does not own Skill rendering.
+func (b *Binder) PrepareUserMessageSkillTemplate(
+	ctx context.Context,
+	request sessionv3Runtime.UserMessageSkillTemplatePreparationRequest,
+) (sessionv3Runtime.UserMessageSkillTemplateResult, error) {
+	if b == nil || b.Base == nil {
+		return sessionv3Runtime.UserMessageSkillTemplateResult{}, errors.New(
+			"session v3 Skill template runtime is unavailable",
+		)
+	}
+	preparer, found := b.Base.(sessionv3Runtime.UserMessageSkillTemplatePreparer)
+	if !found || preparer == nil {
+		return sessionv3Runtime.UserMessageSkillTemplateResult{}, errors.New(
+			"session v3 Skill template runtime is unavailable",
+		)
+	}
+	return preparer.PrepareUserMessageSkillTemplate(ctx, request)
+}
+
+// PreviewInstructionSkill forwards the optional read-only Skill capability to
+// the composed base binder. Workflow composition does not render instructions.
+func (b *Binder) PreviewInstructionSkill(
+	ctx context.Context,
+	request sessionv3Runtime.InstructionSkillPreviewRequest,
+) (sessionv3Runtime.InstructionSkillPreviewResult, error) {
+	if b == nil || b.Base == nil {
+		return sessionv3Runtime.InstructionSkillPreviewResult{}, errors.New(
+			"session v3 instruction Skill preview is unavailable",
+		)
+	}
+	previewer, found := b.Base.(sessionv3Runtime.InstructionSkillPreviewer)
+	if !found || previewer == nil {
+		return sessionv3Runtime.InstructionSkillPreviewResult{}, errors.New(
+			"session v3 instruction Skill preview is unavailable",
+		)
+	}
+	return previewer.PreviewInstructionSkill(ctx, request)
+}
+
 func (b *Binder) PrepareAppTool(
 	ctx context.Context,
 	request sessionv3Runtime.AppToolPreparationRequest,

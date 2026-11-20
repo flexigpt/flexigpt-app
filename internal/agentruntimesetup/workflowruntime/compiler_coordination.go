@@ -173,6 +173,7 @@ func compileWorkflowEmit(
 }
 
 func compileWorkflowRetry(
+	document workflowv1.WorkflowDocument,
 	input workflowv1.Retry,
 ) (sessionv3Runtime.RetryPolicy, error) {
 	output := sessionv3Runtime.RetryPolicy{
@@ -187,6 +188,16 @@ func compileWorkflowRetry(
 				return sessionv3Runtime.RetryPolicy{}, err
 			}
 			output.Match.Categories = append(output.Match.Categories, value)
+		}
+		if len(input.Match.Schema) != 0 {
+			schema, err := compileWorkflowSchema(
+				document,
+				input.Match.Schema,
+			)
+			if err != nil {
+				return sessionv3Runtime.RetryPolicy{}, err
+			}
+			output.Match.Schema = schema
 		}
 	}
 	if input.Match != nil {

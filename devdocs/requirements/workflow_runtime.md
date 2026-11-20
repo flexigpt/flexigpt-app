@@ -1401,40 +1401,38 @@ required before the status can change.
 
 #### `RT-TRIGGER-003` Resume trigger lifecycle changes and expose one event meaning
 
-- Status: Partial.
+- Status: Implemented.
 - Corrected prior claims: `RT-TRIGGER-002`, `ARC-SCHEDULER-001`, and complete
   trigger queue resumption claims.
-- Current evidence:
-  - `SetTriggerRegistrationState` rearms schedule timers without draining
-    already eligible queued occurrences.
-  - Trigger expressions expose `event.name`.
-  - Ordinary event waits expose `type`.
-  - Machine expression behavior depends on the event projection it receives.
-- Required result:
-  - Registration reactivation drains eligible occurrences through the same
-    committed ready-work launch as other Runtime work.
-  - Missed-occurrence behavior follows the declared registration policy.
-  - Trigger, wait, and Machine expressions receive one semantic event
-    projection.
+- Implemented evidence:
+  - `R/runtime.go:SetTriggerRegistrationState` calls
+    `recoverSessionTriggersLocked` and `drainTriggerQueuesLocked` while the
+    registration-state command owns the Session mutation. The normal
+    `changeSession` checkpoint and ready-work launch then commit and dispatch
+    the resulting work.
+  - `R/workflow_triggers.go:TriggerEventEnvelope` serializes `type`.
+  - `R/runtime_triggers.go` maps accepted trigger command `Name` to `Type` and
+    maps the same `Type` to `ExecutionSignal.Name`.
+  - Event waits and Machine waits continue to use `ExecutionSignal.Name` as
+    their durable event type.
 
 ##### `RT-TRIGGER-003.a` Drain eligible occurrences after reactivation
 
-- Status: Partial.
-- Current evidence: registration state changes rearm timers but do not drain
-  eligible queues.
-- Required result:
-  - Persist registration and queue changes.
-  - Apply missed-occurrence behavior.
-  - Launch eligible work through the shared Runtime path.
+- Status: Implemented.
+- Implemented evidence:
+  - `R/runtime.go:SetTriggerRegistrationState` recovers missed schedule
+    occurrences and drains trigger queues before the command checkpoint.
+  - `R/runtime_durability.go:resumeRestoredWork` and
+    `R/runtime.go:changeSession` use the same durable ready-work launch path.
 
 ##### `RT-TRIGGER-003.b` Use one declared event projection
 
-- Status: Partial.
-- Current evidence: `TriggerEventEnvelope` exposes `name`, while event-wait
-  output exposes `type`.
-- Required result:
-  - Preserve `type`, source, identity, data, correlation, and time through one
-    semantic event projection.
+- Status: Implemented.
+- Implemented evidence:
+  - `R/workflow_triggers.go` serializes trigger event `type`, source, identity,
+    data, correlation, and time.
+  - `R/coordination.go:workflowEventWaitOutput` retains the same event type
+    through durable ordinary event waits and Machine transitions.
 
 #### `RT-COMMAND-003` Replay accepted commands independently of regenerated preparation
 
@@ -1445,8 +1443,8 @@ required before the status can change.
     sources before replay lookup.
   - Workflow wrappers can prepare a ProgramSnapshot before Runtime replay
     returns the prior receipt.
-  - `AcceptTriggerEvent` fills missing `OccurredAt` before command
-    fingerprinting.
+  - Trigger event command identity now preserves caller-supplied
+    `OccurredAt`; remaining attachment and Workflow wrapper paths remain open.
 - Required result:
   - An accepted command returns its prior receipt without requiring former
     source files, attachments, selected Artifacts, or setup resources.
@@ -1464,48 +1462,48 @@ required before the status can change.
 
 ##### `RT-COMMAND-003.b` Keep generated occurrence time outside caller identity
 
-- Status: Partial.
-- Current evidence: `AcceptTriggerEvent` fills `OccurredAt` before
-  fingerprinting.
-- Required result:
-  - Fingerprint the original caller payload.
-  - Persist and reuse generated occurrence facts after acceptance.
+- Status: Implemented.
+- Implemented evidence:
+  - `R/runtime_triggers.go:acceptTriggerEvent` copies the caller command to
+    `identity` before it assigns a Runtime occurrence time.
+  - `changeSession` fingerprints and persists `identity`, while the closure
+    uses the normalized command to persist the generated occurrence fact.
 
 #### `RT-PERSIST-003` Complete deletion commitment and idle Session deletion
 
-- Status: Partial.
+- Status: Implemented.
 - Corrected prior claims: `RT-PERSIST-002` and complete normal V2 replacement
   claims.
-- Current evidence:
-  - `sessionstorev3/store.go:HandleSessionTombstone` can commit a tombstone and
-    then return an ordinary derived-index deletion error.
-  - `sessionv3/runtime.go:DeleteSession` can restore the live in-memory Session
-    after that committed tombstone.
-  - An idle normal conversation Execution is intentionally long-lived.
-  - `DeleteSession` rejects every nonterminal Execution.
-- Required result:
-  - Runtime and Store agree whether tombstone commitment occurred.
-  - Derived-index repair never resurrects a deleted Session.
-  - An idle long-lived normal conversation can be deleted while actual active
-    Workflow, child, wait, cleanup, or external work remains protected.
+- Implemented evidence:
+  - `internal/sessionstorev3/store.go:HandleSessionTombstone` writes the
+    tombstone first, schedules derived repair when index deletion fails, and
+    returns `DerivedIndexError`, which implements `CheckpointCommitStatus`.
+  - `R/runtime.go:DeleteSession` recognizes committed checkpoint errors and
+    does not restore the live Session.
+  - `R/runtime.go:idleNormalConversationExecution` permits deletion only for
+    an idle conversation root with no active WorkItem, wait, cleanup, resource
+    lease, pending Fork or Join, uncertain work, or live child frame.
 
 ##### `RT-PERSIST-003.a` Treat committed tombstones as committed
 
-- Status: Partial.
-- Required result:
-  - Report semantic tombstone commitment distinctly from a repairable
-    derived-index failure.
-  - Preserve deletion receipt and deletion barrier.
-  - Schedule derived-index repair without restoring the Session.
+- Status: Implemented.
+- Implemented evidence:
+  - `sessionstorev3.Store.HandleSessionTombstone` returns
+    `DerivedIndexError` only after durable tombstone publication and schedules
+    repair.
+  - `R/runtime.go:DeleteSession` accepts errors whose
+    `CheckpointCommitStatus` reports a committed tombstone.
 
 ##### `RT-PERSIST-003.b` Delete idle long-lived normal conversations
 
-- Status: Partial.
-- Required result:
-  - Retire an idle conversation root during normal Session deletion.
-  - Retain ownership of active Workflow, child, wait, cleanup, and external
-    work until it settles.
-  - Do not treat this as SessionV2 retirement cleanup.
+- Status: Implemented.
+- Implemented evidence:
+  - `R/runtime.go:idleNormalConversationExecution` distinguishes an idle
+    long-lived conversation root from active external, cleanup, child, wait,
+    or uncertain work.
+  - `R/runtime.go:DeleteSession` cancels due-time callbacks, discards private
+    bindings, and requests owning-domain execution-binding cleanup after the
+    committed Session deletion.
 
 ### Workflow preparation, captured calls, ports, and channels
 
@@ -1610,10 +1608,12 @@ required before the status can change.
   - `ports_runtime.go:namespaceWorkflowProgramChannels` changes declaration
     names to private names.
   - CEL expressions are not renamed.
-  - `workflow_messages.go:captureWorkflowMessages` publishes namespaced names
-    as expression-map keys.
-  - `Advance` captures messages before settlement and before `drive` can move
-    to another step or root output.
+  - `WorkflowScopeContext.ChannelAliases` now retains declared-to-private
+    channel mapping for one nested Workflow invocation.
+  - `workflow_messages.go:captureWorkflowMessages` restores declared names for
+    expression-map keys.
+  - `WorkflowInterpreter.drive` recaptures messages when it selects a step or
+    root output. Persisted call-snapshot reuse remains open.
   - Inherited subscriptions are copied into child frames and consumption is
     keyed to the waiting child frame.
 - Required result:
@@ -1626,11 +1626,12 @@ required before the status can change.
 
 ##### `WF-CHANNEL-003.a` Preserve declared channel aliases
 
-- Status: Partial.
-- Required result:
-  - Keep declared aliases such as `messages.review` visible to expressions.
-  - Keep private nested Workflow channel logs invocation-local.
-  - Do not expose private storage namespaces as declaration vocabulary.
+- Status: Implemented.
+- Implemented evidence:
+  - `R/ports_runtime.go:namespaceWorkflowProgramChannels` persists
+    `WorkflowScopeContext.ChannelAliases`.
+  - `R/workflow_messages.go:workflowDeclaredChannelName` publishes declared
+    names to CEL while `ChannelLog` keeps private invocation-local names.
 
 ##### `WF-CHANNEL-003.b` Capture each evaluation boundary
 
@@ -1682,11 +1683,12 @@ required before the status can change.
 
 ##### `WF-EFFECT-003.a` Translate `non-idempotent`
 
-- Status: Partial.
-- Required result:
-  - Map admitted source `non-idempotent` explicitly to Runtime
-    `nonIdempotent`.
-  - Do not treat this as a validation-only issue.
+- Status: Implemented.
+- Implemented evidence:
+  - `S/workflowruntime/compiler.go:compileWorkflowSourceEffectKind` explicitly
+    maps source `non-idempotent` to Runtime `EffectKindNonIdempotent`.
+  - Target-level keyed capability declarations continue to lower to an
+    idempotent base contract with separate keyed capability facts.
 
 ##### `WF-EFFECT-003.b` Settle MCP from actual domain evidence
 
@@ -1714,15 +1716,14 @@ required before the status can change.
 - Corrected prior claims: `WF-CONTROL-001`, `WF-SCOPE-001`, and
   `WF-MACHINE-002`.
 - Current evidence:
-  - Repeat body frames receive an iteration index, but `while` and `until`
-    evaluation do not explicitly install the current Repeat index.
   - Empty Foreach with parent-state merge can create merge progress and return
     idle without emitting required merge work.
   - Empty runtime collections under non-`all` completion can remain pending.
   - Lowering loses the difference between omitted and explicit zero
     `maxItems` or `maxIterations`.
-  - Machine `Microsteps` increments for event-driven transitions and is not
-    reset at a genuine suspension boundary.
+  - Repeat condition evaluation now receives the current Repeat index.
+  - Machine immediate-transition accounting now resets at child-block and wait
+    suspension boundaries.
 - Required result:
   - Apply current Repeat index at every Repeat condition boundary.
   - Execute empty-collection merge behavior.
@@ -1733,10 +1734,12 @@ required before the status can change.
 
 ##### `WF-CONTROL-003.a` Apply Repeat index to condition evaluation
 
-- Status: Partial.
-- Required result:
-  - Install the current Repeat index for `while` and `until`.
-  - Preserve carried state and result semantics at the same boundary.
+- Status: Implemented.
+- Implemented evidence:
+  - `R/workflow_structured.go:repeatAllowsNext` supplies the next iteration
+    index to `while`.
+  - `R/workflow_structured.go:settleRepeatChild` supplies the completed body
+    index to `until` with carried state and result facts.
 
 ##### `WF-CONTROL-003.b` Settle empty collections and preserve maxima
 
@@ -1748,11 +1751,13 @@ required before the status can change.
 
 ##### `WF-CONTROL-003.c` Limit immediate Machine transitions only
 
-- Status: Partial.
-- Required result:
-  - Reset the immediate-transition counter at genuine suspension.
-  - Permit long-lived event-driven Machines.
-  - Retain the immediate-transition safety bound.
+- Status: Implemented.
+- Implemented evidence:
+  - `R/workflow_machine.go:selectMachineTransition` increments the counter
+    only for immediate transitions.
+  - Event and timer transitions reset it.
+  - `startMachineChild` and `armMachineWaits` reset it at genuine suspension
+    boundaries while retaining the immediate-transition bound.
 
 #### `WF-OUTCOME-003` Preserve complete Workflow and conversation terminal meaning
 
@@ -1799,8 +1804,9 @@ required before the status can change.
 - Status: Partial.
 - Corrected prior claims: `V3-HISTORY-002` and `ARC-REPLAY-001`.
 - Current evidence:
-  - `R/runtime.go:recoverLocked` sets `item.Binding = nil` before the later
-    plan-preservation condition.
+  - `R/runtime.go:retainedLLMDispatchBinding` now preserves a durable LLM
+    semantic binding and dispatch plan for recovered Binding and replay-safe
+    Dispatched LLM WorkItems.
   - `bindRecoveredLLM` calls `buildInputs` without retained activity sequence.
   - Recovered activity selection is recomputed.
   - Model resolution uses current source and overlay-derived configuration.
@@ -2049,26 +2055,19 @@ required before the status can change.
 
 #### `V3-API-003` Preserve optional backend capabilities through final binder composition
 
-- Status: Partial.
+- Status: Implemented.
 - Corrected prior claims: `V3-SETUP-002`.
-- Current evidence:
-  - The base V3 binder implements `PrepareUserMessageSkillTemplate` and
-    `PreviewInstructionSkill`.
-  - `S/workflowruntime/binder.go` forwards App operations but does not supply
-    those Skill forwarding methods.
-  - Runtime discovers optional capability interfaces from the composed binder.
-- Required result:
-  - The composed Workflow binder delegates both optional Skill capabilities to
-    Base.
-  - Do not create a second rendering implementation.
+- Implemented evidence:
+  - `S/workflowruntime/binder.go` forwards
+    `PrepareUserMessageSkillTemplate` and `PreviewInstructionSkill` to Base.
+  - Base remains the owner of Skill rendering and preview behavior.
 
 ##### `V3-API-003.a` Forward Skill template preparation and preview
 
-- Status: Not implemented.
-- Required result:
-  - Forward `PrepareUserMessageSkillTemplate`.
-  - Forward `PreviewInstructionSkill`.
-  - Preserve existing base implementation ownership.
+- Status: Implemented.
+- Implemented evidence:
+  - `S/workflowruntime.Binder` implements both optional SessionV3 capability
+    interfaces and delegates without creating another rendering path.
 
 #### `DOMAIN-ATTACH-003` Preserve semantic attachment identity in native Model input
 

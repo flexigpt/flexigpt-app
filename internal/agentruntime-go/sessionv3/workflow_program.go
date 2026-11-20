@@ -933,6 +933,13 @@ func (i *WorkflowInterpreter) drive(
 	program WorkflowProgram,
 	state WorkflowState,
 ) (ProgramTransition, error) {
+	if err := captureWorkflowMessages(program, &state, execution); err != nil {
+		return workflowFailure(
+			state,
+			"workflow_messages_capture_failed",
+			err.Error(),
+		)
+	}
 	if state.CancellationPending && state.Pending == nil {
 		status := ProgramFrameStateCancelled
 		transition, err := workflowTransition(
@@ -965,6 +972,13 @@ func (i *WorkflowInterpreter) drive(
 		}
 
 		if state.Index >= len(program.Root.Steps) {
+			if err := captureWorkflowMessages(program, &state, execution); err != nil {
+				return workflowFailure(
+					state,
+					"workflow_messages_capture_failed",
+					err.Error(),
+				)
+			}
 			output, err := i.evaluate(
 				program.Root.Output,
 				program,
@@ -1002,6 +1016,13 @@ func (i *WorkflowInterpreter) drive(
 		}
 		state.PendingPath = path
 		state.PendingDeclarationPath = step.DeclarationPath
+		if err := captureWorkflowMessages(program, &state, execution); err != nil {
+			return workflowFailure(
+				state,
+				"workflow_messages_capture_failed",
+				err.Error(),
+			)
+		}
 
 		if step.When != nil {
 			allowed, err := i.condition(

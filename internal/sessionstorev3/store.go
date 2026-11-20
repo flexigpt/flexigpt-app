@@ -273,7 +273,11 @@ func (s *Store) HandleSessionTombstone(
 	if err := s.writeRawDocument(tombstone.SessionID, doc); err != nil {
 		return err
 	}
-	return s.deleteIndex(tombstone.SessionID)
+	if err := s.deleteIndex(tombstone.SessionID); err != nil {
+		s.scheduleDerivedRepairLocked()
+		return &DerivedIndexError{Cause: err}
+	}
+	return nil
 }
 
 func (s *Store) Restore(ctx context.Context, restorer sessionv3Runtime.RuntimeRestorer) error {

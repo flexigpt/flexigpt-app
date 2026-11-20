@@ -379,6 +379,7 @@ func namespaceWorkflowProgramChannels(
 		}
 		program.Ports[index].Channel = value
 	}
+	program.Scope.ChannelAliases = cloneWorkflowChannelAliases(aliases)
 	if err := namespaceWorkflowBlockChannels(&program.Root, aliases); err != nil {
 		return ProgramSnapshot{}, nil, err
 	}

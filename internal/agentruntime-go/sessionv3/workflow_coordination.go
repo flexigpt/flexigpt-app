@@ -1079,6 +1079,8 @@ func cloneWorkflowRetryPolicy(value *RetryPolicy) *RetryPolicy {
 	output := *value
 	output.Match.Categories = append([]ErrorCategory(nil), value.Match.Categories...)
 	output.Match.Codes = append([]string(nil), value.Match.Codes...)
+	output.Match.EffectStates = append([]EffectState(nil), value.Match.EffectStates...)
+	output.Match.Schema = value.Match.Schema.Clone()
 	if value.Match.Retryable != nil {
 		copyValue := *value.Match.Retryable
 		output.Match.Retryable = &copyValue

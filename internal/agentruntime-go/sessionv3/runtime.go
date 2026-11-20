@@ -330,7 +330,8 @@ func (r *Runtime) DeleteSession(ctx context.Context, command DeleteSessionComman
 	}
 
 	for _, execution := range session.Executions {
-		if !execution.State.Terminal() {
+		if !execution.State.Terminal() &&
+			!idleNormalConversationExecution(execution) {
 			receipt := r.rejectLocked(
 				session,
 				command.Meta,
@@ -361,16 +362,92 @@ func (r *Runtime) DeleteSession(ctx context.Context, command DeleteSessionComman
 		context.WithoutCancel(ctx),
 		tombstone,
 	); err != nil {
-		*session = previous
-		r.mu.Unlock()
-		return nil, err
+		var committed CheckpointCommitStatus
+		if !errors.As(err, &committed) ||
+			committed == nil ||
+			!committed.CheckpointCommitted() {
+			*session = previous
+			r.mu.Unlock()
+			return nil, err
+		}
+	}
+
+	executionIDs := make(
+		[]ExecutionID,
+		0,
+		len(session.Executions),
+	)
+	for _, execution := range session.Executions {
+		executionIDs = append(executionIDs, execution.ID)
+		r.cancelExecutionDueTimesLocked(execution)
+		for _, item := range execution.WorkItems {
+			if cancel := r.cancels[item.ID]; cancel != nil {
+				cancel()
+				delete(r.cancels, item.ID)
+			}
+			delete(r.privateBindings, item.ID)
+		}
+		for _, wait := range execution.Waits {
+			delete(r.privateWaits, wait.ID)
+		}
 	}
 
 	delete(r.sessions, session.ID)
 	r.retired[session.ID] = cloneSessionTombstone(tombstone)
+	delete(r.checkpointPending, session.ID)
 	r.mu.Unlock()
 
+	if closer, supported := r.deps.Binder.(ExecutionBindingCloser); supported {
+		for _, executionID := range executionIDs {
+			id := executionID
+			r.launchAsync(
+				"session-v3 deleted execution binding cleanup",
+				func() {
+					_ = closer.CloseExecutionBinding(
+						context.WithoutCancel(ctx),
+						id,
+					)
+				},
+				nil,
+			)
+		}
+	}
+
 	return &receipt, nil
+}
+
+func idleNormalConversationExecution(execution Execution) bool {
+	if !isNormalConversationExecution(execution) ||
+		execution.Controls.CancellationRequested ||
+		execution.Cleanup.Active ||
+		len(execution.ResourceLeases) != 0 {
+		return false
+	}
+	for _, item := range execution.WorkItems {
+		if !item.State.Terminal() ||
+			item.State == WorkItemStateUncertain {
+			return false
+		}
+	}
+	for _, wait := range execution.Waits {
+		if wait.Status == WaitStatusPending ||
+			wait.Status == WaitStatusResolving {
+			return false
+		}
+	}
+	for _, frame := range execution.ProgramFrames {
+		if frame.Fork != nil || len(frame.Joins) != 0 {
+			return false
+		}
+		if frame.ParentFrameID == "" &&
+			frame.Program.InterpreterID == BuiltinConversationInterpreterID {
+			continue
+		}
+		if !frame.Status.Terminal() {
+			return false
+		}
+	}
+	return true
 }
 
 func (r *Runtime) SubmitMessage(ctx context.Context, command SubmitMessageCommand) (*CommandReceipt, error) {
@@ -769,6 +846,21 @@ func (r *Runtime) SetTriggerRegistrationState(
 			}
 			registration.State = command.State
 			registration.UpdatedAt = r.now()
+
+			if command.State == TriggerRegistrationStateActive {
+				if _, err := r.recoverSessionTriggersLocked(
+					ctx,
+					session,
+				); err != nil {
+					return nil, err
+				}
+				_ = r.drainTriggerQueuesLocked(
+					ctx,
+					session,
+					"",
+				)
+			}
+
 			r.touchSessionLocked(session)
 			return &CommandReceipt{
 				CommandID:       command.Meta.ID,
@@ -4051,8 +4143,10 @@ func (r *Runtime) recoverLocked(session *Session) bool {
 	for executionIndex := range session.Executions {
 		execution := &session.Executions[executionIndex]
 		needsReview := false
+
 		for itemIndex := range execution.WorkItems {
 			item := &execution.WorkItems[itemIndex]
+			retainedBinding := retainedLLMDispatchBinding(*item)
 			switch item.State {
 			case WorkItemStateBinding:
 				item.State = WorkItemStateReady
@@ -4061,6 +4155,7 @@ func (r *Runtime) recoverLocked(session *Session) bool {
 				if item.Cleanup {
 					item.Requested = true
 				}
+				item.Binding = retainedBinding
 				changed = true
 			case WorkItemStateDispatched:
 				replaySafe := effectReplaySafe(item.Effect)
@@ -4088,22 +4183,13 @@ func (r *Runtime) recoverLocked(session *Session) bool {
 				//nolint:gocritic // No switch.
 				if replaySafe {
 					item.State = WorkItemStateReady
-					item.Binding = nil
+					item.Binding = retainedBinding
 					item.Output = nil
 					item.Error = nil
 					item.EffectState = EffectStateNotStarted
 					item.CompletedAt = nil
 					item.DispatchedAt = nil
 					item.RetryState = nil
-					// A persisted LLM dispatch plan is the immutable
-					// semantic reproduction contract. Runtime-private
-					// bindings are still discarded, but setup can recreate
-					// private provider resources from this plan.
-					if item.Type != WorkItemTypeLLM ||
-						item.Binding == nil ||
-						item.Binding.Plan == nil {
-						item.Binding = nil
-					}
 					item.Requested = item.Automatic
 				} else if r.reconciliationRequiredLocked(execution, item) {
 					item.State = WorkItemStateReconciling
@@ -4187,4 +4273,18 @@ func (r *Runtime) recoverLocked(session *Session) bool {
 		r.touchSessionLocked(session)
 	}
 	return changed
+}
+
+// retainedLLMDispatchBinding preserves durable semantic LLM facts while
+// recovery discards private setup resources. Other work types rebind through
+// their owning domains and do not retain a provider dispatch plan.
+func retainedLLMDispatchBinding(item WorkItem) *SemanticBinding {
+	if item.Type != WorkItemTypeLLM ||
+		item.Binding == nil ||
+		item.Binding.Plan == nil {
+		return nil
+	}
+
+	value := jsonutil.CloneJSONInValue(*item.Binding)
+	return &value
 }

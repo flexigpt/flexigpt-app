@@ -3,6 +3,7 @@ package sessionv3
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strconv"
 	"strings"
@@ -39,6 +40,7 @@ type WorkflowScopeContext struct {
 	Operation          *jsonutil.CanonicalValue    `json:"operation,omitempty"`
 	Completed          *jsonutil.CanonicalValue    `json:"completed,omitempty"`
 	Ports              []PortInput                 `json:"ports,omitempty"`
+	ChannelAliases     map[string]string           `json:"channelAliases,omitempty"`
 	Saga               *WorkflowSagaScope          `json:"saga,omitempty"`
 	Cleanup            bool                        `json:"cleanup,omitempty"`
 }
@@ -80,6 +82,9 @@ func (s WorkflowScopeContext) Validate() error {
 		return errors.New("Workflow scope completed facts are invalid")
 	}
 	if err := validateUniquePortInputs(s.Ports); err != nil {
+		return err
+	}
+	if err := validateWorkflowChannelAliases(s.ChannelAliases); err != nil {
 		return err
 	}
 	if s.Saga != nil {
@@ -1314,9 +1319,13 @@ func (i *WorkflowInterpreter) repeatAllowsNext(
 
 	evaluationState := state
 	evaluationState.State = progress.State.Clone()
+	evaluationProgram := program
+	evaluationProgram.Scope.Index = workflowIntegerPointer(
+		progress.Iterations,
+	)
 
 	if spec.While != nil {
-		allowed, err = i.condition(*spec.While, program, evaluationState)
+		allowed, err = i.condition(*spec.While, evaluationProgram, evaluationState)
 		if err != nil || !allowed {
 			return allowed, false, err
 		}
@@ -2233,9 +2242,10 @@ func (i *WorkflowInterpreter) settleRepeatChild(
 	if step.Repeat.Until != nil {
 		evaluationState := *state
 		evaluationState.State = progress.State.Clone()
-		resultValue := progress.Result.Clone()
 		evaluationProgram := program
+		resultValue := progress.Result.Clone()
 		evaluationProgram.Scope.Result = &resultValue
+		evaluationProgram.Scope.Index = workflowIntegerPointer(progress.Iterations - 1)
 		stop, err := i.condition(
 			*step.Repeat.Until,
 			evaluationProgram,
@@ -2427,6 +2437,7 @@ func workflowInheritedChildScope(
 		Operation:          cloneWorkflowCanonicalPointer(parent.Operation),
 		Completed:          cloneWorkflowCanonicalPointer(parent.Completed),
 		Ports:              clonePortInputs(parent.Ports),
+		ChannelAliases:     cloneWorkflowChannelAliases(parent.ChannelAliases),
 		Saga:               cloneWorkflowSagaScope(parent.Saga),
 		Cleanup:            parent.Cleanup,
 	}
@@ -2494,8 +2505,37 @@ func cloneWorkflowScopeContext(value WorkflowScopeContext) WorkflowScopeContext 
 	output.Operation = cloneWorkflowCanonicalPointer(value.Operation)
 	output.Completed = cloneWorkflowCanonicalPointer(value.Completed)
 	output.Ports = clonePortInputs(value.Ports)
+	output.ChannelAliases = cloneWorkflowChannelAliases(value.ChannelAliases)
 	output.Saga = cloneWorkflowSagaScope(value.Saga)
 	return output
+}
+
+func cloneWorkflowChannelAliases(
+	values map[string]string,
+) map[string]string {
+	if len(values) == 0 {
+		return nil
+	}
+	output := make(map[string]string, len(values))
+	maps.Copy(output, values)
+	return output
+}
+
+func validateWorkflowChannelAliases(values map[string]string) error {
+	physicalNames := make(map[string]struct{}, len(values))
+	for declared, physical := range values {
+		if err := validateID("workflow declared channel alias", declared); err != nil {
+			return err
+		}
+		if err := validateID("workflow private channel name", physical); err != nil {
+			return err
+		}
+		if _, duplicate := physicalNames[physical]; duplicate {
+			return errors.New("workflow private channel alias is duplicated")
+		}
+		physicalNames[physical] = struct{}{}
+	}
+	return nil
 }
 
 func cloneWorkflowTargetSetStates(

@@ -81,11 +81,24 @@ type WorkflowTriggerMissed struct {
 // Correlation before this envelope reaches an evaluated trigger template.
 type TriggerEventEnvelope struct {
 	ID          string                  `json:"id"`
-	Name        string                  `json:"name"`
+	Type        string                  `json:"type"`
 	Source      string                  `json:"source"`
 	Data        jsonutil.CanonicalValue `json:"data"`
 	Correlation jsonutil.CanonicalValue `json:"correlation,omitempty"`
 	Time        time.Time               `json:"time"`
+
+	// Name preserves in-process source compatibility for callers that still
+	// construct the former transient field. It is never serialized into the
+	// Workflow expression boundary. Runtime uses Type as the one event name.
+	Name string `json:"-"`
+}
+
+func (e TriggerEventEnvelope) normalized() TriggerEventEnvelope {
+	if strings.TrimSpace(e.Type) == "" {
+		e.Type = e.Name
+	}
+	e.Name = ""
+	return e
 }
 
 type WorkflowTriggerEvaluation struct {
@@ -263,15 +276,16 @@ func PrepareWorkflowTrigger(
 
 	var eventValue jsonutil.CanonicalValue
 	if event != nil {
-		if event.ID == "" ||
-			event.Name == "" ||
-			event.Source == "" ||
-			!event.Data.Valid() ||
-			!event.Correlation.Valid() ||
-			event.Time.IsZero() {
+		normalizedEvent := event.normalized()
+		if normalizedEvent.ID == "" ||
+			normalizedEvent.Type == "" ||
+			normalizedEvent.Source == "" ||
+			!normalizedEvent.Data.Valid() ||
+			!normalizedEvent.Correlation.Valid() ||
+			normalizedEvent.Time.IsZero() {
 			return WorkflowTriggerEvaluation{}, errors.New("workflow trigger event is invalid")
 		}
-		eventValue = jsonutil.MustCanonicalValue(*event)
+		eventValue = jsonutil.MustCanonicalValue(normalizedEvent)
 	}
 
 	result := WorkflowTriggerEvaluation{Matched: true}

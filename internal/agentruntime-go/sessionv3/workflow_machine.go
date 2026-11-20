@@ -604,6 +604,7 @@ func (i *WorkflowInterpreter) driveMachine(
 				&state,
 				index,
 				nil,
+				true,
 			); err != nil {
 				return workflowFailure(
 					state,
@@ -787,6 +788,7 @@ func (i *WorkflowInterpreter) startMachineChild(
 	progress.ChildPath = childPath
 	progress.ChildMergesState = block.State == nil
 	progress.Phase = phase
+	progress.Microsteps = 0
 	return workflowStructuredTransition(
 		state,
 		[]ProgramFrameIntent{{
@@ -967,6 +969,7 @@ func (i *WorkflowInterpreter) armMachineWaits(
 	}
 
 	progress.Phase = WorkflowMachinePhaseWaiting
+	progress.Microsteps = 0
 	return workflowTransition(state, nil, nil, intents)
 }
 
@@ -1104,6 +1107,7 @@ func (i *WorkflowInterpreter) selectReadyMachineTransition(
 			state,
 			index,
 			wait.Value,
+			false,
 		); err != nil {
 			return false, err
 		}
@@ -1139,6 +1143,7 @@ func (i *WorkflowInterpreter) selectReadyMachineTransition(
 			state,
 			index,
 			nil,
+			false,
 		); err != nil {
 			return false, err
 		}
@@ -1234,6 +1239,7 @@ func selectMachineTransition(
 	state *WorkflowState,
 	index int,
 	event jsonutil.CanonicalValue,
+	immediate bool,
 ) error {
 	if state == nil || state.Pending == nil ||
 		state.Pending.Machine == nil {
@@ -1243,11 +1249,15 @@ func selectMachineTransition(
 	progress.SelectedTransition = index
 	progress.Event = event.Clone()
 	progress.Phase = WorkflowMachinePhaseExit
-	progress.Microsteps++
-	if progress.Microsteps > maximumWorkflowMachineMicrosteps {
-		return errors.New(
-			"workflow machine exceeded its immediate transition limit",
-		)
+	if immediate {
+		progress.Microsteps++
+		if progress.Microsteps > maximumWorkflowMachineMicrosteps {
+			return errors.New(
+				"workflow machine exceeded its immediate transition limit",
+			)
+		}
+	} else {
+		progress.Microsteps = 0
 	}
 
 	for _, wait := range progress.Waits {

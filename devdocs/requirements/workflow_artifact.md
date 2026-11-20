@@ -1621,7 +1621,10 @@ Cleanup work uses declared cleanup duration.
 
 The `cancel` operation declares cancellation intent and its typed child-work
 relationship. Artifact planning retains the declaration, expression templates,
-and canonical declaration path.
+and canonical declaration path. Runtime cancellation, target cancellation
+request, ordinary-wait settlement, child propagation, finalization, cleanup,
+uncertainty, reconciliation, compensation, and catch or finally execution are
+specified in `workflow_runtime.md`.
 
 Runtime cancellation, target cancellation request, ordinary-wait settlement,
 child propagation, finalization, cleanup allowance, uncertainty, reconciliation,

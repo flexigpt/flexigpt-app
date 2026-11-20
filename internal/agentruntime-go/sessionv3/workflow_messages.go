@@ -28,6 +28,7 @@ func captureWorkflowMessages(
 		return errors.New("workflow state is unavailable")
 	}
 
+	// Evaluation uses declaration names, never nested invocation storage names.
 	path := state.PendingDeclarationPath
 	if path == "" && state.Index < len(program.Root.Steps) {
 		path = program.Root.Steps[state.Index].DeclarationPath
@@ -38,6 +39,7 @@ func captureWorkflowMessages(
 
 	output := make(map[string][]WorkflowChannelMessageSnapshot)
 	for _, declaration := range program.Channels {
+		declaredName := workflowDeclaredChannelName(program, declaration.Name)
 		if !workflowChannelAllows(declaration.Readers, path) {
 			continue
 		}
@@ -60,7 +62,7 @@ func captureWorkflowMessages(
 					Time:        message.CreatedAt,
 				})
 			}
-			output[declaration.Name] = values
+			output[declaredName] = values
 			break
 		}
 	}
@@ -70,6 +72,18 @@ func captureWorkflowMessages(
 	}
 	state.Messages = value
 	return nil
+}
+
+func workflowDeclaredChannelName(
+	program WorkflowProgram,
+	physicalName string,
+) string {
+	for declared, physical := range program.Scope.ChannelAliases {
+		if physical == physicalName {
+			return declared
+		}
+	}
+	return physicalName
 }
 
 // workflowActivationContext reserves context.time for the Runtime logical
