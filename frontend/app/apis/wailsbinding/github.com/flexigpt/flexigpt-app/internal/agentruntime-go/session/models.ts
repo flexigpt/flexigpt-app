@@ -282,27 +282,6 @@ export interface HistorySelection {
     "includePreviousUserTurns"?: number;
 }
 
-/**
- * These are aliases, not Session-owned duplicate protocol types. Session owns
- * execution state around them; inference-go owns their provider-neutral wire
- * representation.
- */
-export type InferenceToolOutputItem = spec$0.ToolOutputItemUnion;
-
-/**
- * These are aliases, not Session-owned duplicate protocol types. Session owns
- * execution state around them; inference-go owns their provider-neutral wire
- * representation.
- */
-export type InferenceToolType = spec$0.ToolType;
-
-/**
- * These are aliases, not Session-owned duplicate protocol types. Session owns
- * execution state around them; inference-go owns their provider-neutral wire
- * representation.
- */
-export type InferenceUsage = spec$0.Usage;
-
 export interface InstructionOverride {
     "key": string;
     "mode": CollectionOverrideMode;
@@ -503,7 +482,7 @@ export interface ModelOperation {
      * operation. It is intentionally separate from Run.Usage, which tracks
      * runtime operation/attempt counts.
      */
-    "usage"?: InferenceUsage | null;
+    "usage"?: spec$0.Usage | null;
 
     /**
      * DebugDetails is the debugger-produced HTTP/provider trace for this one
@@ -938,7 +917,7 @@ export interface ToolCall {
     "choiceID"?: string;
     "displayName"?: string;
     "description"?: string;
-    "type"?: InferenceToolType;
+    "type"?: spec$0.ToolType;
     "arguments"?: json$0.RawMessage;
     "binding": ToolBinding;
     "required": boolean;
@@ -1000,10 +979,10 @@ export interface ToolResult {
     "providerCallID"?: string;
     "name": string;
     "choiceID"?: string;
-    "type"?: InferenceToolType;
+    "type"?: spec$0.ToolType;
     "kind": ToolResultKind;
     "text"?: string;
-    "contents"?: InferenceToolOutputItem[] | null;
+    "contents"?: spec$0.ToolOutputItemUnion[] | null;
     "structured"?: json$0.RawMessage;
     "app"?: json$0.RawMessage;
     "error"?: string;

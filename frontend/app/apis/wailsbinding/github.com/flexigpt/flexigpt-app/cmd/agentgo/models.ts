@@ -15,7 +15,13 @@ import * as auth$0 from "../../internal/agentruntime-go/mcp/auth/models.js";
 import * as server$0 from "../../internal/agentruntime-go/mcp/server/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
+import * as sessionv3$0 from "../../internal/agentruntime-go/sessionv3/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
 import * as model$0 from "../../internal/artifactory-go/store/artifact/model/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as jsonutil$0 from "../../internal/jsonutil/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
 import * as mcp$0 from "../../internal/llmartifactory-go/mcp/models.js";
@@ -76,4 +82,22 @@ export interface MCPServerRuntimeDetails {
 export interface MCPSettingsView {
     "settings": auth$0.MCPAuthSettings;
     "revision": number;
+}
+
+/**
+ * WorkflowStartCommand is the transport command accepted by composition.
+ * Runtime v3 receives only the prepared ProgramSnapshot.
+ */
+export interface WorkflowStartCommand {
+    "meta": sessionv3$0.CommandMeta;
+    "sessionID": sessionv3$0.SessionID;
+    "executionID"?: sessionv3$0.ExecutionID;
+    "workflow": sessionv3$0.ArtifactSelection;
+    "input": jsonutil$0.CanonicalValue;
+}
+
+export interface WorkflowTriggerRegistrationCommand {
+    "meta": sessionv3$0.CommandMeta;
+    "sessionID": sessionv3$0.SessionID;
+    "workflow": sessionv3$0.ArtifactSelection;
 }

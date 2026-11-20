@@ -21,8 +21,8 @@ export interface AcceptTriggerEventCommand {
     "source": string;
     "eventID": string;
     "name": string;
-    "data": CanonicalValue;
-    "correlation"?: CanonicalValue;
+    "data": jsonutil$0.CanonicalValue;
+    "correlation"?: jsonutil$0.CanonicalValue;
     "occurredAt": string;
 }
 
@@ -31,7 +31,7 @@ export interface ActionActivity {
     "summary"?: string;
     "actionKind"?: string;
     "outcome"?: string;
-    "output"?: CanonicalValue;
+    "output"?: jsonutil$0.CanonicalValue;
     "error"?: SanitizedError | null;
     "receipt"?: ExternalReceipt | null;
 }
@@ -54,8 +54,8 @@ export interface Activity {
 export interface ActivityDispatchPlan {
     "id": string;
     "bindingVersion": string;
-    "input": CanonicalValue;
-    "context"?: CanonicalValue;
+    "input": jsonutil$0.CanonicalValue;
+    "context"?: jsonutil$0.CanonicalValue;
     "ports"?: PortPlan[] | null;
     "portInputs"?: PortInput[] | null;
     "effect": EffectContract;
@@ -96,12 +96,13 @@ export enum ActivityVisibility {
 export interface ActivityWork {
     "activityID": string;
     "bindingVersion": string;
-    "input": CanonicalValue;
-    "context"?: CanonicalValue;
+    "input": jsonutil$0.CanonicalValue;
+    "context"?: jsonutil$0.CanonicalValue;
 }
 
 export interface AgentDispatchPlan {
     "artifact": ArtifactPin;
+    "includeModelSystemPrompt"?: boolean | null;
     "model"?: ModelDispatchTarget | null;
     "workspace"?: WorkspaceDispatchPlan | null;
     "instructions"?: InstructionDispatchPlan[] | null;
@@ -133,7 +134,7 @@ export interface AppContextUpdate {
     "serverID": string;
     "resourceURI"?: string;
     "content"?: AppContextContent[] | null;
-    "structuredContent"?: CanonicalValue;
+    "structuredContent"?: jsonutil$0.CanonicalValue;
     "updatedAt": string;
     "serverDisplayName"?: string;
     "appDisplayName"?: string;
@@ -174,7 +175,7 @@ export interface AppResourceReadRequest {
 }
 
 export interface AppResourceReadResult {
-    "content": CanonicalValue;
+    "content": jsonutil$0.CanonicalValue;
 }
 
 export type AppViewID = string;
@@ -327,12 +328,27 @@ export interface CancelExecutionCommand {
     "reason"?: string;
 }
 
-export type CanonicalValue = jsonutil$0.CanonicalValue;
-
 export interface ChannelDispatchPlan {
     "name": string;
     "cursor"?: number;
     "access": WorkflowPortAccess;
+}
+
+/**
+ * ChannelForward is a durable published-port bridge. SourceChannel belongs to
+ * the child Workflow invocation. TargetChannel belongs to its caller. Runtime
+ * copies only semantic channel records through this bridge.
+ */
+export interface ChannelForward {
+    "sourceChannel": string;
+    "targetExecutionID": ExecutionID;
+    "targetChannel": string;
+    "portName": string;
+    "stream"?: boolean;
+    "schema": jsonutil$0.CanonicalValue;
+    "channelSchema": jsonutil$0.CanonicalValue;
+    "maxMessages"?: number;
+    "maxBytes"?: number;
 }
 
 /**
@@ -355,11 +371,24 @@ export interface ChannelMessage {
     "sequence": number;
     "channel": string;
     "kind"?: string;
-    "data": CanonicalValue;
-    "correlation"?: CanonicalValue;
+    "data": jsonutil$0.CanonicalValue;
+    "correlation"?: jsonutil$0.CanonicalValue;
     "deduplicationKey"?: string;
     "createdAt": string;
     "consumedBy"?: WaitID[] | null;
+}
+
+/**
+ * ChildCallWork is the durable outer Workflow call boundary for a child
+ * ProgramFrame. It records orchestration facts only. Native Model, Agent,
+ * Tool, MCP, and Workflow execution remains inside the child frame and its
+ * owning setup-domain binder.
+ */
+export interface ChildCallWork {
+    "target": string;
+    "input": jsonutil$0.CanonicalValue;
+    "context"?: jsonutil$0.CanonicalValue;
+    "completion": CompletionHandle;
 }
 
 /**
@@ -459,7 +488,7 @@ export enum CompensationState {
 export interface CompensationWork {
     "originalWorkItemID": WorkItemID;
     "effectID": EffectRecordID;
-    "input"?: CanonicalValue;
+    "input"?: jsonutil$0.CanonicalValue;
 }
 
 export interface CompleteToolCallAsErrorCommand {
@@ -481,12 +510,12 @@ export interface CompletionHandle {
 }
 
 export interface ConditionWork {
-    "input": CanonicalValue;
+    "input": jsonutil$0.CanonicalValue;
 }
 
 export interface ContextDispatchPlan {
     "name": string;
-    "value": CanonicalValue;
+    "value": jsonutil$0.CanonicalValue;
 }
 
 export interface ContinuationInput {
@@ -495,7 +524,7 @@ export interface ContinuationInput {
     "text"?: string;
     "attachments"?: Attachment[] | null;
     "appContext"?: AppContextUpdate[] | null;
-    "metadata"?: CanonicalValue;
+    "metadata"?: jsonutil$0.CanonicalValue;
     "invocationDefaults"?: SessionDefaults | null;
     "invocationBudget"?: ExecutionBudget | null;
     "updatedAt"?: string;
@@ -557,13 +586,13 @@ export interface CreateSessionCommand {
     "sessionID"?: SessionID;
     "title"?: string;
     "defaults": SessionDefaults;
-    "metadata"?: CanonicalValue;
+    "metadata"?: jsonutil$0.CanonicalValue;
 }
 
 export interface DebuggerProjection {
     "executionID": ExecutionID;
     "workItemID": WorkItemID;
-    "details"?: CanonicalValue;
+    "details"?: jsonutil$0.CanonicalValue;
 }
 
 export interface DeleteSessionCommand {
@@ -659,12 +688,12 @@ export interface EmitReceipt {
 export interface EmitWork {
     "destination": EmitDestination;
     "kind"?: string;
-    "data": CanonicalValue;
-    "correlation"?: CanonicalValue;
+    "data": jsonutil$0.CanonicalValue;
+    "correlation"?: jsonutil$0.CanonicalValue;
     "deduplicationKey"?: string;
     "eventSource"?: string;
-    "dataSchema"?: CanonicalValue;
-    "correlationSchema"?: CanonicalValue;
+    "dataSchema"?: jsonutil$0.CanonicalValue;
+    "correlationSchema"?: jsonutil$0.CanonicalValue;
     "maxMessages"?: number;
     "maxBytes"?: number;
 }
@@ -697,7 +726,7 @@ export interface ExecuteAppToolCommand {
     "appInstanceID": AppInstanceID;
     "viewID": AppViewID;
     "toolName": string;
-    "arguments"?: CanonicalValue;
+    "arguments"?: jsonutil$0.CanonicalValue;
 }
 
 export interface ExecuteToolCallsCommand {
@@ -745,6 +774,7 @@ export interface Execution {
     "waits": Wait[] | null;
     "signals"?: ExecutionSignal[] | null;
     "channels"?: ChannelLog[] | null;
+    "channelForwards"?: ChannelForward[] | null;
     "resources"?: WorkflowResourceDefinition[] | null;
     "resourceLeases"?: ResourceLease[] | null;
     "resourceRates"?: ResourceRateWindow[] | null;
@@ -842,8 +872,8 @@ export interface ExecutionSignal {
     "id": string;
     "name": string;
     "source"?: string;
-    "data": CanonicalValue;
-    "correlation"?: CanonicalValue;
+    "data": jsonutil$0.CanonicalValue;
+    "correlation"?: jsonutil$0.CanonicalValue;
     "createdAt": string;
     "consumedBy"?: WaitID[] | null;
     "consumedSubscriptions"?: string[] | null;
@@ -893,6 +923,21 @@ export interface ForkWork {
     "childFrames": ProgramFrameID[] | null;
 }
 
+/**
+ * FramePortDeliveryMode controls final-output port delivery by one child
+ * frame. Forward-only frames retain port ownership for descendants but do not
+ * duplicate a descendant's final-output delivery.
+ */
+export enum FramePortDeliveryMode {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    FramePortDeliveryModeDeliver = "deliver",
+    FramePortDeliveryModeForwardOnly = "forwardOnly",
+};
+
 export interface GoToolBinding {
     "target": ArtifactPin;
     "logicalName"?: string;
@@ -909,11 +954,6 @@ export interface HumanActor {
     "id": string;
     "roles"?: string[] | null;
 }
-
-/**
- * InferenceUsage is the provider-neutral usage record for one LLM WorkItem.
- */
-export type InferenceUsage = spec$0.Usage;
 
 export interface Instruction {
     "id": string;
@@ -962,9 +1002,9 @@ export interface LLMOutput {
     "text"?: string;
     "thinking"?: string;
     "toolCalls"?: ToolCall[] | null;
-    "usage"?: InferenceUsage | null;
-    "protocolOutputs"?: CanonicalValue[] | null;
-    "debugDetails"?: CanonicalValue;
+    "usage"?: spec$0.Usage | null;
+    "protocolOutputs"?: jsonutil$0.CanonicalValue[] | null;
+    "debugDetails"?: jsonutil$0.CanonicalValue;
 }
 
 /**
@@ -975,6 +1015,17 @@ export interface LLMStreamState {
     "text"?: string;
     "thinking"?: string;
     "updatedAt": string;
+}
+
+/**
+ * LLMToolOrigin preserves immutable invocation facts for Tool WorkItems that
+ * result from an LLM output. Tool binders must use this value rather than
+ * current Session defaults.
+ */
+export interface LLMToolOrigin {
+    "originWorkItemID": WorkItemID;
+    "targetFingerprint": string;
+    "plan"?: ModelDispatchPlan | null;
 }
 
 export interface LLMWork {
@@ -1001,6 +1052,7 @@ export interface LLMWork {
      */
     "isolatedInput"?: boolean;
     "historyActivityIDs"?: ActivityID[] | null;
+    "providerTools"?: ProviderManagedToolChoice[] | null;
 }
 
 export interface MCPDispatchPlan {
@@ -1100,14 +1152,11 @@ export interface MCPToolSelection {
 }
 
 /**
- * MCPToolTarget is the semantic Workflow target for an MCP Tool. MCP Runtime
- * discovers the current provider Tool and creates the executable MCP binding
- * immediately before dispatch.
+ * MCPToolTarget retains the prepared MCP Tool identity produced by Workflow
+ * setup. It is an alias so local Tool binding receives the same immutable
+ * server, discovery, policy, and provider Tool facts as Workflow planning.
  */
-export interface MCPToolTarget {
-    "server": ArtifactPin;
-    "toolName": string;
-}
+export type MCPToolTarget = WorkflowMCP;
 
 export interface MessageActivity {
     "role": MessageRole;
@@ -1116,7 +1165,7 @@ export interface MessageActivity {
     "attachments"?: Attachment[] | null;
     "toolResults"?: ToolResultActivity[] | null;
     "appContext"?: AppContextUpdate[] | null;
-    "metadata"?: CanonicalValue;
+    "metadata"?: jsonutil$0.CanonicalValue;
     "error"?: SanitizedError | null;
     "invocationDefaults"?: SessionDefaults | null;
     "invocationBudget"?: ExecutionBudget | null;
@@ -1133,7 +1182,7 @@ export interface MessageInput {
     "text"?: string;
     "attachments"?: Attachment[] | null;
     "attachmentSources"?: AttachmentSource[] | null;
-    "metadata"?: CanonicalValue;
+    "metadata"?: jsonutil$0.CanonicalValue;
     "defaults"?: SessionDefaultsOverride | null;
     "invocationBudget"?: ExecutionBudget | null;
 }
@@ -1196,7 +1245,7 @@ export interface ModelDefaultsOverride {
     "cacheControl"?: ModelCacheControlOverride | null;
     "output"?: ModelOutputOverride | null;
     "stopSequences"?: string[] | null;
-    "adapterParameters"?: { [_ in string]?: CanonicalValue } | null;
+    "adapterParameters"?: { [_ in string]?: jsonutil$0.CanonicalValue } | null;
     "clear"?: ModelDefaultField[] | null;
 }
 
@@ -1204,6 +1253,7 @@ export interface ModelDispatchPlan {
     "agent"?: AgentDispatchPlan | null;
     "workspace"?: WorkspaceDispatchPlan | null;
     "model": ModelDispatchTarget;
+    "providerTools"?: ProviderManagedToolChoice[] | null;
     "modelOverrides"?: ModelDefaultsOverride | null;
     "instructions"?: InstructionDispatchPlan[] | null;
     "texts"?: TextDispatchPlan[] | null;
@@ -1216,6 +1266,7 @@ export interface ModelDispatchPlan {
     "channels"?: ChannelDispatchPlan[] | null;
     "ports"?: PortPlan[] | null;
     "portInputs"?: PortInput[] | null;
+    "history": HistorySelection;
 }
 
 export interface ModelDispatchTarget {
@@ -1242,7 +1293,7 @@ export interface ModelOutputFormatOverride {
 export interface ModelOutputJSONSchemaOverride {
     "name"?: string | null;
     "description"?: string | null;
-    "schema"?: CanonicalValue;
+    "schema"?: jsonutil$0.CanonicalValue;
     "strict"?: boolean | null;
 }
 
@@ -1278,7 +1329,7 @@ export interface PortInput {
     "name": string;
     "channel": string;
     "cursor"?: number;
-    "values"?: CanonicalValue[] | null;
+    "values"?: jsonutil$0.CanonicalValue[] | null;
     "streamed"?: boolean;
 }
 
@@ -1286,14 +1337,15 @@ export interface PortPlan {
     "name": string;
     "direction": WorkflowPortDirection;
     "stream"?: boolean;
-    "schema": CanonicalValue;
-    "channelSchema": CanonicalValue;
+    "schema": jsonutil$0.CanonicalValue;
+    "channelSchema": jsonutil$0.CanonicalValue;
     "channel": string;
     "access": WorkflowPortAccess;
     "maxMessages"?: number;
     "maxBytes"?: number;
     "ownerFrameID"?: ProgramFrameID;
     "parentFrameID"?: ProgramFrameID;
+    "declarationPath"?: string;
 }
 
 export interface PortStream {
@@ -1310,6 +1362,7 @@ export interface ProgramFrame {
     "state": ProgramState;
     "status": ProgramFrameState;
     "path"?: string;
+    "declarationPath"?: string;
     "createdAt": string;
     "updatedAt": string;
     "deadline"?: string | null;
@@ -1319,7 +1372,8 @@ export interface ProgramFrame {
     "workItemIDs"?: WorkItemID[] | null;
     "ports"?: PortPlan[] | null;
     "portInputs"?: PortInput[] | null;
-    "output"?: CanonicalValue;
+    "portDelivery"?: FramePortDeliveryMode;
+    "output"?: jsonutil$0.CanonicalValue;
     "receipt"?: ExternalReceipt | null;
     "error"?: SanitizedError | null;
     "handoffID"?: string;
@@ -1333,14 +1387,28 @@ export interface ProgramFrameIntent {
     "id"?: ProgramFrameID;
     "executionID"?: ExecutionID;
     "path"?: string;
+    "declarationPath"?: string;
     "program": ProgramSnapshot;
     "deadline"?: string | null;
     "budget"?: ExecutionBudget | null;
     "lifetime"?: ChildFrameLifetime;
     "ownership"?: ChildExecutionOwnership | null;
+    "claims"?: ResourceClaim[] | null;
     "ports"?: PortPlan[] | null;
+    "portDelivery"?: FramePortDeliveryMode;
+    "portBoundary"?: ProgramFramePortBoundary;
     "handoff"?: ConversationHandoffIntent | null;
 }
+
+export enum ProgramFramePortBoundary {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    ProgramFramePortBoundaryNone = "",
+    ProgramFramePortBoundaryPublishedWorkflow = "publishedWorkflow",
+};
 
 export enum ProgramFrameState {
     /**
@@ -1365,19 +1433,32 @@ export interface ProgramSnapshot {
     "interpreterVersion": number;
     "artifact"?: ArtifactPin | null;
     "definitionDigest"?: string;
-    "payload"?: CanonicalValue;
+    "payload"?: jsonutil$0.CanonicalValue;
 }
 
 export interface ProgramState {
     "type": string;
     "version": number;
-    "data"?: CanonicalValue;
+    "data"?: jsonutil$0.CanonicalValue;
 }
 
 export interface ProtocolOutputProjection {
     "executionID": ExecutionID;
     "workItemID": WorkItemID;
-    "outputs"?: CanonicalValue[] | null;
+    "outputs"?: jsonutil$0.CanonicalValue[] | null;
+}
+
+/**
+ * ProviderManagedToolChoice is one SDK Tool choice owned by a typed Model
+ * request plan. It cannot be lowered to a local Tool WorkItem.
+ */
+export interface ProviderManagedToolChoice {
+    "artifact": ArtifactPin;
+    "type": string;
+    "inputSchema": jsonutil$0.CanonicalValue;
+    "userArgumentSchema"?: jsonutil$0.CanonicalValue;
+    "configuration"?: jsonutil$0.CanonicalValue;
+    "call": ToolCall;
 }
 
 export interface ProviderToolBinding {
@@ -1395,12 +1476,6 @@ export interface ReconciliationWork {
     "operation": WorkflowOperationFacts;
 }
 
-export interface RegisterWorkflowTriggersCommand {
-    "meta": CommandMeta;
-    "sessionID": SessionID;
-    "workflow": ArtifactSelection;
-}
-
 export interface RenameSessionCommand {
     "meta": CommandMeta;
     "sessionID": SessionID;
@@ -1413,7 +1488,7 @@ export interface ResolveWaitCommand {
     "executionID": ExecutionID;
     "waitID": WaitID;
     "resolution": WaitResolution;
-    "response"?: CanonicalValue;
+    "response"?: jsonutil$0.CanonicalValue;
     "actor"?: HumanActor | null;
 }
 
@@ -1495,7 +1570,7 @@ export interface RetryMatcher {
     "codes"?: string[] | null;
     "retryable"?: boolean | null;
     "effectStates"?: EffectState[] | null;
-    "schema"?: CanonicalValue;
+    "schema"?: jsonutil$0.CanonicalValue;
 }
 
 /**
@@ -1556,7 +1631,7 @@ export interface SanitizedError {
     "retryable"?: boolean;
     "stepPath"?: string;
     "effectState"?: EffectState;
-    "details"?: CanonicalValue;
+    "details"?: jsonutil$0.CanonicalValue;
     "causes"?: SanitizedError[] | null;
 }
 
@@ -1573,8 +1648,8 @@ export interface SemanticBinding {
 export interface ServiceDispatchPlan {
     "id": string;
     "bindingVersion": string;
-    "input": CanonicalValue;
-    "context"?: CanonicalValue;
+    "input": jsonutil$0.CanonicalValue;
+    "context"?: jsonutil$0.CanonicalValue;
     "ports"?: PortPlan[] | null;
     "portInputs"?: PortInput[] | null;
     "effect": EffectContract;
@@ -1583,8 +1658,8 @@ export interface ServiceDispatchPlan {
 export interface ServiceWork {
     "serviceID": string;
     "bindingVersion": string;
-    "input": CanonicalValue;
-    "context"?: CanonicalValue;
+    "input": jsonutil$0.CanonicalValue;
+    "context"?: jsonutil$0.CanonicalValue;
 }
 
 export interface Session {
@@ -1594,7 +1669,7 @@ export interface Session {
     "createdAt": string;
     "updatedAt": string;
     "defaults": SessionDefaults;
-    "metadata"?: CanonicalValue;
+    "metadata"?: jsonutil$0.CanonicalValue;
     "timeline": Activity[] | null;
     "executions": Execution[] | null;
     "conversationOwnership"?: ConversationOwnershipState[] | null;
@@ -1619,7 +1694,7 @@ export enum SessionDefaultField {
     SessionDefaultFieldTemperature = "temperature",
     SessionDefaultFieldMetadata = "metadata",
     SessionDefaultFieldHistory = "history",
-    SessionDefaultFieldTools = "tools",
+    SessionDefaultFieldToolSelections = "toolSelections",
     SessionDefaultFieldSkills = "skills",
     SessionDefaultFieldActiveSkills = "activeSkills",
     SessionDefaultFieldMCP = "mcp",
@@ -1634,9 +1709,9 @@ export interface SessionDefaults {
     "systemInstructions"?: Instruction[] | null;
     "instructionArtifacts"?: ArtifactSelection[] | null;
     "temperature"?: number | null;
-    "metadata"?: CanonicalValue;
+    "metadata"?: jsonutil$0.CanonicalValue;
     "history": HistorySelection;
-    "tools"?: ArtifactSelection[] | null;
+    "toolSelections"?: ToolSelection[] | null;
     "skills"?: ArtifactSelection[] | null;
     "activeSkills"?: ArtifactSelection[] | null;
     "mcp"?: MCPServerSelection[] | null;
@@ -1659,9 +1734,9 @@ export interface SessionDefaultsOverride {
     "systemInstructions"?: Instruction[] | null;
     "instructionArtifacts"?: ArtifactSelection[] | null;
     "temperature"?: number | null;
-    "metadata"?: CanonicalValue | null;
+    "metadata"?: jsonutil$0.CanonicalValue | null;
     "history"?: HistorySelection | null;
-    "tools"?: ArtifactSelection[] | null;
+    "toolSelections"?: ToolSelection[] | null;
     "skills"?: ArtifactSelection[] | null;
     "activeSkills"?: ArtifactSelection[] | null;
     "mcp"?: MCPServerSelection[] | null;
@@ -1728,13 +1803,23 @@ export interface SignalExecutionCommand {
     "signalID"?: string;
     "source"?: string;
     "name": string;
-    "correlation"?: CanonicalValue;
-    "data": CanonicalValue;
+    "correlation"?: jsonutil$0.CanonicalValue;
+    "data": jsonutil$0.CanonicalValue;
 }
 
 export interface SkillDispatchPlan {
     "artifact": ArtifactPin;
     "active"?: boolean;
+}
+
+/**
+ * SkillSelectionState is the durable semantic selection used to recreate a
+ * private Skill Runtime session. It has no runtime session ID, registry,
+ * client, callback, or native handle.
+ */
+export interface SkillSelectionState {
+    "enabled"?: ArtifactPin[] | null;
+    "active"?: ArtifactPin[] | null;
 }
 
 export interface SkillToolBinding {
@@ -1757,17 +1842,9 @@ export interface StageAppContextCommand {
     "update": AppContextUpdate;
 }
 
-export interface StartWorkflowCommand {
-    "meta": CommandMeta;
-    "sessionID": SessionID;
-    "executionID"?: ExecutionID;
-    "workflow": ArtifactSelection;
-    "input": CanonicalValue;
-}
-
 export interface StateAssignment {
     "path": string;
-    "value": CanonicalValue;
+    "value": jsonutil$0.CanonicalValue;
 }
 
 export interface StateUpdateWork {
@@ -1782,13 +1859,13 @@ export interface StateUpdateWork {
      * Base is the immutable state snapshot observed when the Workflow step was
      * prepared. All assignments apply atomically to this value.
      */
-    "base": CanonicalValue;
+    "base": jsonutil$0.CanonicalValue;
 
     /**
      * Schema is the state-owning block boundary. It is generic JSON Schema
      * data, not a compiled schema.
      */
-    "schema"?: CanonicalValue;
+    "schema"?: jsonutil$0.CanonicalValue;
     "assignments"?: StateAssignment[] | null;
     "removePaths"?: string[] | null;
 }
@@ -1878,11 +1955,12 @@ export interface ToolCall {
     "providerCallID"?: string;
     "name": string;
     "choiceID"?: string;
+    "type"?: spec$0.ToolType;
     "displayName"?: string;
     "description"?: string;
     "source"?: ToolCallSource;
     "appInstanceID"?: AppInstanceID;
-    "arguments"?: CanonicalValue;
+    "arguments"?: jsonutil$0.CanonicalValue;
     "binding": ToolBinding;
     "automatic": boolean;
 }
@@ -1911,13 +1989,17 @@ export enum ToolCallSource {
 export interface ToolDispatchPlan {
     "call": ToolCall;
     "providerManaged"?: boolean;
+    "providerConfiguration"?: jsonutil$0.CanonicalValue;
+    "choice"?: jsonutil$0.CanonicalValue;
 }
 
 export interface ToolOutput {
     "kind": ToolOutputKind;
     "text"?: string;
-    "structured"?: CanonicalValue;
+    "contents"?: spec$0.ToolOutputItemUnion[] | null;
+    "structured"?: jsonutil$0.CanonicalValue;
     "error"?: string;
+    "skillState"?: SkillSelectionState | null;
 }
 
 export enum ToolOutputKind {
@@ -1942,21 +2024,35 @@ export interface ToolResultActivity {
     "providerCallID"?: string;
     "choiceID"?: string;
     "name": string;
+    "type"?: spec$0.ToolType;
     "kind": ToolOutputKind;
     "text"?: string;
-    "structured"?: CanonicalValue;
+    "contents"?: spec$0.ToolOutputItemUnion[] | null;
+    "structured"?: jsonutil$0.CanonicalValue;
     "error"?: string;
+}
+
+/**
+ * ToolSelection is the only Session V3 Tool-selection representation.
+ * ArtifactSelection remains generic and must not acquire Tool-specific
+ * configuration or automatic-execution fields.
+ */
+export interface ToolSelection {
+    "artifact": ArtifactSelection;
+    "userArguments"?: jsonutil$0.CanonicalValue;
+    "autoExecute"?: boolean | null;
 }
 
 export interface ToolWork {
     "call": ToolCall;
     "target"?: ArtifactPin | null;
     "mcp"?: MCPToolTarget | null;
+    "origin"?: LLMToolOrigin | null;
 }
 
 export interface TransformWork {
-    "input": CanonicalValue;
-    "outputSchema"?: CanonicalValue;
+    "input": jsonutil$0.CanonicalValue;
+    "outputSchema"?: jsonutil$0.CanonicalValue;
 }
 
 /**
@@ -1979,9 +2075,9 @@ export interface TriggerOccurrence {
     "sourceID": string;
     "occurredAt": string;
     "acceptedAt": string;
-    "data"?: CanonicalValue;
-    "correlation"?: CanonicalValue;
-    "input": CanonicalValue;
+    "data"?: jsonutil$0.CanonicalValue;
+    "correlation"?: jsonutil$0.CanonicalValue;
+    "input": jsonutil$0.CanonicalValue;
     "instanceKey"?: string;
     "state": TriggerOccurrenceState;
     "executionID"?: ExecutionID;
@@ -2016,6 +2112,8 @@ export interface TriggerRegistration {
     "nextOccurrence"?: string | null;
     "lastOccurrence"?: string | null;
     "lastLocalOccurrence"?: string;
+    "nextLocalOccurrence"?: string;
+    "localOccurrenceSlots"?: string[] | null;
     "occurrences"?: TriggerOccurrence[] | null;
     "queue"?: TriggerOccurrenceID[] | null;
     "createdAt": string;
@@ -2072,7 +2170,7 @@ export interface Wait {
     "status": WaitStatus;
     "request": WaitRequest;
     "resolution"?: WaitResolution;
-    "response"?: CanonicalValue;
+    "response"?: jsonutil$0.CanonicalValue;
     "createdAt": string;
     "updatedAt": string;
     "resolvedBy"?: HumanActor | null;
@@ -2117,14 +2215,14 @@ export interface WaitProjection {
 
 export interface WaitRequest {
     "kind": WaitKind;
-    "summary"?: CanonicalValue;
-    "inputSchema"?: CanonicalValue;
+    "summary"?: jsonutil$0.CanonicalValue;
+    "inputSchema"?: jsonutil$0.CanonicalValue;
     "allowedResolutions": WaitResolution[] | null;
     "deadline"?: string | null;
     "runtimeBound": boolean;
-    "correlation"?: CanonicalValue;
-    "correlationSchema"?: CanonicalValue;
-    "dataSchema"?: CanonicalValue;
+    "correlation"?: jsonutil$0.CanonicalValue;
+    "correlationSchema"?: jsonutil$0.CanonicalValue;
+    "dataSchema"?: jsonutil$0.CanonicalValue;
     "eventSource"?: string;
     "filter"?: WorkflowWaitFilter | null;
     "subscription"?: string;
@@ -2136,7 +2234,7 @@ export interface WaitRequest {
     "completion"?: CompletionHandle | null;
     "timer"?: TimerWait | null;
     "assignees"?: WaitAssignees | null;
-    "request"?: CanonicalValue;
+    "request"?: jsonutil$0.CanonicalValue;
 }
 
 export enum WaitResolution {
@@ -2181,6 +2279,7 @@ export interface WorkItem {
     "originWorkItemID"?: WorkItemID;
     "state": WorkItemState;
     "programPath"?: string;
+    "declarationPath"?: string;
     "dependencies"?: WorkItemID[] | null;
     "attemptIDs"?: AttemptID[] | null;
     "deadline"?: string | null;
@@ -2196,9 +2295,11 @@ export interface WorkItem {
     "compensationPolicy"?: CompensationErrorPolicy;
     "requested": boolean;
     "retainClaimsForFrame"?: boolean;
+    "retainClaimsForFrameID"?: ProgramFrameID;
     "stepExecutionReserved"?: boolean;
     "claims"?: ResourceClaim[] | null;
     "resourceWait"?: ResourceWaitState | null;
+    "budgetConcurrencyWait"?: boolean;
     "ports"?: PortPlan[] | null;
     "portInputs"?: PortInput[] | null;
     "portStreams"?: PortStream[] | null;
@@ -2219,7 +2320,7 @@ export type WorkItemID = string;
 export interface WorkItemOutput {
     "llm"?: LLMOutput | null;
     "tool"?: ToolOutput | null;
-    "value"?: CanonicalValue;
+    "value"?: jsonutil$0.CanonicalValue;
     "emit"?: EmitReceipt | null;
     "app"?: AppOutput | null;
     "appInstanceID"?: AppInstanceID;
@@ -2236,6 +2337,7 @@ export interface WorkItemPayload {
     "tool"?: ToolWork | null;
     "service"?: ServiceWork | null;
     "activity"?: ActivityWork | null;
+    "childCall"?: ChildCallWork | null;
     "transform"?: TransformWork | null;
     "condition"?: ConditionWork | null;
     "stateUpdate"?: StateUpdateWork | null;
@@ -2278,6 +2380,7 @@ export enum WorkItemType {
     WorkItemTypeTool = "tool",
     WorkItemTypeService = "service",
     WorkItemTypeActivity = "activity",
+    WorkItemTypeChildCall = "childCall",
     WorkItemTypeTransform = "transform",
     WorkItemTypeCondition = "condition",
     WorkItemTypeStateUpdate = "stateUpdate",
@@ -2294,11 +2397,12 @@ export interface WorkflowActivity {
     "phase": string;
     "summary"?: string;
     "path"?: string;
-    "output"?: CanonicalValue;
+    "output"?: jsonutil$0.CanonicalValue;
     "error"?: SanitizedError | null;
 }
 
 export interface WorkflowBlock {
+    "declarationPath": string;
     "state"?: WorkflowStateSpec | null;
     "listen"?: WorkflowSubscription[] | null;
     "steps": WorkflowStep[] | null;
@@ -2319,6 +2423,7 @@ export interface WorkflowCall {
     "allowedTargetSet"?: string;
     "input": WorkflowValue;
     "context": WorkflowValue;
+    "declarationPath": string;
     "ports"?: WorkflowPortBinding[] | null;
     "contract"?: WorkflowCallableInterface | null;
     "setContract"?: WorkflowCallableInterface | null;
@@ -2328,6 +2433,7 @@ export interface WorkflowCall {
     "ownership"?: WorkflowChildOwnership | null;
     "onCompletion"?: string;
     "internalLifecycleChild"?: boolean;
+    "llmInvocation"?: WorkflowLLMInvocation | null;
 }
 
 export enum WorkflowCallMode {
@@ -2343,30 +2449,25 @@ export enum WorkflowCallMode {
 
 export interface WorkflowCallableInterface {
     "modes"?: WorkflowCallMode[] | null;
-    "inputSchema": CanonicalValue;
-    "outputSchema": CanonicalValue;
-    "errorSchema"?: CanonicalValue;
-    "receiptSchema"?: CanonicalValue;
+    "inputSchema": jsonutil$0.CanonicalValue;
+    "outputSchema": jsonutil$0.CanonicalValue;
+    "errorSchema"?: jsonutil$0.CanonicalValue;
+    "receiptSchema"?: jsonutil$0.CanonicalValue;
     "context"?: WorkflowContextRequirement[] | null;
     "ports"?: WorkflowCallablePort[] | null;
     "limits"?: ExecutionBudget | null;
-    "capabilities"?: WorkflowCapabilityRequirement[] | null;
 }
 
 export interface WorkflowCallablePort {
     "name": string;
     "direction": WorkflowPortDirection;
-    "schema": CanonicalValue;
+    "schema": jsonutil$0.CanonicalValue;
     "stream"?: boolean;
 }
 
 export interface WorkflowCancel {
     "handle": WorkflowValue;
     "reason"?: WorkflowValue | null;
-}
-
-export interface WorkflowCapabilityRequirement {
-    "name": string;
 }
 
 export interface WorkflowCase {
@@ -2410,8 +2511,8 @@ export interface WorkflowChoose {
 export interface WorkflowCompletedOperationFacts {
     "originalWorkItemID": WorkItemID;
     "effectID": EffectRecordID;
-    "input": CanonicalValue;
-    "output": CanonicalValue;
+    "input": jsonutil$0.CanonicalValue;
+    "output": jsonutil$0.CanonicalValue;
     "receipt"?: ExternalReceipt | null;
     "idempotencyKey"?: string;
 }
@@ -2427,7 +2528,7 @@ export interface WorkflowCompletionWait {
 
 export interface WorkflowContextRequirement {
     "name": string;
-    "schema": CanonicalValue;
+    "schema": jsonutil$0.CanonicalValue;
 }
 
 /**
@@ -2459,7 +2560,7 @@ export interface WorkflowErrorMatch {
     "codes"?: string[] | null;
     "retryable"?: boolean | null;
     "effectStates"?: EffectState[] | null;
-    "schema"?: CanonicalValue;
+    "schema"?: jsonutil$0.CanonicalValue;
 }
 
 export interface WorkflowEventWait {
@@ -2478,7 +2579,7 @@ export interface WorkflowFail {
 
 export interface WorkflowForeach {
     "items": WorkflowValue;
-    "itemSchema": CanonicalValue;
+    "itemSchema": jsonutil$0.CanonicalValue;
     "concurrency"?: number;
     "maxItems"?: number;
     "completion": WorkflowCompletion;
@@ -2492,7 +2593,42 @@ export interface WorkflowHumanWait {
     "users"?: WorkflowValue | null;
     "roles"?: WorkflowValue | null;
     "request": WorkflowValue;
-    "responseSchema": CanonicalValue;
+    "responseSchema": jsonutil$0.CanonicalValue;
+}
+
+export interface WorkflowLLMInstruction {
+    "id"?: string;
+    "label"?: string;
+    "content": WorkflowValue;
+}
+
+/**
+ * WorkflowLLMInvocation is the setup-lowered typed Model or Agent invocation
+ * form. Workflow setup converts source data to this value before Runtime
+ * receives a ProgramSnapshot. Runtime evaluates only typed templates and does
+ * not decode a generic Workflow JSON request envelope.
+ */
+export interface WorkflowLLMInvocation {
+    "messages": WorkflowLLMMessage[] | null;
+    "instructions"?: WorkflowLLMInstruction[] | null;
+    "defaults"?: SessionDefaultsOverride | null;
+}
+
+export interface WorkflowLLMMessage {
+    "role": MessageRole;
+    "text"?: WorkflowValue | null;
+    "attachments"?: Attachment[] | null;
+}
+
+export interface WorkflowMCP {
+    "server": ArtifactPin;
+    "toolName": string;
+    "providerToolName": string;
+    "choiceID": string;
+    "toolDigest": string;
+    "approvalRule": string;
+    "executionMode": string;
+    "discoveryDigest": string;
 }
 
 export interface WorkflowMachine {
@@ -2526,7 +2662,7 @@ export interface WorkflowMachineTransition {
 export interface WorkflowOperationFacts {
     "workItemID": WorkItemID;
     "attemptID"?: AttemptID;
-    "input": CanonicalValue;
+    "input": jsonutil$0.CanonicalValue;
     "target": WorkflowOperationTargetFacts;
     "idempotencyKey"?: string;
     "receipt"?: ExternalReceipt | null;
@@ -2674,23 +2810,65 @@ export enum WorkflowSagaOutcome {
     WorkflowSagaOutcomeCancelled = "cancelled",
 };
 
+export interface WorkflowSagaScope {
+    "id": string;
+    "compensationPolicy": CompensationErrorPolicy;
+}
+
+/**
+ * WorkflowScopeContext is the durable parent visibility envelope for an
+ * interpreter-created child block frame. It contains semantic values only.
+ */
+export interface WorkflowScopeContext {
+    "child"?: boolean;
+    "mergeState"?: boolean;
+    "outerState"?: jsonutil$0.CanonicalValue;
+    "stateOwner"?: WorkflowStateOwner | null;
+    "targetSets"?: WorkflowTargetSetState[] | null;
+    "outerOutcomes"?: WorkflowStepOutcome[] | null;
+    "outerSubscriptions"?: WorkflowSubscriptionState[] | null;
+    "context"?: jsonutil$0.CanonicalValue | null;
+    "item"?: jsonutil$0.CanonicalValue | null;
+    "index"?: number | null;
+    "result"?: jsonutil$0.CanonicalValue | null;
+    "event"?: jsonutil$0.CanonicalValue | null;
+    "error"?: jsonutil$0.CanonicalValue | null;
+    "outcome"?: jsonutil$0.CanonicalValue | null;
+    "operation"?: jsonutil$0.CanonicalValue | null;
+    "completed"?: jsonutil$0.CanonicalValue | null;
+    "ports"?: PortInput[] | null;
+    "saga"?: WorkflowSagaScope | null;
+    "cleanup"?: boolean;
+}
+
 export interface WorkflowSet {
     "values"?: WorkflowValuePair[] | null;
     "remove"?: string[] | null;
 }
 
+/**
+ * WorkflowStateOwner identifies the nearest durable state-owning boundary.
+ * It is propagated into child Workflow programs so inherited set operations
+ * retain the schema and owner identity that were active at frame creation.
+ */
+export interface WorkflowStateOwner {
+    "id": string;
+    "schema": jsonutil$0.CanonicalValue;
+}
+
 export interface WorkflowStateSpec {
-    "schema": CanonicalValue;
+    "schema": jsonutil$0.CanonicalValue;
     "initial": WorkflowValue;
 }
 
 export interface WorkflowStep {
     "id": string;
+    "declarationPath": string;
     "timeout"?: WorkflowDuration;
     "when"?: WorkflowValue | null;
     "retry"?: RetryPolicy | null;
     "effect"?: WorkflowStepEffect | null;
-    "outputSchema"?: CanonicalValue;
+    "outputSchema"?: jsonutil$0.CanonicalValue;
     "claims"?: WorkflowResourceClaim[] | null;
     "limits"?: ExecutionBudget | null;
     "call"?: WorkflowCall | null;
@@ -2728,11 +2906,12 @@ export interface WorkflowStepEffect {
 export interface WorkflowStepOutcome {
     "id": string;
     "status": WorkflowStepOutcomeStatus;
-    "output"?: CanonicalValue;
+    "output"?: jsonutil$0.CanonicalValue;
     "target"?: string;
     "receipt"?: ExternalReceipt | null;
     "error"?: SanitizedError | null;
     "effectState"?: EffectState;
+    "declarationPath"?: string;
 }
 
 export interface WorkflowStepOutcomeProjection {
@@ -2764,9 +2943,43 @@ export interface WorkflowSubscription {
     "maxBytes"?: number;
 }
 
+/**
+ * WorkflowSubscriptionEvent is one subscription-local acceptance fact. Event
+ * data remains canonical in Execution.Signals, while this record preserves
+ * durable retention, capacity, and subscription-identity semantics.
+ */
+export interface WorkflowSubscriptionEvent {
+    "source": string;
+    "id": string;
+    "acceptedAt": string;
+    "bytes": number;
+}
+
+export interface WorkflowSubscriptionState {
+    "name": string;
+    "event": string;
+    "source": string;
+    "correlation"?: jsonutil$0.CanonicalValue;
+    "correlationSchema"?: jsonutil$0.CanonicalValue;
+    "dataSchema"?: jsonutil$0.CanonicalValue;
+    "filter"?: WorkflowWaitFilter | null;
+    "retention"?: WorkflowDuration;
+    "capacity": number;
+    "maxBytes": number;
+    "activatedAt": string;
+    "accepted"?: WorkflowSubscriptionEvent[] | null;
+    "bytes"?: number;
+}
+
+export interface WorkflowTargetSetState {
+    "name": string;
+    "members": string[] | null;
+    "resolvedAt": string;
+}
+
 export interface WorkflowTransform {
     "value": WorkflowValue;
-    "outputSchema"?: CanonicalValue;
+    "outputSchema"?: jsonutil$0.CanonicalValue;
 }
 
 /**
@@ -2786,12 +2999,12 @@ export enum WorkflowTriggerKind {
 
 /**
  * WorkflowValue is a typed durable expression template. Literal values remain
- * CanonicalValue because Workflow input and output can be arbitrary JSON, but
+ * jsonutil.CanonicalValue because Workflow input and output can be arbitrary JSON, but
  * no runtime struct uses json.RawMessage as its public representation.
  */
 export interface WorkflowValue {
     "kind": WorkflowValueKind;
-    "literal"?: CanonicalValue;
+    "literal"?: jsonutil$0.CanonicalValue;
     "expression"?: string;
     "object"?: WorkflowValuePair[] | null;
     "array"?: WorkflowValue[] | null;
@@ -2825,10 +3038,12 @@ export interface WorkflowWait {
 
 export interface WorkflowWaitFilter {
     "filters": WorkflowValue[] | null;
-    "input": CanonicalValue;
-    "state": CanonicalValue;
-    "messages"?: CanonicalValue;
+    "input": jsonutil$0.CanonicalValue;
+    "state": jsonutil$0.CanonicalValue;
+    "messages"?: jsonutil$0.CanonicalValue;
     "steps": WorkflowStepOutcome[] | null;
+    "scope": WorkflowScopeContext;
+    "time": string;
 }
 
 export interface WorkspaceDispatchPlan {

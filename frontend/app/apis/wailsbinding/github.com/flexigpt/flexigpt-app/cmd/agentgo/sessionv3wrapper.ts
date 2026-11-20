@@ -12,6 +12,10 @@ import * as sessionv3$0 from "../../internal/agentruntime-go/sessionv3/models.js
 // @ts-ignore: Unused imports
 import * as sessionstorev3$0 from "../../internal/sessionstorev3/models.js";
 
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as $models from "./models.js";
+
 export function AcceptTriggerEvent(command: sessionv3$0.AcceptTriggerEventCommand): $CancellablePromise<sessionv3$0.CommandReceipt | null> {
     return $Call.ByName("main.SessionV3Wrapper.AcceptTriggerEvent", command);
 }
@@ -104,7 +108,7 @@ export function ReadAppResource(request: sessionv3$0.AppResourceReadRequest): $C
     return $Call.ByName("main.SessionV3Wrapper.ReadAppResource", request);
 }
 
-export function RegisterWorkflowTriggers(command: sessionv3$0.RegisterWorkflowTriggersCommand): $CancellablePromise<sessionv3$0.CommandReceipt | null> {
+export function RegisterWorkflowTriggers(command: $models.WorkflowTriggerRegistrationCommand): $CancellablePromise<sessionv3$0.CommandReceipt | null> {
     return $Call.ByName("main.SessionV3Wrapper.RegisterWorkflowTriggers", command);
 }
 
@@ -160,7 +164,7 @@ export function StageAppContext(command: sessionv3$0.StageAppContextCommand): $C
     return $Call.ByName("main.SessionV3Wrapper.StageAppContext", command);
 }
 
-export function StartWorkflow(command: sessionv3$0.StartWorkflowCommand): $CancellablePromise<sessionv3$0.CommandReceipt | null> {
+export function StartWorkflow(command: $models.WorkflowStartCommand): $CancellablePromise<sessionv3$0.CommandReceipt | null> {
     return $Call.ByName("main.SessionV3Wrapper.StartWorkflow", command);
 }
 
