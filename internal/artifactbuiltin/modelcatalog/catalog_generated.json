@@ -340,14 +340,14 @@
                     "path": "/"
                   },
                   "defaultModel": {
-                    "name": "googlegemini-gemini-3.8-flash",
+                    "name": "googlegemini-gemini-4-hydrogen",
                     "scope": "builtin"
                   },
                   "displayName": "Google Gemini API",
                   "name": "googlegemini",
                   "type": "model.provider"
                 },
-                "digest": "sha256:6cda17322558de451630854b0f5ffad781d9b71a498379b82364f57840202615",
+                "digest": "sha256:90dcade84d2652a5efa7d9ddf2768df3f20868995153b8a3431c680cd7c96ef2",
                 "displayName": "Google Gemini API",
                 "kind": "model.provider",
                 "logicalName": "googlegemini",
@@ -356,20 +356,20 @@
               }
             }
           ],
-          "digest": "sha256:de20aa30fd9f303a1f32766f26eaf8202e87568655221d0e1f6e09457fa68b65",
+          "digest": "sha256:235ff57face9349cc267b93f2d8f20779e484c8511a316519085dc56c08cca35",
           "locator": "model-provider.yaml"
         }
       ],
       "embeddedRoot": "model-provider/googlegemini/unversioned",
       "files": [
         {
-          "content": "eyJhZGFwdGVyIjoiZ29vZ2xlLmdlbmVyYXRlQ29udGVudCIsImF1dGhlbnRpY2F0aW9uIjp7ImhlYWRlck5hbWUiOiJ4LWdvb2ctYXBpLWtleSIsIm1vZGUiOiJhcGlLZXlIZWFkZXIifSwiY2FwYWJpbGl0aWVzIjp7Im1vZGFsaXRpZXNJbiI6WyJ0ZXh0SW4iLCJpbWFnZUluIiwiZmlsZUluIl0sIm1vZGFsaXRpZXNPdXQiOlsidGV4dE91dCJdLCJvdXRwdXRDYXBhYmlsaXRpZXMiOnsic3VwcG9ydGVkT3V0cHV0Rm9ybWF0cyI6WyJ0ZXh0IiwianNvblNjaGVtYSJdLCJzdXBwb3J0c1ZlcmJvc2l0eSI6dHJ1ZX0sInJlYXNvbmluZ0NhcGFiaWxpdGllcyI6eyJoeWJyaWRUb2tlbkJ1ZGdldENhcGFiaWxpdGllcyI6eyJtYXhBbGxvd2VkIjozMjc2OCwibWluQWxsb3dlZCI6MSwibWludXNPbmVBbGxvd2VkIjp0cnVlLCJ6ZXJvQWxsb3dlZCI6dHJ1ZX0sInN1cHBvcnRlZFJlYXNvbmluZ0xldmVscyI6WyJub25lIiwibWluaW1hbCIsImxvdyIsIm1lZGl1bSIsImhpZ2giLCJ4aGlnaCIsIm1heCJdLCJzdXBwb3J0ZWRSZWFzb25pbmdUeXBlcyI6WyJzaW5nbGVXaXRoTGV2ZWxzIiwiaHlicmlkV2l0aFRva2VucyJdLCJzdXBwb3J0c0VuY3J5cHRlZFJlYXNvbmluZ0lucHV0IjpmYWxzZSwic3VwcG9ydHNSZWFzb25pbmdDb250ZXh0IjpmYWxzZSwic3VwcG9ydHNSZWFzb25pbmdNb2RlIjpmYWxzZSwic3VwcG9ydHNTdW1tYXJ5U3R5bGUiOnRydWUsInRlbXBlcmF0dXJlRGlzYWxsb3dlZFdoZW5FbmFibGVkIjpmYWxzZX0sInN0b3BTZXF1ZW5jZUNhcGFiaWxpdGllcyI6eyJkaXNhbGxvd2VkV2l0aFJlYXNvbmluZyI6ZmFsc2UsImlzU3VwcG9ydGVkIjp0cnVlLCJtYXhTZXF1ZW5jZXMiOjR9LCJ0b29sQ2FwYWJpbGl0aWVzIjp7Im1heEZvcmNlZFRvb2xzIjoxLCJzdXBwb3J0ZWRDbGllbnRUb29sT3V0cHV0Rm9ybWF0cyI6WyJzdHJpbmciXSwic3VwcG9ydGVkVG9vbFBvbGljeU1vZGVzIjpbImF1dG8iLCJhbnkiLCJ0b29sIiwibm9uZSJdLCJzdXBwb3J0ZWRUb29sVHlwZXMiOlsiZnVuY3Rpb24iLCJjdXN0b20iLCJ3ZWJTZWFyY2giXSwic3VwcG9ydHNQYXJhbGxlbFRvb2xDYWxscyI6dHJ1ZX19LCJjb25uZWN0aW9uIjp7ImhlYWRlcnMiOnsic2V0Ijp7ImNvbnRlbnQtdHlwZSI6ImFwcGxpY2F0aW9uL2pzb24ifX0sIm9yaWdpbiI6Imh0dHBzOi8vZ2VuZXJhdGl2ZWxhbmd1YWdlLmdvb2dsZWFwaXMuY29tIiwicGF0aCI6Ii8ifSwiZGVmYXVsdE1vZGVsIjp7Im5hbWUiOiJnb29nbGVnZW1pbmktZ2VtaW5pLTMuOC1mbGFzaCIsInNjb3BlIjoiYnVpbHRpbiJ9LCJkaXNwbGF5TmFtZSI6Ikdvb2dsZSBHZW1pbmkgQVBJIiwibmFtZSI6Imdvb2dsZWdlbWluaSIsInR5cGUiOiJtb2RlbC5wcm92aWRlciJ9",
-          "digest": "sha256:de20aa30fd9f303a1f32766f26eaf8202e87568655221d0e1f6e09457fa68b65",
+          "content": "eyJhZGFwdGVyIjoiZ29vZ2xlLmdlbmVyYXRlQ29udGVudCIsImF1dGhlbnRpY2F0aW9uIjp7ImhlYWRlck5hbWUiOiJ4LWdvb2ctYXBpLWtleSIsIm1vZGUiOiJhcGlLZXlIZWFkZXIifSwiY2FwYWJpbGl0aWVzIjp7Im1vZGFsaXRpZXNJbiI6WyJ0ZXh0SW4iLCJpbWFnZUluIiwiZmlsZUluIl0sIm1vZGFsaXRpZXNPdXQiOlsidGV4dE91dCJdLCJvdXRwdXRDYXBhYmlsaXRpZXMiOnsic3VwcG9ydGVkT3V0cHV0Rm9ybWF0cyI6WyJ0ZXh0IiwianNvblNjaGVtYSJdLCJzdXBwb3J0c1ZlcmJvc2l0eSI6dHJ1ZX0sInJlYXNvbmluZ0NhcGFiaWxpdGllcyI6eyJoeWJyaWRUb2tlbkJ1ZGdldENhcGFiaWxpdGllcyI6eyJtYXhBbGxvd2VkIjozMjc2OCwibWluQWxsb3dlZCI6MSwibWludXNPbmVBbGxvd2VkIjp0cnVlLCJ6ZXJvQWxsb3dlZCI6dHJ1ZX0sInN1cHBvcnRlZFJlYXNvbmluZ0xldmVscyI6WyJub25lIiwibWluaW1hbCIsImxvdyIsIm1lZGl1bSIsImhpZ2giLCJ4aGlnaCIsIm1heCJdLCJzdXBwb3J0ZWRSZWFzb25pbmdUeXBlcyI6WyJzaW5nbGVXaXRoTGV2ZWxzIiwiaHlicmlkV2l0aFRva2VucyJdLCJzdXBwb3J0c0VuY3J5cHRlZFJlYXNvbmluZ0lucHV0IjpmYWxzZSwic3VwcG9ydHNSZWFzb25pbmdDb250ZXh0IjpmYWxzZSwic3VwcG9ydHNSZWFzb25pbmdNb2RlIjpmYWxzZSwic3VwcG9ydHNTdW1tYXJ5U3R5bGUiOnRydWUsInRlbXBlcmF0dXJlRGlzYWxsb3dlZFdoZW5FbmFibGVkIjpmYWxzZX0sInN0b3BTZXF1ZW5jZUNhcGFiaWxpdGllcyI6eyJkaXNhbGxvd2VkV2l0aFJlYXNvbmluZyI6ZmFsc2UsImlzU3VwcG9ydGVkIjp0cnVlLCJtYXhTZXF1ZW5jZXMiOjR9LCJ0b29sQ2FwYWJpbGl0aWVzIjp7Im1heEZvcmNlZFRvb2xzIjoxLCJzdXBwb3J0ZWRDbGllbnRUb29sT3V0cHV0Rm9ybWF0cyI6WyJzdHJpbmciXSwic3VwcG9ydGVkVG9vbFBvbGljeU1vZGVzIjpbImF1dG8iLCJhbnkiLCJ0b29sIiwibm9uZSJdLCJzdXBwb3J0ZWRUb29sVHlwZXMiOlsiZnVuY3Rpb24iLCJjdXN0b20iLCJ3ZWJTZWFyY2giXSwic3VwcG9ydHNQYXJhbGxlbFRvb2xDYWxscyI6dHJ1ZX19LCJjb25uZWN0aW9uIjp7ImhlYWRlcnMiOnsic2V0Ijp7ImNvbnRlbnQtdHlwZSI6ImFwcGxpY2F0aW9uL2pzb24ifX0sIm9yaWdpbiI6Imh0dHBzOi8vZ2VuZXJhdGl2ZWxhbmd1YWdlLmdvb2dsZWFwaXMuY29tIiwicGF0aCI6Ii8ifSwiZGVmYXVsdE1vZGVsIjp7Im5hbWUiOiJnb29nbGVnZW1pbmktZ2VtaW5pLTQtaHlkcm9nZW4iLCJzY29wZSI6ImJ1aWx0aW4ifSwiZGlzcGxheU5hbWUiOiJHb29nbGUgR2VtaW5pIEFQSSIsIm5hbWUiOiJnb29nbGVnZW1pbmkiLCJ0eXBlIjoibW9kZWwucHJvdmlkZXIifQ==",
+          "digest": "sha256:235ff57face9349cc267b93f2d8f20779e484c8511a316519085dc56c08cca35",
           "locator": "model-provider.yaml",
-          "size": 1362
+          "size": 1363
         }
       ],
-      "fingerprint": "sha256:9da1967ecd127303f7e19984a1da3c09ee02a6144b04481de745311d294e2e2c"
+      "fingerprint": "sha256:b0a2634872a1bb5fbf687419ac58a2d20133ae92a5c4436d44de07576a5eba3a"
     },
     {
       "address": {
@@ -4309,6 +4309,9 @@
                     "timeoutMS": 1800000
                   },
                   "displayName": "Gemini 3.5 Flash Lite",
+                  "labels": {
+                    "model.initialEnabled": "false"
+                  },
                   "name": "googlegemini-gemini-3.5-flash-lite",
                   "provider": {
                     "name": "googlegemini",
@@ -4317,29 +4320,32 @@
                   "providerModelID": "gemini-3.5-flash-lite",
                   "type": "model"
                 },
-                "digest": "sha256:8be2126c4a9752edd7e38f42011cb0a26fcf14faa7f24101df6eff96dd9c455d",
+                "digest": "sha256:290a8def43581c573aec87c7fbbd9c57db9cbbea39544650a9ac47239e3a5127",
                 "displayName": "Gemini 3.5 Flash Lite",
                 "kind": "model",
+                "labels": {
+                  "model.initialEnabled": "false"
+                },
                 "logicalName": "googlegemini-gemini-3.5-flash-lite",
                 "schemaID": "artifact.model.v1",
                 "schemaVersion": "v1"
               }
             }
           ],
-          "digest": "sha256:ec6d03bade3c3461ade5fdab959249207f971c3f59443a81d40f023e8d0fd93f",
+          "digest": "sha256:cf602383840827666ecde1e63c7f565d181aa9d813222e975c45b04757855b2e",
           "locator": "model.yaml"
         }
       ],
       "embeddedRoot": "model/googlegemini-gemini-3.5-flash-lite/unversioned",
       "files": [
         {
-          "content": "eyJjYXBhYmlsaXRpZXMiOnsicmVhc29uaW5nQ2FwYWJpbGl0aWVzIjp7InN1cHBvcnRlZFJlYXNvbmluZ0xldmVscyI6WyJtaW5pbWFsIiwibG93IiwibWVkaXVtIiwiaGlnaCJdLCJzdXBwb3J0ZWRSZWFzb25pbmdUeXBlcyI6WyJzaW5nbGVXaXRoTGV2ZWxzIl0sInN1cHBvcnRzU3VtbWFyeVN0eWxlIjp0cnVlLCJ0ZW1wZXJhdHVyZURpc2FsbG93ZWRXaGVuRW5hYmxlZCI6dHJ1ZX19LCJkZWZhdWx0cyI6eyJtYXhPdXRwdXRUb2tlbnMiOjY1NTM2LCJtYXhQcm9tcHRUb2tlbnMiOjEwMDAwMDAsInJlYXNvbmluZyI6eyJsZXZlbCI6ImhpZ2giLCJ0b2tlbnMiOjAsInR5cGUiOiJzaW5nbGVXaXRoTGV2ZWxzIn0sInN0cmVhbSI6dHJ1ZSwic3lzdGVtUHJvbXB0IjoiIiwidGVtcGVyYXR1cmUiOjEsInRpbWVvdXRNUyI6MTgwMDAwMH0sImRpc3BsYXlOYW1lIjoiR2VtaW5pIDMuNSBGbGFzaCBMaXRlIiwibmFtZSI6Imdvb2dsZWdlbWluaS1nZW1pbmktMy41LWZsYXNoLWxpdGUiLCJwcm92aWRlciI6eyJuYW1lIjoiZ29vZ2xlZ2VtaW5pIiwic2NvcGUiOiJidWlsdGluIn0sInByb3ZpZGVyTW9kZWxJRCI6ImdlbWluaS0zLjUtZmxhc2gtbGl0ZSIsInR5cGUiOiJtb2RlbCJ9",
-          "digest": "sha256:ec6d03bade3c3461ade5fdab959249207f971c3f59443a81d40f023e8d0fd93f",
+          "content": "eyJjYXBhYmlsaXRpZXMiOnsicmVhc29uaW5nQ2FwYWJpbGl0aWVzIjp7InN1cHBvcnRlZFJlYXNvbmluZ0xldmVscyI6WyJtaW5pbWFsIiwibG93IiwibWVkaXVtIiwiaGlnaCJdLCJzdXBwb3J0ZWRSZWFzb25pbmdUeXBlcyI6WyJzaW5nbGVXaXRoTGV2ZWxzIl0sInN1cHBvcnRzU3VtbWFyeVN0eWxlIjp0cnVlLCJ0ZW1wZXJhdHVyZURpc2FsbG93ZWRXaGVuRW5hYmxlZCI6dHJ1ZX19LCJkZWZhdWx0cyI6eyJtYXhPdXRwdXRUb2tlbnMiOjY1NTM2LCJtYXhQcm9tcHRUb2tlbnMiOjEwMDAwMDAsInJlYXNvbmluZyI6eyJsZXZlbCI6ImhpZ2giLCJ0b2tlbnMiOjAsInR5cGUiOiJzaW5nbGVXaXRoTGV2ZWxzIn0sInN0cmVhbSI6dHJ1ZSwic3lzdGVtUHJvbXB0IjoiIiwidGVtcGVyYXR1cmUiOjEsInRpbWVvdXRNUyI6MTgwMDAwMH0sImRpc3BsYXlOYW1lIjoiR2VtaW5pIDMuNSBGbGFzaCBMaXRlIiwibGFiZWxzIjp7Im1vZGVsLmluaXRpYWxFbmFibGVkIjoiZmFsc2UifSwibmFtZSI6Imdvb2dsZWdlbWluaS1nZW1pbmktMy41LWZsYXNoLWxpdGUiLCJwcm92aWRlciI6eyJuYW1lIjoiZ29vZ2xlZ2VtaW5pIiwic2NvcGUiOiJidWlsdGluIn0sInByb3ZpZGVyTW9kZWxJRCI6ImdlbWluaS0zLjUtZmxhc2gtbGl0ZSIsInR5cGUiOiJtb2RlbCJ9",
+          "digest": "sha256:cf602383840827666ecde1e63c7f565d181aa9d813222e975c45b04757855b2e",
           "locator": "model.yaml",
-          "size": 609
+          "size": 651
         }
       ],
-      "fingerprint": "sha256:ab49c86ba0c23b1bd344c287429d8b238b8fa0c71cef2675c0bc76b69dd7de95"
+      "fingerprint": "sha256:07206ed702418b15fa014b3d80829f437a46c7e72c3073c507a39cd6a94bf7b4"
     },
     {
       "address": {
@@ -4617,6 +4623,9 @@
                     "timeoutMS": 1800000
                   },
                   "displayName": "Gemini 3.8 Flash",
+                  "labels": {
+                    "model.initialEnabled": "false"
+                  },
                   "name": "googlegemini-gemini-3.8-flash",
                   "provider": {
                     "name": "googlegemini",
@@ -4625,29 +4634,32 @@
                   "providerModelID": "gemini-3.8-flash",
                   "type": "model"
                 },
-                "digest": "sha256:c5327a1e7d864e8a9f4c22099c17c1de63c157309bd937a975416e64167bf07f",
+                "digest": "sha256:71c1c9dff6962c8d3dfc44b3d253ea2ca6381f3b9df89f3f0f7698ec1f4a3af6",
                 "displayName": "Gemini 3.8 Flash",
                 "kind": "model",
+                "labels": {
+                  "model.initialEnabled": "false"
+                },
                 "logicalName": "googlegemini-gemini-3.8-flash",
                 "schemaID": "artifact.model.v1",
                 "schemaVersion": "v1"
               }
             }
           ],
-          "digest": "sha256:4058e39b21fe8806fb480243c631ff1b4760103a59ff971af071c7aac8f07da2",
+          "digest": "sha256:e1cb2641e7b7739c931caa47ea13a29f2f8fd5ad7c602fac085ba01834c1502b",
           "locator": "model.yaml"
         }
       ],
       "embeddedRoot": "model/googlegemini-gemini-3.8-flash/unversioned",
       "files": [
         {
-          "content": "eyJjYXBhYmlsaXRpZXMiOnsicmVhc29uaW5nQ2FwYWJpbGl0aWVzIjp7InN1cHBvcnRlZFJlYXNvbmluZ0xldmVscyI6WyJsb3ciLCJtZWRpdW0iLCJoaWdoIl0sInN1cHBvcnRlZFJlYXNvbmluZ1R5cGVzIjpbInNpbmdsZVdpdGhMZXZlbHMiXSwic3VwcG9ydHNTdW1tYXJ5U3R5bGUiOnRydWUsInRlbXBlcmF0dXJlRGlzYWxsb3dlZFdoZW5FbmFibGVkIjp0cnVlfX0sImRlZmF1bHRzIjp7Im1heE91dHB1dFRva2VucyI6NjU1MzYsIm1heFByb21wdFRva2VucyI6MTAwMDAwMCwicmVhc29uaW5nIjp7ImxldmVsIjoiaGlnaCIsInRva2VucyI6MCwidHlwZSI6InNpbmdsZVdpdGhMZXZlbHMifSwic3RyZWFtIjp0cnVlLCJzeXN0ZW1Qcm9tcHQiOiIiLCJ0ZW1wZXJhdHVyZSI6MSwidGltZW91dE1TIjoxODAwMDAwfSwiZGlzcGxheU5hbWUiOiJHZW1pbmkgMy44IEZsYXNoIiwibmFtZSI6Imdvb2dsZWdlbWluaS1nZW1pbmktMy44LWZsYXNoIiwicHJvdmlkZXIiOnsibmFtZSI6Imdvb2dsZWdlbWluaSIsInNjb3BlIjoiYnVpbHRpbiJ9LCJwcm92aWRlck1vZGVsSUQiOiJnZW1pbmktMy44LWZsYXNoIiwidHlwZSI6Im1vZGVsIn0=",
-          "digest": "sha256:4058e39b21fe8806fb480243c631ff1b4760103a59ff971af071c7aac8f07da2",
+          "content": "eyJjYXBhYmlsaXRpZXMiOnsicmVhc29uaW5nQ2FwYWJpbGl0aWVzIjp7InN1cHBvcnRlZFJlYXNvbmluZ0xldmVscyI6WyJsb3ciLCJtZWRpdW0iLCJoaWdoIl0sInN1cHBvcnRlZFJlYXNvbmluZ1R5cGVzIjpbInNpbmdsZVdpdGhMZXZlbHMiXSwic3VwcG9ydHNTdW1tYXJ5U3R5bGUiOnRydWUsInRlbXBlcmF0dXJlRGlzYWxsb3dlZFdoZW5FbmFibGVkIjp0cnVlfX0sImRlZmF1bHRzIjp7Im1heE91dHB1dFRva2VucyI6NjU1MzYsIm1heFByb21wdFRva2VucyI6MTAwMDAwMCwicmVhc29uaW5nIjp7ImxldmVsIjoiaGlnaCIsInRva2VucyI6MCwidHlwZSI6InNpbmdsZVdpdGhMZXZlbHMifSwic3RyZWFtIjp0cnVlLCJzeXN0ZW1Qcm9tcHQiOiIiLCJ0ZW1wZXJhdHVyZSI6MSwidGltZW91dE1TIjoxODAwMDAwfSwiZGlzcGxheU5hbWUiOiJHZW1pbmkgMy44IEZsYXNoIiwibGFiZWxzIjp7Im1vZGVsLmluaXRpYWxFbmFibGVkIjoiZmFsc2UifSwibmFtZSI6Imdvb2dsZWdlbWluaS1nZW1pbmktMy44LWZsYXNoIiwicHJvdmlkZXIiOnsibmFtZSI6Imdvb2dsZWdlbWluaSIsInNjb3BlIjoiYnVpbHRpbiJ9LCJwcm92aWRlck1vZGVsSUQiOiJnZW1pbmktMy44LWZsYXNoIiwidHlwZSI6Im1vZGVsIn0=",
+          "digest": "sha256:e1cb2641e7b7739c931caa47ea13a29f2f8fd5ad7c602fac085ba01834c1502b",
           "locator": "model.yaml",
-          "size": 584
+          "size": 626
         }
       ],
-      "fingerprint": "sha256:f6dbd96ec5be9a77e040920866239834d007c5e407ab808d3f5eb9b905d1e5bd"
+      "fingerprint": "sha256:95ab5df0bc868637d05d730eebfe8bf6ac682f816fbfa766db3d05b00d08e954"
     },
     {
       "address": {
@@ -4718,6 +4730,218 @@
         }
       ],
       "fingerprint": "sha256:d91a0cec83a40f370a95a7c71ce152415f32df11fe18f1c2c3cc5da1818d7e76"
+    },
+    {
+      "address": {
+        "kind": "model",
+        "name": "googlegemini-gemini-4-carbon",
+        "version": "unversioned"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "capabilities": {
+                    "reasoningCapabilities": {
+                      "supportedReasoningLevels": [
+                        "low",
+                        "medium",
+                        "high"
+                      ],
+                      "supportedReasoningTypes": [
+                        "singleWithLevels"
+                      ],
+                      "temperatureDisallowedWhenEnabled": true
+                    }
+                  },
+                  "defaults": {
+                    "maxOutputTokens": 65536,
+                    "maxPromptTokens": 983040,
+                    "reasoning": {
+                      "level": "medium",
+                      "tokens": 0,
+                      "type": "singleWithLevels"
+                    },
+                    "stream": true,
+                    "systemPrompt": "",
+                    "timeoutMS": 1800000
+                  },
+                  "displayName": "Gemini 4 Carbon",
+                  "name": "googlegemini-gemini-4-carbon",
+                  "provider": {
+                    "name": "googlegemini",
+                    "scope": "builtin"
+                  },
+                  "providerModelID": "gemini-4-carbon",
+                  "type": "model"
+                },
+                "digest": "sha256:d09a40d6c1a39e14b4201d39e0f064b3f711cb2e816e59eb129d96833571e024",
+                "displayName": "Gemini 4 Carbon",
+                "kind": "model",
+                "logicalName": "googlegemini-gemini-4-carbon",
+                "schemaID": "artifact.model.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:052084f4fe28b21dc8955604e81e54d25e134a067036a61c4525c3f51b4271c6",
+          "locator": "model.yaml"
+        }
+      ],
+      "embeddedRoot": "model/googlegemini-gemini-4-carbon/unversioned",
+      "files": [
+        {
+          "content": "eyJjYXBhYmlsaXRpZXMiOnsicmVhc29uaW5nQ2FwYWJpbGl0aWVzIjp7InN1cHBvcnRlZFJlYXNvbmluZ0xldmVscyI6WyJsb3ciLCJtZWRpdW0iLCJoaWdoIl0sInN1cHBvcnRlZFJlYXNvbmluZ1R5cGVzIjpbInNpbmdsZVdpdGhMZXZlbHMiXSwidGVtcGVyYXR1cmVEaXNhbGxvd2VkV2hlbkVuYWJsZWQiOnRydWV9fSwiZGVmYXVsdHMiOnsibWF4T3V0cHV0VG9rZW5zIjo2NTUzNiwibWF4UHJvbXB0VG9rZW5zIjo5ODMwNDAsInJlYXNvbmluZyI6eyJsZXZlbCI6Im1lZGl1bSIsInRva2VucyI6MCwidHlwZSI6InNpbmdsZVdpdGhMZXZlbHMifSwic3RyZWFtIjp0cnVlLCJzeXN0ZW1Qcm9tcHQiOiIiLCJ0aW1lb3V0TVMiOjE4MDAwMDB9LCJkaXNwbGF5TmFtZSI6IkdlbWluaSA0IENhcmJvbiIsIm5hbWUiOiJnb29nbGVnZW1pbmktZ2VtaW5pLTQtY2FyYm9uIiwicHJvdmlkZXIiOnsibmFtZSI6Imdvb2dsZWdlbWluaSIsInNjb3BlIjoiYnVpbHRpbiJ9LCJwcm92aWRlck1vZGVsSUQiOiJnZW1pbmktNC1jYXJib24iLCJ0eXBlIjoibW9kZWwifQ==",
+          "digest": "sha256:052084f4fe28b21dc8955604e81e54d25e134a067036a61c4525c3f51b4271c6",
+          "locator": "model.yaml",
+          "size": 538
+        }
+      ],
+      "fingerprint": "sha256:a21e2e156f7f75f4948a76fe206815b38512d3cb3461b56e771ca8813f0929cb"
+    },
+    {
+      "address": {
+        "kind": "model",
+        "name": "googlegemini-gemini-4-hydrogen",
+        "version": "unversioned"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "capabilities": {
+                    "reasoningCapabilities": {
+                      "supportedReasoningLevels": [
+                        "low",
+                        "medium",
+                        "high",
+                        "xhigh"
+                      ],
+                      "supportedReasoningTypes": [
+                        "singleWithLevels"
+                      ],
+                      "temperatureDisallowedWhenEnabled": true
+                    }
+                  },
+                  "defaults": {
+                    "maxOutputTokens": 65536,
+                    "maxPromptTokens": 983040,
+                    "reasoning": {
+                      "level": "medium",
+                      "tokens": 0,
+                      "type": "singleWithLevels"
+                    },
+                    "stream": true,
+                    "systemPrompt": "",
+                    "timeoutMS": 1800000
+                  },
+                  "displayName": "Gemini 4 Hydrogen",
+                  "name": "googlegemini-gemini-4-hydrogen",
+                  "provider": {
+                    "name": "googlegemini",
+                    "scope": "builtin"
+                  },
+                  "providerModelID": "gemini-4-hydrogen",
+                  "type": "model"
+                },
+                "digest": "sha256:516cac8af38fc512e2845bb933c3e85641295022f97984ce722740a581cd6064",
+                "displayName": "Gemini 4 Hydrogen",
+                "kind": "model",
+                "logicalName": "googlegemini-gemini-4-hydrogen",
+                "schemaID": "artifact.model.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:91254fd3ed31372fb023e6dd7f211101fc2172fd1a2bd4f11323cc5a0ebc498b",
+          "locator": "model.yaml"
+        }
+      ],
+      "embeddedRoot": "model/googlegemini-gemini-4-hydrogen/unversioned",
+      "files": [
+        {
+          "content": "eyJjYXBhYmlsaXRpZXMiOnsicmVhc29uaW5nQ2FwYWJpbGl0aWVzIjp7InN1cHBvcnRlZFJlYXNvbmluZ0xldmVscyI6WyJsb3ciLCJtZWRpdW0iLCJoaWdoIiwieGhpZ2giXSwic3VwcG9ydGVkUmVhc29uaW5nVHlwZXMiOlsic2luZ2xlV2l0aExldmVscyJdLCJ0ZW1wZXJhdHVyZURpc2FsbG93ZWRXaGVuRW5hYmxlZCI6dHJ1ZX19LCJkZWZhdWx0cyI6eyJtYXhPdXRwdXRUb2tlbnMiOjY1NTM2LCJtYXhQcm9tcHRUb2tlbnMiOjk4MzA0MCwicmVhc29uaW5nIjp7ImxldmVsIjoibWVkaXVtIiwidG9rZW5zIjowLCJ0eXBlIjoic2luZ2xlV2l0aExldmVscyJ9LCJzdHJlYW0iOnRydWUsInN5c3RlbVByb21wdCI6IiIsInRpbWVvdXRNUyI6MTgwMDAwMH0sImRpc3BsYXlOYW1lIjoiR2VtaW5pIDQgSHlkcm9nZW4iLCJuYW1lIjoiZ29vZ2xlZ2VtaW5pLWdlbWluaS00LWh5ZHJvZ2VuIiwicHJvdmlkZXIiOnsibmFtZSI6Imdvb2dsZWdlbWluaSIsInNjb3BlIjoiYnVpbHRpbiJ9LCJwcm92aWRlck1vZGVsSUQiOiJnZW1pbmktNC1oeWRyb2dlbiIsInR5cGUiOiJtb2RlbCJ9",
+          "digest": "sha256:91254fd3ed31372fb023e6dd7f211101fc2172fd1a2bd4f11323cc5a0ebc498b",
+          "locator": "model.yaml",
+          "size": 552
+        }
+      ],
+      "fingerprint": "sha256:3ffc9651f7baf8c0c948e20eea4a6f093f5a329198f92fa81ae578ebc3e93006"
+    },
+    {
+      "address": {
+        "kind": "model",
+        "name": "googlegemini-gemini-4-neon",
+        "version": "unversioned"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "capabilities": {
+                    "reasoningCapabilities": {
+                      "supportedReasoningLevels": [
+                        "low",
+                        "medium",
+                        "high",
+                        "xhigh"
+                      ],
+                      "supportedReasoningTypes": [
+                        "singleWithLevels"
+                      ],
+                      "temperatureDisallowedWhenEnabled": true
+                    }
+                  },
+                  "defaults": {
+                    "maxOutputTokens": 65536,
+                    "maxPromptTokens": 983040,
+                    "reasoning": {
+                      "level": "medium",
+                      "tokens": 0,
+                      "type": "singleWithLevels"
+                    },
+                    "stream": true,
+                    "systemPrompt": "",
+                    "timeoutMS": 1800000
+                  },
+                  "displayName": "Gemini 4 Neon",
+                  "name": "googlegemini-gemini-4-neon",
+                  "provider": {
+                    "name": "googlegemini",
+                    "scope": "builtin"
+                  },
+                  "providerModelID": "gemini-4-neon",
+                  "type": "model"
+                },
+                "digest": "sha256:0f1d58ea8ace89ea0393c3c54f03e72a817bee1a0a3ecc34d960a34267e062c2",
+                "displayName": "Gemini 4 Neon",
+                "kind": "model",
+                "logicalName": "googlegemini-gemini-4-neon",
+                "schemaID": "artifact.model.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:1184d1fbeebd1530b9d65a8d680b285d6ebf0e1abd2a72812487d7c27d4c629b",
+          "locator": "model.yaml"
+        }
+      ],
+      "embeddedRoot": "model/googlegemini-gemini-4-neon/unversioned",
+      "files": [
+        {
+          "content": "eyJjYXBhYmlsaXRpZXMiOnsicmVhc29uaW5nQ2FwYWJpbGl0aWVzIjp7InN1cHBvcnRlZFJlYXNvbmluZ0xldmVscyI6WyJsb3ciLCJtZWRpdW0iLCJoaWdoIiwieGhpZ2giXSwic3VwcG9ydGVkUmVhc29uaW5nVHlwZXMiOlsic2luZ2xlV2l0aExldmVscyJdLCJ0ZW1wZXJhdHVyZURpc2FsbG93ZWRXaGVuRW5hYmxlZCI6dHJ1ZX19LCJkZWZhdWx0cyI6eyJtYXhPdXRwdXRUb2tlbnMiOjY1NTM2LCJtYXhQcm9tcHRUb2tlbnMiOjk4MzA0MCwicmVhc29uaW5nIjp7ImxldmVsIjoibWVkaXVtIiwidG9rZW5zIjowLCJ0eXBlIjoic2luZ2xlV2l0aExldmVscyJ9LCJzdHJlYW0iOnRydWUsInN5c3RlbVByb21wdCI6IiIsInRpbWVvdXRNUyI6MTgwMDAwMH0sImRpc3BsYXlOYW1lIjoiR2VtaW5pIDQgTmVvbiIsIm5hbWUiOiJnb29nbGVnZW1pbmktZ2VtaW5pLTQtbmVvbiIsInByb3ZpZGVyIjp7Im5hbWUiOiJnb29nbGVnZW1pbmkiLCJzY29wZSI6ImJ1aWx0aW4ifSwicHJvdmlkZXJNb2RlbElEIjoiZ2VtaW5pLTQtbmVvbiIsInR5cGUiOiJtb2RlbCJ9",
+          "digest": "sha256:1184d1fbeebd1530b9d65a8d680b285d6ebf0e1abd2a72812487d7c27d4c629b",
+          "locator": "model.yaml",
+          "size": 540
+        }
+      ],
+      "fingerprint": "sha256:0283404e82c0f82e0a318918e0f539109fa1eea5ba2bb62b853338f667c9b80c"
     },
     {
       "address": {
@@ -11878,6 +12102,154 @@
         }
       ],
       "fingerprint": "sha256:2231db8ab20fd0815111fd5c6bbb25631c4131471327d55e76f0f70e126d8d68"
+    },
+    {
+      "address": {
+        "kind": "model",
+        "name": "openairesponses-gpt-6.2-astra",
+        "version": "unversioned"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "capabilities": {
+                    "reasoningCapabilities": {
+                      "supportedReasoningLevels": [
+                        "low",
+                        "medium",
+                        "high",
+                        "xhigh",
+                        "max"
+                      ],
+                      "supportedReasoningTypes": [
+                        "singleWithLevels"
+                      ],
+                      "supportsSummaryStyle": true,
+                      "temperatureDisallowedWhenEnabled": true
+                    }
+                  },
+                  "defaults": {
+                    "maxOutputTokens": 128000,
+                    "maxPromptTokens": 1000000,
+                    "reasoning": {
+                      "level": "high",
+                      "tokens": 0,
+                      "type": "singleWithLevels"
+                    },
+                    "stream": true,
+                    "systemPrompt": "",
+                    "temperature": 1,
+                    "timeoutMS": 1800000
+                  },
+                  "displayName": "GPT 6.2 Astra",
+                  "name": "openairesponses-gpt-6.2-astra",
+                  "provider": {
+                    "name": "openairesponses",
+                    "scope": "builtin"
+                  },
+                  "providerModelID": "gpt-6.2-astra",
+                  "type": "model"
+                },
+                "digest": "sha256:78e925b5483cf3f89120788b1a414c48ea1a13b4fad112c4ac11847c23485048",
+                "displayName": "GPT 6.2 Astra",
+                "kind": "model",
+                "logicalName": "openairesponses-gpt-6.2-astra",
+                "schemaID": "artifact.model.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:d7d6ec1b329c4c33c152fbd744248f21517c6662687ad0676b2a17ef1dbba5d7",
+          "locator": "model.yaml"
+        }
+      ],
+      "embeddedRoot": "model/openairesponses-gpt-6.2-astra/unversioned",
+      "files": [
+        {
+          "content": "eyJjYXBhYmlsaXRpZXMiOnsicmVhc29uaW5nQ2FwYWJpbGl0aWVzIjp7InN1cHBvcnRlZFJlYXNvbmluZ0xldmVscyI6WyJsb3ciLCJtZWRpdW0iLCJoaWdoIiwieGhpZ2giLCJtYXgiXSwic3VwcG9ydGVkUmVhc29uaW5nVHlwZXMiOlsic2luZ2xlV2l0aExldmVscyJdLCJzdXBwb3J0c1N1bW1hcnlTdHlsZSI6dHJ1ZSwidGVtcGVyYXR1cmVEaXNhbGxvd2VkV2hlbkVuYWJsZWQiOnRydWV9fSwiZGVmYXVsdHMiOnsibWF4T3V0cHV0VG9rZW5zIjoxMjgwMDAsIm1heFByb21wdFRva2VucyI6MTAwMDAwMCwicmVhc29uaW5nIjp7ImxldmVsIjoiaGlnaCIsInRva2VucyI6MCwidHlwZSI6InNpbmdsZVdpdGhMZXZlbHMifSwic3RyZWFtIjp0cnVlLCJzeXN0ZW1Qcm9tcHQiOiIiLCJ0ZW1wZXJhdHVyZSI6MSwidGltZW91dE1TIjoxODAwMDAwfSwiZGlzcGxheU5hbWUiOiJHUFQgNi4yIEFzdHJhIiwibmFtZSI6Im9wZW5haXJlc3BvbnNlcy1ncHQtNi4yLWFzdHJhIiwicHJvdmlkZXIiOnsibmFtZSI6Im9wZW5haXJlc3BvbnNlcyIsInNjb3BlIjoiYnVpbHRpbiJ9LCJwcm92aWRlck1vZGVsSUQiOiJncHQtNi4yLWFzdHJhIiwidHlwZSI6Im1vZGVsIn0=",
+          "digest": "sha256:d7d6ec1b329c4c33c152fbd744248f21517c6662687ad0676b2a17ef1dbba5d7",
+          "locator": "model.yaml",
+          "size": 596
+        }
+      ],
+      "fingerprint": "sha256:86114fa8e9d87287044f4cb8b403f0cb85a4600bf85b9668dd432ace4231612e"
+    },
+    {
+      "address": {
+        "kind": "model",
+        "name": "openairesponses-gpt-6.2-sol",
+        "version": "unversioned"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "capabilities": {
+                    "reasoningCapabilities": {
+                      "supportedReasoningLevels": [
+                        "low",
+                        "medium",
+                        "high",
+                        "xhigh",
+                        "max"
+                      ],
+                      "supportedReasoningTypes": [
+                        "singleWithLevels"
+                      ],
+                      "supportsSummaryStyle": true,
+                      "temperatureDisallowedWhenEnabled": true
+                    }
+                  },
+                  "defaults": {
+                    "maxOutputTokens": 128000,
+                    "maxPromptTokens": 1000000,
+                    "reasoning": {
+                      "level": "high",
+                      "tokens": 0,
+                      "type": "singleWithLevels"
+                    },
+                    "stream": true,
+                    "systemPrompt": "",
+                    "temperature": 1,
+                    "timeoutMS": 1800000
+                  },
+                  "displayName": "GPT 6.2 Sol",
+                  "name": "openairesponses-gpt-6.2-sol",
+                  "provider": {
+                    "name": "openairesponses",
+                    "scope": "builtin"
+                  },
+                  "providerModelID": "gpt-6.2-sol",
+                  "type": "model"
+                },
+                "digest": "sha256:5c4ea1cbeeaf3167dc387a611407395da86792ae5ed8303c71aeb37b843eef6a",
+                "displayName": "GPT 6.2 Sol",
+                "kind": "model",
+                "logicalName": "openairesponses-gpt-6.2-sol",
+                "schemaID": "artifact.model.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:26aa1d47d717bf14d187aa646912e4764a38cc65348bb595047f099a0957202f",
+          "locator": "model.yaml"
+        }
+      ],
+      "embeddedRoot": "model/openairesponses-gpt-6.2-sol/unversioned",
+      "files": [
+        {
+          "content": "eyJjYXBhYmlsaXRpZXMiOnsicmVhc29uaW5nQ2FwYWJpbGl0aWVzIjp7InN1cHBvcnRlZFJlYXNvbmluZ0xldmVscyI6WyJsb3ciLCJtZWRpdW0iLCJoaWdoIiwieGhpZ2giLCJtYXgiXSwic3VwcG9ydGVkUmVhc29uaW5nVHlwZXMiOlsic2luZ2xlV2l0aExldmVscyJdLCJzdXBwb3J0c1N1bW1hcnlTdHlsZSI6dHJ1ZSwidGVtcGVyYXR1cmVEaXNhbGxvd2VkV2hlbkVuYWJsZWQiOnRydWV9fSwiZGVmYXVsdHMiOnsibWF4T3V0cHV0VG9rZW5zIjoxMjgwMDAsIm1heFByb21wdFRva2VucyI6MTAwMDAwMCwicmVhc29uaW5nIjp7ImxldmVsIjoiaGlnaCIsInRva2VucyI6MCwidHlwZSI6InNpbmdsZVdpdGhMZXZlbHMifSwic3RyZWFtIjp0cnVlLCJzeXN0ZW1Qcm9tcHQiOiIiLCJ0ZW1wZXJhdHVyZSI6MSwidGltZW91dE1TIjoxODAwMDAwfSwiZGlzcGxheU5hbWUiOiJHUFQgNi4yIFNvbCIsIm5hbWUiOiJvcGVuYWlyZXNwb25zZXMtZ3B0LTYuMi1zb2wiLCJwcm92aWRlciI6eyJuYW1lIjoib3BlbmFpcmVzcG9uc2VzIiwic2NvcGUiOiJidWlsdGluIn0sInByb3ZpZGVyTW9kZWxJRCI6ImdwdC02LjItc29sIiwidHlwZSI6Im1vZGVsIn0=",
+          "digest": "sha256:26aa1d47d717bf14d187aa646912e4764a38cc65348bb595047f099a0957202f",
+          "locator": "model.yaml",
+          "size": 590
+        }
+      ],
+      "fingerprint": "sha256:9521a441540ce068127124e89f74b3ff06639b938cb77105e2f0d3b54b9f8a47"
     },
     {
       "address": {

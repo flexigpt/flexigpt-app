@@ -10,7 +10,7 @@ require (
 	cel.dev/cel-go v0.33.4
 	github.com/adrg/xdg v0.5.3
 	github.com/flexigpt/agentskills-go v0.22.1
-	github.com/flexigpt/inference-go v0.28.8
+	github.com/flexigpt/inference-go v0.28.9
 	github.com/flexigpt/llmtools-go v0.25.1
 	github.com/flexigpt/mapstore-go v0.4.6
 	github.com/glebarez/go-sqlite v1.23.0
