@@ -102,44 +102,65 @@ func (i *WorkflowInterpreter) recordTerminalWorkflowStepOutcome(
 	before WorkflowState,
 	transition ProgramTransition,
 ) (ProgramTransition, error) {
-	if transition.Status == nil ||
-		(*transition.Status != ProgramFrameStateFailed &&
-			*transition.Status != ProgramFrameStateCancelled) {
-		return transition, nil
-	}
-	if before.PendingPath == "" {
-		return transition, nil
-	}
-
-	step, err := workflowStepForPath(program.Root, before.PendingPath)
-	if err != nil {
+	if transition.Status == nil || !transition.Status.Terminal() {
 		return transition, nil
 	}
 	state, err := jsonutil.DecodeCanonicalValue[WorkflowState](transition.State.Data)
 	if err != nil {
 		return ProgramTransition{}, err
 	}
-
-	status := WorkflowStepOutcomeFailed
-	if *transition.Status == ProgramFrameStateCancelled {
-		status = WorkflowStepOutcomeCancelled
+	path := firstText(before.PendingPath, state.PendingPath)
+	if path == "" {
+		return transition, nil
 	}
-	target := before.PendingTarget
-	if target == "" {
-		target = state.PendingTarget
-	}
-	failure := cloneWorkflowSanitizedError(transition.Error)
-	if failure == nil {
-		failure = workflowTerminalFailure(*transition.Status, nil)
+	step, err := workflowStepForPath(program.Root, path)
+	if err != nil {
+		return transition, nil
 	}
 
 	outcome := WorkflowStepOutcome{
 		ID:              step.ID,
-		Status:          status,
-		Target:          target,
-		Error:           failure,
-		DeclarationPath: step.DeclarationPath,
+		Target:          firstText(before.PendingTarget, state.PendingTarget),
+		DeclarationPath: firstText(state.PendingDeclarationPath, step.DeclarationPath),
 	}
+	switch *transition.Status {
+	case ProgramFrameStateCompleted:
+		value := transition.Output.Clone()
+		if program.Scope.Child {
+			if result, decodeErr := jsonutil.DecodeCanonicalValue[WorkflowBlockResult](value); decodeErr == nil {
+				value = result.Value.Clone()
+			}
+		}
+		if len(value) == 0 || !value.Valid() {
+			return transition, nil
+		}
+		outcome.Status = WorkflowStepOutcomeSucceeded
+		outcome.Output = value
+
+	case ProgramFrameStateCancelled:
+		outcome.Status = WorkflowStepOutcomeCancelled
+		outcome.Error = cloneWorkflowSanitizedError(transition.Error)
+		if outcome.Error == nil {
+			outcome.Error = workflowTerminalFailure(
+				ProgramFrameStateCancelled,
+				nil,
+			)
+		}
+		outcome.Effect = outcome.Error.Effect
+
+	case ProgramFrameStateFailed:
+		outcome.Status = WorkflowStepOutcomeFailed
+		outcome.Error = cloneWorkflowSanitizedError(transition.Error)
+		if outcome.Error == nil {
+			outcome.Error = workflowTerminalFailure(
+				ProgramFrameStateFailed,
+				nil,
+			)
+		}
+		outcome.Effect = outcome.Error.Effect
+	default:
+	}
+
 	if err := state.recordTerminalOutcome(outcome); err != nil {
 		return ProgramTransition{}, fmt.Errorf(
 			"record workflow terminal step outcome: %w",

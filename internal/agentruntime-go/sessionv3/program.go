@@ -441,11 +441,13 @@ func (agentLoopInterpreter) Advance(
 		if item.Type == WorkItemTypeLLM {
 			state.LastLLMWorkItemID = item.ID
 			if item.State != WorkItemStateCompleted {
-				return failedAgentTransition(
+				transition, transitionErr := failedAgentTransition(
 					state,
 					"llm_work_failed",
 					workItemFailureMessage(*item),
 				)
+				transition.Activities = interruptedAssistantActivities(*item)
+				return transition, transitionErr
 			}
 			if item.Output == nil || item.Output.LLM == nil {
 				return failedAgentTransition(state, "llm_output_missing", "LLM WorkItem completed without LLM output")
@@ -720,6 +722,41 @@ func workItemFailureMessage(item WorkItem) string {
 	return "LLM WorkItem did not complete successfully"
 }
 
+// interruptedAssistantActivities retains observed assistant text after a
+// failed or cancelled LLM WorkItem. The Activity reports its actual terminal
+// meaning and does not fabricate a successful Model result.
+func interruptedAssistantActivities(item WorkItem) []Activity {
+	text := ""
+	if item.Output != nil && item.Output.LLM != nil {
+		text = item.Output.LLM.Text
+	}
+	if strings.TrimSpace(text) == "" && item.LLMStream != nil {
+		text = item.LLMStream.Text
+	}
+	if strings.TrimSpace(text) == "" {
+		return nil
+	}
+
+	status := "failed"
+	if item.State == WorkItemStateCancelled {
+		status = "cancelled"
+	}
+	if item.State == WorkItemStateUncertain {
+		status = "uncertain"
+	}
+	return []Activity{{
+		Kind:       ActivityKindMessage,
+		Visibility: ActivityVisibilityBoth,
+		WorkItemID: item.ID,
+		Message: &MessageActivity{
+			Role:   MessageRoleAssistant,
+			Status: status,
+			Text:   text,
+			Error:  cloneWorkflowSanitizedError(item.Error),
+		},
+	}}
+}
+
 func encodeAgentLoopState(value agentLoopProgramState) ProgramState {
 	return ProgramState{
 		Type:    BuiltinAgentLoopInterpreterID,
@@ -844,11 +881,13 @@ func (singleModelInterpreter) Advance(
 		}
 		if item.State != WorkItemStateCompleted {
 			status := ProgramFrameStateFailed
-			return ProgramTransition{
+			transition := ProgramTransition{
 				State:  encodeSingleModelState(state),
 				Status: &status,
 				Error:  &SanitizedError{Code: "model_work_failed", Message: workItemFailureMessage(*item)},
-			}, nil
+			}
+			transition.Activities = interruptedAssistantActivities(*item)
+			return transition, nil
 		}
 		if item.Output == nil || item.Output.LLM == nil {
 			status := ProgramFrameStateFailed

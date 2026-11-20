@@ -9,16 +9,13 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
-// dispatchAllowedLocked is used both when work is queued and immediately
-// before binding. A failed checkpoint or recovery review prevents new work.
-func (r *Runtime) dispatchAllowedLocked(execution Execution) bool {
+// executionDispatchAvailableLocked identifies execution-wide conditions that
+// stop all new work, including cleanup. Cancellation is intentionally handled
+// per WorkItem by dispatchAllowedForWorkLocked so eligible cleanup can proceed.
+func (r *Runtime) executionDispatchAvailableLocked(execution Execution) bool {
 	if r.checkpointPending[execution.SessionID] ||
 		execution.Controls.Paused ||
 		execution.State.Terminal() {
-		return false
-	}
-	if execution.Controls.CancellationRequested &&
-		!execution.Cleanup.Active {
 		return false
 	}
 	for _, wait := range execution.Waits {
@@ -35,6 +32,31 @@ func (r *Runtime) workContext(deadline *time.Time) (context.Context, context.Can
 		return context.WithCancel(r.lifecycleCtx)
 	}
 	return context.WithDeadline(r.lifecycleCtx, deadline.UTC())
+}
+
+// effectiveWorkDeadlineLocked returns the only deadline that can stop a
+// WorkItem at the current lifecycle boundary. Cleanup work must not inherit an
+// already elapsed ordinary deadline after Runtime starts bounded cleanup.
+func (r *Runtime) effectiveWorkDeadlineLocked(
+	execution Execution,
+	item WorkItem,
+) *time.Time {
+	if item.Cleanup &&
+		execution.Cleanup.Active &&
+		execution.Cleanup.Deadline != nil {
+		return cloneTime(execution.Cleanup.Deadline)
+	}
+	return cloneTime(item.Deadline)
+}
+
+func (r *Runtime) effectiveAttemptDeadlineLocked(
+	execution Execution,
+	item WorkItem,
+	now time.Time,
+) (*time.Time, error) {
+	effective := item
+	effective.Deadline = r.effectiveWorkDeadlineLocked(execution, item)
+	return attemptDeadline(effective, now)
 }
 
 // resumeRestoredWork starts only after the complete recovery source has

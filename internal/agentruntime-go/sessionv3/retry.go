@@ -258,7 +258,9 @@ func (r *Runtime) waitForRetry(
 	r.consumeDueTimeLocked(retryDueTimeKey(workItemID))
 
 	now := r.now()
-	if execution.Controls.CancellationRequested || execution.State.Terminal() {
+	if execution.State.Terminal() ||
+		(execution.Controls.CancellationRequested &&
+			!r.cleanupDispatchAllowedLocked(*execution, *item)) {
 		item.State = WorkItemStateCancelled
 		item.CompletedAt = &now
 		item.UpdatedAt = now
@@ -267,7 +269,8 @@ func (r *Runtime) waitForRetry(
 		_ = r.persistLocked(persistContext, "retryCancelled", session)
 		return
 	}
-	if item.Deadline != nil && !now.Before(item.Deadline.UTC()) {
+	if deadline := r.effectiveWorkDeadlineLocked(*execution, *item); deadline != nil &&
+		!now.Before(deadline.UTC()) {
 		item.State = WorkItemStateFailed
 		item.Error = deadlineError()
 		item.CompletedAt = &now

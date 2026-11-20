@@ -2376,7 +2376,9 @@ func (r *Runtime) dispatchOne(ctx context.Context, sessionID SessionID, executio
 		r.mu.Unlock()
 		return
 	}
-	bindCtx, cancelBinding := r.workContext(item.Deadline)
+	bindCtx, cancelBinding := r.workContext(
+		r.effectiveWorkDeadlineLocked(*execution, *item),
+	)
 	r.cancels[item.ID] = cancelBinding
 	defer cancelBinding()
 	request := WorkDispatchRequest{
@@ -2449,12 +2451,13 @@ func (r *Runtime) dispatchOne(ctx context.Context, sessionID SessionID, executio
 		}
 		item.Input.Tool.Call = jsonutil.CloneJSONInValue(*bound.BoundToolCall)
 	}
-	if !r.dispatchAllowedLocked(*execution) {
+	if !r.dispatchAllowedForWorkLocked(*execution, *item) {
 		item.State = WorkItemStateReady
 		item.UpdatedAt = r.now()
 		return
 	}
-	if item.Deadline != nil && !r.now().Before(*item.Deadline) {
+	if deadline := r.effectiveWorkDeadlineLocked(*execution, *item); deadline != nil &&
+		!r.now().Before(deadline.UTC()) {
 		r.finishWorkLocked(session, execution, item, nil, WorkExecutionResult{
 			Error: deadlineError(), Confirmed: true,
 		})
@@ -2553,6 +2556,10 @@ func (r *Runtime) dispatchOne(ctx context.Context, sessionID SessionID, executio
 			}
 		}
 		bound.Wait.Deadline = earlierDeadline(bound.Wait.Deadline, item.Deadline)
+		bound.Wait.Deadline = earlierDeadline(
+			bound.Wait.Deadline,
+			r.effectiveWorkDeadlineLocked(*execution, *item),
+		)
 		now := r.now()
 		wait := Wait{
 			ID:         WaitID(r.newID()),
@@ -2567,6 +2574,7 @@ func (r *Runtime) dispatchOne(ctx context.Context, sessionID SessionID, executio
 		item.Binding = &bound.SemanticBinding
 		item.UpdatedAt = now
 		execution.Waits = append(execution.Waits, wait)
+		r.wakeResourceWaitersLocked(execution, nil)
 		r.privateWaits[wait.ID] = bound.Private
 		r.touchExecutionLocked(session, execution)
 		r.appendWaitActivityLocked(session, execution, wait)
@@ -2603,15 +2611,21 @@ func (r *Runtime) dispatchOne(ctx context.Context, sessionID SessionID, executio
 		if err := r.persistLocked(ctx, "waitRequested", session); err != nil {
 			return
 		}
+		execution = mutableSessionExecution(session, executionID)
+		if execution == nil {
+			return
+		}
 		r.publishLocked(ctx, session, execution.ID, RuntimeEventWaitChanged)
 		storedWait := mutableWait(execution, wait.ID)
+		ready := r.readyWorkForSessionLocked(session)
 		if storedWait != nil && storedWait.Status == WaitStatusPending {
 			r.scheduleWaitDeadlineLocked(ctx, sessionID, executionID, *storedWait)
+			r.launchReadyWork(ctx, session.ID, ready)
 			return
 		}
 
 		r.armExecutionRetriesLocked(ctx, sessionID, executionID, *execution)
-		r.launchWork(ctx, sessionID, executionID, r.readyWorkLocked(*execution))
+		r.launchReadyWork(ctx, session.ID, ready)
 		return
 	}
 	previous = cloneSession(*session)
@@ -2775,11 +2789,16 @@ func (r *Runtime) startDispatchedLocked(
 	}
 	now := r.now()
 
-	attemptDeadlineValue, err := attemptDeadline(*item, now)
+	attemptDeadlineValue, err := r.effectiveAttemptDeadlineLocked(
+		*execution,
+		*item,
+		now,
+	)
 	if err != nil {
 		return err
 	}
-	if item.Deadline != nil && !now.Before(*item.Deadline) {
+	if deadline := r.effectiveWorkDeadlineLocked(*execution, *item); deadline != nil &&
+		!now.Before(deadline.UTC()) {
 		return errors.New("work deadline elapsed before dispatch")
 	}
 	if err := r.reserveCallAttemptLocked(execution, item); err != nil {
@@ -3100,12 +3119,28 @@ func (r *Runtime) finishWorkLocked(
 		}
 		released := r.releaseWorkResourcesLocked(execution, item.ID)
 		r.wakeResourceWaitersLocked(execution, released)
+		r.advanceSettledWorkLocked(
+			session,
+			execution,
+			item.FrameID,
+			item.ID,
+		)
+		execution = mutableSessionExecution(session, executionID)
+		if execution == nil {
+			return
+		}
+		item = mutableWorkItem(execution, workItemID)
+		if item == nil {
+			return
+		}
+		r.wakeCompletionWorkWaitsLocked(session, execution, *item)
 		r.resumeCancellationCleanupFramesLocked(session, execution)
 		execution = mutableSessionExecution(session, executionID)
 		if execution == nil {
 			return
 		}
 		r.refreshExecutionStateLocked(execution)
+		r.settleTerminalExecutionLocked(session, execution)
 		r.touchExecutionLocked(session, execution)
 		return
 	}
@@ -3539,7 +3574,7 @@ func (r *Runtime) finishPanickedWork(
 }
 
 func (r *Runtime) readyWorkLocked(execution Execution) []WorkItemID {
-	if !r.dispatchAllowedLocked(execution) {
+	if !r.executionDispatchAvailableLocked(execution) {
 		return nil
 	}
 
@@ -3567,13 +3602,14 @@ func (r *Runtime) dispatchAllowedForWorkLocked(
 	execution Execution,
 	item WorkItem,
 ) bool {
-	if !r.dispatchAllowedLocked(execution) {
-		if !execution.Controls.CancellationRequested {
-			return false
-		}
-		return r.cleanupDispatchAllowedLocked(execution, item)
+	if !r.executionDispatchAvailableLocked(execution) {
+		return false
 	}
-	return true
+
+	if !execution.Controls.CancellationRequested {
+		return true
+	}
+	return r.cleanupDispatchAllowedLocked(execution, item)
 }
 
 func (r *Runtime) refreshExecutionStateLocked(execution *Execution) {

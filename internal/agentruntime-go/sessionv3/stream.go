@@ -33,8 +33,9 @@ func (r *Runtime) appendLLMStream(
 	if item == nil ||
 		item.Type != WorkItemTypeLLM ||
 		item.State != WorkItemStateDispatched ||
-		execution.Controls.CancellationRequested ||
-		execution.State.Terminal() {
+		execution.State.Terminal() ||
+		(execution.Controls.CancellationRequested &&
+			!r.cleanupDispatchAllowedLocked(*execution, *item)) {
 		return context.Canceled
 	}
 

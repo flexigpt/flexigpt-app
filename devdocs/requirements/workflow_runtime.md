@@ -1310,16 +1310,19 @@ required before the status can change.
 
 ##### `RT-CLEANUP-003.a` Carry cleanup classification and effective deadline
 
-- Status: Partial.
-- Current evidence: `R/runtime.go`, `coordination.go`, `retry.go`,
-  `runtime_resources.go`, and stream paths retain ordinary-work decisions.
-- Required result:
-  - Apply the effective cleanup deadline from binding through external
-    invocation, retry, resource waiting, emits, streams, and final settlement.
-  - Ensure retry wrappers and other synthetic frames inherit cleanup
-    classification.
-  - Do not reject eligible cleanup only because ordinary work is cancelled or
-    expired.
+- Status: Implemented.
+- Implemented evidence:
+  - `R/runtime_durability.go:effectiveWorkDeadlineLocked` and
+    `effectiveAttemptDeadlineLocked` select the cleanup deadline for eligible
+    cleanup WorkItems.
+  - `R/runtime.go:dispatchOne` uses the effective deadline during binding,
+    post-binding dispatch, durable waits, and Attempt creation.
+  - `R/coordination.go`, `retry.go`, `runtime_resources.go`, `stream.go`, and
+    `ports_runtime.go` distinguish normal cancellation from eligible cleanup.
+  - `R/runtime_children.go:childFrameDeadlineInputs` prevents cleanup child
+    frames from inheriting expired ordinary deadlines.
+  - `R/workflow_saga.go:workflowProgramRunsCleanup` recursively recognizes
+    cleanup work inside retry-boundary ProgramSnapshots.
 
 ##### `RT-CLEANUP-003.b` Retain Saga ownership until late outcomes settle
 
@@ -1367,10 +1370,13 @@ required before the status can change.
 ##### `RT-BUDGET-003.a` Wake waiters when a counted slot becomes available
 
 - Status: Partial.
-- Current evidence: `budget.go:activeBudgetWork`,
-  `wakeBudgetConcurrencyWaitersLocked`, and `runtime.go:dispatchOne` do not
-  consistently wake waiters after `Binding` to `Waiting`, binding failure, or
-  similar state transitions.
+- Current evidence:
+  - `R/runtime.go:dispatchOne` now wakes resource and budget-concurrency
+    waiters when a WorkItem changes from `Binding` to `Waiting`, then launches
+    ready Session work after the wait checkpoint.
+  - Binding failure, port failure, panic, manual settlement, and all
+    cross-Execution release paths do not yet use one authoritative slot-release
+    lifecycle.
 - Required result:
   - Every counted-slot release runs eligible durable wakeup and ready-work
     launch.
@@ -1645,12 +1651,16 @@ required before the status can change.
 
 ##### `WF-CHANNEL-003.c` Preserve inherited subscription identity
 
-- Status: Partial.
-- Required result:
-  - Retain the originating subscription owner when a child inherits a
-    subscription.
-  - Do not make an already consumed event available again because execution
-    entered a child scope.
+- Status: Implemented.
+- Implemented evidence:
+  - `R/workflow_coordination.go:WorkflowSubscriptionState` persists
+    `OwnerFrameID`.
+  - `R/workflow_program.go:ensureWorkflowSubscriptionOwners` assigns the
+    current ProgramFrame identity to locally activated subscriptions while
+    preserving inherited owner identities.
+  - `R/workflow_machine.go:startMachine` records machine listener ownership.
+  - `R/subscription_runtime.go:subscriptionConsumptionForWait` uses the
+    originating subscription owner instead of the transient child wait frame.
 
 ### Workflow effects, recovery, structured control, and outcomes
 
@@ -1692,18 +1702,25 @@ required before the status can change.
 
 ##### `WF-EFFECT-003.b` Settle MCP from actual domain evidence
 
-- Status: Partial.
-- Required result:
-  - Mark confirmed successful MCP responses as confirmed application where
-    domain evidence supports that result.
-  - Preserve uncertainty for errors that do not prove non-application.
-  - Preserve receipts and settled Tool results for normal continuation, history,
-    reconciliation, and Saga recording.
+- Status: Implemented.
+- Implemented evidence:
+  - `S/mcpruntime/v3.go:V3Executor.Execute` returns confirmed success without
+    forcing `EffectStateUncertain`; Runtime derives read `notApplicable` and
+    mutating `confirmedApplied` from the durable receipt.
+  - MCP error responses remain uncertain for mutating WorkItems and preserve
+    their Tool output and typed uncertainty error.
+  - Read-only MCP error responses remain confirmed read failures and do not
+    invent a mutating business effect.
 
 ##### `WF-EFFECT-003.c` Preserve compensation causality and operation facts
 
 - Status: Partial.
 - Required result:
+  - `R/workflow_program.go` now retains the last confirmed mutating WorkItem
+    identity and appends it as a dependency for later sequential mutating
+    WorkItems.
+  - `R/workflow_reconciliation.go` preserves the reconciled original WorkItem
+    as the next causal dependency.
   - Establish effect dependencies across ordered work and structured boundaries.
   - Compensate independent effects concurrently only when dependencies permit
     it.
@@ -1743,11 +1760,17 @@ required before the status can change.
 
 ##### `WF-CONTROL-003.b` Settle empty collections and preserve maxima
 
-- Status: Partial.
-- Required result:
-  - Emit required merge work for empty Foreach results.
-  - Settle non-`all` empty collections according to declared result behavior.
-  - Preserve omitted versus explicit zero `maxItems` and `maxIterations`.
+- Status: Implemented.
+- Implemented evidence:
+  - `R/types.go` retains `WorkflowForeach.MaxItems` and
+    `WorkflowRepeat.MaxIterations` as pointers.
+  - `S/workflowruntime/compiler_structured.go` preserves explicit zero values
+    from the admitted declaration.
+  - `R/workflow_structured.go:launchForeachChildren` re-enters
+    `drivePending` after an empty collection completes so a declared parent
+    state merge emits its durable StateUpdate WorkItem.
+  - Empty non-`all` Foreach completion creates a typed no-selected-item or
+    quorum-unreachable failure rather than waiting indefinitely.
 
 ##### `WF-CONTROL-003.c` Limit immediate Machine transitions only
 
@@ -1791,11 +1814,14 @@ required before the status can change.
 
 ##### `WF-OUTCOME-003.b` Persist interrupted assistant output truthfully
 
-- Status: Partial.
-- Required result:
-  - Persist a semantic assistant Activity for usable partial output.
-  - Preserve actual provider observations and actual failure or cancellation.
-  - Do not create a fabricated successful Model or Tool result.
+- Status: Implemented.
+- Implemented evidence:
+  - `R/program.go:interruptedAssistantActivities` persists usable final or
+    streamed assistant text with failed, cancelled, or uncertain status.
+  - Agent-loop and single-model interpreters attach that Activity to their
+    terminal failure transition.
+  - The originating WorkItem retains the provider output, receipt, and actual
+    error. The Activity does not create a successful Model or Tool result.
 
 ### Conversation replay, configuration, continuation, handoff, and Skill state
 

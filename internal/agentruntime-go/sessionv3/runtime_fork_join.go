@@ -292,10 +292,15 @@ func (r *Runtime) materializeForkFramesLocked(
 			return budgetErr
 		}
 		now := r.now()
+		parentDeadline, intentDeadline := childFrameDeadlineInputs(
+			*execution,
+			*parent,
+			intent,
+		)
 		deadline, budgetErr := programFrameDeadline(
 			now,
-			parent.Deadline,
-			intent.Deadline,
+			parentDeadline,
+			intentDeadline,
 			childBudget,
 		)
 		if budgetErr != nil {

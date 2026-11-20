@@ -219,7 +219,7 @@ type WorkflowForeach struct {
 	Items       WorkflowValue             `json:"items"`
 	ItemSchema  jsonutil.CanonicalValue   `json:"itemSchema"`
 	Concurrency int                       `json:"concurrency,omitempty"`
-	MaxItems    int                       `json:"maxItems,omitempty"`
+	MaxItems    *int                      `json:"maxItems,omitempty"`
 	Completion  WorkflowCompletion        `json:"completion"`
 	Errors      string                    `json:"errors,omitempty"`
 	Merge       *WorkflowParentStateMerge `json:"merge,omitempty"`
@@ -233,7 +233,7 @@ type WorkflowRepeat struct {
 	Until         *WorkflowValue     `json:"until,omitempty"`
 	Lifetime      string             `json:"lifetime,omitempty"`
 	State         *WorkflowStateSpec `json:"state,omitempty"`
-	MaxIterations int                `json:"maxIterations,omitempty"`
+	MaxIterations *int               `json:"maxIterations,omitempty"`
 	OnExhausted   string             `json:"onExhausted,omitempty"`
 	Timeout       WorkflowDuration   `json:"timeout,omitempty"`
 	Do            WorkflowBlock      `json:"do"`
@@ -952,7 +952,7 @@ func (i *WorkflowInterpreter) startForeach(
 			"Workflow foreach items must be an array",
 		)
 	}
-	if step.Foreach.MaxItems > 0 && len(items) > step.Foreach.MaxItems {
+	if step.Foreach.MaxItems != nil && len(items) > *step.Foreach.MaxItems {
 		return workflowFailure(
 			state,
 			"workflow_foreach_limit_exceeded",
@@ -1139,7 +1139,7 @@ func workflowActiveChildren(values []WorkflowChild) int {
 
 func (i *WorkflowInterpreter) launchForeachChildren(
 	frame ProgramFrame,
-	_ Execution,
+	execution Execution,
 	program WorkflowProgram,
 	state WorkflowState,
 ) (ProgramTransition, error) {
@@ -1200,7 +1200,7 @@ func (i *WorkflowInterpreter) launchForeachChildren(
 			return workflowFailure(state, "workflow_foreach_failed", err.Error())
 		}
 		if state.Pending != nil {
-			return workflowTransition(state, nil, nil, nil)
+			return i.drivePending(frame, execution, program, state)
 		}
 		return i.drive(frame, Execution{}, program, state)
 	}
@@ -1333,7 +1333,8 @@ func (i *WorkflowInterpreter) repeatAllowsNext(
 	if progress.Count != nil && progress.Iterations >= *progress.Count {
 		return false, false, nil
 	}
-	if spec.MaxIterations > 0 && progress.Iterations >= spec.MaxIterations {
+	if spec.MaxIterations != nil &&
+		progress.Iterations >= *spec.MaxIterations {
 		return false, true, nil
 	}
 	return true, false, nil
@@ -2048,6 +2049,21 @@ func (i *WorkflowInterpreter) finishForeach(
 	progress := state.Pending.Foreach
 	successes := workflowForeachSuccessIndexes(progress.Outcomes)
 	mode := workflowCompletionMode(progress.Completion)
+	if len(progress.Outcomes) == 0 && mode != allStr {
+		code := "workflow_foreach_no_selected_item"
+		message := "foreach completion mode requires at least one item"
+		if mode == quorumStr {
+			code = "workflow_foreach_quorum_unreachable"
+			message = "foreach success quorum cannot be reached by an empty collection"
+		}
+		failure := workflowAggregateForeachFailure(progress.Outcomes)
+		failure.Code = code
+		failure.Message = message
+		if output, err := workflowForeachOutput(progress); err == nil {
+			failure.Details = output
+		}
+		return workflowChildError{errorValue: failure}
+	}
 
 	switch mode {
 	case "all":
@@ -2650,7 +2666,10 @@ func (f WorkflowForeach) Validate() error {
 	if !f.ItemSchema.Valid() || len(f.ItemSchema) == 0 {
 		return errors.New("Workflow foreach item schema is invalid")
 	}
-	if f.Concurrency < 0 || f.MaxItems < 0 {
+	if f.Concurrency < 0 {
+		return errors.New("Workflow foreach limits are invalid")
+	}
+	if f.MaxItems != nil && *f.MaxItems < 0 {
 		return errors.New("Workflow foreach limits are invalid")
 	}
 	if err := f.Completion.Validate(); err != nil {
@@ -2710,7 +2729,7 @@ func (r WorkflowRepeat) Validate() error {
 			return err
 		}
 	}
-	if r.MaxIterations < 0 {
+	if r.MaxIterations != nil && *r.MaxIterations < 0 {
 		return errors.New("Workflow repeat maxIterations is invalid")
 	}
 	switch r.OnExhausted {

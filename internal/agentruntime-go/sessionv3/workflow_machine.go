@@ -407,6 +407,9 @@ func (i *WorkflowInterpreter) startMachine(
 			err.Error(),
 		)
 	}
+	for index := range subscriptions {
+		subscriptions[index].OwnerFrameID = frame.ID
+	}
 	state.Subscriptions = append(state.Subscriptions, subscriptions...)
 
 	names := make([]string, 0, len(subscriptions))

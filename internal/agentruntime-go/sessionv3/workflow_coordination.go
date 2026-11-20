@@ -40,6 +40,7 @@ type WorkflowSubscriptionState struct {
 	Name              string                      `json:"name"`
 	Event             string                      `json:"event"`
 	Source            string                      `json:"source"`
+	OwnerFrameID      ProgramFrameID              `json:"ownerFrameID,omitempty"`
 	Correlation       jsonutil.CanonicalValue     `json:"correlation,omitempty"`
 	CorrelationSchema jsonutil.CanonicalValue     `json:"correlationSchema,omitempty"`
 	DataSchema        jsonutil.CanonicalValue     `json:"dataSchema,omitempty"`
@@ -201,6 +202,14 @@ func (s WorkflowSubscriptionState) Validate() error {
 	}
 	if err := validateID("workflow subscription source", s.Source); err != nil {
 		return err
+	}
+	if s.OwnerFrameID != "" {
+		if err := validateID(
+			"workflow subscription owner frame ID",
+			string(s.OwnerFrameID),
+		); err != nil {
+			return err
+		}
 	}
 	if s.Capacity < 1 || s.Capacity > maximumCoordinationRecords {
 		return errors.New("workflow subscription state capacity is invalid")
@@ -576,6 +585,20 @@ func (i *WorkflowInterpreter) activateWorkflowSubscriptions(
 		active[declaration.Name] = struct{}{}
 	}
 	return nil
+}
+
+func ensureWorkflowSubscriptionOwners(
+	state *WorkflowState,
+	frameID ProgramFrameID,
+) {
+	if state == nil || frameID == "" {
+		return
+	}
+	for index := range state.Subscriptions {
+		if state.Subscriptions[index].OwnerFrameID == "" {
+			state.Subscriptions[index].OwnerFrameID = frameID
+		}
+	}
 }
 
 func (i *WorkflowInterpreter) workflowWaitFilter(
@@ -1124,6 +1147,7 @@ func cloneWorkflowSubscriptionStates(
 			Name:              values[index].Name,
 			Event:             values[index].Event,
 			Source:            values[index].Source,
+			OwnerFrameID:      values[index].OwnerFrameID,
 			Correlation:       values[index].Correlation.Clone(),
 			CorrelationSchema: values[index].CorrelationSchema.Clone(),
 			DataSchema:        values[index].DataSchema.Clone(),

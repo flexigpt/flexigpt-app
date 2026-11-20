@@ -183,9 +183,8 @@ func (r *Runtime) dispatchEmit(
 	if item == nil ||
 		item.State != WorkItemStateReady ||
 		item.Type != WorkItemTypeEmit ||
-		execution.Controls.Paused ||
-		execution.Controls.CancellationRequested ||
-		execution.State.Terminal() {
+		execution.State.Terminal() ||
+		!r.dispatchAllowedForWorkLocked(*execution, *item) {
 		return
 	}
 	if item.Input.Emit == nil {

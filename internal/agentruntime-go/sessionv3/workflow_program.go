@@ -333,6 +333,7 @@ type WorkflowState struct {
 	TargetSets             []WorkflowTargetSetState     `json:"targetSets,omitempty"`
 	TargetSetResolution    *WorkflowTargetSetResolution `json:"targetSetResolution,omitempty"`
 	ChildCallWorkItemID    WorkItemID                   `json:"childCallWorkItemID,omitempty"`
+	LastEffectWorkItemID   WorkItemID                   `json:"lastEffectWorkItemID,omitempty"`
 }
 
 // WorkflowResourceClaim is a declaration-level resource claim template. Key
@@ -387,6 +388,18 @@ func (s *WorkflowState) Validate() error {
 		if err := validateID(
 			"workflow child call WorkItem ID",
 			string(s.ChildCallWorkItemID),
+		); err != nil {
+			return err
+		}
+	}
+	if s.LastEffectWorkItemID != "" &&
+		validateID("workflow last effect work item ID", string(s.LastEffectWorkItemID)) != nil {
+		return errors.New("workflow last effect WorkItem ID is invalid")
+	}
+	if s.LastEffectWorkItemID != "" {
+		if err := validateID(
+			"workflow last effect work item ID",
+			string(s.LastEffectWorkItemID),
 		); err != nil {
 			return err
 		}
@@ -603,6 +616,7 @@ func (i *WorkflowInterpreter) Advance(
 	} else {
 		state.LogicalTime = frame.CreatedAt.UTC()
 	}
+	ensureWorkflowSubscriptionOwners(&state, frame.ID)
 
 	if err := captureWorkflowMessages(program, &state, execution); err != nil {
 		return ProgramTransition{}, err
@@ -2056,6 +2070,10 @@ func (i *WorkflowInterpreter) settleWork(
 	if err := state.recordOutcome(outcome); err != nil {
 		return err
 	}
+	if item.Effect.Kind != EffectKindRead &&
+		item.EffectState == EffectStateConfirmedApplied {
+		state.LastEffectWorkItemID = item.ID
+	}
 	state.Index++
 	state.clearPendingStep()
 	return nil
@@ -3165,6 +3183,14 @@ func workflowWork(
 	path string,
 	intent WorkItemIntent,
 ) (ProgramTransition, error) {
+	if intent.Effect.Kind != EffectKindRead &&
+		state.LastEffectWorkItemID != "" &&
+		!slices.Contains(intent.Dependencies, state.LastEffectWorkItemID) {
+		intent.Dependencies = append(
+			intent.Dependencies,
+			state.LastEffectWorkItemID,
+		)
+	}
 	state.PendingPath = path
 	intent.DeclarationPath = state.PendingDeclarationPath
 	if state.PendingDeclarationPath != "" {

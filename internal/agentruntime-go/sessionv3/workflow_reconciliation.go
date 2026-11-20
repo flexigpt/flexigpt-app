@@ -409,6 +409,7 @@ func (i *WorkflowInterpreter) settleReconciliationChild(
 		}
 
 		state.Pending = nil
+		state.LastEffectWorkItemID = original.ID
 		state.Index++
 		state.clearPendingStep()
 

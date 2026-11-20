@@ -123,6 +123,21 @@ func programFrameDeadline(
 	return earlierDeadline(deadline, &budgetDeadline), nil
 }
 
+// childFrameDeadlineInputs prevents cleanup child frames from inheriting a
+// normal deadline that has already elapsed. The enclosing cleanup deadline
+// remains the upper bound and child budget duration can narrow it further.
+func childFrameDeadlineInputs(
+	execution Execution,
+	parent ProgramFrame,
+	intent ProgramFrameIntent,
+) (parentDeadline, intentDeadline *time.Time) {
+	if workflowProgramRunsCleanup(intent.Program) &&
+		execution.Cleanup.Active {
+		return cloneTime(execution.Cleanup.Deadline), nil
+	}
+	return cloneTime(parent.Deadline), cloneTime(intent.Deadline)
+}
+
 func workItemBudgetForFrame(
 	execution Execution,
 	frame ProgramFrame,
@@ -226,10 +241,15 @@ func (r *Runtime) createIndependentChildExecutionLocked(
 	if err != nil {
 		return nil, err
 	}
+	parentDeadline, intentDeadline := childFrameDeadlineInputs(
+		*parent,
+		*parentFrame,
+		intent,
+	)
 	deadline, err := programFrameDeadline(
 		now,
-		parentFrame.Deadline,
-		intent.Deadline,
+		parentDeadline,
+		intentDeadline,
 		effectiveBudget,
 	)
 	if err != nil {

@@ -290,7 +290,25 @@ func subscriptionConsumptionForWait(
 	if frameID == "" {
 		return SubscriptionConsumption{}, false
 	}
-	return workflowSubscriptionIdentity(frameID, wait.Request.Subscription), true
+	frame := mutableFrame(execution, frameID)
+	if frame == nil || frame.Program.InterpreterID != WorkflowInterpreterID {
+		return SubscriptionConsumption{}, false
+	}
+
+	ownerFrameID := frame.ID
+	_, state, err := decodeWorkflowProgram(*frame)
+	if err == nil {
+		for _, subscription := range state.Subscriptions {
+			if subscription.Name != wait.Request.Subscription {
+				continue
+			}
+			if subscription.OwnerFrameID != "" {
+				ownerFrameID = subscription.OwnerFrameID
+			}
+			break
+		}
+	}
+	return workflowSubscriptionIdentity(ownerFrameID, wait.Request.Subscription), true
 }
 
 func signalConsumedBySubscription(

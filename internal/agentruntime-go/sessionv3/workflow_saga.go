@@ -899,11 +899,23 @@ func workflowTerminalChildPath(
 func workflowProgramRunsCleanup(
 	program ProgramSnapshot,
 ) bool {
-	if program.InterpreterID != WorkflowInterpreterID {
+	switch program.InterpreterID {
+	case WorkflowInterpreterID:
+		value, err := workflowProgramFromSnapshot(program)
+		return err == nil && value.Scope.Cleanup
+
+	case BuiltinRetryBoundaryInterpreterID:
+		payload, err := jsonutil.DecodeCanonicalValue[retryProgramPayload](
+			program.Payload,
+		)
+		if err != nil {
+			return false
+		}
+		return workflowProgramRunsCleanup(payload.Child)
+
+	default:
 		return false
 	}
-	value, err := workflowProgramFromSnapshot(program)
-	return err == nil && value.Scope.Cleanup
 }
 
 func workflowFrameRunsCleanup(frame ProgramFrame) bool {

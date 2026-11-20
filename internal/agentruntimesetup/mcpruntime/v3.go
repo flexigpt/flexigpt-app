@@ -720,7 +720,7 @@ func (e *V3Executor) Execute(
 		}
 	}
 
-	return sessionv3Runtime.WorkExecutionResult{
+	result := sessionv3Runtime.WorkExecutionResult{
 		Output: &sessionv3Runtime.WorkItemOutput{
 			Value: structured,
 			Tool: &sessionv3Runtime.ToolOutput{
@@ -738,11 +738,34 @@ func (e *V3Executor) Execute(
 			App: app,
 		},
 		Confirmed: true,
-		EffectState: func() *sessionv3Runtime.EffectState {
-			effect := sessionv3Runtime.EffectStateUncertain
-			return &effect
-		}(),
-	}, true, nil
+	}
+
+	if !response.IsError {
+		// A successful MCP response is positive domain evidence that the
+		// invocation settled. Runtime derives notApplicable for reads and
+		// confirmedApplied for mutating WorkItems from this receipt.
+		return result, true, nil
+	}
+
+	if request.WorkItem.Effect.Kind == sessionv3Runtime.EffectKindRead {
+		result.Error = &sessionv3Runtime.SanitizedError{
+			Code:     "mcp_tool_error",
+			Category: sessionv3Runtime.ErrorCategoryExecution,
+			Message:  errorText,
+		}
+		return result, true, nil
+	}
+
+	effect := sessionv3Runtime.EffectStateUncertain
+	result.Confirmed = false
+	result.EffectState = &effect
+	result.Error = &sessionv3Runtime.SanitizedError{
+		Code:     "mcp_tool_error",
+		Category: sessionv3Runtime.ErrorCategoryUncertainty,
+		Effect:   effect,
+		Message:  errorText,
+	}
+	return result, true, nil
 }
 
 // ResolveWait translates a Session v3 approval resolution into the MCP

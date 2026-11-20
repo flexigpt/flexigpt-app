@@ -1007,8 +1007,9 @@ func (r *Runtime) appendWorkPortStream(
 	item := mutableWorkItem(execution, workItemID)
 	if item == nil ||
 		item.State != WorkItemStateDispatched ||
-		execution.Controls.CancellationRequested ||
-		execution.State.Terminal() {
+		execution.State.Terminal() ||
+		(execution.Controls.CancellationRequested &&
+			!r.cleanupDispatchAllowedLocked(*execution, *item)) {
 		return context.Canceled
 	}
 	if err := validateWorkPortOwnership(*execution, *item); err != nil {

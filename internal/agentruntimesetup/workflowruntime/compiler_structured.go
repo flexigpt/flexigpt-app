@@ -205,7 +205,8 @@ func compileWorkflowForeach(
 		output.Concurrency = *input.Concurrency
 	}
 	if input.MaxItems != nil {
-		output.MaxItems = *input.MaxItems
+		value := *input.MaxItems
+		output.MaxItems = &value
 	}
 	return output, nil
 }
@@ -252,7 +253,8 @@ func compileWorkflowRepeat(
 		Do:          block,
 	}
 	if input.MaxIterations != nil {
-		output.MaxIterations = *input.MaxIterations
+		value := *input.MaxIterations
+		output.MaxIterations = &value
 	}
 	if len(input.Count) != 0 {
 		value, err := compileWorkflowValue(input.Count)

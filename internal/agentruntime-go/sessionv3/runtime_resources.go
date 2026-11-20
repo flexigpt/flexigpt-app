@@ -548,8 +548,9 @@ func (r *Runtime) waitForResource(
 	}
 	r.consumeDueTimeLocked(resourceDueTimeKey(workItemID))
 
-	if execution.Controls.CancellationRequested ||
-		execution.State.Terminal() {
+	if execution.State.Terminal() ||
+		(execution.Controls.CancellationRequested &&
+			!r.cleanupDispatchAllowedLocked(*execution, *item)) {
 		item.State = WorkItemStateCancelled
 		item.ResourceWait = nil
 		item.UpdatedAt = r.now()
@@ -557,7 +558,18 @@ func (r *Runtime) waitForResource(
 		_ = r.persistLocked(persistContext, "resourceWaitCancelled", session)
 		return
 	}
-
+	if deadline := r.effectiveWorkDeadlineLocked(*execution, *item); deadline != nil &&
+		!r.now().Before(deadline.UTC()) {
+		now := r.now()
+		item.State = WorkItemStateFailed
+		item.Error = deadlineError()
+		item.CompletedAt = &now
+		item.ResourceWait = nil
+		item.UpdatedAt = now
+		r.touchExecutionLocked(session, execution)
+		_ = r.persistLocked(persistContext, "resourceDeadlineElapsed", session)
+		return
+	}
 	item.State = WorkItemStateReady
 	item.ResourceWait = nil
 	item.UpdatedAt = r.now()
