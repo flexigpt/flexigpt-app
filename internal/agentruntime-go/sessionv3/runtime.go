@@ -1096,6 +1096,51 @@ func (r *Runtime) ContinueExecution(ctx context.Context, command ContinueExecuti
 	)
 }
 
+func (r *Runtime) CompleteConversationHandoff(
+	ctx context.Context,
+	command CompleteConversationHandoffCommand,
+) (*CommandReceipt, error) {
+	return r.changeExecution(
+		ctx,
+		command.Meta,
+		command.SessionID,
+		command.ExecutionID,
+		command,
+		func(session *Session, execution *Execution) (*CommandReceipt, error) {
+			for _, frame := range execution.ProgramFrames {
+				if frame.HandoffID == "" ||
+					frame.HandoffID != command.HandoffID ||
+					frame.Status.Terminal() {
+					continue
+				}
+				if err := r.advanceFrameLocked(
+					session,
+					execution,
+					frame.ID,
+					ProgramEvent{Kind: ProgramEventHandoffComplete},
+				); err != nil {
+					return nil, err
+				}
+				r.touchExecutionLocked(session, execution)
+				return &CommandReceipt{
+					CommandID:         command.Meta.ID,
+					Accepted:          true,
+					SessionID:         session.ID,
+					ExecutionID:       execution.ID,
+					SessionRevision:   session.Revision,
+					ExecutionRevision: execution.Revision,
+				}, nil
+			}
+			return &CommandReceipt{
+				CommandID:   command.Meta.ID,
+				SessionID:   session.ID,
+				ExecutionID: execution.ID,
+				Message:     "active conversation handoff is unavailable",
+			}, nil
+		},
+	)
+}
+
 func (r *Runtime) PauseExecution(ctx context.Context, command PauseExecutionCommand) (*CommandReceipt, error) {
 	return r.setPaused(ctx, command.Meta, command.SessionID, command.ExecutionID, command, true)
 }
@@ -2088,6 +2133,18 @@ func (r *Runtime) advanceFrameLocked(
 			if json.Unmarshal(frame.State.Data, &ss) == nil {
 				ss.WorkItemID = item.ID
 				frame.State = encodeSingleModelState(ss)
+			}
+		}
+		if item.Type == WorkItemTypeLLM && item.Input.LLM != nil {
+			for _, consumedID := range item.Input.LLM.ContinuationWorkItemIDs {
+				consumed := mutableWorkItem(execution, consumedID)
+				if consumed == nil ||
+					consumed.Type != WorkItemTypeTool ||
+					consumed.ConsumedByWorkItemID != "" {
+					continue
+				}
+				consumed.ConsumedByWorkItemID = item.ID
+				consumed.UpdatedAt = now
 			}
 		}
 	}

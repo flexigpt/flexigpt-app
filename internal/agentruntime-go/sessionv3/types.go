@@ -992,6 +992,7 @@ type WorkItem struct {
 	PortStreams            []PortStream            `json:"portStreams,omitempty"`
 	Input                  WorkItemPayload         `json:"input"`
 	Binding                *SemanticBinding        `json:"binding,omitempty"`
+	ConsumedByWorkItemID   WorkItemID              `json:"consumedByWorkItemID,omitempty"`
 	Output                 *WorkItemOutput         `json:"output,omitempty"`
 	Error                  *SanitizedError         `json:"error,omitempty"`
 	LLMStream              *LLMStreamState         `json:"llmStream,omitempty"`
@@ -1527,12 +1528,13 @@ type SanitizedError struct {
 type ProgramEventKind string
 
 const (
-	ProgramEventStarted      ProgramEventKind = "started"
-	ProgramEventActivity     ProgramEventKind = "activity"
-	ProgramEventWorkSettled  ProgramEventKind = "workSettled"
-	ProgramEventChildSettled ProgramEventKind = "childSettled"
-	ProgramEventContinue     ProgramEventKind = "continue"
-	ProgramEventCancelled    ProgramEventKind = "cancelled"
+	ProgramEventStarted         ProgramEventKind = "started"
+	ProgramEventActivity        ProgramEventKind = "activity"
+	ProgramEventWorkSettled     ProgramEventKind = "workSettled"
+	ProgramEventChildSettled    ProgramEventKind = "childSettled"
+	ProgramEventContinue        ProgramEventKind = "continue"
+	ProgramEventHandoffComplete ProgramEventKind = "handoffComplete"
+	ProgramEventCancelled       ProgramEventKind = "cancelled"
 )
 
 type ProgramEvent struct {
@@ -1724,6 +1726,16 @@ type ProgramFrameBindingCloser interface {
 		executionID ExecutionID,
 		frameID ProgramFrameID,
 	) error
+}
+
+// CompleteConversationHandoffCommand completes one active handoff Agent frame
+// successfully. It is distinct from cancellation and therefore permits the
+// persisted restore or retain ownership policy to settle normally.
+type CompleteConversationHandoffCommand struct {
+	Meta        CommandMeta `json:"meta"`
+	SessionID   SessionID   `json:"sessionID"`
+	ExecutionID ExecutionID `json:"executionID"`
+	HandoffID   string      `json:"handoffID"`
 }
 
 type WorkflowAdmissionRequest struct {

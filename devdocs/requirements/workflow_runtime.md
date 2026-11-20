@@ -1993,80 +1993,75 @@ required before the status can change.
 
 #### `V3-CONTINUE-003` Complete active-operation continuation and manual Tool ownership
 
-- Status: Partial.
+- Status: Implemented.
 - Corrected prior claims: `V3-CONTROL-002` and parts of `WF-HANDOFF-002`.
-- Current evidence:
-  - `normal_session.go:consumeContinuationLocked` submits staged input through
-    the conversation frame.
-  - A live Agent child waiting for explicit continuation can leave that input
-    queued behind the Agent that must consume it.
-  - `ContinueExecution` can return after consuming staged input without
-    resuming the active Agent round.
-  - Manual Tool controls can address a conversation queue or whole Execution.
-  - Normal Tool mutation can rewrite consumed historical results.
-  - Continuation can broadcast across Agent frames.
-- Required result:
-  - Consume staged text, attachments, defaults, budget, approved App context,
-    and settled Tool results in the next round of the active owning operation.
-  - Scope manual retry, skip, completion-as-error, and continuation to the
-    current unconsumed operation.
-  - Preserve actual effect certainty.
-  - Keep App-originated and unrelated Workflow work outside normal Tool-result
-    continuation.
+- Implemented evidence:
+  - `R/normal_session.go:consumeContinuationLocked` routes staged input to the
+    active conversation Agent ProgramFrame when one exists.
+  - `R/program.go:agentLoopProgramState` retains queued Activity identity,
+    invocation defaults, and invocation budget.
+  - `R/runtime.go:advanceFrameLocked` persists the LLM WorkItem that consumes
+    each generated Tool result.
+  - `R/normal_session.go` rejects retry, skip, and manual error completion for
+    Tool results already consumed by a later LLM WorkItem.
+  - `requestAgentContinuationLocked` advances only the active conversation or
+    handoff Agent frame.
 
 ##### `V3-CONTINUE-003.a` Resume the active conversation operation
 
-- Status: Partial.
-- Required result:
-  - Do not queue continuation behind the Agent round that needs it.
-  - Consume staged input exactly once into the correct next Model round.
-  - Include settled Tool results and approved App context.
+- Status: Implemented.
+- Implemented evidence:
+  - `consumeContinuationLocked` uses `activeConversationAgentFrame` and
+    `submitNormalMessageToFrameWithDefaultsLocked`.
+  - ProgramEvent activity facts retain the exact defaults and budget required
+    for the next Agent Model round.
+  - Existing continuation consumption keeps approved App context and durable
+    Tool-result activity facts in the resulting message Activity.
 
 ##### `V3-CONTINUE-003.b` Scope manual controls to the current operation
 
-- Status: Partial.
-- Required result:
-  - Preserve consumed-result ownership.
-  - Do not mutate historical Tool results already consumed by a later Model
-    round.
-  - Do not broadcast continuation into unrelated Agent frames.
-  - Do not replace confirmed-applied effect facts with synthetic
-    confirmed-not-applied facts.
+- Status: Implemented.
+- Implemented evidence:
+  - `WorkItem.ConsumedByWorkItemID` retains durable consumer identity.
+  - Manual Tool retry and completion paths reject consumed results.
+  - `requestAgentContinuationLocked` selects one active semantic owner instead
+    of broadcasting ProgramEventContinue.
+  - Existing effect settlement facts remain unchanged when manual controls are
+    rejected.
 
 #### `WF-HANDOFF-003` Complete durable multi-message handoff ownership
 
-- Status: Partial.
+- Status: Implemented.
 - Corrected prior claims: `WF-HANDOFF-002`.
-- Current evidence:
-  - Agent-loop queues retain activity IDs but not each message's effective
-    defaults and budget.
-  - When a no-Tool handoff Agent has queued work, it can return
-    `startQueuedAgentLLM` without retaining assistant Activities already
-    constructed for the completed round.
-  - A successful no-Tool handoff round remains waiting.
-  - No typed successful completion or relinquish operation exists.
-- Required result:
-  - Preserve each queued message's assistant round, immutable configuration,
-    budget, and causal isolated history.
-  - Complete or relinquish handoff successfully.
-  - Apply `restore` or `retain` without using cancellation as success.
+- Implemented evidence:
+  - `R/program.go` stores queued Activity ID, invocation defaults, and
+    invocation budget in Agent-loop state.
+  - A queued handoff round appends the completed assistant Activities before it
+    starts the next queued LLM WorkItem.
+  - `CompleteConversationHandoffCommand` emits
+    `ProgramEventHandoffComplete`.
+  - Agent-loop completion uses an ordinary completed ProgramFrame terminal
+    result; `advanceFrameLocked` then invokes existing restore or retain
+    ownership settlement.
 
 ##### `WF-HANDOFF-003.a` Preserve queued message semantic facts
 
-- Status: Partial.
-- Required result:
-  - Retain each completed assistant Activity exactly once.
-  - Retain immutable defaults and budget for each accepted message.
-  - Extend isolated history causally across messages handled by the handoff
-    owner.
+- Status: Implemented.
+- Implemented evidence:
+  - `conversationQueuedActivity` carries immutable defaults and budget.
+  - Agent-loop queue conversion preserves legacy queued IDs.
+  - `startQueuedAgentLLM` applies queued facts to the next LLM WorkItem.
+  - The preceding assistant Activity remains attached to the transition that
+    starts queued handoff work.
 
 ##### `WF-HANDOFF-003.b` Complete or relinquish handoff successfully
 
-- Status: Not implemented.
-- Required result:
-  - Add a typed backend lifecycle operation that settles successful handoff.
-  - Apply restore or retain behavior.
-  - Do not use cancellation as a successful completion substitute.
+- Status: Implemented.
+- Implemented evidence:
+  - `R/Runtime.CompleteConversationHandoff` targets one active handoff frame.
+  - `ProgramEventHandoffComplete` completes only an idle handoff Agent frame.
+  - Existing `settleConversationHandoffLocked` applies the durable restore or
+    retain policy after normal ProgramFrame completion.
 
 ### Domain setup ownership, binder composition, attachment meaning, and duplication
 

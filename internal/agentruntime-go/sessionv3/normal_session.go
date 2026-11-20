@@ -206,6 +206,14 @@ func (r *Runtime) RetryToolCall(
 					Message:     "Tool WorkItem is unavailable",
 				}, nil
 			}
+			if normalToolResultConsumed(*execution, item.ID) {
+				return &CommandReceipt{
+					CommandID:   command.Meta.ID,
+					SessionID:   session.ID,
+					ExecutionID: execution.ID,
+					Message:     "Tool WorkItem result was already consumed by a later Model operation",
+				}, nil
+			}
 			if !manualToolRetryAllowed(*item) {
 				return &CommandReceipt{
 					CommandID:   command.Meta.ID,
@@ -591,14 +599,31 @@ func (r *Runtime) consumeContinuationLocked(
 		Metadata:         staged.Metadata.Clone(),
 		InvocationBudget: cloneBudget(staged.InvocationBudget),
 	}
-	activity, err := r.submitNormalMessageWithDefaultsLocked(
-		session,
-		execution,
-		input,
-		nil,
-		staged.InvocationDefaults,
-		staged.AppContext,
+	frame := activeConversationAgentFrame(execution)
+	var (
+		activity Activity
+		err      error
 	)
+	if frame != nil {
+		activity, err = r.submitNormalMessageToFrameWithDefaultsLocked(
+			session,
+			execution,
+			frame,
+			input,
+			nil,
+			staged.InvocationDefaults,
+			staged.AppContext,
+		)
+	} else {
+		activity, err = r.submitNormalMessageWithDefaultsLocked(
+			session,
+			execution,
+			input,
+			nil,
+			staged.InvocationDefaults,
+			staged.AppContext,
+		)
+	}
 	if err != nil {
 		return nil, false, err
 	}
@@ -648,6 +673,30 @@ func (r *Runtime) submitNormalMessageWithDefaultsLocked(
 		frame = liveConversationAgentFrame(session, *execution)
 	}
 	if frame == nil || frame.Status.Terminal() {
+		return Activity{}, errors.New("conversation frame is unavailable")
+	}
+	return r.submitNormalMessageToFrameWithDefaultsLocked(
+		session,
+		execution,
+		frame,
+		input,
+		carried,
+		resolvedDefaults,
+		appContext,
+	)
+}
+
+func (r *Runtime) submitNormalMessageToFrameWithDefaultsLocked(
+	session *Session,
+	execution *Execution,
+	frame *ProgramFrame,
+	input MessageInput,
+	carried []ToolResultActivity,
+	resolvedDefaults *SessionDefaults,
+	appContext []AppContextUpdate,
+) (Activity, error) {
+	if session == nil || execution == nil || frame == nil ||
+		frame.Status.Terminal() {
 		return Activity{}, errors.New("conversation frame is unavailable")
 	}
 	if resolvedDefaults == nil {
@@ -743,6 +792,14 @@ func (r *Runtime) completeNormalToolCall(
 					SessionID:   session.ID,
 					ExecutionID: execution.ID,
 					Message:     "Tool WorkItem is unavailable",
+				}, nil
+			}
+			if normalToolResultConsumed(*execution, item.ID) {
+				return &CommandReceipt{
+					CommandID:   meta.ID,
+					SessionID:   session.ID,
+					ExecutionID: execution.ID,
+					Message:     "Tool WorkItem result was already consumed by a later Model operation",
 				}, nil
 			}
 			switch item.State {
@@ -841,25 +898,31 @@ func (r *Runtime) requestAgentContinuationLocked(
 	if session == nil || execution == nil {
 		return errors.New("conversation execution is unavailable")
 	}
-	frames := make([]ProgramFrameID, 0)
-	for _, frame := range execution.ProgramFrames {
-		if frame.Status.Terminal() ||
-			frame.Program.InterpreterID != BuiltinAgentLoopInterpreterID {
-			continue
-		}
-		frames = append(frames, frame.ID)
+
+	frame := activeConversationAgentFrame(execution)
+	if frame == nil {
+		frame = liveConversationAgentFrame(session, *execution)
 	}
-	for _, frameID := range frames {
-		if err := r.advanceFrameLocked(
-			session,
-			execution,
-			frameID,
-			ProgramEvent{Kind: ProgramEventContinue},
-		); err != nil {
-			return err
-		}
+	if frame == nil {
+		return nil
 	}
-	return nil
+	return r.advanceFrameLocked(
+		session,
+		execution,
+		frame.ID,
+		ProgramEvent{Kind: ProgramEventContinue},
+	)
+}
+
+func normalToolResultConsumed(
+	execution Execution,
+	workItemID WorkItemID,
+) bool {
+	item := executionWorkItem(execution, workItemID)
+	if item == nil {
+		return false
+	}
+	return item.ConsumedByWorkItemID != ""
 }
 
 func isNormalConversationExecution(execution Execution) bool {
@@ -903,6 +966,28 @@ func liveConversationAgentFrame(
 		return frame
 	}
 	return nil
+}
+
+func activeConversationAgentFrame(
+	execution *Execution,
+) *ProgramFrame {
+	root := normalConversationFrame(execution)
+	if root == nil || root.Status.Terminal() {
+		return nil
+	}
+	state, err := jsonutil.DecodeCanonicalValue[conversationProgramState](
+		root.State.Data,
+	)
+	if err != nil || state.ActiveFrameID == "" {
+		return nil
+	}
+	frame := mutableFrame(execution, state.ActiveFrameID)
+	if frame == nil ||
+		frame.Status.Terminal() ||
+		frame.Program.InterpreterID != BuiltinAgentLoopInterpreterID {
+		return nil
+	}
+	return frame
 }
 
 func (r *Runtime) conversationMessageExecutionLocked(
@@ -962,6 +1047,9 @@ func applySessionConversationOwnerDefaults(
 func manualToolRetryAllowed(item WorkItem) bool {
 	if item.State == WorkItemStateUncertain ||
 		item.EffectState == EffectStateUncertain {
+		return false
+	}
+	if item.ConsumedByWorkItemID != "" {
 		return false
 	}
 	if item.State == WorkItemStateCompleted &&

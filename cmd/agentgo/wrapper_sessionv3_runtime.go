@@ -226,6 +226,17 @@ func (w *SessionV3Wrapper) ContinueExecution(
 	})
 }
 
+func (w *SessionV3Wrapper) CompleteConversationHandoff(
+	command sessionv3Runtime.CompleteConversationHandoffCommand,
+) (*sessionv3Runtime.CommandReceipt, error) {
+	return withSessionV3(w, func(r *sessionv3Runtime.Runtime) (*sessionv3Runtime.CommandReceipt, error) {
+		return r.CompleteConversationHandoff(
+			context.Background(),
+			command,
+		)
+	})
+}
+
 func (w *SessionV3Wrapper) PauseExecution(
 	command sessionv3Runtime.PauseExecutionCommand,
 ) (*sessionv3Runtime.CommandReceipt, error) {
