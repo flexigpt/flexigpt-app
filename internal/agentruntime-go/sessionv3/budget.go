@@ -282,6 +282,7 @@ func workConsumesCallAttempt(kind WorkItemType) bool {
 		WorkItemTypeTool,
 		WorkItemTypeService,
 		WorkItemTypeActivity,
+		WorkItemTypeChildCall,
 		WorkItemTypeCompensation,
 		WorkItemTypeReconciliation,
 		WorkItemTypeTargetResolver:

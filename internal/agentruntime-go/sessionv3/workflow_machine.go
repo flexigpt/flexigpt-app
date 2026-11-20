@@ -3,6 +3,7 @@ package sessionv3
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -50,10 +51,21 @@ const (
 	WorkflowMachinePhaseActionRunning WorkflowMachinePhase = "actionRunning"
 )
 
+type WorkflowMachineWaitKind string
+
+const (
+	WorkflowMachineWaitKindEvent WorkflowMachineWaitKind = "event"
+	WorkflowMachineWaitKindTimer WorkflowMachineWaitKind = "timer"
+)
+
 type WorkflowMachineWait struct {
-	Key               string     `json:"key"`
-	WorkItemID        WorkItemID `json:"workItemID"`
-	TransitionIndexes []int      `json:"transitionIndexes"`
+	Key               string                  `json:"key"`
+	WorkItemID        WorkItemID              `json:"workItemID"`
+	TransitionIndexes []int                   `json:"transitionIndexes"`
+	Kind              WorkflowMachineWaitKind `json:"kind,omitempty"`
+	Ready             bool                    `json:"ready,omitempty"`
+	Value             jsonutil.CanonicalValue `json:"value,omitempty"`
+	ReadyAt           *time.Time              `json:"readyAt,omitempty"`
 }
 
 type WorkflowMachineProgress struct {
@@ -70,6 +82,7 @@ type WorkflowMachineProgress struct {
 	ChildMergesState   bool                    `json:"childMergesState,omitempty"`
 	Waits              []WorkflowMachineWait   `json:"waits,omitempty"`
 	Subscriptions      []string                `json:"subscriptions,omitempty"`
+	ElapsedTimers      []int                   `json:"elapsedTimers,omitempty"`
 	Microsteps         int                     `json:"microsteps"`
 }
 
@@ -275,6 +288,30 @@ func (p WorkflowMachineProgress) Validate() error {
 			len(wait.TransitionIndexes) == 0 {
 			return errors.New("workflow machine wait is invalid")
 		}
+		switch workflowMachineWaitKind(wait) {
+		case WorkflowMachineWaitKindEvent, WorkflowMachineWaitKindTimer:
+		default:
+			return errors.New("workflow machine wait kind is invalid")
+		}
+		if wait.Ready {
+			if !wait.Value.Valid() ||
+				wait.ReadyAt == nil ||
+				wait.ReadyAt.IsZero() {
+				return errors.New(
+					"ready workflow machine wait has invalid settlement facts",
+				)
+			}
+		}
+	}
+	seenElapsed := make(map[int]struct{}, len(p.ElapsedTimers))
+	for _, index := range p.ElapsedTimers {
+		if index < 0 {
+			return errors.New("workflow machine elapsed timer index is invalid")
+		}
+		if _, duplicate := seenElapsed[index]; duplicate {
+			return errors.New("workflow machine elapsed timer is duplicated")
+		}
+		seenElapsed[index] = struct{}{}
 	}
 	for _, subscription := range p.Subscriptions {
 		if err := validateID(
@@ -576,6 +613,22 @@ func (i *WorkflowInterpreter) driveMachine(
 			}
 			return i.driveMachine(frame, execution, program, state)
 		}
+		selected, selectErr := i.selectReadyMachineTransition(
+			program,
+			&state,
+			*current,
+		)
+		if selectErr != nil {
+			return workflowFailure(
+				state,
+				"workflow_machine_transition_invalid",
+				selectErr.Error(),
+			)
+		}
+		if selected {
+			return i.driveMachine(frame, execution, program, state)
+		}
+
 		return i.armMachineWaits(
 			frame,
 			execution,
@@ -586,6 +639,21 @@ func (i *WorkflowInterpreter) driveMachine(
 		)
 
 	case WorkflowMachinePhaseWaiting:
+		selected, selectErr := i.selectReadyMachineTransition(
+			program,
+			&state,
+			*current,
+		)
+		if selectErr != nil {
+			return workflowFailure(
+				state,
+				"workflow_machine_transition_invalid",
+				selectErr.Error(),
+			)
+		}
+		if selected {
+			return i.driveMachine(frame, execution, program, state)
+		}
 		return i.armMachineWaits(
 			frame,
 			execution,
@@ -749,6 +817,11 @@ func (i *WorkflowInterpreter) armMachineWaits(
 	active := make([]WorkflowMachineWait, 0, len(progress.Waits))
 	activeByKey := make(map[string]WorkflowMachineWait, len(progress.Waits))
 	for _, wait := range progress.Waits {
+		if wait.Ready {
+			active = append(active, wait)
+			activeByKey[wait.Key] = wait
+			continue
+		}
 		item := executionWorkItem(execution, wait.WorkItemID)
 		if item != nil && !item.State.Terminal() {
 			active = append(active, wait)
@@ -816,6 +889,7 @@ func (i *WorkflowInterpreter) armMachineWaits(
 		progress.Waits = append(progress.Waits, WorkflowMachineWait{
 			Key:        key,
 			WorkItemID: id,
+			Kind:       WorkflowMachineWaitKindEvent,
 			TransitionIndexes: append(
 				[]int(nil),
 				eventGroups[name]...,
@@ -845,6 +919,9 @@ func (i *WorkflowInterpreter) armMachineWaits(
 
 	for _, index := range timerIndexes {
 		transition := current.Transitions[index]
+		if machineTimerElapsed(*progress, index) {
+			continue
+		}
 		key := "timer-" + strconv.Itoa(index)
 		if _, found := activeByKey[key]; found {
 			continue
@@ -867,6 +944,7 @@ func (i *WorkflowInterpreter) armMachineWaits(
 		)
 		progress.Waits = append(progress.Waits, WorkflowMachineWait{
 			Key:               key,
+			Kind:              WorkflowMachineWaitKindTimer,
 			WorkItemID:        id,
 			TransitionIndexes: []int{index},
 		})
@@ -943,12 +1021,18 @@ func (i *WorkflowInterpreter) settleMachineWork(
 			workItemID,
 		)
 	}
-
-	wait := progress.Waits[waitIndex]
-	progress.Waits = append(
-		progress.Waits[:waitIndex],
-		progress.Waits[waitIndex+1:]...,
-	)
+	wait := &progress.Waits[waitIndex]
+	if wait.Ready {
+		return true, nil
+	}
+	wait.Kind = workflowMachineWaitKind(*wait)
+	wait.Ready = true
+	wait.Value = item.Output.Value.Clone()
+	readyAt := state.LogicalTime.UTC()
+	if item.CompletedAt != nil {
+		readyAt = item.CompletedAt.UTC()
+	}
+	wait.ReadyAt = &readyAt
 
 	step, err := workflowStepForPath(program.Root, pending.Path)
 	if err != nil || step.Machine == nil {
@@ -962,23 +1046,56 @@ func (i *WorkflowInterpreter) settleMachineWork(
 		return true, errors.New("workflow machine current state is unavailable")
 	}
 
-	event := item.Output.Value.Clone()
-	for _, index := range wait.TransitionIndexes {
-		if index < 0 || index >= len(current.Transitions) {
-			return true, errors.New(
-				"workflow machine transition index is invalid",
-			)
+	if len(wait.TransitionIndexes) == 0 {
+		return true, errors.New(
+			"workflow machine wait has no transition candidates",
+		)
+	}
+	_ = current
+	progress.Phase = WorkflowMachinePhaseSelect
+	return true, nil
+}
+
+// selectReadyMachineTransition applies the declared machine ordering after
+// durable waits settle:
+//
+//  1. Immediate transitions are selected by driveMachine before this helper.
+//  2. Event transitions are selected in declaration order.
+//  3. Timer transitions are selected in declaration order.
+//
+// Arrival order does not decide the result. This is important when an event
+// and a timer become ready during the same persisted scheduler interval.
+func (i *WorkflowInterpreter) selectReadyMachineTransition(
+	program WorkflowProgram,
+	state *WorkflowState,
+	current WorkflowMachineState,
+) (bool, error) {
+	if state == nil || state.Pending == nil || state.Pending.Machine == nil {
+		return false, errors.New("workflow machine state is unavailable")
+	}
+	progress := state.Pending.Machine
+
+	for index, transition := range current.Transitions {
+		if transition.Event == "" {
+			continue
 		}
-		transition := current.Transitions[index]
+		wait, found := readyMachineWaitForTransition(
+			*progress,
+			index,
+			WorkflowMachineWaitKindEvent,
+		)
+		if !found {
+			continue
+		}
 		matched, err := i.machineTransitionMatches(
 			transition,
 			program,
 			*state,
 			*progress,
-			event,
+			wait.Value,
 		)
 		if err != nil {
-			return true, err
+			return false, err
 		}
 		if !matched {
 			continue
@@ -986,18 +1103,111 @@ func (i *WorkflowInterpreter) settleMachineWork(
 		if err := selectMachineTransition(
 			state,
 			index,
-			event,
+			wait.Value,
 		); err != nil {
-			return true, err
+			return false, err
 		}
 		return true, nil
 	}
 
-	// The accepted event was consumed by its subscription. Re-arm this state
-	// for a future event without re-reading the same retained signal. Existing timer and subscription waits remain
-	// active. "armMachineWaits" creates a new durable WorkItem identity for only the consumed wait occurrence.
+	for index, transition := range current.Transitions {
+		if transition.After == "" {
+			continue
+		}
+		_, found := readyMachineWaitForTransition(
+			*progress,
+			index,
+			WorkflowMachineWaitKindTimer,
+		)
+		if !found {
+			continue
+		}
+		matched, err := i.machineTransitionMatches(
+			transition,
+			program,
+			*state,
+			*progress,
+			nil,
+		)
+		if err != nil {
+			return false, err
+		}
+		if !matched {
+			continue
+		}
+		if err := selectMachineTransition(
+			state,
+			index,
+			nil,
+		); err != nil {
+			return false, err
+		}
+		return true, nil
+	}
+
+	// A ready event that did not match is consumed by its subscription. It
+	// must be re-armed with a new WorkItem identity. A timer that fired but
+	// did not match is elapsed for this state entry and must not fire again.
+	next := make([]WorkflowMachineWait, 0, len(progress.Waits))
+	for _, wait := range progress.Waits {
+		if !wait.Ready {
+			next = append(next, wait)
+			continue
+		}
+		if workflowMachineWaitKind(wait) == WorkflowMachineWaitKindTimer {
+			for _, index := range wait.TransitionIndexes {
+				markMachineTimerElapsed(progress, index)
+			}
+		}
+	}
+	progress.Waits = next
 	progress.Phase = WorkflowMachinePhaseWaiting
-	return true, nil
+	return false, nil
+}
+
+func readyMachineWaitForTransition(
+	progress WorkflowMachineProgress,
+	transitionIndex int,
+	kind WorkflowMachineWaitKind,
+) (WorkflowMachineWait, bool) {
+	for _, wait := range progress.Waits {
+		if !wait.Ready ||
+			workflowMachineWaitKind(wait) != kind ||
+			!slices.Contains(wait.TransitionIndexes, transitionIndex) {
+			continue
+		}
+		return wait, true
+	}
+	return WorkflowMachineWait{}, false
+}
+
+func workflowMachineWaitKind(
+	value WorkflowMachineWait,
+) WorkflowMachineWaitKind {
+	if value.Kind != "" {
+		return value.Kind
+	}
+	if strings.HasPrefix(value.Key, "event-") {
+		return WorkflowMachineWaitKindEvent
+	}
+	return WorkflowMachineWaitKindTimer
+}
+
+func machineTimerElapsed(
+	progress WorkflowMachineProgress,
+	index int,
+) bool {
+	return slices.Contains(progress.ElapsedTimers, index)
+}
+
+func markMachineTimerElapsed(
+	progress *WorkflowMachineProgress,
+	index int,
+) {
+	if progress == nil || machineTimerElapsed(*progress, index) {
+		return
+	}
+	progress.ElapsedTimers = append(progress.ElapsedTimers, index)
 }
 
 func (i *WorkflowInterpreter) machineTransitionMatches(
@@ -1140,6 +1350,7 @@ func (i *WorkflowInterpreter) settleMachineChild(
 		progress.EnteredAt = state.LogicalTime.UTC()
 		progress.Event = nil
 		progress.SelectedTransition = -1
+		progress.ElapsedTimers = nil
 		progress.Phase = WorkflowMachinePhaseEntry
 
 	default:
@@ -1166,6 +1377,7 @@ func (i *WorkflowInterpreter) enterMachineTarget(
 	progress.EnteredAt = state.LogicalTime.UTC()
 	progress.Event = nil
 	progress.SelectedTransition = -1
+	progress.ElapsedTimers = nil
 	progress.Phase = WorkflowMachinePhaseEntry
 	return i.driveMachine(frame, execution, program, state)
 }

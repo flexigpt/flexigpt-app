@@ -117,14 +117,7 @@ func workflowSubscriptionMatchesSignal(
 		return true, nil
 	}
 
-	event := jsonutil.MustCanonicalValue(eventWaitOutput{
-		ID:          signal.ID,
-		Name:        signal.Name,
-		Source:      signal.Source,
-		Data:        signal.Data.Clone(),
-		Correlation: signal.Correlation.Clone(),
-		Time:        signal.CreatedAt,
-	})
+	event := jsonutil.MustCanonicalValue(workflowEventWaitOutput(signal))
 	return subscription.Filter.Matches(event)
 }
 

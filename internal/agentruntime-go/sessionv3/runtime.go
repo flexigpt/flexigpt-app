@@ -440,7 +440,7 @@ func (r *Runtime) SubmitMessage(ctx context.Context, command SubmitMessageComman
 	}
 
 	previous := cloneSession(*session)
-	execution, err := r.conversationExecutionLocked(session)
+	execution, err := r.conversationMessageExecutionLocked(session)
 	if err != nil {
 		*session = previous
 		r.mu.Unlock()
@@ -2434,10 +2434,25 @@ func (r *Runtime) dispatchOne(ctx context.Context, sessionID SessionID, executio
 	}
 	if bound.Wait != nil {
 		if item.Type == WorkItemTypeChildCall {
-			r.beginChildCallAttemptLocked(
-				execution,
-				item,
-			)
+			if err := r.beginChildCallAttemptLocked(execution, item); err != nil {
+				failure, found := budgetFailure(err)
+				if !found {
+					failure = &SanitizedError{
+						Code:     budgetErrorCode,
+						Category: ErrorCategoryLimit,
+						Message:  err.Error(),
+					}
+				}
+				r.blockWorkForBudgetLocked(
+					ctx,
+					session,
+					execution,
+					item,
+					failure,
+					"childCallBudgetBlocked",
+				)
+				return
+			}
 		}
 		bound.Wait.Deadline = earlierDeadline(bound.Wait.Deadline, item.Deadline)
 		now := r.now()
@@ -2624,6 +2639,11 @@ func (r *Runtime) blockWorkForBudgetLocked(
 	now := r.now()
 	item.State = WorkItemStateBlocked
 	item.Error = cloneWorkflowSanitizedError(failure)
+	delete(r.privateBindings, item.ID)
+	r.cancelResourceWaitLocked(item.ID)
+	r.cancelRetryLocked(item.ID)
+	released := r.releaseWorkResourcesLocked(execution, item.ID)
+	r.wakeResourceWaitersLocked(execution, released)
 	item.CompletedAt = &now
 	item.UpdatedAt = now
 	r.advanceSettledWorkLocked(session, execution, item.FrameID, item.ID)
@@ -2701,12 +2721,15 @@ func (r *Runtime) startDispatchedLocked(
 func (r *Runtime) beginChildCallAttemptLocked(
 	execution *Execution,
 	item *WorkItem,
-) {
+) error {
 	if execution == nil ||
 		item == nil ||
 		item.Type != WorkItemTypeChildCall ||
 		activeAttempt(execution, item.ID) != nil {
-		return
+		return nil
+	}
+	if err := r.reserveCallAttemptLocked(execution, *item); err != nil {
+		return err
 	}
 
 	now := r.now()
@@ -2725,6 +2748,7 @@ func (r *Runtime) beginChildCallAttemptLocked(
 	item.DispatchedAt = &now
 	item.UpdatedAt = now
 	execution.Attempts = append(execution.Attempts, attempt)
+	return nil
 }
 
 func (r *Runtime) executeOne(
@@ -2964,6 +2988,25 @@ func (r *Runtime) finishWorkLocked(
 			attempt.Error = result.Error
 		}
 		recordEffectSettlement(item, attempt, result)
+		if item.EffectState == EffectStateConfirmedApplied {
+			if err := r.recordConfirmedEffectLocked(execution, item); err != nil {
+				execution.Cleanup.Primary = appendCleanupCause(
+					execution.Cleanup.Primary,
+					SanitizedError{
+						Code:     "effect_record_failed",
+						Category: ErrorCategoryExecution,
+						Message:  err.Error(),
+					},
+				)
+			}
+		}
+		released := r.releaseWorkResourcesLocked(execution, item.ID)
+		r.wakeResourceWaitersLocked(execution, released)
+		r.resumeCancellationCleanupFramesLocked(session, execution)
+		execution = mutableSessionExecution(session, executionID)
+		if execution == nil {
+			return
+		}
 		r.refreshExecutionStateLocked(execution)
 		r.touchExecutionLocked(session, execution)
 		return
@@ -3140,6 +3183,49 @@ func (r *Runtime) finishWorkLocked(
 		return
 	}
 	r.touchExecutionLocked(session, execution)
+}
+
+// resumeCancellationCleanupFramesLocked wakes durable cleanup orchestration
+// after a late external result settles. A cancelled WorkItem can still prove
+// that an effect applied. Saga compensation must then re-read EffectRecord
+// facts instead of completing before that late confirmation is available.
+func (r *Runtime) resumeCancellationCleanupFramesLocked(
+	session *Session,
+	execution *Execution,
+) {
+	if session == nil || execution == nil {
+		return
+	}
+
+	frameIDs := make([]ProgramFrameID, 0)
+	for _, frame := range execution.ProgramFrames {
+		if frame.Status.Terminal() ||
+			frame.Program.InterpreterID != WorkflowInterpreterID {
+			continue
+		}
+		_, state, err := decodeWorkflowProgram(frame)
+		if err != nil ||
+			state.Pending == nil ||
+			state.Pending.Kind != WorkflowPendingSaga ||
+			state.Pending.Saga == nil ||
+			state.Pending.Saga.PrimaryStatus == "" {
+			continue
+		}
+		frameIDs = append(frameIDs, frame.ID)
+	}
+
+	for _, frameID := range frameIDs {
+		current := mutableSessionExecution(session, execution.ID)
+		if current == nil {
+			return
+		}
+		_ = r.advanceFrameLocked(
+			session,
+			current,
+			frameID,
+			ProgramEvent{Kind: ProgramEventContinue},
+		)
+	}
 }
 
 func (r *Runtime) appendWaitActivityLocked(session *Session, execution *Execution, wait Wait) {
@@ -3993,6 +4079,15 @@ func (r *Runtime) recoverLocked(session *Session) bool {
 					item.CompletedAt = nil
 					item.DispatchedAt = nil
 					item.RetryState = nil
+					// A persisted LLM dispatch plan is the immutable
+					// semantic reproduction contract. Runtime-private
+					// bindings are still discarded, but setup can recreate
+					// private provider resources from this plan.
+					if item.Type != WorkItemTypeLLM ||
+						item.Binding == nil ||
+						item.Binding.Plan == nil {
+						item.Binding = nil
+					}
 					item.Requested = item.Automatic
 				} else if r.reconciliationRequiredLocked(execution, item) {
 					item.State = WorkItemStateReconciling
@@ -4068,6 +4163,9 @@ func (r *Runtime) recoverLocked(session *Session) bool {
 			)
 			changed = true
 		}
+	}
+	if r.recoverConversationOwnershipLocked(session, now) {
+		changed = true
 	}
 	if changed {
 		r.touchSessionLocked(session)

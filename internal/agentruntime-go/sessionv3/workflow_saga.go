@@ -224,6 +224,21 @@ func (i *WorkflowInterpreter) driveSaga(
 		return workflowTransition(state, nil, nil, nil)
 	}
 
+	if len(progress.Active) == 0 {
+		order, err := compensationRecordsInReverseDependencyOrder(
+			execution,
+			progress.ID,
+		)
+		if err != nil {
+			return workflowFailure(
+				state,
+				"workflow_compensation_invalid",
+				err.Error(),
+			)
+		}
+		progress.Remaining = mergeSagaRemaining(progress.Remaining, order)
+	}
+
 	if progress.StopRequested {
 		if len(progress.Active) == 0 {
 			return i.finishSaga(frame, program, state), nil
@@ -296,6 +311,9 @@ func (i *WorkflowInterpreter) driveSaga(
 		return workflowTransition(state, nil, nil, intents)
 	}
 	if len(progress.Active) == 0 && len(progress.Remaining) == 0 {
+		if workflowSagaHasOutstandingNormalWork(execution, progress.ID) {
+			return workflowTransition(state, nil, nil, nil)
+		}
 		return i.finishSaga(frame, program, state), nil
 	}
 
@@ -308,6 +326,44 @@ func (i *WorkflowInterpreter) driveSaga(
 		"workflow_compensation_deadlock",
 		"workflow compensation has no dependency-eligible effect",
 	)
+}
+
+func mergeSagaRemaining(
+	current []EffectRecordID,
+	incoming []EffectRecordID,
+) []EffectRecordID {
+	seen := make(map[EffectRecordID]struct{}, len(current)+len(incoming))
+	output := make([]EffectRecordID, 0, len(current)+len(incoming))
+	for _, value := range current {
+		if _, found := seen[value]; found {
+			continue
+		}
+		seen[value] = struct{}{}
+		output = append(output, value)
+	}
+	for _, value := range incoming {
+		if _, found := seen[value]; found {
+			continue
+		}
+		seen[value] = struct{}{}
+		output = append(output, value)
+	}
+	return output
+}
+
+func workflowSagaHasOutstandingNormalWork(
+	execution Execution,
+	sagaID string,
+) bool {
+	for _, item := range execution.WorkItems {
+		if item.SagaID != sagaID ||
+			item.Cleanup ||
+			item.State.Terminal() {
+			continue
+		}
+		return true
+	}
+	return false
 }
 
 func workflowSagaNextEligibleEffect(

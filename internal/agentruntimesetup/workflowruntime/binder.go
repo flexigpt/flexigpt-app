@@ -243,10 +243,35 @@ func bindExternal(
 	if err != nil {
 		return sessionv3Runtime.BindResult{}, err
 	}
-	return sessionv3Runtime.BindResult{
-		SemanticBinding: semantic,
-		Private:         boundExternal{binding: binding, private: rb.Private},
-	}, nil
+
+	if rb.Wait != nil && rb.ImmediateOutput != nil {
+		return sessionv3Runtime.BindResult{}, errors.New(
+			"external binding returned both a durable wait and immediate output",
+		)
+	}
+	result := sessionv3Runtime.BindResult{
+		SemanticBinding:      semantic,
+		Wait:                 rb.Wait,
+		ImmediateOutput:      rb.ImmediateOutput,
+		ImmediateEffectState: rb.ImmediateEffectState,
+	}
+	switch {
+	case rb.Wait != nil:
+		result.Private = boundExternal{
+			binding: binding,
+			private: rb.Private,
+		}
+	case rb.ImmediateOutput != nil:
+		// Immediate domain output is durable at the Runtime boundary. It has
+		// no subsequent domain wait or private execution state.
+		result.Private = nil
+	default:
+		result.Private = boundExternal{
+			binding: binding,
+			private: rb.Private,
+		}
+	}
+	return result, nil
 }
 
 func wrapExternalWaitResolution(

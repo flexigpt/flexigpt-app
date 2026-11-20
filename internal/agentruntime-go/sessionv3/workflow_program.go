@@ -2361,6 +2361,9 @@ func (i *WorkflowInterpreter) workflowChildCallBoundary(
 	); err != nil {
 		return WorkItemIntent{}, err
 	}
+	if err := i.applyWorkflowStepWorkBudget(step, &intent); err != nil {
+		return WorkItemIntent{}, err
+	}
 	return intent, nil
 }
 

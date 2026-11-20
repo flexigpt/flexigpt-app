@@ -455,6 +455,46 @@ func (r *Runtime) settleConversationHandoffLocked(
 	}
 }
 
+// recoverConversationOwnershipLocked prevents a restored Session from
+// retaining a live-handoff routing pointer to an Execution that already
+// settled before the process stopped. Retain preserves the selected Agent;
+// restore returns the previous semantic owner.
+func (r *Runtime) recoverConversationOwnershipLocked(
+	session *Session,
+	now time.Time,
+) bool {
+	if session == nil {
+		return false
+	}
+	changed := false
+	for index := range session.ConversationOwnership {
+		ownership := &session.ConversationOwnership[index]
+		if ownership.ConversationID != string(session.ID) ||
+			ownership.ActiveHandoffID == "" ||
+			ownership.Owner.ExecutionID == "" {
+			continue
+		}
+		execution := mutableSessionExecution(
+			session,
+			ownership.Owner.ExecutionID,
+		)
+		if execution != nil && !execution.State.Terminal() {
+			continue
+		}
+		if ownership.RestoreOnCompletion &&
+			ownership.PreviousOwner != nil {
+			ownership.Owner = cloneConversationParticipant(
+				*ownership.PreviousOwner,
+			)
+		}
+		ownership.ActiveHandoffID = ""
+		ownership.CompletedAt = &now
+		ownership.UpdatedAt = now
+		changed = true
+	}
+	return changed
+}
+
 func (r *Runtime) settleTerminalExecutionLocked(
 	session *Session,
 	execution *Execution,

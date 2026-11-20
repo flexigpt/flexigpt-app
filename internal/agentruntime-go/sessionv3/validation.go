@@ -322,6 +322,12 @@ func validateDefaults(value SessionDefaults) error {
 	return nil
 }
 
+// ValidateSessionDefaults validates a durable effective invocation plan.
+// Setup uses it when it reconstructs private execution resources after restore.
+func ValidateSessionDefaults(value SessionDefaults) error {
+	return validateDefaults(value)
+}
+
 func validateMCPToolSelection(value MCPToolSelection) error {
 	if err := validateID("MCP Tool name", value.ToolName); err != nil {
 		return err

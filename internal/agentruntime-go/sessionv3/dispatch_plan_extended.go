@@ -274,6 +274,9 @@ func validateDispatchTools(
 				"local tool dispatch plan contains provider configuration",
 			)
 		}
+		if len(value.Choice) != 0 && !value.Choice.Valid() {
+			return errors.New("tool dispatch plan choice is invalid")
+		}
 	}
 	return nil
 }

@@ -644,6 +644,9 @@ func (r *Runtime) submitNormalMessageWithDefaultsLocked(
 	appContext []AppContextUpdate,
 ) (Activity, error) {
 	frame := normalConversationFrame(execution)
+	if frame == nil {
+		frame = liveConversationAgentFrame(session, *execution)
+	}
 	if frame == nil || frame.Status.Terminal() {
 		return Activity{}, errors.New("conversation frame is unavailable")
 	}
@@ -875,6 +878,62 @@ func normalConversationFrame(execution *Execution) *ProgramFrame {
 		}
 	}
 	return nil
+}
+
+func liveConversationAgentFrame(
+	session *Session,
+	execution Execution,
+) *ProgramFrame {
+	if session == nil {
+		return nil
+	}
+	for _, ownership := range session.ConversationOwnership {
+		if ownership.ConversationID != string(session.ID) ||
+			ownership.ActiveHandoffID == "" ||
+			ownership.Owner.ExecutionID != execution.ID ||
+			ownership.Owner.FrameID == "" {
+			continue
+		}
+		frame := mutableFrame(&execution, ownership.Owner.FrameID)
+		if frame == nil ||
+			frame.Status.Terminal() ||
+			frame.Program.InterpreterID != BuiltinAgentLoopInterpreterID {
+			return nil
+		}
+		return frame
+	}
+	return nil
+}
+
+func (r *Runtime) conversationMessageExecutionLocked(
+	session *Session,
+) (*Execution, error) {
+	if session == nil {
+		return nil, ErrSessionNotFound
+	}
+	for _, ownership := range session.ConversationOwnership {
+		if ownership.ConversationID != string(session.ID) ||
+			ownership.ActiveHandoffID == "" ||
+			ownership.Owner.ExecutionID == "" ||
+			ownership.Owner.FrameID == "" {
+			continue
+		}
+		execution := mutableSessionExecution(
+			session,
+			ownership.Owner.ExecutionID,
+		)
+		if execution == nil || execution.State.Terminal() {
+			continue
+		}
+		frame := mutableFrame(execution, ownership.Owner.FrameID)
+		if frame == nil ||
+			frame.Status.Terminal() ||
+			frame.Program.InterpreterID != BuiltinAgentLoopInterpreterID {
+			continue
+		}
+		return execution, nil
+	}
+	return r.conversationExecutionLocked(session)
 }
 
 func applySessionConversationOwnerDefaults(

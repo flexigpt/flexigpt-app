@@ -401,6 +401,8 @@ func (i *WorkflowInterpreter) settleReconciliationChild(
 			Status:          WorkflowStepOutcomeSucceeded,
 			Output:          reconciled.Output.Clone(),
 			Target:          state.PendingTarget,
+			Receipt:         cloneReconciliationReceipt(reconciled.Receipt),
+			Effect:          EffectStateConfirmedApplied,
 			DeclarationPath: state.PendingDeclarationPath,
 		}); err != nil {
 			return ProgramTransition{}, true, err

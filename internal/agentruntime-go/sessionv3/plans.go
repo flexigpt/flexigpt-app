@@ -37,6 +37,7 @@ type ModelDispatchPlan struct {
 	Channels       []ChannelDispatchPlan       `json:"channels,omitempty"`
 	Ports          []PortPlan                  `json:"ports,omitempty"`
 	PortInputs     []PortInput                 `json:"portInputs,omitempty"`
+	History        HistorySelection            `json:"history"`
 }
 
 type AgentDispatchPlan struct {
@@ -81,6 +82,7 @@ type ToolDispatchPlan struct {
 	Call                  ToolCall                `json:"call"`
 	ProviderManaged       bool                    `json:"providerManaged,omitempty"`
 	ProviderConfiguration jsonutil.CanonicalValue `json:"providerConfiguration,omitempty"`
+	Choice                jsonutil.CanonicalValue `json:"choice,omitempty"`
 }
 
 type SkillDispatchPlan struct {

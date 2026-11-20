@@ -20,7 +20,8 @@ const (
 
 type eventWaitOutput struct {
 	ID          string                  `json:"id"`
-	Name        string                  `json:"name"`
+	Type        string                  `json:"type"`
+	Name        string                  `json:"name,omitempty"`
 	Source      string                  `json:"source,omitempty"`
 	Data        jsonutil.CanonicalValue `json:"data"`
 	Correlation jsonutil.CanonicalValue `json:"correlation,omitempty"`
@@ -35,6 +36,20 @@ type channelWaitOutput struct {
 	Data        jsonutil.CanonicalValue `json:"data"`
 	Correlation jsonutil.CanonicalValue `json:"correlation,omitempty"`
 	Time        time.Time               `json:"time"`
+}
+
+func workflowEventWaitOutput(
+	signal ExecutionSignal,
+) eventWaitOutput {
+	return eventWaitOutput{
+		ID:          signal.ID,
+		Type:        signal.Name,
+		Name:        signal.Name,
+		Source:      signal.Source,
+		Data:        signal.Data.Clone(),
+		Correlation: signal.Correlation.Clone(),
+		Time:        signal.CreatedAt,
+	}
 }
 
 type completionWaitOutput struct {
@@ -548,14 +563,7 @@ func (r *Runtime) wakeEventWaitsLocked(
 			continue
 		}
 
-		response := jsonutil.MustCanonicalValue(eventWaitOutput{
-			ID:          signal.ID,
-			Name:        signal.Name,
-			Source:      signal.Source,
-			Data:        signal.Data.Clone(),
-			Correlation: signal.Correlation.Clone(),
-			Time:        signal.CreatedAt,
-		})
+		response := jsonutil.MustCanonicalValue(workflowEventWaitOutput(signal))
 		if !waitMatchesEvent(
 			*wait,
 			response,

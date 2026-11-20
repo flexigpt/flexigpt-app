@@ -50,6 +50,7 @@ type agentLoopProgramState struct {
 	InputActivityID   ActivityID   `json:"inputActivityID"`
 	LastLLMWorkItemID WorkItemID   `json:"lastLLMWorkItemID,omitempty"`
 	PendingToolIDs    []WorkItemID `json:"pendingToolIDs,omitempty"`
+	QueuedActivityIDs []ActivityID `json:"queuedActivityIDs,omitempty"`
 	Round             int          `json:"round"`
 	AwaitingContinue  bool         `json:"awaitingContinue"`
 	ContinueRequested bool         `json:"continueRequested,omitempty"`
@@ -404,6 +405,27 @@ func (agentLoopInterpreter) Advance(
 		return ProgramTransition{}, err
 	}
 	switch event.Kind {
+	case ProgramEventActivity:
+		if event.ActivityID == "" {
+			return ProgramTransition{State: encodeAgentLoopState(state)}, nil
+		}
+		state.QueuedActivityIDs = append(
+			state.QueuedActivityIDs,
+			event.ActivityID,
+		)
+		if !agentLoopCanStartQueuedActivity(
+			frame,
+			execution,
+			state,
+		) {
+			status := ProgramFrameStateWaiting
+			return ProgramTransition{
+				State:  encodeAgentLoopState(state),
+				Status: &status,
+			}, nil
+		}
+		return startQueuedAgentLLM(state, payload)
+
 	case ProgramEventStarted:
 		if state.LastLLMWorkItemID == "" {
 			return startAgentLLM(state, payload)
@@ -439,6 +461,18 @@ func (agentLoopInterpreter) Advance(
 			activities = append(activities, assistant)
 			activities = append(activities, observed...)
 			if len(executable) == 0 {
+				if frame.HandoffID != "" {
+					if len(state.QueuedActivityIDs) != 0 {
+						return startQueuedAgentLLM(state, payload)
+					}
+					status := ProgramFrameStateWaiting
+					return ProgramTransition{
+						State:      encodeAgentLoopState(state),
+						Status:     &status,
+						Output:     jsonutil.MustCanonicalValue(item.Output.LLM),
+						Activities: activities,
+					}, nil
+				}
 				status := ProgramFrameStateCompleted
 				return ProgramTransition{
 					State:      encodeAgentLoopState(state),
@@ -511,21 +545,71 @@ func (agentLoopInterpreter) Advance(
 			if state.ContinueRequested || automaticContinuation {
 				return startAgentLLM(state, payload)
 			}
+			if frame.HandoffID != "" && len(state.QueuedActivityIDs) != 0 {
+				return startQueuedAgentLLM(state, payload)
+			}
 			status := ProgramFrameStateWaiting
 			return ProgramTransition{State: encodeAgentLoopState(state), Status: &status}, nil
 		}
-	case ProgramEventActivity, ProgramEventChildSettled:
+	case ProgramEventChildSettled:
 		// Agent loop observes only work settlement and continue; no action.
 	case ProgramEventContinue:
 		state.ContinueRequested = true
 		if state.AwaitingContinue && allToolItemsSettled(execution, state.PendingToolIDs) {
 			return startAgentLLM(state, payload)
 		}
+		if frame.HandoffID != "" && agentLoopCanStartQueuedActivity(frame, execution, state) {
+			return startQueuedAgentLLM(state, payload)
+		}
 	case ProgramEventCancelled:
 		status := ProgramFrameStateCancelled
 		return ProgramTransition{State: encodeAgentLoopState(state), Status: &status}, nil
 	}
 	return ProgramTransition{State: encodeAgentLoopState(state)}, nil
+}
+
+func agentLoopCanStartQueuedActivity(
+	frame ProgramFrame,
+	execution Execution,
+	state agentLoopProgramState,
+) bool {
+	if len(state.QueuedActivityIDs) == 0 {
+		return false
+	}
+
+	for _, item := range execution.WorkItems {
+		if item.FrameID == frame.ID && !item.State.Terminal() {
+			return false
+		}
+	}
+	if len(state.PendingToolIDs) != 0 &&
+		!allToolItemsSettled(execution, state.PendingToolIDs) {
+		return false
+	}
+	if state.LastLLMWorkItemID == "" {
+		return true
+	}
+	last := executionWorkItem(execution, state.LastLLMWorkItemID)
+	return last != nil && last.State.Terminal()
+}
+
+func startQueuedAgentLLM(
+	state agentLoopProgramState,
+	payload agentLoopProgramPayload,
+) (ProgramTransition, error) {
+	if len(state.QueuedActivityIDs) == 0 {
+		return ProgramTransition{
+			State: encodeAgentLoopState(state),
+		}, nil
+	}
+	state.InputActivityID = state.QueuedActivityIDs[0]
+	state.QueuedActivityIDs = state.QueuedActivityIDs[1:]
+	state.LastLLMWorkItemID = ""
+	state.PendingToolIDs = nil
+	state.Round = 0
+	state.AwaitingContinue = false
+	state.ContinueRequested = false
+	return startAgentLLM(state, payload)
 }
 
 func startAgentLLM(

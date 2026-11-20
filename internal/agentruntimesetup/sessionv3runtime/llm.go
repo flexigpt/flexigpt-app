@@ -43,6 +43,14 @@ func (b *Binder) bindLLM(
 	if payload == nil {
 		return sessionv3Runtime.BindResult{}, errors.New("LLM payload is missing")
 	}
+	if req.WorkItem.Binding != nil &&
+		req.WorkItem.Binding.Plan != nil {
+		return b.bindRecoveredLLM(
+			ctx,
+			req,
+			*req.WorkItem.Binding,
+		)
+	}
 
 	plan, err := b.prepareLLMPlan(ctx, req)
 	if err != nil {

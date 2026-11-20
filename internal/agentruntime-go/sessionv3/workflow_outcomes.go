@@ -74,9 +74,22 @@ func (s *WorkflowState) recordTerminalOutcome(
 		if current.ID != outcome.ID {
 			continue
 		}
-		if current.Status == WorkflowStepOutcomeUncertain &&
-			outcome.Status == WorkflowStepOutcomeSucceeded {
-			s.Outcomes[index] = cloneWorkflowStepOutcome(outcome)
+		if current.Status == WorkflowStepOutcomeUncertain {
+			switch outcome.Status {
+			case WorkflowStepOutcomeSucceeded:
+				s.Outcomes[index] = cloneWorkflowStepOutcome(outcome)
+			case WorkflowStepOutcomeFailed,
+				WorkflowStepOutcomeCancelled:
+				// Reconciliation can prove confirmed non-application after
+				// an earlier uncertain external result. Preserve uncertainty
+				// for all other cancellation and failure paths.
+				if outcome.Error != nil &&
+					outcome.Error.Effect ==
+						EffectStateConfirmedNotApplied {
+					s.Outcomes[index] = cloneWorkflowStepOutcome(outcome)
+				}
+			default:
+			}
 		}
 		return nil
 	}

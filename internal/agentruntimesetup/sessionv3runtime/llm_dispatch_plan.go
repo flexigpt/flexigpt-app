@@ -20,6 +20,7 @@ func (b *Binder) durableLLMDispatchPlan(
 		},
 		Ports:      clonePlanPortValues(request.WorkItem.Ports),
 		PortInputs: clonePlanPortInputs(request.WorkItem.PortInputs),
+		History:    plan.defaults.History,
 	}
 
 	if payload := request.WorkItem.Input.LLM; payload != nil {
@@ -106,12 +107,21 @@ func (b *Binder) durableLLMDispatchPlan(
 		)
 	}
 	for _, choice := range choices {
+		raw, err := jsonutil.EncodeToJSONRaw(choice.Choice)
+		if err != nil {
+			return sessionv3Runtime.ModelDispatchPlan{}, err
+		}
+		canonicalChoice, err := jsonutil.CanonicalValueFrom(raw)
+		if err != nil {
+			return sessionv3Runtime.ModelDispatchPlan{}, err
+		}
 		output.Tools = append(
 			output.Tools,
 			sessionv3Runtime.ToolDispatchPlan{
 				Call:                  choice.Call,
 				ProviderManaged:       choice.Call.Binding.Kind == sessionv3Runtime.ToolBindingKindProvider,
 				ProviderConfiguration: choice.ProviderConfiguration.Clone(),
+				Choice:                canonicalChoice,
 			},
 		)
 	}
