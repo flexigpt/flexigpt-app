@@ -170,6 +170,8 @@ func (r *Runtime) createIndependentChildExecutionLocked(
 	if mutableSessionExecution(session, intent.ExecutionID) != nil {
 		return nil, fmt.Errorf("child execution %q already exists", intent.ExecutionID)
 	}
+	parentExecutionID := parent.ID
+	parentFrameID := parentFrame.ID
 
 	interpreter := r.interpreterLocked(intent.Program)
 	if interpreter == nil {
@@ -304,7 +306,16 @@ func (r *Runtime) createIndependentChildExecutionLocked(
 	parentFrame.ChildExecutionIDs = append(parentFrame.ChildExecutionIDs, child.ID)
 	session.Executions = append(session.Executions, child)
 	created := &session.Executions[len(session.Executions)-1]
-	if created.ProgramFrames[0].PortDelivery.DeliversFinalOutput() {
+	if intent.PortBoundary == ProgramFramePortBoundaryPublishedWorkflow {
+		if err := r.preparePublishedWorkflowPortBoundaryLocked(
+			session,
+			parentExecutionID,
+			created,
+			&created.ProgramFrames[0],
+		); err != nil {
+			return nil, err
+		}
+	} else if len(created.ProgramFrames[0].Ports) != 0 {
 		if err := r.stageFramePortInputsLocked(
 			session,
 			created,
@@ -325,8 +336,22 @@ func (r *Runtime) createIndependentChildExecutionLocked(
 			created.ProgramFrames[0].Program = next
 		}
 	}
+	created = mutableSessionExecution(session, intent.ExecutionID)
+	if created == nil {
+		return nil, errors.New(
+			"independent child execution disappeared during port preparation",
+		)
+	}
 
 	if intent.Handoff != nil {
+		parent = mutableSessionExecution(session, parentExecutionID)
+		if parent == nil {
+			return nil, errors.New("independent child parent execution is unavailable")
+		}
+		parentFrame = mutableFrame(parent, parentFrameID)
+		if parentFrame == nil {
+			return nil, errors.New("independent child parent frame is unavailable")
+		}
 		if err := r.applyConversationHandoffLocked(
 			session,
 			parent,

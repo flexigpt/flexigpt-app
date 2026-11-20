@@ -268,20 +268,35 @@ func (r *Runtime) dispatchEmit(
 				*session = previous
 				return
 			}
+			if err := r.forwardChannelMessageLocked(
+				session,
+				execution,
+				*channelMessage,
+			); err != nil {
+				*session = previous
+				return
+			}
 		}
 	}
 
+	execution = mutableSessionExecution(session, executionID)
+	if execution == nil {
+		return
+	}
+	item = mutableWorkItem(execution, workItemID)
+	if item == nil {
+		return
+	}
 	if err := r.persistLocked(ctx, "emitFinished", session); err != nil {
 		return
 	}
 	r.armExecutionRetriesLocked(ctx, session.ID, execution.ID, *execution)
 	r.publishLocked(ctx, session, execution.ID, RuntimeEventWorkChanged)
 	if item.State != WorkItemStateRetryWaiting {
-		r.launchWork(
+		r.launchReadyWork(
 			ctx,
 			session.ID,
-			execution.ID,
-			r.readyWorkLocked(*execution),
+			r.readyWorkForSessionLocked(session),
 		)
 	}
 }

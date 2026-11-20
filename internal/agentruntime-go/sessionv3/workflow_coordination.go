@@ -1149,6 +1149,8 @@ func cloneWorkflowWaitFilter(
 		State:    value.State.Clone(),
 		Messages: value.Messages.Clone(),
 		Steps:    cloneWorkflowStepOutcomes(value.Steps),
+		Scope:    cloneWorkflowScopeContext(value.Scope),
+		Time:     value.Time,
 	}
 	for index := range value.Filters {
 		output.Filters[index] = cloneWorkflowValue(value.Filters[index])

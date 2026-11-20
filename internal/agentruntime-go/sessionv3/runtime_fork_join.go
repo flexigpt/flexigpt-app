@@ -307,15 +307,6 @@ func (r *Runtime) materializeForkFramesLocked(
 				return err
 			}
 		}
-		if len(ports) != 0 {
-			intent.Program, err = workflowProgramWithPortInputs(
-				intent.Program,
-				nil,
-			)
-			if err != nil {
-				return err
-			}
-		}
 
 		handoffID := ""
 		if intent.Handoff != nil {
@@ -350,7 +341,16 @@ func (r *Runtime) materializeForkFramesLocked(
 		if childFrame == nil {
 			return errors.New("fork child ProgramFrame is unavailable")
 		}
-		if childFrame.PortDelivery.DeliversFinalOutput() {
+		if intent.PortBoundary == ProgramFramePortBoundaryPublishedWorkflow {
+			if err := r.preparePublishedWorkflowPortBoundaryLocked(
+				session,
+				execution.ID,
+				execution,
+				childFrame,
+			); err != nil {
+				return err
+			}
+		} else if len(childFrame.Ports) != 0 {
 			if err := r.stageFramePortInputsLocked(
 				session,
 				execution,
@@ -369,12 +369,17 @@ func (r *Runtime) materializeForkFramesLocked(
 				childFrame.Program = next
 			}
 		}
+		execution = mutableSessionExecution(session, execution.ID)
+		if execution == nil {
+			return errors.New("fork parent execution disappeared during port preparation")
+		}
+		parent = mutableFrame(execution, parentID)
+		childFrame = mutableFrame(execution, child.ID)
+		if parent == nil || childFrame == nil {
+			return errors.New("fork ProgramFrame disappeared during port preparation")
+		}
 
 		if intent.Handoff != nil {
-			childFrame := mutableFrame(execution, child.ID)
-			if childFrame == nil {
-				return errors.New("fork handoff child ProgramFrame is unavailable")
-			}
 			if err := r.applyConversationHandoffLocked(
 				session,
 				execution,

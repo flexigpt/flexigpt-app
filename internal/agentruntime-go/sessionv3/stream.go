@@ -70,7 +70,15 @@ func (r *Runtime) appendLLMStream(
 		}
 	}
 	item.LLMStream.UpdatedAt = now
-	item.UpdatedAt = now
+	execution = mutableSessionExecution(session, executionID)
+	if execution == nil {
+		return ErrExecutionNotFound
+	}
+	item = mutableWorkItem(execution, workItemID)
+	if item == nil {
+		return ErrExecutionNotFound
+	}
+	item.UpdatedAt = r.now()
 	r.touchExecutionLocked(session, execution)
 
 	if err := r.persistLocked(ctx, "llmStream", session); err != nil {

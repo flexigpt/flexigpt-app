@@ -2,6 +2,8 @@ package sessionv3
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"strconv"
@@ -22,6 +24,10 @@ const (
 	portMessageKind       = "port"
 	portStreamMessageKind = "port-stream"
 	portMessageSeparator  = ":"
+
+	publishedWorkflowPortNamespacePrefix = "workflow-port"
+	publishedWorkflowPortInputPrefix     = "port-input"
+	publishedWorkflowPortForwardPrefix   = "port-forward"
 )
 
 func bindWorkPortPlans(
@@ -47,6 +53,487 @@ func bindFramePortPlans(
 		output[index].OwnerFrameID = childID
 	}
 	return output
+}
+
+// preparePublishedWorkflowPortBoundaryLocked creates one private channel
+// namespace for a nested Workflow invocation. Child input ports receive a
+// snapshot of the caller channel. Child output records are forwarded to the
+// caller channel through durable ChannelForward facts.
+func (r *Runtime) preparePublishedWorkflowPortBoundaryLocked(
+	session *Session,
+	parentExecutionID ExecutionID,
+	childExecution *Execution,
+	childFrame *ProgramFrame,
+) error {
+	if session == nil || childExecution == nil || childFrame == nil {
+		return errors.New("published workflow port owner is unavailable")
+	}
+	if parentExecutionID == "" ||
+		mutableSessionExecution(session, parentExecutionID) == nil {
+		return errors.New(portChannelParentExecutionUnavailableMessage)
+	}
+	if err := r.stageFramePortInputsLocked(
+		session,
+		childExecution,
+		childFrame,
+	); err != nil {
+		return err
+	}
+
+	program, err := workflowProgramFromSnapshot(childFrame.Program)
+	if err != nil {
+		return err
+	}
+	published := make(map[string]WorkflowPort, len(program.Ports))
+	for _, port := range program.Ports {
+		published[port.Name] = port
+	}
+
+	namespace := portBoundaryMessageID(
+		publishedWorkflowPortNamespacePrefix,
+		string(childExecution.ID),
+		string(childFrame.ID),
+	)
+	snapshot, aliases, err := namespaceWorkflowProgramChannels(
+		childFrame.Program,
+		namespace,
+	)
+	if err != nil {
+		return err
+	}
+
+	inputsByName := make(map[string]PortInput, len(childFrame.PortInputs))
+	for _, input := range childFrame.PortInputs {
+		inputsByName[input.Name] = input
+	}
+	localInputs := make([]PortInput, 0, len(childFrame.PortInputs))
+	hasOutputForward := false
+
+	for _, plan := range childFrame.Ports {
+		port, found := published[plan.Name]
+		if !found {
+			return errors.New(
+				"published workflow port is unavailable at the child boundary",
+			)
+		}
+		localChannel, found := aliases[port.Channel]
+		if !found {
+			return errors.New(
+				"published workflow port has no invocation-local channel",
+			)
+		}
+
+		switch plan.Direction {
+		case WorkflowPortDirectionInput:
+			channel, found := workflowChannelForName(
+				program,
+				port.Channel,
+			)
+			if !found {
+				return errors.New(
+					"published workflow input port has no declared channel",
+				)
+			}
+
+			source := inputsByName[plan.Name]
+			local := PortInput{
+				Name:     plan.Name,
+				Channel:  localChannel,
+				Streamed: plan.Stream,
+			}
+			for index, value := range source.Values {
+				sequence, inputErr := r.appendPublishedWorkflowPortInputLocked(
+					childExecution,
+					childFrame.ID,
+					plan,
+					channel,
+					localChannel,
+					index,
+					value,
+				)
+				if inputErr != nil {
+					return inputErr
+				}
+				local.Values = append(local.Values, value.Clone())
+				if sequence > local.Cursor {
+					local.Cursor = sequence
+				}
+			}
+			if log := executionChannel(childExecution, localChannel); log != nil &&
+				log.NextSequence > local.Cursor {
+				local.Cursor = log.NextSequence
+			}
+			localInputs = append(localInputs, local)
+
+		case WorkflowPortDirectionOutput:
+			if err := appendChannelForward(
+				childExecution,
+				ChannelForward{
+					SourceChannel:     localChannel,
+					TargetExecutionID: parentExecutionID,
+					TargetChannel:     plan.Channel,
+					PortName:          plan.Name,
+					Stream:            plan.Stream,
+					Schema:            plan.Schema.Clone(),
+					ChannelSchema:     plan.ChannelSchema.Clone(),
+					MaxMessages:       plan.MaxMessages,
+					MaxBytes:          plan.MaxBytes,
+				},
+			); err != nil {
+				return err
+			}
+			hasOutputForward = true
+
+		default:
+			return errors.New("published workflow port direction is invalid")
+		}
+	}
+
+	if len(localInputs) != 0 {
+		snapshot, err = workflowProgramWithPortInputs(snapshot, localInputs)
+		if err != nil {
+			return err
+		}
+	}
+	childFrame.Program = snapshot
+	childFrame.UpdatedAt = r.now()
+
+	// A published Workflow channel owns its final and streamed records. The
+	// containing child frame must not append its internal block-result value
+	// as a second final port record.
+	if hasOutputForward {
+		childFrame.PortDelivery = FramePortDeliveryModeForwardOnly
+	}
+	r.touchExecutionLocked(session, childExecution)
+	return nil
+}
+
+func (r *Runtime) appendPublishedWorkflowPortInputLocked(
+	execution *Execution,
+	frameID ProgramFrameID,
+	plan PortPlan,
+	channelDeclaration WorkflowChannel,
+	localChannel string,
+	index int,
+	value jsonutil.CanonicalValue,
+) (uint64, error) {
+	if execution == nil {
+		return 0, errors.New("published workflow input execution is unavailable")
+	}
+	if err := validateWorkflowSchema(plan.Schema, value); err != nil {
+		return 0, fmt.Errorf("validate published workflow input port: %w", err)
+	}
+	if err := validateWorkflowSchema(
+		channelDeclaration.Schema,
+		value,
+	); err != nil {
+		return 0, fmt.Errorf(
+			"validate published workflow input channel: %w",
+			err,
+		)
+	}
+
+	maxMessages, maxBytes := publishedWorkflowChannelRetention(
+		channelDeclaration,
+	)
+	channel, err := mutableChannelLog(
+		execution,
+		localChannel,
+		maxMessages,
+		maxBytes,
+	)
+	if err != nil {
+		return 0, err
+	}
+
+	messageID := portBoundaryMessageID(
+		publishedWorkflowPortInputPrefix,
+		string(frameID),
+		plan.Name,
+		strconv.Itoa(index),
+	)
+	for _, existing := range channel.Messages {
+		if existing.ID != messageID {
+			continue
+		}
+		if !canonicalValuesEqual(existing.Data, value) {
+			return 0, errors.New(
+				"published workflow input port changed during transfer",
+			)
+		}
+		return existing.Sequence, nil
+	}
+	if len(channel.Messages) >= channel.MaxMessages {
+		return 0, errors.New("published workflow input channel retention limit exceeded")
+	}
+
+	correlation := jsonutil.MustCanonicalValue(nil)
+	if channel.Bytes+len(value)+len(correlation) > channel.MaxBytes {
+		return 0, errors.New("published workflow input channel byte limit exceeded")
+	}
+	if err := r.reserveChannelMessageBudgetLocked(
+		execution,
+		value,
+		correlation,
+	); err != nil {
+		return 0, err
+	}
+
+	channel.NextSequence++
+	kind := portMessageKind
+	if plan.Stream {
+		kind = portStreamMessageKind
+	}
+	message := ChannelMessage{
+		ID:          messageID,
+		Sequence:    channel.NextSequence,
+		Channel:     channel.Name,
+		Kind:        kind,
+		Data:        value.Clone(),
+		Correlation: correlation,
+		CreatedAt:   r.now(),
+	}
+	channel.Messages = append(channel.Messages, message)
+	channel.Bytes += len(message.Data) + len(message.Correlation)
+	return message.Sequence, nil
+}
+
+func publishedWorkflowChannelRetention(
+	channel WorkflowChannel,
+) (maxMessages, maxBytes int) {
+	maxMessages = maximumCoordinationRecords
+	if channel.MaxMessages > 0 && channel.MaxMessages < maxMessages {
+		maxMessages = channel.MaxMessages
+	}
+	maxBytes = maximumCoordinationBytes
+	if channel.MaxBytes > 0 && channel.MaxBytes < maxBytes {
+		maxBytes = channel.MaxBytes
+	}
+	return maxMessages, maxBytes
+}
+
+func appendChannelForward(
+	execution *Execution,
+	value ChannelForward,
+) error {
+	if execution == nil {
+		return errors.New("channel forward execution is unavailable")
+	}
+	if err := value.Validate(); err != nil {
+		return err
+	}
+	for _, existing := range execution.ChannelForwards {
+		if existing.SourceChannel != value.SourceChannel ||
+			existing.TargetExecutionID != value.TargetExecutionID ||
+			existing.TargetChannel != value.TargetChannel ||
+			existing.PortName != value.PortName {
+			continue
+		}
+		if !sameChannelForward(existing, value) {
+			return errors.New("published workflow channel forward facts changed")
+		}
+		return nil
+	}
+	execution.ChannelForwards = append(execution.ChannelForwards, value)
+	return nil
+}
+
+func sameChannelForward(left, right ChannelForward) bool {
+	return left.SourceChannel == right.SourceChannel &&
+		left.TargetExecutionID == right.TargetExecutionID &&
+		left.TargetChannel == right.TargetChannel &&
+		left.PortName == right.PortName &&
+		left.Stream == right.Stream &&
+		left.MaxMessages == right.MaxMessages &&
+		left.MaxBytes == right.MaxBytes &&
+		canonicalValuesEqual(left.Schema, right.Schema) &&
+		canonicalValuesEqual(left.ChannelSchema, right.ChannelSchema)
+}
+
+func namespaceWorkflowProgramChannels(
+	snapshot ProgramSnapshot,
+	namespace string,
+) (ProgramSnapshot, map[string]string, error) {
+	program, err := workflowProgramFromSnapshot(snapshot)
+	if err != nil {
+		return ProgramSnapshot{}, nil, err
+	}
+
+	aliases := make(map[string]string, len(program.Channels))
+	for _, channel := range program.Channels {
+		value := namespace + ":" + channel.Name
+		if err := validateID("workflow invocation channel", value); err != nil {
+			return ProgramSnapshot{}, nil, err
+		}
+		aliases[channel.Name] = value
+	}
+	for index := range program.Channels {
+		program.Channels[index].Name = aliases[program.Channels[index].Name]
+	}
+	for index := range program.Ports {
+		value, found := aliases[program.Ports[index].Channel]
+		if !found {
+			return ProgramSnapshot{}, nil, errors.New(
+				"published workflow port has no declared local channel",
+			)
+		}
+		program.Ports[index].Channel = value
+	}
+	if err := namespaceWorkflowBlockChannels(&program.Root, aliases); err != nil {
+		return ProgramSnapshot{}, nil, err
+	}
+
+	payload, err := canonicalWorkflowValue(program)
+	if err != nil {
+		return ProgramSnapshot{}, nil, err
+	}
+	snapshot.Payload = payload
+	return snapshot, aliases, nil
+}
+
+func namespaceWorkflowBlockChannels(
+	block *WorkflowBlock,
+	aliases map[string]string,
+) error {
+	if block == nil {
+		return nil
+	}
+	for index := range block.Steps {
+		step := &block.Steps[index]
+		if step.Call != nil {
+			for portIndex := range step.Call.Ports {
+				channel, err := namespaceWorkflowChannel(
+					aliases,
+					step.Call.Ports[portIndex].Channel,
+				)
+				if err != nil {
+					return err
+				}
+				step.Call.Ports[portIndex].Channel = channel
+			}
+		}
+		if step.Wait != nil && step.Wait.Channel != nil {
+			channel, err := namespaceWorkflowChannel(
+				aliases,
+				step.Wait.Channel.Channel,
+			)
+			if err != nil {
+				return err
+			}
+			step.Wait.Channel.Channel = channel
+		}
+		if step.Emit != nil && step.Emit.Destination.Channel != "" {
+			channel, err := namespaceWorkflowChannel(
+				aliases,
+				step.Emit.Destination.Channel,
+			)
+			if err != nil {
+				return err
+			}
+			step.Emit.Destination.Channel = channel
+		}
+		if step.Effect != nil {
+			if err := namespaceWorkflowBlockChannels(
+				step.Effect.Reconcile,
+				aliases,
+			); err != nil {
+				return err
+			}
+			if err := namespaceWorkflowBlockChannels(
+				step.Effect.Compensate,
+				aliases,
+			); err != nil {
+				return err
+			}
+		}
+
+		switch {
+		case step.Scope != nil:
+			if err := namespaceWorkflowBlockChannels(step.Scope, aliases); err != nil {
+				return err
+			}
+		case step.Choose != nil:
+			for caseIndex := range step.Choose.Cases {
+				if err := namespaceWorkflowBlockChannels(
+					&step.Choose.Cases[caseIndex].Do,
+					aliases,
+				); err != nil {
+					return err
+				}
+			}
+			if err := namespaceWorkflowBlockChannels(
+				step.Choose.Default,
+				aliases,
+			); err != nil {
+				return err
+			}
+		case step.Parallel != nil:
+			for branchIndex := range step.Parallel.Branches {
+				if err := namespaceWorkflowBlockChannels(
+					&step.Parallel.Branches[branchIndex].Do,
+					aliases,
+				); err != nil {
+					return err
+				}
+			}
+		case step.Foreach != nil:
+			if err := namespaceWorkflowBlockChannels(&step.Foreach.Do, aliases); err != nil {
+				return err
+			}
+		case step.Repeat != nil:
+			if err := namespaceWorkflowBlockChannels(&step.Repeat.Do, aliases); err != nil {
+				return err
+			}
+		case step.Machine != nil:
+			for stateIndex := range step.Machine.States {
+				machineState := &step.Machine.States[stateIndex]
+				if err := namespaceWorkflowBlockChannels(
+					machineState.Entry,
+					aliases,
+				); err != nil {
+					return err
+				}
+				if err := namespaceWorkflowBlockChannels(
+					machineState.Exit,
+					aliases,
+				); err != nil {
+					return err
+				}
+				for transitionIndex := range machineState.Transitions {
+					if err := namespaceWorkflowBlockChannels(
+						machineState.Transitions[transitionIndex].Do,
+						aliases,
+					); err != nil {
+						return err
+					}
+				}
+			}
+		case step.Saga != nil:
+			if err := namespaceWorkflowBlockChannels(&step.Saga.Do, aliases); err != nil {
+				return err
+			}
+		}
+	}
+	for index := range block.Catch {
+		if err := namespaceWorkflowBlockChannels(
+			&block.Catch[index].Do,
+			aliases,
+		); err != nil {
+			return err
+		}
+	}
+	return namespaceWorkflowBlockChannels(block.Finally, aliases)
+}
+
+func namespaceWorkflowChannel(
+	aliases map[string]string,
+	channel string,
+) (string, error) {
+	value, found := aliases[channel]
+	if !found {
+		return "", errors.New("workflow channel is unavailable in this invocation")
+	}
+	return value, nil
 }
 
 func llmPortPlansForFrame(
@@ -553,6 +1040,14 @@ func (r *Runtime) appendWorkPortStream(
 	); err != nil {
 		return err
 	}
+	execution = mutableSessionExecution(session, executionID)
+	if execution == nil {
+		return ErrExecutionNotFound
+	}
+	item = mutableWorkItem(execution, workItemID)
+	if item == nil {
+		return ErrExecutionNotFound
+	}
 	item.UpdatedAt = r.now()
 	r.touchExecutionLocked(session, execution)
 
@@ -655,6 +1150,7 @@ func (r *Runtime) appendPortMessageLocked(
 	if err != nil {
 		return err
 	}
+	channelExecutionID := channelExecution.ID
 	channel, err := mutableChannelLog(
 		channelExecution,
 		plan.Channel,
@@ -698,6 +1194,17 @@ func (r *Runtime) appendPortMessageLocked(
 	if err := r.wakeChannelWaitsLocked(session, channelExecution, message); err != nil {
 		return err
 	}
+	if err := r.forwardChannelMessageLocked(
+		session,
+		channelExecution,
+		message,
+	); err != nil {
+		return err
+	}
+	channelExecution = mutableSessionExecution(session, channelExecutionID)
+	if channelExecution == nil {
+		return errors.New(portChannelParentExecutionUnavailableMessage)
+	}
 	r.touchExecutionLocked(session, channelExecution)
 
 	// The receiver can belong to another independent Execution. Launching
@@ -709,6 +1216,211 @@ func (r *Runtime) appendPortMessageLocked(
 		r.readyWorkForSessionLocked(session),
 	)
 	return nil
+}
+
+type channelForwardRoute struct {
+	SourceExecution ExecutionID
+	SourceChannel   string
+	TargetExecution ExecutionID
+	TargetChannel   string
+	PortName        string
+}
+
+func (r *Runtime) forwardChannelMessageLocked(
+	session *Session,
+	sourceExecution *Execution,
+	message ChannelMessage,
+) error {
+	return r.forwardChannelMessageFromLocked(
+		session,
+		sourceExecution,
+		message,
+		map[channelForwardRoute]struct{}{},
+	)
+}
+
+func (r *Runtime) forwardChannelMessageFromLocked(
+	session *Session,
+	sourceExecution *Execution,
+	message ChannelMessage,
+	visited map[channelForwardRoute]struct{},
+) error {
+	if session == nil || sourceExecution == nil {
+		return errors.New("channel forward source is unavailable")
+	}
+
+	forwards := append(
+		[]ChannelForward(nil),
+		sourceExecution.ChannelForwards...,
+	)
+	for _, forward := range forwards {
+		if forward.SourceChannel != message.Channel {
+			continue
+		}
+		if err := forward.Validate(); err != nil {
+			return err
+		}
+		route := channelForwardRoute{
+			SourceExecution: sourceExecution.ID,
+			SourceChannel:   forward.SourceChannel,
+			TargetExecution: forward.TargetExecutionID,
+			TargetChannel:   forward.TargetChannel,
+			PortName:        forward.PortName,
+		}
+		if _, found := visited[route]; found {
+			return errors.New(portChannelForwardingCycleMessage)
+		}
+		if route.SourceExecution == route.TargetExecution &&
+			route.SourceChannel == route.TargetChannel {
+			return errors.New(portChannelForwardingCycleMessage)
+		}
+		visited[route] = struct{}{}
+
+		target := mutableSessionExecution(
+			session,
+			forward.TargetExecutionID,
+		)
+		if target == nil {
+			delete(visited, route)
+			return errors.New(portChannelParentExecutionUnavailableMessage)
+		}
+		if err := validateWorkflowSchema(forward.Schema, message.Data); err != nil {
+			delete(visited, route)
+			return fmt.Errorf("validate forwarded workflow port: %w", err)
+		}
+		if err := validateWorkflowSchema(
+			forward.ChannelSchema,
+			message.Data,
+		); err != nil {
+			delete(visited, route)
+			return fmt.Errorf(
+				"validate forwarded workflow port channel: %w",
+				err,
+			)
+		}
+
+		forwarded, appended, err := r.appendForwardedChannelMessageLocked(
+			session,
+			target,
+			sourceExecution.ID,
+			forward,
+			message,
+		)
+		if err == nil && appended {
+			target = mutableSessionExecution(
+				session,
+				forward.TargetExecutionID,
+			)
+			if target == nil {
+				err = errors.New(portChannelParentExecutionUnavailableMessage)
+			} else {
+				err = r.forwardChannelMessageFromLocked(
+					session,
+					target,
+					forwarded,
+					visited,
+				)
+			}
+		}
+		delete(visited, route)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *Runtime) appendForwardedChannelMessageLocked(
+	session *Session,
+	target *Execution,
+	sourceExecutionID ExecutionID,
+	forward ChannelForward,
+	source ChannelMessage,
+) (ChannelMessage, bool, error) {
+	if session == nil || target == nil {
+		return ChannelMessage{}, false, errors.New(
+			portChannelParentExecutionUnavailableMessage,
+		)
+	}
+	maxMessages, maxBytes := portRetention(PortPlan{
+		MaxMessages: forward.MaxMessages,
+		MaxBytes:    forward.MaxBytes,
+	})
+	channel, err := mutableChannelLog(
+		target,
+		forward.TargetChannel,
+		maxMessages,
+		maxBytes,
+	)
+	if err != nil {
+		return ChannelMessage{}, false, err
+	}
+	messageID := portBoundaryMessageID(
+		publishedWorkflowPortForwardPrefix,
+		string(sourceExecutionID),
+		source.Channel,
+		source.ID,
+		string(forward.TargetExecutionID),
+		forward.TargetChannel,
+		forward.PortName,
+	)
+	for _, existing := range channel.Messages {
+		if existing.ID == messageID {
+			return existing, false, nil
+		}
+	}
+	if len(channel.Messages) >= channel.MaxMessages {
+		return ChannelMessage{}, false, errors.New(
+			"forwarded workflow port channel retention limit exceeded",
+		)
+	}
+	if channel.Bytes+len(source.Data)+len(source.Correlation) > channel.MaxBytes {
+		return ChannelMessage{}, false, errors.New(
+			"forwarded workflow port channel byte limit exceeded",
+		)
+	}
+	if err := r.reserveChannelMessageBudgetLocked(
+		target,
+		source.Data,
+		source.Correlation,
+	); err != nil {
+		return ChannelMessage{}, false, err
+	}
+
+	now := r.now()
+	channel.NextSequence++
+	message := ChannelMessage{
+		ID:          messageID,
+		Sequence:    channel.NextSequence,
+		Channel:     channel.Name,
+		Kind:        source.Kind,
+		Data:        source.Data.Clone(),
+		Correlation: source.Correlation.Clone(),
+		CreatedAt:   now,
+	}
+	channel.Messages = append(channel.Messages, message)
+	channel.Bytes += len(message.Data) + len(message.Correlation)
+	if err := r.wakeChannelWaitsLocked(session, target, message); err != nil {
+		return ChannelMessage{}, false, err
+	}
+
+	target = mutableSessionExecution(session, target.ID)
+	if target == nil {
+		return ChannelMessage{}, false, errors.New(
+			portChannelParentExecutionUnavailableMessage,
+		)
+	}
+	r.touchExecutionLocked(session, target)
+	return message, true, nil
+}
+
+func portBoundaryMessageID(prefix string, values ...string) string {
+	sum := sha256.New()
+	for _, value := range values {
+		_, _ = sum.Write([]byte(value))
+		_, _ = sum.Write([]byte{0})
+	}
+	return prefix + ":" + hex.EncodeToString(sum.Sum(nil))
 }
 
 func portRetention(plan PortPlan) (maxMessages, maxBytes int) {

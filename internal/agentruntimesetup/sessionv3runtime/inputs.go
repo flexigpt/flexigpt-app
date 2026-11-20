@@ -157,16 +157,6 @@ func llmInputActivitySequence(
 			}
 			output = append(output, *activity)
 		}
-		for _, activity := range session.Timeline[currentIndex+1:] {
-			if activity.Kind != sessionv3Runtime.ActivityKindMessage ||
-				activity.Message == nil ||
-				activity.Message.Role != sessionv3Runtime.MessageRoleAssistant ||
-				activity.ExecutionID != execution.ID ||
-				activity.FrameID != workItem.FrameID {
-				continue
-			}
-			output = append(output, activity)
-		}
 		output = append(output, current)
 		for _, activity := range session.Timeline[currentIndex+1:] {
 			if activity.Kind != sessionv3Runtime.ActivityKindMessage ||

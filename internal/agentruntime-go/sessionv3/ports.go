@@ -62,6 +62,21 @@ type PortStream struct {
 	NextSequence uint64 `json:"nextSequence"`
 }
 
+// ChannelForward is a durable published-port bridge. SourceChannel belongs to
+// the child Workflow invocation. TargetChannel belongs to its caller. Runtime
+// copies only semantic channel records through this bridge.
+type ChannelForward struct {
+	SourceChannel     string                  `json:"sourceChannel"`
+	TargetExecutionID ExecutionID             `json:"targetExecutionID"`
+	TargetChannel     string                  `json:"targetChannel"`
+	PortName          string                  `json:"portName"`
+	Stream            bool                    `json:"stream,omitempty"`
+	Schema            jsonutil.CanonicalValue `json:"schema"`
+	ChannelSchema     jsonutil.CanonicalValue `json:"channelSchema"`
+	MaxMessages       int                     `json:"maxMessages,omitempty"`
+	MaxBytes          int                     `json:"maxBytes,omitempty"`
+}
+
 func (m FramePortDeliveryMode) Validate() error {
 	switch m {
 	case "",
@@ -196,6 +211,34 @@ func (p PortStream) Validate() error {
 	}
 	if p.NextSequence == 0 {
 		return errors.New("port stream sequence is invalid")
+	}
+	return nil
+}
+
+func (f ChannelForward) Validate() error {
+	if err := validateID("channel forward source channel", f.SourceChannel); err != nil {
+		return err
+	}
+	if err := validateID(
+		"channel forward target execution ID",
+		string(f.TargetExecutionID),
+	); err != nil {
+		return err
+	}
+	if err := validateID("channel forward target channel", f.TargetChannel); err != nil {
+		return err
+	}
+	if err := validateID("channel forward port name", f.PortName); err != nil {
+		return err
+	}
+	if len(f.Schema) == 0 || !f.Schema.Valid() {
+		return errors.New("channel forward port schema is invalid")
+	}
+	if len(f.ChannelSchema) == 0 || !f.ChannelSchema.Valid() {
+		return errors.New("channel forward channel schema is invalid")
+	}
+	if f.MaxMessages < 0 || f.MaxBytes < 0 {
+		return errors.New("channel forward retention limit is invalid")
 	}
 	return nil
 }

@@ -532,6 +532,7 @@ type Execution struct {
 	Waits             []Wait                       `json:"waits"`
 	Signals           []ExecutionSignal            `json:"signals,omitempty"`
 	Channels          []ChannelLog                 `json:"channels,omitempty"`
+	ChannelForwards   []ChannelForward             `json:"channelForwards,omitempty"`
 	Resources         []WorkflowResourceDefinition `json:"resources,omitempty"`
 	ResourceLeases    []ResourceLease              `json:"resourceLeases,omitempty"`
 	ResourceRates     []ResourceRateWindow         `json:"resourceRates,omitempty"`

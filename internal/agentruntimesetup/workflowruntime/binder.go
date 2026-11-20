@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 
 	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
@@ -292,10 +293,15 @@ func externalWorkRequest(
 		return WorkBindingRequest{}, err
 	}
 	return WorkBindingRequest{
-		Input:   input,
-		Context: contextValue,
-		Ports:   cloneExternalPortInputs(item.PortInputs),
-		Stream:  request.PortStream,
+		ExecutionID:    request.Execution.ID,
+		WorkItemID:     item.ID,
+		AttemptID:      externalAttemptID(request.Execution, item.ID),
+		Effect:         item.Effect,
+		IdempotencyKey: item.Effect.IdempotencyKey,
+		Input:          input,
+		Context:        contextValue,
+		Ports:          cloneExternalPortInputs(item.PortInputs),
+		Stream:         request.PortStream,
 	}, nil
 }
 
@@ -311,13 +317,31 @@ func externalWaitRequest(
 		return WorkBindingWaitRequest{}, err
 	}
 	return WorkBindingWaitRequest{
-		Wait:       request.Wait,
-		Resolution: request.Resolution,
-		Response:   request.Response.Clone(),
-		Input:      input,
-		Context:    contextValue,
-		Ports:      cloneExternalPortInputs(request.WorkItem.PortInputs),
+		Wait:           request.Wait,
+		Resolution:     request.Resolution,
+		Response:       request.Response.Clone(),
+		ExecutionID:    request.Execution.ID,
+		WorkItemID:     request.WorkItem.ID,
+		AttemptID:      externalAttemptID(request.Execution, request.WorkItem.ID),
+		Effect:         request.WorkItem.Effect,
+		IdempotencyKey: request.WorkItem.Effect.IdempotencyKey,
+		Input:          input,
+		Context:        contextValue,
+		Ports:          cloneExternalPortInputs(request.WorkItem.PortInputs),
 	}, nil
+}
+
+func externalAttemptID(
+	execution sessionv3Runtime.Execution,
+	workItemID sessionv3Runtime.WorkItemID,
+) sessionv3Runtime.AttemptID {
+	for _, attempt := range slices.Backward(execution.Attempts) {
+		if attempt.WorkItemID == workItemID &&
+			attempt.State == sessionv3Runtime.AttemptStateDispatched {
+			return attempt.ID
+		}
+	}
+	return ""
 }
 
 func externalWorkContext(

@@ -581,9 +581,9 @@ func (r *Runtime) waitForResource(
 
 func normalizeRecoveredResources(
 	execution *Execution,
-) {
+) []string {
 	if execution == nil {
-		return
+		return nil
 	}
 
 	active := make(map[WorkItemID]struct{}, len(execution.WorkItems))
@@ -603,6 +603,7 @@ func normalizeRecoveredResources(
 		}
 	}
 
+	released := make(map[string]struct{})
 	leases := execution.ResourceLeases[:0]
 	for _, lease := range execution.ResourceLeases {
 		if _, found := active[lease.WorkItemID]; found {
@@ -611,7 +612,15 @@ func normalizeRecoveredResources(
 		}
 		if _, found := activeFrames[lease.FrameID]; found {
 			leases = append(leases, lease)
+			continue
 		}
+		released[lease.Resource] = struct{}{}
 	}
 	execution.ResourceLeases = leases
+
+	output := make([]string, 0, len(released))
+	for resource := range released {
+		output = append(output, resource)
+	}
+	return output
 }

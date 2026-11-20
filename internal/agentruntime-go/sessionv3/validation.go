@@ -63,6 +63,17 @@ func (s Session) Validate() error {
 		executionIDs[execution.ID] = struct{}{}
 	}
 
+	for _, execution := range s.Executions {
+		for _, forward := range execution.ChannelForwards {
+			if _, found := executionIDs[forward.TargetExecutionID]; !found {
+				return fmt.Errorf(
+					"execution %q channel forward has an unavailable target execution",
+					execution.ID,
+				)
+			}
+		}
+	}
+
 	if err := validateTriggerRegistrations(s, executionIDs); err != nil {
 		return err
 	}
@@ -709,6 +720,21 @@ func (e Execution) Validate(sessionID SessionID) error {
 			)
 		}
 		signals[identity] = struct{}{}
+	}
+
+	forwards := make(map[string]struct{}, len(e.ChannelForwards))
+	for _, forward := range e.ChannelForwards {
+		if err := forward.Validate(); err != nil {
+			return err
+		}
+		key := string(forward.TargetExecutionID) + "\x00" +
+			forward.SourceChannel + "\x00" +
+			forward.TargetChannel + "\x00" +
+			forward.PortName
+		if _, duplicate := forwards[key]; duplicate {
+			return errors.New("channel forward is duplicated")
+		}
+		forwards[key] = struct{}{}
 	}
 
 	channels := make(map[string]struct{}, len(e.Channels))

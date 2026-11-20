@@ -3896,9 +3896,13 @@ func (r *Runtime) recoverLocked(session *Session) bool {
 				// No recovery action.
 			}
 		}
-		normalizeRecoveredResources(execution)
-		r.wakeBudgetConcurrencyWaitersLocked(
+		released := normalizeRecoveredResources(execution)
+		if len(released) != 0 {
+			changed = true
+		}
+		r.wakeResourceWaitersLocked(
 			execution,
+			released,
 		)
 		for waitIndex := range execution.Waits {
 			wait := &execution.Waits[waitIndex]
