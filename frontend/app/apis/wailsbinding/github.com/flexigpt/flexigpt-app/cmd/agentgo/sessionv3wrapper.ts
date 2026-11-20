@@ -32,6 +32,10 @@ export function CancelExecution(command: sessionv3$0.CancelExecutionCommand): $C
     return $Call.ByName("main.SessionV3Wrapper.CancelExecution", command);
 }
 
+export function CompleteConversationHandoff(command: sessionv3$0.CompleteConversationHandoffCommand): $CancellablePromise<sessionv3$0.CommandReceipt | null> {
+    return $Call.ByName("main.SessionV3Wrapper.CompleteConversationHandoff", command);
+}
+
 export function CompleteToolCallAsError(command: sessionv3$0.CompleteToolCallAsErrorCommand): $CancellablePromise<sessionv3$0.CommandReceipt | null> {
     return $Call.ByName("main.SessionV3Wrapper.CompleteToolCallAsError", command);
 }

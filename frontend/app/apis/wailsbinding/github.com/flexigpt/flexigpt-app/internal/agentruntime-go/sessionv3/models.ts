@@ -431,6 +431,16 @@ export enum CollectionOverrideMode {
     CollectionOverrideReplace = "replace",
 };
 
+/**
+ * CollectionPolicy preserves collection intent separately from the resulting
+ * collection. In particular, it keeps explicit empty replacement distinct
+ * from inherited omission and retains supported per-item removals.
+ */
+export interface CollectionPolicy {
+    "mode"?: CollectionOverrideMode;
+    "removed"?: string[] | null;
+}
+
 export type CommandID = string;
 
 export interface CommandMeta {
@@ -489,6 +499,18 @@ export interface CompensationWork {
     "originalWorkItemID": WorkItemID;
     "effectID": EffectRecordID;
     "input"?: jsonutil$0.CanonicalValue;
+}
+
+/**
+ * CompleteConversationHandoffCommand completes one active handoff Agent frame
+ * successfully. It is distinct from cancellation and therefore permits the
+ * persisted restore or retain ownership policy to settle normally.
+ */
+export interface CompleteConversationHandoffCommand {
+    "meta": CommandMeta;
+    "sessionID": SessionID;
+    "executionID": ExecutionID;
+    "handoffID": string;
 }
 
 export interface CompleteToolCallAsErrorCommand {
@@ -727,6 +749,13 @@ export enum ErrorCategory {
 export interface EvaluationBoundary {
     "declarationPath": string;
     "logicalTime": string;
+
+    /**
+     * Messages is the authorized declaration-visible channel snapshot used at
+     * this exact logical evaluation boundary. It contains no channel handles,
+     * cursors, callbacks, or compiled CEL state.
+     */
+    "messages"?: jsonutil$0.CanonicalValue;
 }
 
 export interface ExecuteAppToolCommand {
@@ -1035,6 +1064,13 @@ export interface LLMStreamState {
 export interface LLMToolOrigin {
     "originWorkItemID": WorkItemID;
     "targetFingerprint": string;
+    "planReference"?: string;
+
+    /**
+     * Plan is retained only for documents created before canonical origin-plan
+     * references. New Tool WorkItems contain PlanReference and resolve the
+     * canonical immutable plan from their origin LLM WorkItem.
+     */
     "plan"?: ModelDispatchPlan | null;
 }
 
@@ -1063,6 +1099,7 @@ export interface LLMWork {
     "isolatedInput"?: boolean;
     "historyActivityIDs"?: ActivityID[] | null;
     "providerTools"?: ProviderManagedToolChoice[] | null;
+    "preparedInvocation"?: WorkflowPreparedInvocation | null;
 }
 
 export interface MCPDispatchPlan {
@@ -1186,6 +1223,9 @@ export interface MessageDispatchPlan {
     "role": MessageRole;
     "text"?: string;
     "attachments"?: Attachment[] | null;
+    "toolResults"?: ToolResultActivity[] | null;
+    "appContext"?: AppContextUpdate[] | null;
+    "metadata"?: jsonutil$0.CanonicalValue;
 }
 
 export interface MessageInput {
@@ -1277,6 +1317,7 @@ export interface ModelDispatchPlan {
     "ports"?: PortPlan[] | null;
     "portInputs"?: PortInput[] | null;
     "history": HistorySelection;
+    "runtimeConfiguration"?: jsonutil$0.CanonicalValue;
 }
 
 export interface ModelDispatchTarget {
@@ -1404,6 +1445,7 @@ export interface ProgramFrameIntent {
     "deadline"?: string | null;
     "budget"?: ExecutionBudget | null;
     "lifetime"?: ChildFrameLifetime;
+    "workflowNesting"?: boolean;
     "ownership"?: ChildExecutionOwnership | null;
     "claims"?: ResourceClaim[] | null;
     "ports"?: PortPlan[] | null;
@@ -1691,6 +1733,15 @@ export interface Session {
     "commands"?: CommandRecord[] | null;
 }
 
+export interface SessionCollectionPolicies {
+    "systemInstructions"?: CollectionPolicy;
+    "instructionArtifacts"?: CollectionPolicy;
+    "toolSelections"?: CollectionPolicy;
+    "skills"?: CollectionPolicy;
+    "activeSkills"?: CollectionPolicy;
+    "mcp"?: CollectionPolicy;
+}
+
 export enum SessionDefaultField {
     /**
      * The Go zero value for the underlying type of the enum.
@@ -1728,6 +1779,7 @@ export interface SessionDefaults {
     "skills"?: ArtifactSelection[] | null;
     "activeSkills"?: ArtifactSelection[] | null;
     "mcp"?: MCPServerSelection[] | null;
+    "collectionPolicies"?: SessionCollectionPolicies;
     "conversationBudget"?: ExecutionBudget | null;
 }
 
@@ -1753,6 +1805,7 @@ export interface SessionDefaultsOverride {
     "skills"?: ArtifactSelection[] | null;
     "activeSkills"?: ArtifactSelection[] | null;
     "mcp"?: MCPServerSelection[] | null;
+    "collectionPolicies"?: SessionCollectionPolicies | null;
     "clear"?: SessionDefaultField[] | null;
 }
 
@@ -2319,6 +2372,7 @@ export interface WorkItem {
     "portStreams"?: PortStream[] | null;
     "input": WorkItemPayload;
     "binding"?: SemanticBinding | null;
+    "consumedByWorkItemID"?: WorkItemID;
     "output"?: WorkItemOutput | null;
     "error"?: SanitizedError | null;
     "llmStream"?: LLMStreamState | null;
@@ -2525,11 +2579,18 @@ export interface WorkflowChoose {
 
 export interface WorkflowCompletedOperationFacts {
     "originalWorkItemID": WorkItemID;
+    "originalAttemptID": AttemptID;
+    "originalFrameID": ProgramFrameID;
     "effectID": EffectRecordID;
+    "target": WorkflowOperationTargetFacts;
+    "effect": EffectContract;
+    "effectState": EffectState;
     "input": jsonutil$0.CanonicalValue;
     "output": jsonutil$0.CanonicalValue;
+    "idempotencyKey": string;
+    "compensationWorkItemID": WorkItemID;
+    "compensationFrameID": ProgramFrameID;
     "receipt"?: ExternalReceipt | null;
-    "idempotencyKey"?: string;
 }
 
 export interface WorkflowCompletion {
@@ -2596,7 +2657,7 @@ export interface WorkflowForeach {
     "items": WorkflowValue;
     "itemSchema": jsonutil$0.CanonicalValue;
     "concurrency"?: number;
-    "maxItems"?: number;
+    "maxItems"?: number | null;
     "completion": WorkflowCompletion;
     "errors"?: string;
     "merge"?: WorkflowParentStateMerge | null;
@@ -2627,6 +2688,7 @@ export interface WorkflowLLMInvocation {
     "messages": WorkflowLLMMessage[] | null;
     "instructions"?: WorkflowLLMInstruction[] | null;
     "defaults"?: SessionDefaultsOverride | null;
+    "preparedTargets"?: { [_ in string]?: WorkflowPreparedInvocation } | null;
 }
 
 export interface WorkflowLLMMessage {
@@ -2739,6 +2801,52 @@ export enum WorkflowPortDirection {
     WorkflowPortDirectionOutput = "output",
 };
 
+/**
+ * WorkflowPreparedInvocation is a setup-owned immutable contribution
+ * snapshot. It contains source-backed pins and declaration contribution facts,
+ * but no client, credential, Artifact Store handle, callback, or provider
+ * request.
+ * 
+ * Runtime uses this snapshot for Workflow Model and Agent child calls instead
+ * of resolving current Agent or Workspace contribution graphs at dispatch.
+ */
+export interface WorkflowPreparedInvocation {
+    "model"?: ArtifactPin | null;
+    "agent"?: ArtifactPin | null;
+    "workspace"?: ArtifactPin | null;
+    "includeModelSystemPrompt"?: boolean | null;
+    "texts"?: WorkflowPreparedText[] | null;
+    "tools"?: WorkflowPreparedTool[] | null;
+    "skills"?: WorkflowPreparedSkill[] | null;
+    "mcp"?: WorkflowPreparedMCP[] | null;
+}
+
+export interface WorkflowPreparedMCP {
+    "server": ArtifactPin;
+    "includeServerInstructions"?: boolean;
+    "toolExposure": MCPToolExposure;
+}
+
+export interface WorkflowPreparedSkill {
+    "artifact": ArtifactPin;
+    "active"?: boolean;
+    "instructions"?: boolean;
+}
+
+/**
+ * WorkflowPreparedText records a source-backed Text contribution selected
+ * during Workflow preparation. Text materialization occurs later through the
+ * Text domain, after exact Artifact-pin verification.
+ */
+export interface WorkflowPreparedText {
+    "artifact": ArtifactPin;
+}
+
+export interface WorkflowPreparedTool {
+    "artifact": ArtifactPin;
+    "autoExecute"?: boolean | null;
+}
+
 export interface WorkflowProjection {
     "schemaVersion": string;
     "sessionID": SessionID;
@@ -2754,7 +2862,7 @@ export interface WorkflowRepeat {
     "until"?: WorkflowValue | null;
     "lifetime"?: string;
     "state"?: WorkflowStateSpec | null;
-    "maxIterations"?: number;
+    "maxIterations"?: number | null;
     "onExhausted"?: string;
     "timeout"?: WorkflowDuration;
     "do": WorkflowBlock;
@@ -2841,6 +2949,7 @@ export interface WorkflowScopeContext {
     "stateOwner"?: WorkflowStateOwner | null;
     "targetSets"?: WorkflowTargetSetState[] | null;
     "outerOutcomes"?: WorkflowStepOutcome[] | null;
+    "causalEffectWorkItemIDs"?: WorkItemID[] | null;
     "outerSubscriptions"?: WorkflowSubscriptionState[] | null;
     "context"?: jsonutil$0.CanonicalValue | null;
     "item"?: jsonutil$0.CanonicalValue | null;
@@ -2852,6 +2961,7 @@ export interface WorkflowScopeContext {
     "operation"?: jsonutil$0.CanonicalValue | null;
     "completed"?: jsonutil$0.CanonicalValue | null;
     "ports"?: PortInput[] | null;
+    "channelAliases"?: { [_ in string]?: string } | null;
     "saga"?: WorkflowSagaScope | null;
     "cleanup"?: boolean;
 }
@@ -2974,6 +3084,7 @@ export interface WorkflowSubscriptionState {
     "name": string;
     "event": string;
     "source": string;
+    "ownerFrameID"?: ProgramFrameID;
     "correlation"?: jsonutil$0.CanonicalValue;
     "correlationSchema"?: jsonutil$0.CanonicalValue;
     "dataSchema"?: jsonutil$0.CanonicalValue;
