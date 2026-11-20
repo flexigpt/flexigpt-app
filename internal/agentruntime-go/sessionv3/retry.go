@@ -279,6 +279,10 @@ func (r *Runtime) waitForRetry(
 			item.FrameID,
 			item.ID,
 		)
+		execution = mutableSessionExecution(session, executionID)
+		if execution == nil {
+			return
+		}
 		r.refreshExecutionStateLocked(execution)
 		r.touchExecutionLocked(session, execution)
 		if err := r.persistLocked(persistContext, "retryDeadlineElapsed", session); err != nil {

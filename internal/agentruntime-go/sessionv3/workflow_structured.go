@@ -254,6 +254,7 @@ const (
 	WorkflowChildStateSucceeded WorkflowChildState = "succeeded"
 	WorkflowChildStateFailed    WorkflowChildState = "failed"
 	WorkflowChildStateCancelled WorkflowChildState = "cancelled"
+	WorkflowChildStateUncertain WorkflowChildState = "uncertain"
 	WorkflowChildStateSkipped   WorkflowChildState = "skipped"
 )
 
@@ -262,6 +263,7 @@ func (s WorkflowChildState) terminal() bool {
 	case WorkflowChildStateSucceeded,
 		WorkflowChildStateFailed,
 		WorkflowChildStateCancelled,
+		WorkflowChildStateUncertain,
 		WorkflowChildStateSkipped:
 		return true
 	default:
@@ -319,6 +321,7 @@ type WorkflowRepeatProgress struct {
 	Count      *int                    `json:"count,omitempty"`
 	LocalState bool                    `json:"localState"`
 	LaunchNext bool                    `json:"launchNext"`
+	Exhausted  bool                    `json:"exhausted,omitempty"`
 }
 
 type WorkflowPending struct {
@@ -1223,12 +1226,15 @@ func (i *WorkflowInterpreter) launchRepeatChild(
 		return workflowFailure(state, "workflow_repeat_condition_failed", err.Error())
 	}
 	if !allowed {
-		if exhausted && step.Repeat.OnExhausted != "return" {
-			return workflowFailure(
-				state,
-				"workflow_repeat_exhausted",
-				"Workflow repeat exhausted its iteration limit",
-			)
+		if exhausted {
+			progress.Exhausted = true
+			if step.Repeat.OnExhausted != "return" {
+				return workflowFailure(
+					state,
+					"workflow_repeat_exhausted",
+					"Workflow repeat exhausted its iteration limit",
+				)
+			}
 		}
 		if err := i.finishRepeat(&state, program, step); err != nil {
 			return workflowFailure(state, "workflow_repeat_failed", err.Error())
@@ -1350,6 +1356,9 @@ func workflowFrameResult(
 		return result, nil
 
 	case ProgramFrameStateCancelled:
+		if uncertainty := workflowFrameUncertainty(frame); uncertainty != nil {
+			return WorkflowBlockResult{}, uncertainty
+		}
 		return WorkflowBlockResult{}, &SanitizedError{
 			Code:     workflowChildCancelled,
 			Category: ErrorCategoryCancellation,
@@ -1369,6 +1378,37 @@ func workflowFrameResult(
 			Message:  "Workflow child block failed",
 		}
 	}
+}
+
+// workflowFrameUncertainty preserves an already-recorded uncertain operation
+// when structured cancellation settles a sibling branch. Cancellation stops
+// remaining work, but it does not prove that an already-dispatched external
+// effect was not applied.
+func workflowFrameUncertainty(
+	frame ProgramFrame,
+) *SanitizedError {
+	if frame.Program.InterpreterID != WorkflowInterpreterID {
+		return nil
+	}
+	_, state, err := decodeWorkflowProgram(frame)
+	if err != nil {
+		return nil
+	}
+	for _, outcome := range slices.Backward(state.Outcomes) {
+		if outcome.Status != WorkflowStepOutcomeUncertain {
+			continue
+		}
+		if outcome.Error != nil {
+			return cloneWorkflowSanitizedError(outcome.Error)
+		}
+		return &SanitizedError{
+			Code:     "workflow_child_uncertain",
+			Category: ErrorCategoryUncertainty,
+			Effect:   outcome.Effect,
+			Message:  "Workflow child contains an uncertain external outcome",
+		}
+	}
+	return nil
 }
 
 func (i *WorkflowInterpreter) settleStructuredChild(
@@ -1412,6 +1452,8 @@ func (i *WorkflowInterpreter) settleStructuredChild(
 		switch childErr.Category {
 		case ErrorCategoryCancellation:
 			child.State = WorkflowChildStateCancelled
+		case ErrorCategoryUncertainty:
+			child.State = WorkflowChildStateUncertain
 		default:
 			child.State = WorkflowChildStateFailed
 		}
@@ -1534,18 +1576,23 @@ func workflowAggregateChildFailure(
 	message string,
 	children []WorkflowChild,
 ) SanitizedError {
+	category := ErrorCategoryExecution
 	causes := make([]SanitizedError, 0)
 	for _, child := range children {
-		if child.Error != nil {
-			cause := *child.Error
-			cause.Details = child.Error.Details.Clone()
-			cause.Causes = append([]SanitizedError(nil), child.Error.Causes...)
-			causes = append(causes, cause)
+		if child.Error == nil {
+			continue
+		}
+		cause := *child.Error
+		cause.Details = child.Error.Details.Clone()
+		cause.Causes = append([]SanitizedError(nil), child.Error.Causes...)
+		causes = append(causes, cause)
+		if cause.Category == ErrorCategoryUncertainty {
+			category = ErrorCategoryUncertainty
 		}
 	}
 	return SanitizedError{
 		Code:     code,
-		Category: ErrorCategoryExecution,
+		Category: category,
 		Message:  message,
 		Causes:   causes,
 	}
@@ -1656,6 +1703,19 @@ func workflowParallelOutput(
 	})
 }
 
+func workflowParallelAggregateFailure(
+	children []WorkflowChild,
+	winners []string,
+	code string,
+	message string,
+) workflowChildError {
+	failure := workflowAggregateChildFailure(code, message, children)
+	if output, err := workflowParallelOutput(children, winners); err == nil {
+		failure.Details = output
+	}
+	return workflowChildError{errorValue: failure}
+}
+
 func (i *WorkflowInterpreter) finishParallel(
 	frame ProgramFrame,
 	state *WorkflowState,
@@ -1687,26 +1747,20 @@ func (i *WorkflowInterpreter) finishParallel(
 			return nil
 		}
 		if len(successes) != selected {
-			return workflowChildError{
-				errorValue: workflowAggregateChildFailure(
-					"workflow_parallel_failed",
-					"one or more parallel branches failed",
-					children,
-				),
-			}
+			return workflowParallelAggregateFailure(
+				children, progress.Winners, "workflow_parallel_failed",
+				"one or more parallel branches failed",
+			)
 		}
 		progress.Winners = append([]string(nil), successes...)
 
 	case "first-completed":
 		if len(progress.Winners) == 0 {
 			if allTerminal {
-				return workflowChildError{
-					errorValue: SanitizedError{
-						Code:     "workflow_parallel_no_selected_branch",
-						Category: ErrorCategoryRouting,
-						Message:  "parallel selected no branch",
-					},
-				}
+				return workflowParallelAggregateFailure(
+					children, nil, "workflow_parallel_no_selected_branch",
+					"parallel selected no branch",
+				)
 			}
 			return nil
 		}
@@ -1721,13 +1775,10 @@ func (i *WorkflowInterpreter) finishParallel(
 				continue
 			}
 			if !workflowParallelSucceeded(child) {
-				return workflowChildError{
-					errorValue: workflowAggregateChildFailure(
-						"workflow_parallel_failed",
-						"the first completed parallel branch failed",
-						[]WorkflowChild{child},
-					),
-				}
+				return workflowParallelAggregateFailure(
+					children, progress.Winners, "workflow_parallel_failed",
+					"the first completed parallel branch failed",
+				)
 			}
 			break
 		}
@@ -1741,13 +1792,10 @@ func (i *WorkflowInterpreter) finishParallel(
 			return nil
 		}
 		if len(progress.Winners) == 0 {
-			return workflowChildError{
-				errorValue: workflowAggregateChildFailure(
-					"workflow_parallel_failed",
-					"no parallel branch succeeded",
-					children,
-				),
-			}
+			return workflowParallelAggregateFailure(
+				children, nil, "workflow_parallel_failed",
+				"no parallel branch succeeded",
+			)
 		}
 
 	case quorumStr:
@@ -1762,13 +1810,11 @@ func (i *WorkflowInterpreter) finishParallel(
 			return nil
 		}
 		if len(progress.Winners) < progress.Completion.Quorum {
-			return workflowChildError{
-				errorValue: workflowAggregateChildFailure(
-					"workflow_parallel_quorum_unreachable",
-					"parallel success quorum was not reached",
-					children,
-				),
-			}
+			return workflowParallelAggregateFailure(
+				children, progress.Winners,
+				"workflow_parallel_quorum_unreachable",
+				"parallel success quorum was not reached",
+			)
 		}
 		progress.Winners = append(
 			[]string(nil),
@@ -1877,6 +1923,8 @@ func workflowForeachHasFailure(
 		switch outcome.State {
 		case WorkflowChildStateFailed, WorkflowChildStateCancelled:
 			return true
+		case WorkflowChildStateUncertain:
+			return true
 		default:
 		}
 	}
@@ -1945,6 +1993,31 @@ func (i *WorkflowInterpreter) settleForeachChild(
 	return i.finishForeach(frame, state, program, step)
 }
 
+func workflowForeachOutput(
+	progress *WorkflowForeachProgress,
+) (jsonutil.CanonicalValue, error) {
+	if progress == nil {
+		return nil, errors.New("Workflow foreach state is unavailable")
+	}
+	return canonicalWorkflowValue(struct {
+		Items   []WorkflowItemOutcome `json:"items"`
+		Winners []int                 `json:"winningIndexes,omitempty"`
+	}{
+		Items:   append([]WorkflowItemOutcome(nil), progress.Outcomes...),
+		Winners: append([]int(nil), progress.Winners...),
+	})
+}
+
+func workflowForeachAggregateFailure(
+	progress *WorkflowForeachProgress,
+) workflowChildError {
+	failure := workflowAggregateForeachFailure(progress.Outcomes)
+	if output, err := workflowForeachOutput(progress); err == nil {
+		failure.Details = output
+	}
+	return workflowChildError{errorValue: failure}
+}
+
 func (i *WorkflowInterpreter) finishForeach(
 	frame ProgramFrame,
 	state *WorkflowState,
@@ -1968,9 +2041,7 @@ func (i *WorkflowInterpreter) finishForeach(
 			return nil
 		}
 		if len(successes) != len(progress.Outcomes) {
-			return workflowChildError{
-				errorValue: workflowAggregateForeachFailure(progress.Outcomes),
-			}
+			return workflowForeachAggregateFailure(progress)
 		}
 		progress.Winners = append([]int(nil), successes...)
 
@@ -1987,9 +2058,7 @@ func (i *WorkflowInterpreter) finishForeach(
 		winner := progress.Winners[0]
 		if winner < 0 || winner >= len(progress.Outcomes) ||
 			progress.Outcomes[winner].State != WorkflowChildStateSucceeded {
-			return workflowChildError{
-				errorValue: workflowAggregateForeachFailure(progress.Outcomes),
-			}
+			return workflowForeachAggregateFailure(progress)
 		}
 
 	case "first-success":
@@ -2001,9 +2070,7 @@ func (i *WorkflowInterpreter) finishForeach(
 			return nil
 		}
 		if len(progress.Winners) == 0 {
-			return workflowChildError{
-				errorValue: workflowAggregateForeachFailure(progress.Outcomes),
-			}
+			return workflowForeachAggregateFailure(progress)
 		}
 		progress.Winners = []int{progress.Winners[0]}
 
@@ -2019,9 +2086,7 @@ func (i *WorkflowInterpreter) finishForeach(
 			return nil
 		}
 		if len(progress.Winners) < progress.Completion.Quorum {
-			return workflowChildError{
-				errorValue: workflowAggregateForeachFailure(progress.Outcomes),
-			}
+			return workflowForeachAggregateFailure(progress)
 		}
 		progress.Winners = append(
 			[]int(nil),
@@ -2032,13 +2097,7 @@ func (i *WorkflowInterpreter) finishForeach(
 		return errors.New("Workflow foreach completion mode is invalid")
 	}
 
-	value, err := canonicalWorkflowValue(struct {
-		Items   []WorkflowItemOutcome `json:"items"`
-		Winners []int                 `json:"winningIndexes,omitempty"`
-	}{
-		Items:   append([]WorkflowItemOutcome(nil), progress.Outcomes...),
-		Winners: append([]int(nil), progress.Winners...),
-	})
+	value, err := workflowForeachOutput(progress)
 	if err != nil {
 		return err
 	}
@@ -2070,6 +2129,7 @@ func (i *WorkflowInterpreter) finishForeach(
 func workflowAggregateForeachFailure(
 	outcomes []WorkflowItemOutcome,
 ) SanitizedError {
+	category := ErrorCategoryExecution
 	causes := make([]SanitizedError, 0)
 	for _, outcome := range outcomes {
 		if outcome.Error == nil {
@@ -2079,10 +2139,13 @@ func workflowAggregateForeachFailure(
 		cause.Details = outcome.Error.Details.Clone()
 		cause.Causes = append([]SanitizedError(nil), outcome.Error.Causes...)
 		causes = append(causes, cause)
+		if cause.Category == ErrorCategoryUncertainty {
+			category = ErrorCategoryUncertainty
+		}
 	}
 	return SanitizedError{
 		Code:     "workflow_foreach_failed",
-		Category: ErrorCategoryExecution,
+		Category: category,
 		Message:  "one or more foreach items failed",
 		Causes:   causes,
 	}
@@ -2199,8 +2262,7 @@ func (i *WorkflowInterpreter) finishRepeat(
 		State:      progress.State.Clone(),
 		Result:     progress.Result.Clone(),
 		Iterations: progress.Iterations,
-		Exhausted: step.Repeat.MaxIterations > 0 &&
-			progress.Iterations >= step.Repeat.MaxIterations,
+		Exhausted:  progress.Exhausted,
 	})
 	if err != nil {
 		return err

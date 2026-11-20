@@ -576,6 +576,17 @@ func retryCaptureChildCall(
 		Kind:    WorkflowValueLiteral,
 		Literal: contextValue.Clone(),
 	}
+	if call.LLMInvocation != nil {
+		invocation, invocationErr := retryCaptureLLMInvocation(
+			program,
+			state,
+			*call.LLMInvocation,
+		)
+		if invocationErr != nil {
+			return ProgramSnapshot{}, invocationErr
+		}
+		call.LLMInvocation = invocation
+	}
 	if step.Effect != nil &&
 		item.Effect.Kind == EffectKindKeyed {
 		key := WorkflowValue{
@@ -595,6 +606,80 @@ func retryCaptureChildCall(
 	output := cloneRetryProgramSnapshot(snapshot)
 	output.Payload = payload
 	return output, nil
+}
+
+// retryCaptureLLMInvocation evaluates typed message and instruction templates
+// at the first logical call boundary. Later retry attempts must not observe
+// changed state, messages, context, or prior outcomes and silently construct
+// another provider request.
+func retryCaptureLLMInvocation(
+	program WorkflowProgram,
+	state WorkflowState,
+	input WorkflowLLMInvocation,
+) (*WorkflowLLMInvocation, error) {
+	interpreter, err := NewWorkflowInterpreter()
+	if err != nil {
+		return nil, err
+	}
+
+	output := WorkflowLLMInvocation{
+		Messages: make([]WorkflowLLMMessage, 0, len(input.Messages)),
+		Instructions: make(
+			[]WorkflowLLMInstruction,
+			0,
+			len(input.Instructions),
+		),
+	}
+	if input.Defaults != nil {
+		defaults := jsonutil.CloneJSONInValue(*input.Defaults)
+		output.Defaults = &defaults
+	}
+	for _, message := range input.Messages {
+		captured := WorkflowLLMMessage{
+			Role:        message.Role,
+			Attachments: jsonutil.CloneJSONInValue(message.Attachments),
+		}
+		if message.Text != nil {
+			value, evaluateErr := interpreter.evaluate(
+				*message.Text,
+				program,
+				state,
+			)
+			if evaluateErr != nil {
+				return nil, evaluateErr
+			}
+			captured.Text = &WorkflowValue{
+				Kind:    WorkflowValueLiteral,
+				Literal: value.Clone(),
+			}
+		}
+		output.Messages = append(output.Messages, captured)
+	}
+	for _, instruction := range input.Instructions {
+		value, evaluateErr := interpreter.evaluate(
+			instruction.Content,
+			program,
+			state,
+		)
+		if evaluateErr != nil {
+			return nil, evaluateErr
+		}
+		output.Instructions = append(
+			output.Instructions,
+			WorkflowLLMInstruction{
+				ID:    instruction.ID,
+				Label: instruction.Label,
+				Content: WorkflowValue{
+					Kind:    WorkflowValueLiteral,
+					Literal: value.Clone(),
+				},
+			},
+		)
+	}
+	if err := output.Validate(); err != nil {
+		return nil, err
+	}
+	return &output, nil
 }
 
 func retryAttemptCallWorkItem(

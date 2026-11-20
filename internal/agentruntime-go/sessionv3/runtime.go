@@ -1250,6 +1250,14 @@ func (r *Runtime) ResolveWait(ctx context.Context, command ResolveWaitCommand) (
 		item.CompletedAt = &now
 		item.UpdatedAt = now
 	}
+	execution = mutableSessionExecution(session, command.ExecutionID)
+	if execution == nil {
+		return nil, ErrExecutionNotFound
+	}
+	wait = mutableWait(execution, command.WaitID)
+	if wait == nil {
+		return nil, errors.New("wait disappeared during resolution")
+	}
 	r.touchExecutionLocked(session, execution)
 	receipt := CommandReceipt{
 		CommandID:         command.Meta.ID,
@@ -1643,6 +1651,16 @@ func (r *Runtime) changeExecution(
 		r.mu.Unlock()
 		return receipt, err
 	}
+	execution = mutableSessionExecution(session, executionID)
+	if execution == nil {
+		*session = previous
+		r.mu.Unlock()
+		return nil, errors.New("execution disappeared during command mutation")
+	}
+	receipt.SessionID = session.ID
+	receipt.ExecutionID = execution.ID
+	receipt.SessionRevision = session.Revision
+	receipt.ExecutionRevision = execution.Revision
 	r.refreshExecutionStateLocked(execution)
 	r.rememberCommandLocked(session, meta, payload, *receipt)
 	if err := r.persistLocked(ctx, "executionChanged", session); err != nil {
@@ -1765,6 +1783,22 @@ func (r *Runtime) advanceFrameLocked(
 	if frame == nil || frame.Status.Terminal() {
 		return nil
 	}
+	reacquire := func() error {
+		execution = mutableSessionExecution(session, parentExecutionID)
+		if execution == nil {
+			return errors.New(
+				"program frame execution disappeared during transition",
+			)
+		}
+		frame = mutableFrame(execution, frameID)
+		if frame == nil {
+			return errors.New(
+				"program frame disappeared during transition",
+			)
+		}
+		return nil
+	}
+
 	if event.Kind == ProgramEventWorkSettled {
 		if handled, forkErr := r.settleForkBoundaryLocked(
 			session,
@@ -1825,10 +1859,16 @@ func (r *Runtime) advanceFrameLocked(
 	if err != nil {
 		return err
 	}
+	if err := reacquire(); err != nil {
+		return err
+	}
 	if err := r.applyCompensationSettlementsLocked(
 		execution,
 		transition.Compensations,
 	); err != nil {
+		return err
+	}
+	if err := reacquire(); err != nil {
 		return err
 	}
 	for _, activity := range transition.Activities {
@@ -1961,12 +2001,18 @@ func (r *Runtime) advanceFrameLocked(
 	); err != nil {
 		return err
 	}
+	if err := reacquire(); err != nil {
+		return err
+	}
 	if err := r.cancelChildFrameIDsLocked(
 		session,
 		execution,
 		frameID,
 		transition.CancelChildFrameIDs,
 	); err != nil {
+		return err
+	}
+	if err := reacquire(); err != nil {
 		return err
 	}
 	if err := r.cancelWorkItemsLocked(
@@ -1977,6 +2023,9 @@ func (r *Runtime) advanceFrameLocked(
 	); err != nil {
 		return err
 	}
+	if err := reacquire(); err != nil {
+		return err
+	}
 	if err := r.cancelChildExecutionIDsLocked(
 		context.Background(),
 		session,
@@ -1985,6 +2034,9 @@ func (r *Runtime) advanceFrameLocked(
 		transition.CancelChildExecutionIDs,
 		workflowChildCancelled,
 	); err != nil {
+		return err
+	}
+	if err := reacquire(); err != nil {
 		return err
 	}
 	if transition.ContinueParent {
@@ -2015,10 +2067,12 @@ func (r *Runtime) advanceFrameLocked(
 			frameID,
 			workItemID,
 		)
+		if err := reacquire(); err != nil {
+			return err
+		}
 	}
-	frame = mutableFrame(execution, frameID)
-	if frame == nil {
-		return errors.New("program frame disappeared during child advancement")
+	if err := reacquire(); err != nil {
+		return err
 	}
 	if frame.Status.Terminal() && frame.HandoffID != "" {
 		r.settleConversationHandoffLocked(session, frame.HandoffID)
@@ -2032,11 +2086,15 @@ func (r *Runtime) advanceFrameLocked(
 		r.wakeResourceWaitersLocked(execution, released)
 	}
 	if frame.Status == ProgramFrameStateCompleted {
-		if err := r.deliverFramePortsLocked(session, execution, frame); err != nil {
+		deliveryErr := r.deliverFramePortsLocked(session, execution, frame)
+		if err := reacquire(); err != nil {
+			return err
+		}
+		if deliveryErr != nil {
 			frame.Status = ProgramFrameStateFailed
 			frame.Error = portPlanError(
 				"port_delivery_failed",
-				err.Error(),
+				deliveryErr.Error(),
 			)
 			frame.UpdatedAt = r.now()
 		}
@@ -2569,6 +2627,10 @@ func (r *Runtime) blockWorkForBudgetLocked(
 	item.CompletedAt = &now
 	item.UpdatedAt = now
 	r.advanceSettledWorkLocked(session, execution, item.FrameID, item.ID)
+	execution = mutableSessionExecution(session, execution.ID)
+	if execution == nil {
+		return
+	}
 	r.refreshExecutionStateLocked(execution)
 	r.touchExecutionLocked(session, execution)
 	if err := r.persistLocked(ctx, reason, session); err != nil {
@@ -2799,6 +2861,11 @@ func (r *Runtime) executeOne(
 	delete(r.cancels, itemID)
 	delete(r.privateBindings, itemID)
 	r.finishWorkLocked(session, execution, item, activeAttempt(execution, itemID), result)
+	execution = mutableSessionExecution(session, executionID)
+	item = mutableWorkItem(execution, itemID)
+	if execution == nil || item == nil {
+		return
+	}
 	if execution.Controls.CancellationRequested &&
 		!hasDispatched(*execution) &&
 		!hasOutstandingCleanup(*execution) {
@@ -2838,9 +2905,11 @@ func (r *Runtime) finishWorkLocked(
 	session *Session,
 	execution *Execution,
 	item *WorkItem,
-	attempt *Attempt,
+	att *Attempt,
 	result WorkExecutionResult,
 ) {
+	executionID := execution.ID
+	workItemID := item.ID
 	result = mergeLLMStreamResult(*item, result)
 	result = normalizeWorkResult(*item, result)
 	now := r.now()
@@ -2875,6 +2944,15 @@ func (r *Runtime) finishWorkLocked(
 			item.Error = result.Error
 		}
 	}
+	execution = mutableSessionExecution(session, executionID)
+	if execution == nil {
+		return
+	}
+	item = mutableWorkItem(execution, workItemID)
+	if item == nil {
+		return
+	}
+	attempt := activeAttempt(execution, workItemID)
 
 	if execution.Controls.CancellationRequested &&
 		!item.Cleanup &&
@@ -3042,10 +3120,25 @@ func (r *Runtime) finishWorkLocked(
 			item.ID,
 		)
 	}
-	execution = mutableSessionExecution(session, execution.ID)
+	execution = mutableSessionExecution(session, executionID)
+	if execution == nil {
+		return
+	}
+	item = mutableWorkItem(execution, workItemID)
+	if item == nil {
+		return
+	}
 	r.wakeCompletionWorkWaitsLocked(session, execution, *item)
+	execution = mutableSessionExecution(session, executionID)
+	if execution == nil {
+		return
+	}
 	r.refreshExecutionStateLocked(execution)
 	r.settleTerminalExecutionLocked(session, execution)
+	execution = mutableSessionExecution(session, executionID)
+	if execution == nil {
+		return
+	}
 	r.touchExecutionLocked(session, execution)
 }
 
@@ -3169,6 +3262,11 @@ func (r *Runtime) expireAt(
 			},
 		)
 	}
+	execution = mutableSessionExecution(session, executionID)
+	if execution == nil {
+		return
+	}
+
 	r.refreshExecutionStateLocked(execution)
 	r.touchExecutionLocked(session, execution)
 	if err := r.persistLocked(context.WithoutCancel(ctx), "waitExpired", session); err != nil {
@@ -3235,6 +3333,14 @@ func (r *Runtime) finishPanickedWork(
 			result,
 		)
 	default:
+		return
+	}
+	execution = mutableSessionExecution(session, executionID)
+	if execution == nil {
+		return
+	}
+	item = mutableWorkItem(execution, itemID)
+	if item == nil {
 		return
 	}
 	delete(r.privateBindings, item.ID)
@@ -3468,6 +3574,10 @@ func (r *Runtime) completeExecutionLocked(
 		execution.State = ExecutionStateCompleted
 	}
 	r.settleTerminalExecutionLocked(session, execution)
+	execution = mutableSessionExecution(session, execution.ID)
+	if execution == nil {
+		return
+	}
 	r.cancelExecutionDueTimesLocked(*execution)
 	r.touchExecutionLocked(session, execution)
 	if closer, ok := r.deps.Binder.(ExecutionBindingCloser); ok {

@@ -348,6 +348,10 @@ func (r *Runtime) settleUnstartedAttemptLocked(
 		activeAttempt(execution, item.ID),
 		WorkExecutionResult{Error: failure, Confirmed: true},
 	)
+	execution = mutableSessionExecution(session, execution.ID)
+	if execution == nil {
+		return
+	}
 	if execution.Controls.CancellationRequested &&
 		!hasDispatched(*execution) &&
 		!hasOutstandingCleanup(*execution) {

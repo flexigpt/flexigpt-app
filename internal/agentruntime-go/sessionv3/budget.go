@@ -795,6 +795,10 @@ func (r *Runtime) waitForCleanupDeadline(
 		outcome.Kind = ExecutionOutcomeCancelled
 	}
 	r.completeExecutionLocked(persistContext, session, execution, outcome)
+	execution = mutableSessionExecution(session, executionID)
+	if execution == nil {
+		return
+	}
 	if err := r.persistLocked(persistContext, "cleanupDeadlineElapsed", session); err != nil {
 		return
 	}
@@ -977,6 +981,10 @@ func (r *Runtime) waitForExecutionDeadline(
 			frameID,
 			ProgramEvent{Kind: ProgramEventCancelled},
 		)
+	}
+	execution = mutableSessionExecution(session, executionID)
+	if execution == nil {
+		return
 	}
 	r.touchExecutionLocked(session, execution)
 	if err := r.persistLocked(persistContext, "executionDeadlineElapsed", session); err != nil {
