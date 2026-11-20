@@ -584,6 +584,7 @@ func workflowStructuredTransition(
 			frames[index].Evaluation = &EvaluationBoundary{
 				DeclarationPath: state.PendingDeclarationPath,
 				LogicalTime:     state.LogicalTime.UTC(),
+				Messages:        state.Messages.Clone(),
 			}
 		}
 	}

@@ -681,23 +681,25 @@ func v3SkillSelectionsForTool(
 			request.Session.Defaults.ActiveSkills,
 			nil
 	}
-	if payload.Origin.Plan == nil {
-		return nil, nil, errors.New(
-			"generated Skill Tool has no immutable LLM invocation plan",
-		)
+	originPlan, originErr := sessionv3Runtime.LLMOriginPlan(
+		request.Session,
+		*payload.Origin,
+	)
+	if originErr != nil {
+		return nil, nil, originErr
 	}
 
 	skills = make(
 		[]sessionv3Runtime.ArtifactSelection,
 		0,
-		len(payload.Origin.Plan.Skills),
+		len(originPlan.Skills),
 	)
 	active = make(
 		[]sessionv3Runtime.ArtifactSelection,
 		0,
-		len(payload.Origin.Plan.Skills),
+		len(originPlan.Skills),
 	)
-	for _, value := range payload.Origin.Plan.Skills {
+	for _, value := range originPlan.Skills {
 		selection := sessionv3Runtime.ArtifactSelection{
 			RootID:           value.Artifact.RootID,
 			ArtifactID:       value.Artifact.ArtifactID,

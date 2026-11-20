@@ -54,7 +54,8 @@ type Runtime struct {
 	asyncWG      sync.WaitGroup
 	asyncClosing bool
 
-	closed bool
+	restoring bool
+	closed    bool
 }
 
 func NewRuntime(dependencies RuntimeDependencies) (*Runtime, error) {
@@ -99,6 +100,20 @@ func NewRuntime(dependencies RuntimeDependencies) (*Runtime, error) {
 }
 
 func (r *Runtime) Restore(ctx context.Context) error {
+	r.mu.Lock()
+	if r.closed {
+		r.mu.Unlock()
+		return ErrRuntimeClosed
+	}
+	r.restoring = true
+	r.mu.Unlock()
+
+	defer func() {
+		r.mu.Lock()
+		r.restoring = false
+		r.mu.Unlock()
+	}()
+
 	if err := r.deps.Recovery.Restore(ctx, runtimeRestorer{runtime: r}); err != nil {
 		return err
 	}
@@ -1390,16 +1405,23 @@ func (r *Runtime) ResolveWait(ctx context.Context, command ResolveWaitCommand) (
 		item.Binding = &result.Bound.SemanticBinding
 		item.UpdatedAt = now
 	default:
-		item.State = WorkItemStateFailed
-		item.Error = result.Error
-		if item.Error == nil {
-			item.Error = &SanitizedError{
+		failure := result.Error
+		if failure == nil {
+			failure = &SanitizedError{
 				Code:    "wait_resolution_invalid",
 				Message: "wait resolver returned no resume or result",
 			}
 		}
-		item.CompletedAt = &now
-		item.UpdatedAt = now
+		r.finishWorkLocked(
+			session,
+			execution,
+			item,
+			activeAttempt(execution, item.ID),
+			WorkExecutionResult{
+				Error:     failure,
+				Confirmed: true,
+			},
+		)
 	}
 	execution = mutableSessionExecution(session, command.ExecutionID)
 	if execution == nil {
@@ -2026,6 +2048,19 @@ func (r *Runtime) advanceFrameLocked(
 	frame.UpdatedAt = now
 	if transition.Status != nil {
 		frame.Status = *transition.Status
+	}
+	if frame.Program.InterpreterID == WorkflowInterpreterID {
+		if _, workflowState, decodeErr := decodeWorkflowProgram(*frame); decodeErr == nil {
+			if frame.Evaluation == nil {
+				frame.Evaluation = &EvaluationBoundary{}
+			}
+			frame.Evaluation.DeclarationPath = firstText(
+				workflowState.PendingDeclarationPath,
+				frame.DeclarationPath,
+			)
+			frame.Evaluation.LogicalTime = workflowState.LogicalTime.UTC()
+			frame.Evaluation.Messages = workflowState.Messages.Clone()
+		}
 	}
 	frame.Output = transition.Output.Clone()
 	if transition.Error != nil {
@@ -3993,6 +4028,18 @@ func (r *Runtime) persistLocked(ctx context.Context, reason string, session *Ses
 	if session == nil {
 		return errors.New("cannot checkpoint a nil session")
 	}
+
+	// A prior terminal settlement can free a budget-concurrency slot without
+	// releasing a named resource. Wake those durable waiters before building
+	// the checkpoint candidate. The resulting Ready state is part of the same
+	// authoritative committed Session mutation.
+	for index := range session.Executions {
+		execution := &session.Executions[index]
+		if r.wakeResourceWaitersLocked(execution, nil) {
+			r.touchExecutionLocked(session, execution)
+		}
+	}
+
 	defer func() {
 		if err != nil {
 			r.checkpointPending[session.ID] = true
@@ -4037,6 +4084,17 @@ func (r *Runtime) persistLocked(ctx context.Context, reason string, session *Ses
 		return err
 	}
 	session.EventSequence = snapshot.EventSequence
+
+	// All durable command, settlement, retry, wait, and resource paths pass
+	// through persistLocked. Launch only after the authoritative checkpoint
+	// has committed. Dispatch guards make duplicate launch requests harmless.
+	if !r.closed && !r.restoring {
+		r.launchReadyWork(
+			context.WithoutCancel(ctx),
+			session.ID,
+			r.readyWorkForSessionLocked(session),
+		)
+	}
 	return nil
 }
 
@@ -4320,6 +4378,7 @@ func cloneEvaluationBoundary(
 		return nil
 	}
 	output := *value
+	output.Messages = value.Messages.Clone()
 	return &output
 }
 

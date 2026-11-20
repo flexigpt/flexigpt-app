@@ -178,6 +178,9 @@ func validateDefaults(value SessionDefaults) error {
 			return err
 		}
 	}
+	if err := validateSessionCollectionPolicies(value.CollectionPolicies); err != nil {
+		return err
+	}
 
 	instructions := make(map[string]struct{}, len(value.SystemInstructions))
 	for index, instruction := range value.SystemInstructions {
@@ -324,6 +327,39 @@ func validateDefaults(value SessionDefaults) error {
 
 // ValidateSessionDefaults validates a durable effective invocation plan.
 // Setup uses it when it reconstructs private execution resources after restore.
+func validateSessionCollectionPolicies(
+	value SessionCollectionPolicies,
+) error {
+	for _, policy := range []CollectionPolicy{
+		value.SystemInstructions,
+		value.InstructionArtifacts,
+		value.ToolSelections,
+		value.Skills,
+		value.ActiveSkills,
+		value.MCP,
+	} {
+		switch policy.Mode {
+		case "",
+			CollectionOverrideInherit,
+			CollectionOverrideAdd,
+			CollectionOverrideReplace:
+		default:
+			return errors.New("session collection policy mode is invalid")
+		}
+		seen := make(map[string]struct{}, len(policy.Removed))
+		for _, key := range policy.Removed {
+			if err := validateID("session collection removed key", key); err != nil {
+				return err
+			}
+			if _, duplicate := seen[key]; duplicate {
+				return errors.New("session collection removed key is duplicated")
+			}
+			seen[key] = struct{}{}
+		}
+	}
+	return nil
+}
+
 func ValidateSessionDefaults(value SessionDefaults) error {
 	return validateDefaults(value)
 }
@@ -1055,6 +1091,9 @@ func (e EvaluationBoundary) Validate() error {
 	}
 	if e.LogicalTime.IsZero() {
 		return errors.New("workflow evaluation has no logical time")
+	}
+	if len(e.Messages) != 0 && !e.Messages.Valid() {
+		return errors.New("workflow evaluation messages are invalid")
 	}
 	return nil
 }

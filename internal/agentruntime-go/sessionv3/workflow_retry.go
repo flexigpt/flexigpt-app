@@ -19,6 +19,19 @@ func (i *WorkflowInterpreter) startWorkflowRetry(
 			"workflow retry boundary requires a retry policy",
 		)
 	}
+	if step.Call != nil {
+		if transition, waiting, err := i.beginTargetSetResolution(
+			frame,
+			program,
+			&state,
+			path,
+			*step.Call,
+		); err != nil {
+			return workflowFailure(state, "workflow_target_set_invalid", err.Error())
+		} else if waiting {
+			return transition, nil
+		}
+	}
 
 	childStep := step
 	childStep.When = nil
@@ -31,6 +44,13 @@ func (i *WorkflowInterpreter) startWorkflowRetry(
 	)
 	if err != nil {
 		return workflowFailure(state, "workflow_retry_capture_failed", err.Error())
+	}
+	if step.Call != nil && step.Call.AllowedTargetSet != "" {
+		childStep.Call.AllowedTargetSet = step.Call.AllowedTargetSet
+		childStep.Call.AllowedTargets = append(
+			[]string(nil),
+			step.Call.AllowedTargets...,
+		)
 	}
 
 	childBlock := WorkflowBlock{

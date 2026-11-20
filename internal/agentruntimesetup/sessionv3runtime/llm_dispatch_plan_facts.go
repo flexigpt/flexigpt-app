@@ -37,32 +37,6 @@ func enrichDurableLLMDispatchPlan(
 		appendDurableActivityMessageDispatchPlan(output, activity)
 	}
 
-	if output.Workspace != nil {
-		output.Workspace.Instructions = cloneInstructionDispatchPlans(
-			output.Instructions,
-		)
-		output.Workspace.Texts = cloneTextDispatchPlans(output.Texts)
-		output.Workspace.Skills = cloneSkillDispatchPlans(output.Skills)
-		output.Workspace.MCP = cloneMCPDispatchPlans(output.MCP)
-		output.Workspace.Context = cloneContextDispatchPlans(output.Context)
-	}
-
-	if output.Agent != nil {
-		modelTarget := sessionv3Runtime.ModelDispatchTarget{Artifact: model}
-		output.Agent.Model = &modelTarget
-		output.Agent.Workspace = cloneWorkspaceDispatchPlan(output.Workspace)
-		output.Agent.IncludeModelSystemPrompt = cloneBool(
-			plan.agentModelIncludeSystemPrompt,
-		)
-		output.Agent.Instructions = cloneInstructionDispatchPlans(
-			output.Instructions,
-		)
-		output.Agent.Texts = cloneTextDispatchPlans(output.Texts)
-		output.Agent.Tools = cloneToolDispatchPlans(output.Tools)
-		output.Agent.Skills = cloneSkillDispatchPlans(output.Skills)
-		output.Agent.MCP = cloneMCPDispatchPlans(output.MCP)
-	}
-
 	return nil
 }
 
@@ -155,61 +129,12 @@ func appendDurableMessageDispatchPlan(
 		return
 	}
 	output.Messages = append(output.Messages, message)
-	for _, attachment := range message.Attachments {
-		output.Attachments = append(
-			output.Attachments,
-			sessionv3Runtime.AttachmentDispatchPlan{
-				MessageID:  message.ID,
-				Attachment: attachment,
-			},
-		)
-	}
-}
-
-func cloneInstructionDispatchPlans(
-	values []sessionv3Runtime.InstructionDispatchPlan,
-) []sessionv3Runtime.InstructionDispatchPlan {
-	return jsonutil.CloneJSONInValue(values)
 }
 
 func cloneTextDispatchPlans(
 	values []sessionv3Runtime.TextDispatchPlan,
 ) []sessionv3Runtime.TextDispatchPlan {
 	return jsonutil.CloneJSONInValue(values)
-}
-
-func cloneToolDispatchPlans(
-	values []sessionv3Runtime.ToolDispatchPlan,
-) []sessionv3Runtime.ToolDispatchPlan {
-	return jsonutil.CloneJSONInValue(values)
-}
-
-func cloneSkillDispatchPlans(
-	values []sessionv3Runtime.SkillDispatchPlan,
-) []sessionv3Runtime.SkillDispatchPlan {
-	return jsonutil.CloneJSONInValue(values)
-}
-
-func cloneMCPDispatchPlans(
-	values []sessionv3Runtime.MCPDispatchPlan,
-) []sessionv3Runtime.MCPDispatchPlan {
-	return jsonutil.CloneJSONInValue(values)
-}
-
-func cloneContextDispatchPlans(
-	values []sessionv3Runtime.ContextDispatchPlan,
-) []sessionv3Runtime.ContextDispatchPlan {
-	return jsonutil.CloneJSONInValue(values)
-}
-
-func cloneWorkspaceDispatchPlan(
-	value *sessionv3Runtime.WorkspaceDispatchPlan,
-) *sessionv3Runtime.WorkspaceDispatchPlan {
-	if value == nil {
-		return nil
-	}
-	output := jsonutil.CloneJSONInValue(*value)
-	return &output
 }
 
 func cloneString(

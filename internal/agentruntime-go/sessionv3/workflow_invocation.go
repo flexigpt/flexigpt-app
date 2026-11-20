@@ -13,6 +13,7 @@ type workflowLLMInvocation struct {
 	Defaults           SessionDefaults
 	InputActivityID    ActivityID
 	HistoryActivityIDs []ActivityID
+	PreparedInvocation *WorkflowPreparedInvocation
 }
 
 func (v WorkflowLLMInvocation) Validate() error {
@@ -71,6 +72,7 @@ func (v WorkflowLLMInstruction) Validate() error {
 func (i *WorkflowInterpreter) prepareWorkflowLLMInvocation(
 	frame ProgramFrame,
 	path string,
+	targetName string,
 	target WorkflowTarget,
 	template WorkflowLLMInvocation,
 	program WorkflowProgram,
@@ -111,13 +113,25 @@ func (i *WorkflowInterpreter) prepareWorkflowLLMInvocation(
 		)
 	}
 
-	if target.Artifact == nil {
+	prepared := target.Invocation
+	if value, found := template.PreparedTargets[targetName]; found {
+		copyValue := value
+		prepared = &copyValue
+	}
+	if prepared != nil {
+		if err := prepared.Validate(); err != nil {
+			return workflowLLMInvocation{}, err
+		}
+		if prepared.Model != nil {
+			defaults.Model = selectionForPreparedPin(*prepared.Model)
+		}
+	} else if target.Artifact == nil {
 		return workflowLLMInvocation{}, errors.New(
 			"workflow model or agent target has no source-backed Artifact pin",
 		)
 	}
 
-	if target.Artifact != nil {
+	if prepared == nil && target.Artifact != nil {
 		selection := &ArtifactSelection{
 			RootID:           target.Artifact.RootID,
 			ArtifactID:       target.Artifact.ArtifactID,
@@ -180,7 +194,17 @@ func (i *WorkflowInterpreter) prepareWorkflowLLMInvocation(
 		Defaults:           defaults,
 		InputActivityID:    activityIDs[len(activityIDs)-1],
 		HistoryActivityIDs: append([]ActivityID(nil), activityIDs[:len(activityIDs)-1]...),
+		PreparedInvocation: prepared,
 	}, nil
+}
+
+func selectionForPreparedPin(value ArtifactPin) *ArtifactSelection {
+	return &ArtifactSelection{
+		RootID:           value.RootID,
+		ArtifactID:       value.ArtifactID,
+		ExpectedRevision: value.Revision,
+		ExpectedDigest:   value.Digest,
+	}
 }
 
 func workflowInvocationOverridesTarget(
@@ -263,6 +287,7 @@ func (i *WorkflowInterpreter) invokeWorkflowLLMTarget(
 	invocation, err := i.prepareWorkflowLLMInvocation(
 		frame,
 		path,
+		targetName,
 		target,
 		*call.LLMInvocation,
 		program,
@@ -284,6 +309,7 @@ func (i *WorkflowInterpreter) invokeWorkflowLLMTarget(
 			invocation.InputActivityID,
 			invocation.HistoryActivityIDs,
 			nil,
+			invocation.PreparedInvocation,
 		)
 	case WorkflowTargetAgent:
 		child, err = NewAgentLoopWorkflowInvocationProgram(
@@ -291,6 +317,7 @@ func (i *WorkflowInterpreter) invokeWorkflowLLMTarget(
 			invocation.InputActivityID,
 			invocation.HistoryActivityIDs,
 			nil,
+			invocation.PreparedInvocation,
 		)
 	default:
 		return workflowFailure(

@@ -44,6 +44,7 @@ type agentLoopProgramPayload struct {
 	IsolatedInput      bool                        `json:"isolatedInput,omitempty"`
 	HistoryActivityIDs []ActivityID                `json:"historyActivityIDs,omitempty"`
 	ProviderTools      []ProviderManagedToolChoice `json:"providerTools,omitempty"`
+	PreparedInvocation *WorkflowPreparedInvocation `json:"preparedInvocation,omitempty"`
 }
 
 type agentLoopProgramState struct {
@@ -65,6 +66,7 @@ type singleModelProgramPayload struct {
 	IsolatedInput      bool                        `json:"isolatedInput,omitempty"`
 	HistoryActivityIDs []ActivityID                `json:"historyActivityIDs,omitempty"`
 	ProviderTools      []ProviderManagedToolChoice `json:"providerTools,omitempty"`
+	PreparedInvocation *WorkflowPreparedInvocation `json:"preparedInvocation,omitempty"`
 }
 
 type singleModelProgramState struct {
@@ -113,12 +115,14 @@ func NewAgentLoopWorkflowInvocationProgram(
 	input ActivityID,
 	history []ActivityID,
 	providerTools []ProviderManagedToolChoice,
+	prepared ...*WorkflowPreparedInvocation,
 ) (ProgramSnapshot, error) {
 	return newAgentLoopWorkflowInvocationProgram(
 		defaults,
 		input,
 		history,
 		providerTools,
+		prepared...,
 	)
 }
 
@@ -147,6 +151,7 @@ func newAgentLoopWorkflowInvocationProgram(
 	input ActivityID,
 	history []ActivityID,
 	providerTools []ProviderManagedToolChoice,
+	prepared ...*WorkflowPreparedInvocation,
 ) (ProgramSnapshot, error) {
 	if input == "" {
 		return ProgramSnapshot{}, errors.New("agent-loop input Activity is required")
@@ -157,6 +162,7 @@ func newAgentLoopWorkflowInvocationProgram(
 		IsolatedInput:      true,
 		HistoryActivityIDs: append([]ActivityID(nil), history...),
 		ProviderTools:      jsonutil.CloneJSONInValue(providerTools),
+		PreparedInvocation: optionalWorkflowPreparedInvocation(prepared),
 	})
 }
 
@@ -188,12 +194,14 @@ func NewSingleModelWorkflowInvocationProgram(
 	input ActivityID,
 	history []ActivityID,
 	providerTools []ProviderManagedToolChoice,
+	prepared ...*WorkflowPreparedInvocation,
 ) (ProgramSnapshot, error) {
 	return newSingleModelWorkflowInvocationProgram(
 		defaults,
 		input,
 		history,
 		providerTools,
+		prepared...,
 	)
 }
 
@@ -222,6 +230,7 @@ func newSingleModelWorkflowInvocationProgram(
 	input ActivityID,
 	history []ActivityID,
 	providerTools []ProviderManagedToolChoice,
+	prepared ...*WorkflowPreparedInvocation,
 ) (ProgramSnapshot, error) {
 	if input == "" {
 		return ProgramSnapshot{}, errors.New("single-model input Activity is required")
@@ -232,6 +241,7 @@ func newSingleModelWorkflowInvocationProgram(
 		IsolatedInput:      true,
 		HistoryActivityIDs: append([]ActivityID(nil), history...),
 		ProviderTools:      jsonutil.CloneJSONInValue(providerTools),
+		PreparedInvocation: optionalWorkflowPreparedInvocation(prepared),
 	})
 }
 
@@ -241,6 +251,17 @@ func programSnapshot(id string, payload any) (ProgramSnapshot, error) {
 		InterpreterVersion: BuiltinInterpreterVersion,
 		Payload:            jsonutil.MustCanonicalValue(payload),
 	}, nil
+}
+
+func optionalWorkflowPreparedInvocation(
+	values []*WorkflowPreparedInvocation,
+) *WorkflowPreparedInvocation {
+	if len(values) == 0 || values[0] == nil {
+		return nil
+	}
+
+	value := jsonutil.CloneJSONInValue(*values[0])
+	return &value
 }
 
 func ProgramInterpreterKey(id string, version uint32) string {
@@ -748,6 +769,7 @@ func agentLLMWork(
 		payload.IsolatedInput,
 		payload.HistoryActivityIDs,
 	)
+	work.PreparedInvocation = jsonutil.CloneJSONInValue(payload.PreparedInvocation)
 	work.ProviderTools = jsonutil.CloneJSONInValue(payload.ProviderTools)
 	return work
 }
@@ -954,6 +976,7 @@ func (singleModelInterpreter) Advance(
 				payload.IsolatedInput,
 				payload.HistoryActivityIDs,
 			)
+			work.PreparedInvocation = jsonutil.CloneJSONInValue(payload.PreparedInvocation)
 			work.ProviderTools = jsonutil.CloneJSONInValue(payload.ProviderTools)
 			status := ProgramFrameStateRunning
 			return ProgramTransition{

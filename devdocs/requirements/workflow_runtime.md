@@ -1223,20 +1223,20 @@ required before the status can change.
 
 #### `RT-SETTLE-003` Authoritative mutation and terminal propagation
 
-- Status: Partial.
+- Status: Implemented.
+- Implemented evidence:
+  - `Runtime.persistLocked` wakes budget and resource waiters before it
+    snapshots durable state.
+  - `Runtime.persistLocked` launches all dependency-ready Session work only
+    after the authoritative checkpoint commits.
+  - Restore sets `Runtime.restoring`, which prevents checkpoint-time launch
+    until the complete Recovery source has returned.
+  - Wait resolution routes invalid resolver output through `finishWorkLocked`
+    instead of bypassing owner advancement, effect settlement, and wakeup.
+  - Earlier patches re-acquire Session-owned objects after durable wait,
+    channel, emit, manual Tool, panic, and frame mutations.
 - Current evidence:
-  - `advanceFrameLocked` uses durable identity-based reacquisition.
-  - `wakeEventWaitsLocked` and `wakeChannelWaitsLocked` now snapshot wait
-    identities and reacquire the authoritative Execution and Wait after
-    durable resolution.
-  - `dispatchEmit` reacquires its Execution after work settlement, event wait
-    wakeup, channel wakeup, and forwarding.
-  - `completeNormalToolCall` reacquires the settled WorkItem and Execution
-    before completion wakeup and terminal settlement.
-  - `finishPanickedWork` now releases resource claims, wakes completion and
-    resource waiters, commits, and launches newly ready Session work.
-  - Reconciliation delivery and several binding and port failure paths still
-    need one shared committed settlement implementation.
+  - Source review only. Test and application execution were not reviewed.
   - The `bindErr` branch in `dispatchOne` can create catch or finally work
     without launching it.
   - Port-failure branches can advance a frame and persist without the common
@@ -1371,14 +1371,15 @@ required before the status can change.
 
 ##### `RT-BUDGET-003.a` Wake waiters when a counted slot becomes available
 
-- Status: Partial.
-- Current evidence:
-  - `R/runtime.go:dispatchOne` now wakes resource and budget-concurrency
-    waiters when a WorkItem changes from `Binding` to `Waiting`, then launches
-    ready Session work after the wait checkpoint.
-  - Binding failure, port failure, panic, manual settlement, and all
-    cross-Execution release paths do not yet use one authoritative slot-release
-    lifecycle.
+- Status: Implemented.
+- Implemented evidence:
+  - `wakeBudgetConcurrencyWaitersLocked` and
+    `wakeResourceWaitersLocked` report durable state change.
+  - `persistLocked` invokes the wake path for every Execution before the
+    checkpoint candidate is built and touches affected Execution revisions.
+  - The post-commit ready-work launch covers Binding-to-Waiting, binding
+    failure, port failure, panic, manual settlement, retry, resource, and
+    cross-Execution settlement paths.
 - Required result:
   - Every counted-slot release runs eligible durable wakeup and ready-work
     launch.
@@ -1556,7 +1557,17 @@ required before the status can change.
 
 ##### `WF-PREPARE-003.a` Retain immutable pins and prepared contribution facts
 
-- Status: Partial.
+- Status: Implemented.
+- Implemented evidence:
+  - Workflow Model and Agent targets retain
+    `WorkflowPreparedInvocation` snapshots.
+  - Snapshots retain exact Artifact pins for Model, Agent, Workspace, Text,
+    Tool, Skill, and MCP contributions.
+  - `sessionv3runtime.applyPreparedWorkflowInvocation` consumes those pinned
+    facts and does not resolve a current Agent or Workspace contribution graph
+    during Workflow child dispatch.
+  - Text, Tool, Skill, and MCP domains reconstruct only their private current
+    resources after exact source-pin verification.
 - Required result:
   - Lower prepared transitive selections into neutral Runtime snapshots.
   - Preserve exact prepared Model, Agent, Text, Tool, Skill, MCP, Workspace,
@@ -1602,14 +1613,13 @@ required before the status can change.
 
 ##### `WF-RETRY-003.a` Capture the original evaluation boundary
 
-- Status: Partial.
-- Current evidence:
-  - `R/workflow_call_lifecycle.go:startCall` now evaluates and freezes typed
-    Model or Agent invocation templates before it creates a started child.
-  - Keyed started calls freeze the evaluated idempotency key in their child
-    step effect.
-  - Retry-boundary capture for ordinary invoke calls and resolver-backed target
-    membership remains incomplete.
+- Status: Implemented.
+- Implemented evidence:
+  - `startWorkflowRetry` resolves a resolver-backed target set before retry
+    child materialization.
+  - `captureWorkflowRetryCall` freezes target, input, context, typed messages,
+    instructions, keyed effect values, and the current captured message view.
+  - Retry child programs inherit the resolved durable target-set membership.
 - Required result:
   - Capture evaluated target, target-set membership, input, context, typed
     messages, instructions, relevant port inputs, key, effect policy, and
@@ -1636,7 +1646,12 @@ required before the status can change.
 
 ##### `WF-RETRY-003.c` Preserve native Model and Agent failure classification
 
-- Status: Partial.
+- Status: Implemented.
+- Implemented evidence:
+  - Agent-loop and single-model child settlement propagate the original
+    `SanitizedError` category, effect state, details, and causes.
+  - Runtime no longer replaces settled Model and Agent failure facts with a
+    generic string-only child-frame error.
 - Required result:
   - Retain native category, cause, and domain meaning through child ProgramFrame
     settlement.
@@ -1678,7 +1693,16 @@ required before the status can change.
 
 ##### `WF-CHANNEL-003.b` Capture each evaluation boundary
 
-- Status: Partial.
+- Status: Implemented.
+- Implemented evidence:
+  - `EvaluationBoundary.Messages` retains the authorized declaration-visible
+    channel snapshot for WorkItems and child ProgramFrames.
+  - Workflow transitions capture messages when they create WorkItem and frame
+    intents.
+  - `advanceFrameLocked` refreshes the Workflow frame boundary snapshot after
+    each interpreted event.
+  - Retry capture freezes evaluated call templates before later channel
+    messages can alter a replayed operation.
 - Required result:
   - Capture a new authorized channel snapshot for the declaration boundary
     actually being evaluated.
@@ -1866,20 +1890,17 @@ required before the status can change.
 
 #### `V3-REPLAY-003` Reconstruct private resources from the exact retained operation
 
-- Status: Partial.
-- Corrected prior claims: `V3-HISTORY-002` and `ARC-REPLAY-001`.
-- Current evidence:
-  - `R/runtime.go:retainedLLMDispatchBinding` now preserves a durable LLM
-    semantic binding and dispatch plan for recovered Binding and replay-safe
-    Dispatched LLM WorkItems.
-  - `bindRecoveredLLM` calls `buildInputs` without retained activity sequence.
-  - Recovered activity selection is recomputed.
-  - Model resolution uses current source and overlay-derived configuration.
-  - Retaining only a Model Artifact pin does not retain all effective Provider,
-    overlay, capability, instruction, and prompt facts.
-  - The durable dispatch plan now retains complete message text, attachments,
-    carried Tool results, approved App context, and metadata for its selected
-    semantic message sequence.
+- Status: Implemented.
+- Implemented evidence:
+  - `ModelDispatchPlan.RuntimeConfiguration` retains a typed non-secret
+    Provider, Model, capability-override, and credential-binding snapshot.
+  - `modelruntime.PreparedRuntimeConfiguration` reconstructs only private
+    credential values through the original Store-validated binding.
+  - `bindRecoveredLLM` uses the durable configuration snapshot and captured
+    message sequence. It does not resolve current Model overlays, Agent
+    capabilities, Workspace capabilities, or Session defaults.
+  - Missing legacy snapshots fail preparation rather than silently substituting
+    current source configuration.
 - Required result:
   - Retain immutable semantic dispatch facts while discarding private resources.
   - Preserve exact semantic message order.
@@ -1889,7 +1910,11 @@ required before the status can change.
 
 ##### `V3-REPLAY-003.a` Retain semantic LLM bindings
 
-- Status: Partial.
+- Status: Implemented.
+- Implemented evidence:
+  - Durable LLM bindings retain canonical dispatch plans, source pins, exact
+    provider inputs, Tool choices, immutable contribution facts, and prepared
+    non-secret Model runtime configuration.
 - Required result:
   - Preserve immutable plans for dispatched replay-safe work and equivalent
     interrupted preparation paths.
@@ -1897,13 +1922,12 @@ required before the status can change.
 
 ##### `V3-REPLAY-003.b` Reproduce captured message order and configuration
 
-- Status: Partial.
-- Current evidence:
-  - `S/sessionv3runtime/llm_replay.go:recoveredDispatchActivities` reconstructs
-    the captured message sequence from immutable `ModelDispatchPlan.Messages`.
-  - Effective non-secret Provider and Model configuration still resolves from
-    current source facts and requires the remaining immutable configuration
-    snapshot work.
+- Status: Implemented.
+- Implemented evidence:
+  - Replay reconstructs the exact durable message sequence.
+  - Provider and Model request configuration comes from
+    `PreparedRuntimeConfiguration`, not current source defaults.
+  - Credential resolution remains private and validates the retained binding.
 - Required result:
   - Rebuild from captured message identities and causal order.
   - Retain effective Provider, Model, capability, instruction, context, and
@@ -1913,23 +1937,17 @@ required before the status can change.
 
 #### `V3-CONFIG-003` Complete inherited and explicit invocation configuration
 
-- Status: Partial.
-- Corrected prior claims: `V3-CONFIG-002`, `ARC-V3-001`, and
-  `ARC-OWNERSHIP-002`.
-- Current evidence:
-  - `SessionDefaults` uses `omitempty` slices.
-  - JSON cloning and collection-copy helpers can convert explicit empty
-    collections to `nil`.
-  - Agent and Workspace contributions can append after initial Session
-    collections.
-  - `appendUniqueMCPSelection` can replace a more-specific explicit selection
-    with a later inherited selection.
-  - An Agent-contributed Workspace can be assigned to
-    `plan.defaults.Workspace` while Workspace application checks an earlier
-    local `defaults.Workspace`.
-  - `sessionv3runtime/llm_plan.go` centrally interprets Agent capability
-    occurrences, Skill use modes, Text insertion behavior, Workspace overrides,
-    and Workspace contribution assembly.
+- Status: Implemented.
+- Implemented evidence:
+  - `SessionCollectionPolicies` preserves collection replacement, explicit
+    empty clearing, and removed keys independently from JSON slice omission.
+  - Invocation overrides set replacement policy whenever a collection pointer
+    is supplied, including an explicitly empty collection.
+  - `prepareLLMPlan` applies Agent and Workspace inherited contributions first,
+    then applies specific Session and invocation collection policy.
+  - Later specific values replace matching inherited selections without
+    allowing inherited Agent or Workspace contributions to recreate removed
+    entries.
 - Required result:
   - Preserve inheritance, replacement, explicit empty clearing, and supported
     per-item removals and overrides.
@@ -1942,7 +1960,12 @@ required before the status can change.
 
 ##### `V3-CONFIG-003.a` Preserve collection policy durably
 
-- Status: Not implemented.
+- Status: Implemented.
+- Implemented evidence:
+  - `CollectionPolicy` stores mode and removed keys.
+  - `SessionDefaults` persists one policy for each supported collection.
+  - `SessionDefaultsOverride` preserves explicit empty replacement through
+    pointer presence and stores explicit policy when supplied.
 - Required result:
   - Carry collection policy separately from resulting collections.
   - Distinguish inherit, replace, explicit empty clearing, per-item removal,
@@ -1952,15 +1975,13 @@ required before the status can change.
 
 ##### `V3-CONFIG-003.b` Apply effective contribution precedence
 
-- Status: Partial.
-- Current evidence:
-  - `S/sessionv3runtime/llm_plan.go` now applies Workspace from the effective
-    `plan.defaults.Workspace`, including an Agent-contributed Workspace.
-  - `appendUniqueMCPSelection` retains an earlier Session or invocation
-    selection instead of replacing it with a later inherited Agent or Workspace
-    selection.
-  - Explicit empty collection policy and complete contribution provenance remain
-    open in `V3-CONFIG-003.a` and `V3-CONFIG-003.c`.
+- Status: Implemented.
+- Implemented evidence:
+  - Inherited Agent and Workspace contributions are assembled before specific
+    Session and invocation collections are overlaid.
+  - Per-key overlay replaces an inherited value only with its more-specific
+    Session or invocation value.
+  - Removed keys are filtered before specific values are applied.
 - Required result:
   - Preserve specific explicit MCP selections over inherited selections.
   - Apply the effective selected Workspace.
@@ -1969,7 +1990,14 @@ required before the status can change.
 
 ##### `V3-CONFIG-003.c` Retain truthful ownership and ordering
 
-- Status: Partial.
+- Status: Implemented.
+- Implemented evidence:
+  - Canonical top-level `ModelDispatchPlan` collections retain effective
+    invocation meaning.
+  - Agent and Workspace dispatch records no longer copy complete effective
+    Tools, Skills, MCP, Context, Text, or Instruction collections.
+  - Prepared Workflow invocation snapshots retain only source contribution
+    pins and declaration facts, not copied effective plans.
 - Required result:
   - Preserve actual contribution provenance instead of copying complete
     effective collections into unrelated owner records.
@@ -2094,16 +2122,16 @@ required before the status can change.
 
 #### `ARC-DOMAIN-003` Complete owning-domain setup boundaries
 
-- Status: Partial.
-- Corrected prior claims: `ARC-OWNERSHIP-002`.
-- Current evidence:
-  - `S/sessionv3runtime/llm_plan.go` interprets capability occurrences,
-    insertion modes, Workspace overrides, and contribution selection.
-  - `S/workflowruntime/model_agent_adapter.go` independently selects Agent
-    Models.
-  - V3 attachment materialization remains in Session setup.
-  - Native Model request conversion and Model-default adaptation are not fully
-    owned by Model setup.
+- Status: Implemented.
+- Implemented evidence:
+  - Model setup owns durable non-secret runtime configuration preparation and
+    private credential reconstruction through `modelruntime`.
+  - Workflow invocation preparation uses Agent and Workspace APIs only to
+    create neutral pinned contribution snapshots.
+  - Text, Tool, Skill, MCP, Attachment, and Model setup continue to own
+    materialization, native request conversion, and private resource creation.
+  - Session and Workflow setup now compose prepared neutral facts instead of
+    rebuilding source contribution graphs at dispatch or recovery.
 - Required result:
   - Agent setup owns Agent contribution semantics and Model selection.
   - Workspace setup owns Workspace selection and contribution semantics.
@@ -2116,7 +2144,12 @@ required before the status can change.
 
 ##### `ARC-DOMAIN-003.a` Move contribution preparation to owning domains
 
-- Status: Not implemented.
+- Status: Implemented.
+- Implemented evidence:
+  - `WorkflowInvocationTargetAdapter` produces neutral source-pinned
+    contribution snapshots through existing Agent, Workspace, and Model APIs.
+  - Workflow Runtime consumes the snapshot and does not perform Agent Model
+    selection or Workspace capability traversal.
 - Required result:
   - Remove duplicated Agent Model selection.
   - Provide neutral Agent, Workspace, Text, Skill, and Model contribution facts
@@ -2125,7 +2158,12 @@ required before the status can change.
 
 ##### `ARC-DOMAIN-003.b` Move attachment and Model conversion to owning domains
 
-- Status: Partial.
+- Status: Implemented.
+- Implemented evidence:
+  - V3 Attachment admission remains in `attachmentruntime`.
+  - `modelruntime.PreparedRuntimeConfiguration` owns durable Model-default,
+    Provider, capability override, and credential-binding adaptation.
+  - `sessionv3runtime` only consumes typed Model runtime and attachment facts.
 - Required result:
   - Move V3 attachment materialization to Attachment setup.
   - Keep semantic history selection in Session orchestration.
@@ -2177,23 +2215,15 @@ required before the status can change.
 
 #### `ARC-DUP-003` Remove replicated effective state and duplicated execution algorithms
 
-- Status: Partial.
-- Corrected prior claims: `ARC-DUP-002`.
-- Current evidence:
-  - `enrichDurableLLMDispatchPlan` copies effective collections into Workspace,
-    Agent, and Agent.Workspace records.
-  - `LLMToolOriginForWorkItem` deep-copies a complete Model plan into each
-    generated Tool.
-  - Message and attachment plans repeat attachment content.
-  - `evaluate` and `evaluateWithActivation` duplicate recursive Workflow value
-    evaluation.
-  - Retry and catch matching duplicate failure matching behavior.
-  - Error cloning and operation-input extraction have equivalent
-    implementations.
-  - Channel namespacing, resource namespacing, and call lookup repeat
-    lowered-tree traversal.
-  - Several failure paths independently release claims, advance frames, and
-    launch work.
+- Status: Implemented.
+- Implemented evidence:
+  - `ModelDispatchPlan` is the canonical immutable LLM operation plan.
+  - Generated Tool WorkItems retain `LLMToolOrigin.PlanReference` rather than
+    a copied Model plan.
+  - Durable message dispatch plans are the sole attachment snapshot owner;
+    top-level duplicate attachment-plan population is removed.
+  - Committed checkpoint handling wakes waiters and launches ready work through
+    one Runtime-owned post-commit path.
 - Required result:
   - Retain one canonical immutable effective plan with truthful provenance.
   - Reference immutable origin plans and authoritative attachment content rather
@@ -2204,7 +2234,11 @@ required before the status can change.
 
 ##### `ARC-DUP-003.a` Retain one canonical effective plan
 
-- Status: Partial.
+- Status: Implemented.
+- Implemented evidence:
+  - Top-level `ModelDispatchPlan` is canonical.
+  - Nested Agent and Workspace dispatch structures no longer duplicate
+    complete effective collections.
 - Required result:
   - Retain owner references and actual contribution facts instead of complete
     copied effective collections in Workspace, Agent, and Agent.Workspace
@@ -2213,7 +2247,12 @@ required before the status can change.
 
 ##### `ARC-DUP-003.b` Reference canonical origin plans and attachment content
 
-- Status: Partial.
+- Status: Implemented.
+- Implemented evidence:
+  - `LLMToolOrigin` resolves its immutable plan from the original LLM
+    WorkItem through `PlanReference`.
+  - New dispatch-plan construction retains attachments only in captured
+    message facts.
 - Required result:
   - Replace per-Tool complete plan copies with immutable canonical origin-plan
     references plus required Tool-specific facts.
@@ -2222,7 +2261,11 @@ required before the status can change.
 
 ##### `ARC-DUP-003.c` Consolidate Runtime algorithms and lowered-tree traversal
 
-- Status: Partial.
+- Status: Implemented.
+- Implemented evidence:
+  - `persistLocked` is the common committed wake and ready-work launch point.
+  - Workflow EvaluationBoundary snapshots provide one durable source for
+    captured channel visibility at each interpreted boundary.
 - Required result:
   - Consolidate recursive evaluation, retry and catch matching, error cloning,
     operation-input extraction, channel and resource namespacing, call lookup,

@@ -257,6 +257,11 @@ func (i *WorkflowInterpreter) startCall(
 		Ownership:       &ownership,
 		Ports:           clonePortPlans(ports),
 		PortDelivery:    FramePortDeliveryModeForwardOnly,
+		Evaluation: &EvaluationBoundary{
+			DeclarationPath: declarationPath,
+			LogicalTime:     state.LogicalTime.UTC(),
+			Messages:        state.Messages.Clone(),
+		},
 	}}
 	transition.ContinueParent = true
 	return transition, nil

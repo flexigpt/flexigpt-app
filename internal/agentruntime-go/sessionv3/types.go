@@ -58,6 +58,7 @@ type SessionDefaults struct {
 	Skills               []ArtifactSelection         `json:"skills,omitempty"`
 	ActiveSkills         []ArtifactSelection         `json:"activeSkills,omitempty"`
 	MCP                  []MCPServerSelection        `json:"mcp,omitempty"`
+	CollectionPolicies   SessionCollectionPolicies   `json:"collectionPolicies,omitzero"`
 	ConversationBudget   *ExecutionBudget            `json:"conversationBudget,omitempty"`
 }
 
@@ -81,6 +82,7 @@ type SessionDefaultsOverride struct {
 	Skills               *[]ArtifactSelection         `json:"skills,omitempty"`
 	ActiveSkills         *[]ArtifactSelection         `json:"activeSkills,omitempty"`
 	MCP                  *[]MCPServerSelection        `json:"mcp,omitempty"`
+	CollectionPolicies   *SessionCollectionPolicies   `json:"collectionPolicies,omitempty"`
 	Clear                []SessionDefaultField        `json:"clear,omitempty"`
 }
 
@@ -187,6 +189,23 @@ const (
 	CollectionOverrideRemove  CollectionOverrideMode = "remove"
 	CollectionOverrideReplace CollectionOverrideMode = "replace"
 )
+
+// CollectionPolicy preserves collection intent separately from the resulting
+// collection. In particular, it keeps explicit empty replacement distinct
+// from inherited omission and retains supported per-item removals.
+type CollectionPolicy struct {
+	Mode    CollectionOverrideMode `json:"mode,omitempty"`
+	Removed []string               `json:"removed,omitempty"`
+}
+
+type SessionCollectionPolicies struct {
+	SystemInstructions   CollectionPolicy `json:"systemInstructions,omitzero"`
+	InstructionArtifacts CollectionPolicy `json:"instructionArtifacts,omitzero"`
+	ToolSelections       CollectionPolicy `json:"toolSelections,omitzero"`
+	Skills               CollectionPolicy `json:"skills,omitzero"`
+	ActiveSkills         CollectionPolicy `json:"activeSkills,omitzero"`
+	MCP                  CollectionPolicy `json:"mcp,omitzero"`
+}
 
 // ArtifactOverride changes one selected Workspace capability collection.
 // It is Session-owned configuration and has no Workspace or Workflow import.
@@ -622,6 +641,11 @@ type ProgramState struct {
 type EvaluationBoundary struct {
 	DeclarationPath string    `json:"declarationPath"`
 	LogicalTime     time.Time `json:"logicalTime"`
+
+	// Messages is the authorized declaration-visible channel snapshot used at
+	// this exact logical evaluation boundary. It contains no channel handles,
+	// cursors, callbacks, or compiled CEL state.
+	Messages jsonutil.CanonicalValue `json:"messages,omitempty"`
 }
 
 type ChildFrameLifetime string
@@ -1045,7 +1069,8 @@ type LLMWork struct {
 	IsolatedInput      bool         `json:"isolatedInput,omitempty"`
 	HistoryActivityIDs []ActivityID `json:"historyActivityIDs,omitempty"`
 
-	ProviderTools []ProviderManagedToolChoice `json:"providerTools,omitempty"`
+	ProviderTools      []ProviderManagedToolChoice `json:"providerTools,omitempty"`
+	PreparedInvocation *WorkflowPreparedInvocation `json:"preparedInvocation,omitempty"`
 }
 
 type ToolWork struct {

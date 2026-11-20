@@ -416,13 +416,13 @@ func (r *Runtime) releaseFrameResourcesLocked(
 func (r *Runtime) wakeResourceWaitersLocked(
 	execution *Execution,
 	released []string,
-) {
+) bool {
 	if execution == nil {
-		return
+		return false
 	}
-	r.wakeBudgetConcurrencyWaitersLocked(execution)
+	changed := r.wakeBudgetConcurrencyWaitersLocked(execution)
 	if len(released) == 0 {
-		return
+		return changed
 	}
 	for index := range execution.WorkItems {
 		item := &execution.WorkItems[index]
@@ -439,7 +439,9 @@ func (r *Runtime) wakeResourceWaitersLocked(
 		item.State = WorkItemStateReady
 		item.ResourceWait = nil
 		item.UpdatedAt = r.now()
+		changed = true
 	}
+	return changed
 }
 
 func workItemUsesResource(

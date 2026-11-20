@@ -10,6 +10,7 @@ import (
 	inferenceRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inference"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
 	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	modelAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model"
@@ -68,12 +69,33 @@ func (a *SourceResolver) ResolveRuntimeModelWithRequestPatch(
 	if err != nil {
 		return inferenceRuntime.RuntimeConfiguration{}, nil, err
 	}
+	pc, err := a.runtime.PreparedRuntimeConfiguration(
+		resolved,
+		value,
+	)
+	if err != nil {
+		return inferenceRuntime.RuntimeConfiguration{}, nil, err
+	}
 	return value, &RuntimeModelUse{
-		RootID:     string(resolved.Model.Artifact.RootID),
-		ArtifactID: string(resolved.Model.Artifact.ID),
-		Revision:   resolved.Model.Artifact.Revision,
-		Digest:     string(resolved.Model.Definition.Digest),
+		RootID:                       string(resolved.Model.Artifact.RootID),
+		ArtifactID:                   string(resolved.Model.Artifact.ID),
+		Revision:                     resolved.Model.Artifact.Revision,
+		Digest:                       string(resolved.Model.Definition.Digest),
+		PreparedRuntimeConfiguration: pc,
 	}, nil
+}
+
+// RehydrateRuntimeConfiguration reconstructs only process-private credentials
+// and provider clients from a durable, non-secret prepared configuration.
+// It does not read current Model, Agent, Workspace, or Session defaults.
+func (a *SourceResolver) RehydrateRuntimeConfiguration(
+	ctx context.Context,
+	value jsonutil.CanonicalValue,
+) (inferenceRuntime.RuntimeConfiguration, error) {
+	if a == nil || a.runtime == nil {
+		return inferenceRuntime.RuntimeConfiguration{}, storeSpec.ErrClosed
+	}
+	return a.runtime.RehydrateRuntimeConfiguration(ctx, value)
 }
 
 // ResolveRuntimeModelTarget handles source-backed Model capability targets.

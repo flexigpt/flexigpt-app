@@ -78,6 +78,14 @@ type WorkflowInvocationTargetAdapter interface {
 		ctx context.Context,
 		agent sessionv3Runtime.ArtifactPin,
 	) (sessionv3Runtime.ArtifactPin, error)
+	PrepareWorkflowModelInvocation(
+		ctx context.Context,
+		model sessionv3Runtime.ArtifactPin,
+	) (sessionv3Runtime.WorkflowPreparedInvocation, error)
+	PrepareWorkflowAgentInvocation(
+		ctx context.Context,
+		agent sessionv3Runtime.ArtifactPin,
+	) (sessionv3Runtime.WorkflowPreparedInvocation, error)
 }
 
 // Registered binding contracts are runtime-neutral. They are aliases here so

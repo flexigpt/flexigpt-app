@@ -175,9 +175,10 @@ type WorkflowCall struct {
 // receives a ProgramSnapshot. Runtime evaluates only typed templates and does
 // not decode a generic Workflow JSON request envelope.
 type WorkflowLLMInvocation struct {
-	Messages     []WorkflowLLMMessage     `json:"messages"`
-	Instructions []WorkflowLLMInstruction `json:"instructions,omitempty"`
-	Defaults     *SessionDefaultsOverride `json:"defaults,omitempty"`
+	Messages        []WorkflowLLMMessage                  `json:"messages"`
+	Instructions    []WorkflowLLMInstruction              `json:"instructions,omitempty"`
+	Defaults        *SessionDefaultsOverride              `json:"defaults,omitempty"`
+	PreparedTargets map[string]WorkflowPreparedInvocation `json:"preparedTargets,omitempty"`
 }
 
 type WorkflowLLMMessage struct {
@@ -255,12 +256,13 @@ type WorkflowTarget struct {
 	ActivityID     string `json:"activityID,omitempty"`
 	BindingVersion string `json:"bindingVersion,omitempty"`
 
-	NestedProgram   *ProgramSnapshot           `json:"nestedProgram,omitempty"`
-	ToolName        string                     `json:"toolName,omitempty"`
-	Contract        *WorkflowCallableInterface `json:"contract,omitempty"`
-	Effect          EffectContract             `json:"effect"`
-	KeyedCapable    bool                       `json:"keyedCapable,omitempty"`
-	DeclarationPath string                     `json:"declarationPath,omitempty"`
+	NestedProgram   *ProgramSnapshot            `json:"nestedProgram,omitempty"`
+	ToolName        string                      `json:"toolName,omitempty"`
+	Contract        *WorkflowCallableInterface  `json:"contract,omitempty"`
+	Effect          EffectContract              `json:"effect"`
+	Invocation      *WorkflowPreparedInvocation `json:"invocation,omitempty"`
+	KeyedCapable    bool                        `json:"keyedCapable,omitempty"`
+	DeclarationPath string                      `json:"declarationPath,omitempty"`
 }
 
 type WorkflowMCP struct {
@@ -1025,6 +1027,15 @@ func (i *WorkflowInterpreter) resumeResolvedTargetSetCall(
 	if step.Call == nil {
 		return ProgramTransition{}, errors.New(
 			"resolved workflow target set does not belong to a call step",
+		)
+	}
+	if step.Retry != nil && step.Retry.MaxAttempts > 1 {
+		return i.startWorkflowRetry(
+			frame,
+			program,
+			state,
+			step,
+			state.PendingPath,
 		)
 	}
 	return i.call(
@@ -1847,6 +1858,7 @@ func (i *WorkflowInterpreter) call(
 		invocation, invokeErr := i.prepareWorkflowLLMInvocation(
 			frame,
 			path,
+			targetName,
 			modelTarget,
 			*call.LLMInvocation,
 			program,
@@ -1879,6 +1891,7 @@ func (i *WorkflowInterpreter) call(
 			invocation.InputActivityID,
 			invocation.HistoryActivityIDs,
 			[]ProviderManagedToolChoice{choice},
+			invocation.PreparedInvocation,
 		)
 		if childErr != nil {
 			return workflowFailure(
@@ -3282,6 +3295,7 @@ func workflowTransition(
 			work[index].Evaluation = &EvaluationBoundary{
 				DeclarationPath: state.PendingDeclarationPath,
 				LogicalTime:     state.LogicalTime.UTC(),
+				Messages:        state.Messages.Clone(),
 			}
 		}
 	}
@@ -3352,6 +3366,7 @@ func workflowWork(
 		intent.Evaluation = &EvaluationBoundary{
 			DeclarationPath: state.PendingDeclarationPath,
 			LogicalTime:     state.LogicalTime.UTC(),
+			Messages:        state.Messages.Clone(),
 		}
 	}
 	intent.Deadline = earlierDeadline(intent.Deadline, state.Deadline)

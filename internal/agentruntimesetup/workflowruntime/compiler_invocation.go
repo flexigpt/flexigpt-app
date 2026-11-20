@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	workflowAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workflow"
 	workflowv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workflow/contract/v1"
 )
@@ -472,6 +473,19 @@ func prepareWorkflowLLMInvocations(
 				callSite.Path,
 				err,
 			)
+		}
+		invocation.PreparedTargets = make(
+			map[string]sessionv3Runtime.WorkflowPreparedInvocation,
+		)
+		for _, use := range callSite.TargetUses {
+			target, found := program.Targets[use.Name]
+			if !found || target.Invocation == nil {
+				continue
+			}
+			invocation.PreparedTargets[use.Name] = jsonutil.CloneJSONInValue(*target.Invocation)
+		}
+		if len(invocation.PreparedTargets) == 0 {
+			invocation.PreparedTargets = nil
 		}
 		call.LLMInvocation = invocation
 	}

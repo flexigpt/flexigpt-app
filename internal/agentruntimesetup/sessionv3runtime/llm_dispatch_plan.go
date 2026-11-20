@@ -13,14 +13,16 @@ func (b *Binder) durableLLMDispatchPlan(
 	plan llmExecutionPlan,
 	model sessionv3Runtime.ArtifactPin,
 	choices []preparedChoice,
+	runtimeConfiguration jsonutil.CanonicalValue,
 ) (sessionv3Runtime.ModelDispatchPlan, error) {
 	output := sessionv3Runtime.ModelDispatchPlan{
 		Model: sessionv3Runtime.ModelDispatchTarget{
 			Artifact: model,
 		},
-		Ports:      clonePlanPortValues(request.WorkItem.Ports),
-		PortInputs: clonePlanPortInputs(request.WorkItem.PortInputs),
-		History:    plan.defaults.History,
+		RuntimeConfiguration: runtimeConfiguration.Clone(),
+		Ports:                clonePlanPortValues(request.WorkItem.Ports),
+		PortInputs:           clonePlanPortInputs(request.WorkItem.PortInputs),
+		History:              plan.defaults.History,
 	}
 
 	if payload := request.WorkItem.Input.LLM; payload != nil {

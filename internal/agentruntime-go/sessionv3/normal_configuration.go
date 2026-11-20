@@ -10,6 +10,11 @@ func resolveSessionInvocationDefaults(
 	if override == nil {
 		return output, nil
 	}
+	if override.CollectionPolicies != nil {
+		output.CollectionPolicies = cloneSessionCollectionPolicies(
+			*override.CollectionPolicies,
+		)
+	}
 
 	if override.Model != nil {
 		output.Model = cloneSessionDefaultSelection(override.Model)
@@ -34,12 +39,14 @@ func resolveSessionInvocationDefaults(
 			[]Instruction(nil),
 			(*override.SystemInstructions)...,
 		)
+		output.CollectionPolicies.SystemInstructions.Mode = CollectionOverrideReplace
 	}
 	if override.InstructionArtifacts != nil {
 		output.InstructionArtifacts = append(
 			[]ArtifactSelection(nil),
 			(*override.InstructionArtifacts)...,
 		)
+		output.CollectionPolicies.InstructionArtifacts.Mode = CollectionOverrideReplace
 	}
 	if override.Temperature != nil {
 		value := *override.Temperature
@@ -56,23 +63,27 @@ func resolveSessionInvocationDefaults(
 		output.ToolSelections = cloneToolSelections(
 			*override.ToolSelections,
 		)
+		output.CollectionPolicies.ToolSelections.Mode = CollectionOverrideReplace
 	}
 	if override.Skills != nil {
 		output.Skills = append(
 			[]ArtifactSelection(nil),
 			(*override.Skills)...,
 		)
+		output.CollectionPolicies.Skills.Mode = CollectionOverrideReplace
 	}
 	if override.ActiveSkills != nil {
 		output.ActiveSkills = append(
 			[]ArtifactSelection(nil),
 			(*override.ActiveSkills)...,
 		)
+		output.CollectionPolicies.ActiveSkills.Mode = CollectionOverrideReplace
 	}
 	if override.MCP != nil {
 		output.MCP = cloneSessionDefaults(SessionDefaults{
 			MCP: *override.MCP,
 		}).MCP
+		output.CollectionPolicies.MCP.Mode = CollectionOverrideReplace
 	}
 
 	for _, field := range override.Clear {
@@ -89,8 +100,10 @@ func resolveSessionInvocationDefaults(
 			output.WorkspaceOverrides = WorkspaceSelectionOverrides{}
 		case SessionDefaultFieldSystemInstructions:
 			output.SystemInstructions = nil
+			output.CollectionPolicies.SystemInstructions.Mode = CollectionOverrideReplace
 		case SessionDefaultFieldInstructionArtifacts:
 			output.InstructionArtifacts = nil
+			output.CollectionPolicies.InstructionArtifacts.Mode = CollectionOverrideReplace
 		case SessionDefaultFieldTemperature:
 			output.Temperature = nil
 		case SessionDefaultFieldMetadata:
@@ -99,12 +112,16 @@ func resolveSessionInvocationDefaults(
 			output.History = HistorySelection{}
 		case SessionDefaultFieldToolSelections:
 			output.ToolSelections = nil
+			output.CollectionPolicies.ToolSelections.Mode = CollectionOverrideReplace
 		case SessionDefaultFieldSkills:
 			output.Skills = nil
+			output.CollectionPolicies.Skills.Mode = CollectionOverrideReplace
 		case SessionDefaultFieldActiveSkills:
 			output.ActiveSkills = nil
+			output.CollectionPolicies.ActiveSkills.Mode = CollectionOverrideReplace
 		case SessionDefaultFieldMCP:
 			output.MCP = nil
+			output.CollectionPolicies.MCP.Mode = CollectionOverrideReplace
 		default:
 			return SessionDefaults{}, errors.New(
 				"session invocation default clear field is invalid",
@@ -173,4 +190,29 @@ func cloneInvocationDefaults(
 	}
 	output := cloneSessionDefaults(*value)
 	return &output
+}
+
+func cloneSessionCollectionPolicies(
+	value SessionCollectionPolicies,
+) SessionCollectionPolicies {
+	output := value
+	output.SystemInstructions.Removed = append(
+		[]string(nil),
+		value.SystemInstructions.Removed...,
+	)
+	output.InstructionArtifacts.Removed = append(
+		[]string(nil),
+		value.InstructionArtifacts.Removed...,
+	)
+	output.ToolSelections.Removed = append(
+		[]string(nil),
+		value.ToolSelections.Removed...,
+	)
+	output.Skills.Removed = append([]string(nil), value.Skills.Removed...)
+	output.ActiveSkills.Removed = append(
+		[]string(nil),
+		value.ActiveSkills.Removed...,
+	)
+	output.MCP.Removed = append([]string(nil), value.MCP.Removed...)
+	return output
 }

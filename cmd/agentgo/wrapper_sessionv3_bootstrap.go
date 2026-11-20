@@ -89,6 +89,7 @@ func newSessionV3WorkflowAdmission(
 	models *modelruntime.SourceResolver,
 	agents *agentAPI.Service,
 	mcpRuntime *mcpConnection.MCPRuntimeManager,
+	workspaces *workspaceAPI.Service,
 ) (
 	*workflowruntime.Admission,
 	*workflowruntime.BindingRegistry,
@@ -103,6 +104,9 @@ func newSessionV3WorkflowAdmission(
 		mcpRuntime == nil {
 		return nil, nil, errSessionV3Deps
 	}
+	if workspaces == nil {
+		return nil, nil, errSessionV3Deps
+	}
 
 	workflows, err := workflowAPI.NewService(resolver)
 	if err != nil {
@@ -115,6 +119,8 @@ func newSessionV3WorkflowAdmission(
 	invocations, err := workflowruntime.NewModelAgentInvocationAdapter(
 		models,
 		agents,
+		artifacts,
+		workspaces,
 	)
 	if err != nil {
 		return nil, nil, err

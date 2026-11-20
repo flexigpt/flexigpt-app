@@ -53,31 +53,45 @@ func (b *Binder) prepareLLMPlan(
 		defaults.Agent = cloneLLMArtifactSelection(payload.Agent)
 	}
 
+	specificCollections := jsonutil.CloneJSONInValue(defaults)
+	defaults.SystemInstructions = nil
+	defaults.InstructionArtifacts = nil
+	defaults.ToolSelections = nil
+	defaults.Skills = nil
+	defaults.ActiveSkills = nil
+	defaults.MCP = nil
+
 	plan := llmExecutionPlan{
 		model:    cloneLLMArtifactSelection(defaults.Model),
 		defaults: defaults,
 	}
-	sessionInstructions := append(
-		[]sessionv3Runtime.Instruction(nil),
-		defaults.SystemInstructions...,
-	)
 	workflowInstructions := append(
 		[]sessionv3Runtime.Instruction(nil),
 		payload.SystemInstructions...,
 	)
 
-	normalizedMCP, err := normalizeMCPSelections(defaults.MCP)
+	normalizedMCP, err := normalizeMCPSelections(
+		specificCollections.MCP,
+	)
 	if err != nil {
 		return llmExecutionPlan{}, err
 	}
-	defaults.MCP = normalizedMCP
+	specificCollections.MCP = normalizedMCP
 
-	if defaults.Agent != nil {
+	if payload.PreparedInvocation == nil && defaults.Agent != nil {
 		if err := b.applyAgentPlan(ctx, &plan, *defaults.Agent); err != nil {
 			return llmExecutionPlan{}, err
 		}
 	}
-	if plan.defaults.Workspace != nil {
+	if payload.PreparedInvocation != nil {
+		if err := b.applyPreparedWorkflowInvocation(
+			ctx,
+			&plan,
+			*payload.PreparedInvocation,
+		); err != nil {
+			return llmExecutionPlan{}, err
+		}
+	} else if plan.defaults.Workspace != nil {
 		if err := b.applyWorkspacePlan(
 			ctx,
 			&plan,
@@ -87,8 +101,13 @@ func (b *Binder) prepareLLMPlan(
 			return llmExecutionPlan{}, err
 		}
 	}
-	for _, instruction := range sessionInstructions {
+	applySpecificCollections(&plan.defaults, specificCollections)
+	for _, instruction := range plan.defaults.SystemInstructions {
 		plan.addInstruction(instruction)
+	}
+	plan.defaults.MCP, err = normalizeMCPSelections(plan.defaults.MCP)
+	if err != nil {
+		return llmExecutionPlan{}, err
 	}
 	for _, instruction := range workflowInstructions {
 		plan.addInstruction(instruction)

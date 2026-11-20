@@ -235,9 +235,17 @@ func (a *Admission) prepareBoundTarget(
 				targetPlan.Name,
 			)
 		}
+		invocation, err := a.invocations.PrepareWorkflowModelInvocation(
+			ctx,
+			*target.Artifact,
+		)
+		if err != nil {
+			return sessionv3Runtime.WorkflowTarget{}, err
+		}
 		target.Transport = invocationTransport(
 			a.invocations.ModelInvocationCapabilities(),
 		)
+		target.Invocation = &invocation
 
 	case sessionv3Runtime.WorkflowTargetAgent:
 		if a.invocations == nil || target.Artifact == nil {
@@ -247,9 +255,17 @@ func (a *Admission) prepareBoundTarget(
 				targetPlan.Name,
 			)
 		}
+		invocation, err := a.invocations.PrepareWorkflowAgentInvocation(
+			ctx,
+			*target.Artifact,
+		)
+		if err != nil {
+			return sessionv3Runtime.WorkflowTarget{}, err
+		}
 		target.Transport = invocationTransport(
 			a.invocations.AgentInvocationCapabilities(),
 		)
+		target.Invocation = &invocation
 
 	case sessionv3Runtime.WorkflowTargetTool,
 		sessionv3Runtime.WorkflowTargetMCPTool:

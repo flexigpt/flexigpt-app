@@ -62,27 +62,17 @@ func (b *Binder) bindRecoveredLLM(
 		)
 	}
 
-	patch, err := v3ModelRequestPatch(modelDefaults)
-	if err != nil {
-		return sessionv3Runtime.BindResult{}, err
+	if len(plan.RuntimeConfiguration) == 0 {
+		return sessionv3Runtime.BindResult{}, errors.New(
+			"recovered llm dispatch plan has no immutable runtime configuration",
+		)
 	}
-	modelRef := artifactRefForSelection(*defaults.Model)
-	resolved, modelUse, err := b.deps.Models.ResolveRuntimeModelWithRequestPatch(
+	resolved, err := b.deps.Models.RehydrateRuntimeConfiguration(
 		ctx,
-		modelRef,
-		patch,
+		plan.RuntimeConfiguration,
 	)
 	if err != nil {
 		return sessionv3Runtime.BindResult{}, err
-	}
-	if modelUse == nil ||
-		modelUse.RootID != plan.Model.Artifact.RootID ||
-		modelUse.ArtifactID != plan.Model.Artifact.ArtifactID ||
-		modelUse.Revision != plan.Model.Artifact.Revision ||
-		modelUse.Digest != plan.Model.Artifact.Digest {
-		return sessionv3Runtime.BindResult{}, errors.New(
-			"recovered model dispatch plan no longer matches its model pin",
-		)
 	}
 
 	instructions := make([]string, 0, len(plan.Instructions))

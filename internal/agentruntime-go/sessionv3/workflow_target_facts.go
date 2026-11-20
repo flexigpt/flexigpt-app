@@ -45,13 +45,60 @@ type WorkflowRequirementFact struct {
 	BindingVersion string             `json:"bindingVersion,omitempty"`
 }
 
+// WorkflowPreparedText records a source-backed Text contribution selected
+// during Workflow preparation. Text materialization occurs later through the
+// Text domain, after exact Artifact-pin verification.
+type WorkflowPreparedText struct {
+	Artifact ArtifactPin `json:"artifact"`
+}
+
+type WorkflowPreparedTool struct {
+	Artifact    ArtifactPin `json:"artifact"`
+	AutoExecute *bool       `json:"autoExecute,omitempty"`
+}
+
+type WorkflowPreparedSkill struct {
+	Artifact     ArtifactPin `json:"artifact"`
+	Active       bool        `json:"active,omitempty"`
+	Instructions bool        `json:"instructions,omitempty"`
+}
+
+type WorkflowPreparedMCP struct {
+	Server                    ArtifactPin     `json:"server"`
+	IncludeServerInstructions bool            `json:"includeServerInstructions,omitempty"`
+	ToolExposure              MCPToolExposure `json:"toolExposure"`
+}
+
+// WorkflowPreparedInvocation is a setup-owned immutable contribution
+// snapshot. It contains source-backed pins and declaration contribution facts,
+// but no client, credential, Artifact Store handle, callback, or provider
+// request.
+//
+// Runtime uses this snapshot for Workflow Model and Agent child calls instead
+// of resolving current Agent or Workspace contribution graphs at dispatch.
+type WorkflowPreparedInvocation struct {
+	Model                    *ArtifactPin            `json:"model,omitempty"`
+	Agent                    *ArtifactPin            `json:"agent,omitempty"`
+	Workspace                *ArtifactPin            `json:"workspace,omitempty"`
+	IncludeModelSystemPrompt *bool                   `json:"includeModelSystemPrompt,omitempty"`
+	Texts                    []WorkflowPreparedText  `json:"texts,omitempty"`
+	Tools                    []WorkflowPreparedTool  `json:"tools,omitempty"`
+	Skills                   []WorkflowPreparedSkill `json:"skills,omitempty"`
+	MCP                      []WorkflowPreparedMCP   `json:"mcp,omitempty"`
+}
+
 // LLMToolOrigin preserves immutable invocation facts for Tool WorkItems that
 // result from an LLM output. Tool binders must use this value rather than
 // current Session defaults.
 type LLMToolOrigin struct {
-	OriginWorkItemID  WorkItemID         `json:"originWorkItemID"`
-	TargetFingerprint string             `json:"targetFingerprint"`
-	Plan              *ModelDispatchPlan `json:"plan,omitempty"`
+	OriginWorkItemID  WorkItemID `json:"originWorkItemID"`
+	TargetFingerprint string     `json:"targetFingerprint"`
+	PlanReference     string     `json:"planReference,omitempty"`
+
+	// Plan is retained only for documents created before canonical origin-plan
+	// references. New Tool WorkItems contain PlanReference and resolve the
+	// canonical immutable plan from their origin LLM WorkItem.
+	Plan *ModelDispatchPlan `json:"plan,omitempty"`
 }
 
 func (v ProviderManagedToolChoice) Validate() error {
@@ -146,10 +193,96 @@ func (v LLMToolOrigin) Validate() error {
 	); err != nil {
 		return err
 	}
-	if v.Plan == nil {
+	if v.Plan == nil && v.PlanReference == "" {
 		return errors.New("llm tool origin has no immutable invocation plan")
 	}
-	return v.Plan.Validate()
+	if v.Plan != nil {
+		return v.Plan.Validate()
+	}
+	return validateID("llm tool origin plan reference", v.PlanReference)
+}
+
+func (v WorkflowPreparedInvocation) Validate() error {
+	for _, pin := range []*ArtifactPin{v.Model, v.Agent, v.Workspace} {
+		if pin != nil {
+			if err := validatePin(*pin); err != nil {
+				return err
+			}
+		}
+	}
+	for _, value := range v.Texts {
+		if err := validatePin(value.Artifact); err != nil {
+			return err
+		}
+	}
+	for _, value := range v.Tools {
+		if err := validatePin(value.Artifact); err != nil {
+			return err
+		}
+	}
+	for _, value := range v.Skills {
+		if err := validatePin(value.Artifact); err != nil {
+			return err
+		}
+	}
+	for _, value := range v.MCP {
+		if err := validatePin(value.Server); err != nil {
+			return err
+		}
+		switch value.ToolExposure {
+		case MCPToolExposureNone, MCPToolExposureAll, MCPToolExposureSelected:
+		default:
+			return errors.New("prepared workflow MCP exposure is invalid")
+		}
+	}
+	for _, duplicate := range [][]ArtifactPin{
+		preparedInvocationTextPins(v.Texts),
+		preparedInvocationToolPins(v.Tools),
+		preparedInvocationSkillPins(v.Skills),
+		preparedInvocationMCPPins(v.MCP),
+	} {
+		seen := make(map[string]struct{}, len(duplicate))
+		for _, pin := range duplicate {
+			key := pin.RootID + "\x00" + pin.ArtifactID
+			if _, found := seen[key]; found {
+				return errors.New("prepared workflow invocation contribution is duplicated")
+			}
+			seen[key] = struct{}{}
+		}
+	}
+	return nil
+}
+
+func preparedInvocationTextPins(values []WorkflowPreparedText) []ArtifactPin {
+	output := make([]ArtifactPin, 0, len(values))
+	for _, value := range values {
+		output = append(output, value.Artifact)
+	}
+	return output
+}
+
+func preparedInvocationToolPins(values []WorkflowPreparedTool) []ArtifactPin {
+	output := make([]ArtifactPin, 0, len(values))
+	for _, value := range values {
+		output = append(output, value.Artifact)
+	}
+	return output
+}
+
+func preparedInvocationSkillPins(values []WorkflowPreparedSkill) []ArtifactPin {
+	output := make([]ArtifactPin, 0, len(values))
+	for _, value := range values {
+		output = append(output, value.Artifact)
+	}
+	return output
+}
+
+func preparedInvocationMCPPins(values []WorkflowPreparedMCP) []ArtifactPin {
+	output := make([]ArtifactPin, 0, len(values))
+	for _, value := range values {
+		output = append(output, value.Server)
+	}
+	return output
 }
 
 func cloneModelDispatchPlan(
@@ -177,12 +310,46 @@ func LLMToolOriginForWorkItem(
 	origin := &LLMToolOrigin{
 		OriginWorkItemID:  item.ID,
 		TargetFingerprint: item.Binding.TargetFingerprint,
-		Plan:              cloneModelDispatchPlan(item.Binding.Plan),
+		PlanReference:     "workitem:" + string(item.ID),
 	}
 	if err := origin.Validate(); err != nil {
 		return nil, err
 	}
 	return origin, nil
+}
+
+// LLMOriginPlan resolves the canonical immutable ModelDispatchPlan retained
+// by the originating LLM WorkItem. It never uses current Session defaults.
+func LLMOriginPlan(
+	session Session,
+	origin LLMToolOrigin,
+) (*ModelDispatchPlan, error) {
+	if origin.Plan != nil {
+		return cloneModelDispatchPlan(origin.Plan), nil
+	}
+	for _, execution := range session.Executions {
+		for _, item := range execution.WorkItems {
+			if item.ID != origin.OriginWorkItemID ||
+				item.Type != WorkItemTypeLLM ||
+				item.Binding == nil ||
+				item.Binding.Plan == nil {
+				continue
+			}
+			if origin.PlanReference != "" &&
+				origin.PlanReference != "workitem:"+string(item.ID) {
+				return nil, errors.New(
+					"llm tool origin plan reference differs from its origin work item",
+				)
+			}
+			if item.Binding.TargetFingerprint != origin.TargetFingerprint {
+				return nil, errors.New(
+					"llm tool origin target fingerprint differs from its origin work item",
+				)
+			}
+			return cloneModelDispatchPlan(item.Binding.Plan), nil
+		}
+	}
+	return nil, errors.New("llm tool origin plan is unavailable")
 }
 
 func (v WorkflowTargetTransport) Validate() error {
@@ -214,5 +381,6 @@ func cloneLLMToolOrigin(value *LLMToolOrigin) *LLMToolOrigin {
 	}
 	output := *value
 	output.Plan = cloneModelDispatchPlan(value.Plan)
+	output.PlanReference = value.PlanReference
 	return &output
 }

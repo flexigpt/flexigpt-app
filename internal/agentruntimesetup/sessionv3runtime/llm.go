@@ -110,6 +110,11 @@ func (b *Binder) bindLLM(
 		modelSel.ExpectedDigest != modelUse.Digest {
 		return sessionv3Runtime.BindResult{}, errors.New("selected Model definition changed")
 	}
+	if modelUse.PreparedRuntimeConfiguration == nil {
+		return sessionv3Runtime.BindResult{}, errors.New(
+			"runtime model resolution returned no durable prepared configuration",
+		)
+	}
 
 	if prompt := plan.systemPrompt(); strings.TrimSpace(prompt) != "" {
 		resolved.ModelParam.SystemPrompt = appendPrompt(resolved.ModelParam.SystemPrompt, prompt)
@@ -213,6 +218,7 @@ func (b *Binder) bindLLM(
 		plan,
 		modelPin,
 		preparedChoices,
+		modelUse.PreparedRuntimeConfiguration,
 	)
 	if err != nil {
 		return sessionv3Runtime.BindResult{}, err

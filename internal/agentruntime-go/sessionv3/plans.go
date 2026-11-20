@@ -21,23 +21,24 @@ type WorkflowCallablePort struct {
 }
 
 type ModelDispatchPlan struct {
-	Agent          *AgentDispatchPlan          `json:"agent,omitempty"`
-	Workspace      *WorkspaceDispatchPlan      `json:"workspace,omitempty"`
-	Model          ModelDispatchTarget         `json:"model"`
-	ProviderTools  []ProviderManagedToolChoice `json:"providerTools,omitempty"`
-	ModelOverrides *ModelDefaultsOverride      `json:"modelOverrides,omitempty"`
-	Instructions   []InstructionDispatchPlan   `json:"instructions,omitempty"`
-	Texts          []TextDispatchPlan          `json:"texts,omitempty"`
-	Tools          []ToolDispatchPlan          `json:"tools,omitempty"`
-	Skills         []SkillDispatchPlan         `json:"skills,omitempty"`
-	MCP            []MCPDispatchPlan           `json:"mcp,omitempty"`
-	Attachments    []AttachmentDispatchPlan    `json:"attachments,omitempty"`
-	Messages       []MessageDispatchPlan       `json:"messages,omitempty"`
-	Context        []ContextDispatchPlan       `json:"context,omitempty"`
-	Channels       []ChannelDispatchPlan       `json:"channels,omitempty"`
-	Ports          []PortPlan                  `json:"ports,omitempty"`
-	PortInputs     []PortInput                 `json:"portInputs,omitempty"`
-	History        HistorySelection            `json:"history"`
+	Agent                *AgentDispatchPlan          `json:"agent,omitempty"`
+	Workspace            *WorkspaceDispatchPlan      `json:"workspace,omitempty"`
+	Model                ModelDispatchTarget         `json:"model"`
+	ProviderTools        []ProviderManagedToolChoice `json:"providerTools,omitempty"`
+	ModelOverrides       *ModelDefaultsOverride      `json:"modelOverrides,omitempty"`
+	Instructions         []InstructionDispatchPlan   `json:"instructions,omitempty"`
+	Texts                []TextDispatchPlan          `json:"texts,omitempty"`
+	Tools                []ToolDispatchPlan          `json:"tools,omitempty"`
+	Skills               []SkillDispatchPlan         `json:"skills,omitempty"`
+	MCP                  []MCPDispatchPlan           `json:"mcp,omitempty"`
+	Attachments          []AttachmentDispatchPlan    `json:"attachments,omitempty"`
+	Messages             []MessageDispatchPlan       `json:"messages,omitempty"`
+	Context              []ContextDispatchPlan       `json:"context,omitempty"`
+	Channels             []ChannelDispatchPlan       `json:"channels,omitempty"`
+	Ports                []PortPlan                  `json:"ports,omitempty"`
+	PortInputs           []PortInput                 `json:"portInputs,omitempty"`
+	History              HistorySelection            `json:"history"`
+	RuntimeConfiguration jsonutil.CanonicalValue     `json:"runtimeConfiguration,omitempty"`
 }
 
 type AgentDispatchPlan struct {
@@ -139,6 +140,9 @@ func (p ModelDispatchPlan) Validate() error {
 		if err := p.Workspace.Validate(); err != nil {
 			return fmt.Errorf("model dispatch plan workspace: %w", err)
 		}
+	}
+	if len(p.RuntimeConfiguration) != 0 && !p.RuntimeConfiguration.Valid() {
+		return errors.New("model dispatch plan runtime configuration is invalid")
 	}
 
 	instructionIDs := make(map[string]struct{}, len(p.Instructions))

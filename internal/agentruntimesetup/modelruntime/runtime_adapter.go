@@ -66,10 +66,11 @@ func (field RuntimeDefaultField) Validate() error {
 }
 
 type RuntimeModelUse struct {
-	RootID     string
-	ArtifactID string
-	Revision   uint64
-	Digest     string
+	RootID                       string
+	ArtifactID                   string
+	Revision                     uint64
+	Digest                       string
+	PreparedRuntimeConfiguration jsonutil.CanonicalValue
 }
 
 // Credential is one runtime-only credential value and version pair.

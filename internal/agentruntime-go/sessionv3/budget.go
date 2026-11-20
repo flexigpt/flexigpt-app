@@ -395,10 +395,11 @@ func (r *Runtime) setBudgetConcurrencyWaitingLocked(
 
 func (r *Runtime) wakeBudgetConcurrencyWaitersLocked(
 	execution *Execution,
-) {
+) bool {
 	if r == nil || execution == nil {
-		return
+		return false
 	}
+	changed := false
 	for index := range execution.WorkItems {
 		item := &execution.WorkItems[index]
 		if item.State != WorkItemStateResourceWaiting ||
@@ -417,7 +418,9 @@ func (r *Runtime) wakeBudgetConcurrencyWaitersLocked(
 		item.BudgetConcurrencyWait = false
 		item.ResourceWait = nil
 		item.UpdatedAt = r.now()
+		changed = true
 	}
+	return changed
 }
 
 func (r *Runtime) reserveActivityBudgetLocked(
