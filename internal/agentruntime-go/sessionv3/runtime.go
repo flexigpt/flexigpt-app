@@ -461,6 +461,16 @@ func (r *Runtime) SubmitMessage(ctx context.Context, command SubmitMessageComman
 			Message:   err.Error(),
 		}, nil
 	}
+	if receipt, found, lookupErr := r.FindCommandReceipt(
+		ctx,
+		command.SessionID,
+		command.Meta,
+		command,
+	); lookupErr != nil {
+		return nil, lookupErr
+	} else if found {
+		return receipt, nil
+	}
 
 	admittedAttachments, admitErr := r.admitMessageAttachments(
 		ctx,
@@ -1442,6 +1452,45 @@ func (r *Runtime) GetSession(_ context.Context, id SessionID) (Session, error) {
 	return cloneSession(*session), nil
 }
 
+// FindCommandReceipt returns an already accepted receipt before a caller
+// performs setup-owned preparation. It does not reserve a command or mutate
+// Runtime state.
+//
+// Workflow wrappers use this method before source resolution. Message command
+// paths use the same check before attachment admission. This lets an accepted
+// duplicate replay after source files, selected Artifacts, or setup resources
+// are no longer available.
+func (r *Runtime) FindCommandReceipt(
+	_ context.Context,
+	sessionID SessionID,
+	meta CommandMeta,
+	payload any,
+) (*CommandReceipt, bool, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	if r.closed {
+		return nil, false, ErrRuntimeClosed
+	}
+	if session := r.sessions[sessionID]; session != nil {
+		return r.commandReceiptLocked(session, meta, payload)
+	}
+
+	tombstone, found := r.retired[sessionID]
+	if !found {
+		return nil, false, ErrSessionNotFound
+	}
+	receipt, accepted, err := commandReceiptFromRecords(
+		tombstone.Commands,
+		meta,
+		payload,
+	)
+	if err != nil || accepted {
+		return receipt, accepted, err
+	}
+	return nil, false, ErrSessionNotFound
+}
+
 func (r *Runtime) PrepareUserMessageSkillTemplate(
 	ctx context.Context,
 	request UserMessageSkillTemplatePreparationRequest,
@@ -2027,12 +2076,17 @@ func (r *Runtime) advanceFrameLocked(
 		session.Timeline = append(session.Timeline, activity)
 	}
 	if len(transition.Frames) != 0 {
+		forkDependencies := childCallForkDependencies(
+			transition.Frames,
+			transition.WorkItems,
+		)
 		if err := r.deferFrameForkLocked(
 			execution,
 			frame,
 			transition.Frames,
 			transition.ContinueParent,
 			transition.ForkClaims,
+			forkDependencies,
 		); err != nil {
 			return err
 		}
@@ -3194,7 +3248,7 @@ func (r *Runtime) finishWorkLocked(
 			return
 		}
 		r.wakeCompletionWorkWaitsLocked(session, execution, *item)
-		r.resumeCancellationCleanupFramesLocked(session, execution)
+		r.resumeSagaCompensationFramesLocked(session, execution)
 		execution = mutableSessionExecution(session, executionID)
 		if execution == nil {
 			return
@@ -3369,6 +3423,15 @@ func (r *Runtime) finishWorkLocked(
 	if execution == nil {
 		return
 	}
+	r.resumeSagaCompensationFramesLocked(session, execution)
+	execution = mutableSessionExecution(session, executionID)
+	if execution == nil {
+		return
+	}
+	item = mutableWorkItem(execution, workItemID)
+	if item == nil {
+		return
+	}
 	r.refreshExecutionStateLocked(execution)
 	r.settleTerminalExecutionLocked(session, execution)
 	execution = mutableSessionExecution(session, executionID)
@@ -3378,11 +3441,11 @@ func (r *Runtime) finishWorkLocked(
 	r.touchExecutionLocked(session, execution)
 }
 
-// resumeCancellationCleanupFramesLocked wakes durable cleanup orchestration
-// after a late external result settles. A cancelled WorkItem can still prove
-// that an effect applied. Saga compensation must then re-read EffectRecord
-// facts instead of completing before that late confirmation is available.
-func (r *Runtime) resumeCancellationCleanupFramesLocked(
+// resumeSagaCompensationFramesLocked wakes a pending Saga after any relevant
+// WorkItem settles. This includes late confirmations after cancellation and
+// ordinary effects that finish after the Saga body has already reached its
+// primary failure boundary.
+func (r *Runtime) resumeSagaCompensationFramesLocked(
 	session *Session,
 	execution *Execution,
 ) {
@@ -3594,14 +3657,13 @@ func (r *Runtime) finishPanickedWork(
 		item.Error = result.Error
 		item.CompletedAt = &now
 		item.UpdatedAt = now
-		_ = r.advanceFrameLocked(
+		released := r.releaseWorkResourcesLocked(execution, item.ID)
+		r.wakeResourceWaitersLocked(execution, released)
+		r.advanceSettledWorkLocked(
 			session,
 			execution,
 			item.FrameID,
-			ProgramEvent{
-				Kind:       ProgramEventWorkSettled,
-				WorkItemID: item.ID,
-			},
+			item.ID,
 		)
 	case WorkItemStateDispatched:
 		r.finishWorkLocked(
@@ -3622,6 +3684,11 @@ func (r *Runtime) finishPanickedWork(
 	if item == nil {
 		return
 	}
+	r.wakeCompletionWorkWaitsLocked(session, execution, *item)
+	execution = mutableSessionExecution(session, executionID)
+	if execution == nil {
+		return
+	}
 	delete(r.privateBindings, item.ID)
 	if cancel := r.cancels[item.ID]; cancel != nil {
 		cancel()
@@ -3629,8 +3696,16 @@ func (r *Runtime) finishPanickedWork(
 	}
 	r.refreshExecutionStateLocked(execution)
 	r.touchExecutionLocked(session, execution)
-	_ = r.persistLocked(context.Background(), "workPanicked", session)
+	if err := r.persistLocked(context.Background(), "workPanicked", session); err != nil {
+		return
+	}
+	r.armSessionExecutionTimersLocked(context.Background(), session)
 	r.publishLocked(context.Background(), session, execution.ID, RuntimeEventWorkChanged)
+	r.launchReadyWork(
+		context.Background(),
+		session.ID,
+		r.readyWorkForSessionLocked(session),
+	)
 }
 
 func (r *Runtime) readyWorkLocked(execution Execution) []WorkItemID {
@@ -4011,7 +4086,7 @@ func commandReceiptFromRecords(
 	if meta.ID == "" {
 		return nil, false, errors.New("command ID is required")
 	}
-	fingerprint, err := fingerprintCommand(payload)
+	fingerprint, err := fingerprintCommand(commandFingerprintPayload(payload))
 	if err != nil {
 		return nil, false, err
 	}
@@ -4030,7 +4105,9 @@ func commandReceiptFromRecords(
 }
 
 func (r *Runtime) rememberCommandLocked(session *Session, meta CommandMeta, payload any, receipt CommandReceipt) {
-	fingerprint, err := fingerprintCommand(payload)
+	fingerprint, err := fingerprintCommand(
+		commandFingerprintPayload(payload),
+	)
 	if err != nil {
 		panic(err)
 	}
@@ -4049,6 +4126,20 @@ func (r *Runtime) rejectLocked(session *Session, meta CommandMeta, payload any, 
 	}
 	r.rememberCommandLocked(session, meta, payload, receipt)
 	return &receipt
+}
+
+func commandFingerprintPayload(value any) any {
+	switch command := value.(type) {
+	case StartWorkflowCommand:
+		if command.CommandIdentity != nil {
+			return *command.CommandIdentity
+		}
+	case RegisterWorkflowTriggersCommand:
+		if command.CommandIdentity != nil {
+			return *command.CommandIdentity
+		}
+	}
+	return value
 }
 
 func fingerprintCommand(value any) (string, error) {
@@ -4138,10 +4229,67 @@ func unresolvedDependencies(execution Execution, item WorkItem) bool {
 	for _, id := range item.Dependencies {
 		dependency := executionWorkItem(execution, id)
 		if dependency == nil || !dependency.State.Terminal() {
+			if item.Type == WorkItemTypeFork &&
+				dependency != nil &&
+				dependency.Type == WorkItemTypeChildCall &&
+				childCallForkReservationReady(execution, *dependency) {
+				continue
+			}
 			return true
 		}
 	}
 	return false
+}
+
+// childCallForkReservationReady permits the Fork that materializes a child
+// frame only after the owning ChildCall WorkItem has persisted its outer
+// Attempt and durable completion wait. A child cannot start native work before
+// its parent logical operation owns budget and effect accounting.
+func childCallForkReservationReady(
+	execution Execution,
+	item WorkItem,
+) bool {
+	if item.Type != WorkItemTypeChildCall ||
+		item.State != WorkItemStateWaiting {
+		return false
+	}
+	for _, attempt := range execution.Attempts {
+		if attempt.WorkItemID == item.ID &&
+			attempt.State == AttemptStateDispatched {
+			return true
+		}
+	}
+	return false
+}
+
+func childCallForkDependencies(
+	frames []ProgramFrameIntent,
+	work []WorkItemIntent,
+) []WorkItemID {
+	frameIDs := make(map[ProgramFrameID]struct{}, len(frames))
+	for _, frame := range frames {
+		if frame.ID != "" {
+			frameIDs[frame.ID] = struct{}{}
+		}
+	}
+
+	output := make([]WorkItemID, 0)
+	seen := make(map[WorkItemID]struct{})
+	for _, intent := range work {
+		if intent.ID == "" || intent.Type != WorkItemTypeChildCall ||
+			intent.Input.ChildCall == nil {
+			continue
+		}
+		if _, found := frameIDs[intent.Input.ChildCall.Completion.FrameID]; !found {
+			continue
+		}
+		if _, duplicate := seen[intent.ID]; duplicate {
+			continue
+		}
+		seen[intent.ID] = struct{}{}
+		output = append(output, intent.ID)
+	}
+	return output
 }
 
 func hasDispatched(execution Execution) bool {

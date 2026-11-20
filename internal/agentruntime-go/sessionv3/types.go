@@ -1556,6 +1556,7 @@ type ProgramFrameIntent struct {
 	Deadline        *time.Time                 `json:"deadline,omitempty"`
 	Budget          *ExecutionBudget           `json:"budget,omitempty"`
 	Lifetime        ChildFrameLifetime         `json:"lifetime,omitempty"`
+	WorkflowNesting bool                       `json:"workflowNesting,omitempty"`
 	Ownership       *ChildExecutionOwnership   `json:"ownership,omitempty"`
 	Claims          []ResourceClaim            `json:"claims,omitempty"`
 	Ports           []PortPlan                 `json:"ports,omitempty"`
@@ -1890,17 +1891,42 @@ type SubmitMessageCommand struct {
 	Input     MessageInput `json:"input"`
 }
 
+// WorkflowStartCommandIdentity is the caller-owned command identity for a
+// prepared Workflow start. Runtime stores its receipt against this value,
+// rather than against the regenerated ProgramSnapshot.
+//
+// The Workflow wrapper checks this identity before it resolves source files,
+// Artifacts, bindings, or Workflow preparation resources.
+type WorkflowStartCommandIdentity struct {
+	Meta        CommandMeta             `json:"meta"`
+	SessionID   SessionID               `json:"sessionID"`
+	ExecutionID ExecutionID             `json:"executionID,omitempty"`
+	Workflow    ArtifactSelection       `json:"workflow"`
+	Input       jsonutil.CanonicalValue `json:"input"`
+}
+
 type StartWorkflowCommand struct {
-	Meta        CommandMeta     `json:"meta"`
-	SessionID   SessionID       `json:"sessionID"`
-	ExecutionID ExecutionID     `json:"executionID,omitempty"`
-	Program     ProgramSnapshot `json:"program"`
+	Meta            CommandMeta                   `json:"meta"`
+	SessionID       SessionID                     `json:"sessionID"`
+	ExecutionID     ExecutionID                   `json:"executionID,omitempty"`
+	Program         ProgramSnapshot               `json:"program"`
+	CommandIdentity *WorkflowStartCommandIdentity `json:"-"`
+}
+
+// WorkflowTriggerRegistrationCommandIdentity is the stable caller-owned
+// identity for trigger registration. Program preparation is intentionally
+// outside this identity.
+type WorkflowTriggerRegistrationCommandIdentity struct {
+	Meta      CommandMeta       `json:"meta"`
+	SessionID SessionID         `json:"sessionID"`
+	Workflow  ArtifactSelection `json:"workflow"`
 }
 
 type RegisterWorkflowTriggersCommand struct {
-	Meta      CommandMeta     `json:"meta"`
-	SessionID SessionID       `json:"sessionID"`
-	Program   ProgramSnapshot `json:"program"`
+	Meta            CommandMeta                                 `json:"meta"`
+	SessionID       SessionID                                   `json:"sessionID"`
+	Program         ProgramSnapshot                             `json:"program"`
+	CommandIdentity *WorkflowTriggerRegistrationCommandIdentity `json:"-"`
 }
 
 type SetTriggerRegistrationStateCommand struct {

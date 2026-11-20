@@ -1224,19 +1224,19 @@ required before the status can change.
 #### `RT-SETTLE-003` Authoritative mutation and terminal propagation
 
 - Status: Partial.
-- Corrected prior claims: `RT-DISPATCH-001`, `RT-DISPATCH-001.a`,
-  `RT-DISPATCH-001.b`, and `ARC-CALL-POLICY-001`.
 - Current evidence:
-  - `advanceFrameLocked` contains identity-based reacquisition.
-  - `wakeEventWaitsLocked` can retain a `Wait` pointer across
-    `resolveDurableWaitLocked`, which can call `finishWorkLocked` and advance
-    orchestration.
-  - `dispatchEmit` calls `finishWorkLocked` and can continue with an earlier
-    Execution pointer before later reacquisition.
-  - `completeNormalToolCall` can advance the owning frame and continue with
-    earlier WorkItem and Execution pointers.
-  - Reconciliation delivery can wake work and mutate Session execution state
-    before later mutation of the original operation.
+  - `advanceFrameLocked` uses durable identity-based reacquisition.
+  - `wakeEventWaitsLocked` and `wakeChannelWaitsLocked` now snapshot wait
+    identities and reacquire the authoritative Execution and Wait after
+    durable resolution.
+  - `dispatchEmit` reacquires its Execution after work settlement, event wait
+    wakeup, channel wakeup, and forwarding.
+  - `completeNormalToolCall` reacquires the settled WorkItem and Execution
+    before completion wakeup and terminal settlement.
+  - `finishPanickedWork` now releases resource claims, wakes completion and
+    resource waiters, commits, and launches newly ready Session work.
+  - Reconciliation delivery and several binding and port failure paths still
+    need one shared committed settlement implementation.
   - The `bindErr` branch in `dispatchOne` can create catch or finally work
     without launching it.
   - Port-failure branches can advance a frame and persist without the common
@@ -1326,13 +1326,15 @@ required before the status can change.
 
 ##### `RT-CLEANUP-003.b` Retain Saga ownership until late outcomes settle
 
-- Status: Partial.
-- Current evidence:
-  - `workflow_saga.go:beginSagaCompensation` can finish a Saga immediately when
-    its initial compensation order is empty.
-  - Dispatched normal work can confirm an effect after that point.
-  - `resumeCancellationCleanupFramesLocked` resumes only nonterminal frames
-    with pending Saga progress.
+- Status: Implemented.
+- Implemented evidence:
+  - `workflow_saga.go:beginSagaCompensation` keeps a Saga pending when its
+    first compensation order is empty but associated normal work or child
+    frames can still settle.
+  - `workflowSagaHasOutstandingNormalWork` includes active Saga-scoped
+    Workflow frames as well as WorkItems.
+  - `finishWorkLocked` calls `resumeSagaCompensationFramesLocked` after both
+    ordinary and cancellation settlement paths.
 - Required result:
   - Keep a Saga available while late effect confirmation, reconciliation,
     compensation, completion wakeup, or final resource release remains
@@ -1385,9 +1387,13 @@ required before the status can change.
 
 ##### `RT-BUDGET-003.b` Apply structured limits and semantic Workflow depth
 
-- Status: Partial.
-- Current evidence: structured child-frame intents do not consistently carry
-  `step.Limits`; `childProgramFrameDepth` counts synthetic frames.
+- Status: Implemented.
+- Implemented evidence:
+  - Scope, Choose, Parallel, Foreach, Repeat, Machine, and Saga child frame
+    intents carry their controlling `step.Limits`.
+  - `childProgramFrameDepth` increments only for
+    `ProgramFrameIntent.WorkflowNesting`; retry, Fork, Join, and ordinary
+    structured-block frames no longer consume Workflow nesting depth.
 - Required result:
   - Apply construct-local narrowed limits to Scope, Choose, Parallel, Foreach,
     Repeat, Machine, and Saga work.
@@ -1397,9 +1403,14 @@ required before the status can change.
 
 ##### `RT-BUDGET-003.c` Reserve outer child-call work before child dispatch
 
-- Status: Partial.
-- Current evidence: child-call and Fork work can be created as separately ready
-  work.
+- Status: Implemented.
+- Implemented evidence:
+  - The durable Fork WorkItem for a child call depends on the matching outer
+    `ChildCall` WorkItem.
+  - A Fork dependency accepts a ChildCall only after its binding has persisted
+    the outer dispatched Attempt and durable completion wait.
+  - Child ProgramFrames cannot materialize or dispatch native work before
+    outer call budgeting, ownership, effect state, and Attempt facts exist.
 - Required result:
   - Persist the logical outer Attempt, effective policy, accounting, and
     ownership before a child performs native work.
@@ -1442,15 +1453,16 @@ required before the status can change.
 
 #### `RT-COMMAND-003` Replay accepted commands independently of regenerated preparation
 
-- Status: Partial.
-- Current evidence:
-  - Message attachment admission can run before command receipt lookup.
-  - Continuation attachment admission and edit paths can require old local
-    sources before replay lookup.
-  - Workflow wrappers can prepare a ProgramSnapshot before Runtime replay
-    returns the prior receipt.
-  - Trigger event command identity now preserves caller-supplied
-    `OccurredAt`; remaining attachment and Workflow wrapper paths remain open.
+- Status: Implemented.
+- Implemented evidence:
+  - `Runtime.FindCommandReceipt` finds accepted Session and tombstone receipts
+    before setup-owned work begins.
+  - Submit-message, continuation-input, and edit-and-resend paths check for a
+    durable receipt before attachment admission.
+  - The Wails Workflow start and trigger-registration wrappers check a stable
+    caller identity before Session reads or Workflow preparation.
+  - `StartWorkflowCommand` and `RegisterWorkflowTriggersCommand` persist
+    caller identities rather than regenerated ProgramSnapshot payloads.
 - Required result:
   - An accepted command returns its prior receipt without requiring former
     source files, attachments, selected Artifacts, or setup resources.
@@ -1459,7 +1471,13 @@ required before the status can change.
 
 ##### `RT-COMMAND-003.a` Preserve public command identity before preparation
 
-- Status: Partial.
+- Status: Implemented.
+- Implemented evidence:
+  - Workflow wrapper identities contain the original command metadata,
+    Session, optional Execution, Workflow selection, and canonical input.
+  - Runtime command fingerprinting uses those identities when supplied.
+  - Attachment-backed commands query durable command records before external
+    attachment materialization.
 - Required result:
   - Use the original caller identity to find prior accepted receipts.
   - Preserve the caller identity across prepared snapshots.
@@ -1601,7 +1619,14 @@ required before the status can change.
 
 ##### `WF-RETRY-003.b` Apply complete retry selection and effect replay semantics
 
-- Status: Partial.
+- Status: Implemented.
+- Implemented evidence:
+  - `compiler_coordination.go:compileWorkflowRetry` retains
+    `match.schema` in the typed Runtime retry matcher.
+  - `retryMatches` validates declared retry schemas against durable typed
+    errors.
+  - `retryBoundaryReplaySafe` permits declared read, idempotent, keyed, and
+    confirmed-not-applied replay paths before it rejects uncertain outcomes.
 - Required result:
   - Retain `match.schema`.
   - Reuse declared retry matching.
@@ -1726,18 +1751,20 @@ required before the status can change.
 
 ##### `WF-EFFECT-003.c` Preserve compensation causality and operation facts
 
-- Status: Partial.
-- Required result:
-  - `R/workflow_program.go` now retains the last confirmed mutating WorkItem
-    identity and appends it as a dependency for later sequential mutating
-    WorkItems.
-  - `R/workflow_reconciliation.go` preserves the reconciled original WorkItem
-    as the next causal dependency.
-  - Establish effect dependencies across ordered work and structured boundaries.
-  - Compensate independent effects concurrently only when dependencies permit
+- Status: Implemented.
+- Implemented evidence:
+  - `WorkflowState` and child scope snapshots retain causal effect-frontier
+    WorkItem identities.
+  - Scope, Choose, Parallel, Foreach, Repeat, Machine, Saga, nested Workflow,
+    and retry boundaries preserve or merge those frontiers.
+  - Later mutating WorkItems depend on the complete causal frontier; parallel
+    branches remain independent until a later dependent operation joins them.
+  - `WorkflowCompletedOperationFacts` now retains original WorkItem, Attempt,
+    ProgramFrame, target binding facts, effect contract and state, receipt,
+    idempotency key, and compensation WorkItem and frame identities.
+  - Existing compensation ordering continues to use persisted dependencies,
+    so concurrent compensation occurs only when no reverse dependency blocks
     it.
-  - Supply original operation, target, Attempt, receipt, effect, and
-    compensation identities without private state.
 
 #### `WF-CONTROL-003` Complete structured-control value and lifetime behavior
 
@@ -1798,16 +1825,16 @@ required before the status can change.
 
 - Status: Partial.
 - Current evidence:
-  - `recordTerminalWorkflowStepOutcome` can use an earlier `PendingPath`.
-  - Inline failure reached while `drive` selects a new step can lack the actual
-    failing-step outcome.
-  - Successful `return`, `break`, and `continue` can bypass ordinary
-    step-outcome recording.
-  - Failed outcomes do not consistently retain receipt and effect facts from
-    the settled WorkItem.
-  - Failed or cancelled Agent LLM work can retain stream text only on the
-    WorkItem.
-  - Current stream merge behavior requires a final LLM payload.
+  - Terminal outcome recording now prefers the post-transition active
+    declaration path and includes the settled WorkItem receipt, semantic
+    output, target, effect state, and typed error where available.
+  - Inline `fail`, `return`, `break`, and `continue` record their actual
+    source-step outcomes before they clear the pending declaration boundary.
+  - Model and Agent child-frame failures now retain the settled LLM
+    `SanitizedError` rather than replacing its category and causes with a
+    generic string-only error.
+  - Recovery and some cross-Execution terminal aggregation paths still need
+    consolidation with the common settlement lifecycle.
 - Required result:
   - Record the actual active step boundary.
   - Retain target, receipt, effect, aggregate, error, and declaration facts.

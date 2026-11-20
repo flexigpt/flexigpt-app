@@ -23,26 +23,27 @@ const (
 // WorkflowScopeContext is the durable parent visibility envelope for an
 // interpreter-created child block frame. It contains semantic values only.
 type WorkflowScopeContext struct {
-	Child              bool                        `json:"child,omitempty"`
-	MergeState         bool                        `json:"mergeState,omitempty"`
-	OuterState         jsonutil.CanonicalValue     `json:"outerState,omitempty"`
-	StateOwner         *WorkflowStateOwner         `json:"stateOwner,omitempty"`
-	TargetSets         []WorkflowTargetSetState    `json:"targetSets,omitempty"`
-	OuterOutcomes      []WorkflowStepOutcome       `json:"outerOutcomes,omitempty"`
-	OuterSubscriptions []WorkflowSubscriptionState `json:"outerSubscriptions,omitempty"`
-	Context            *jsonutil.CanonicalValue    `json:"context,omitempty"`
-	Item               *jsonutil.CanonicalValue    `json:"item,omitempty"`
-	Index              *int                        `json:"index,omitempty"`
-	Result             *jsonutil.CanonicalValue    `json:"result,omitempty"`
-	Event              *jsonutil.CanonicalValue    `json:"event,omitempty"`
-	Error              *jsonutil.CanonicalValue    `json:"error,omitempty"`
-	Outcome            *jsonutil.CanonicalValue    `json:"outcome,omitempty"`
-	Operation          *jsonutil.CanonicalValue    `json:"operation,omitempty"`
-	Completed          *jsonutil.CanonicalValue    `json:"completed,omitempty"`
-	Ports              []PortInput                 `json:"ports,omitempty"`
-	ChannelAliases     map[string]string           `json:"channelAliases,omitempty"`
-	Saga               *WorkflowSagaScope          `json:"saga,omitempty"`
-	Cleanup            bool                        `json:"cleanup,omitempty"`
+	Child                   bool                        `json:"child,omitempty"`
+	MergeState              bool                        `json:"mergeState,omitempty"`
+	OuterState              jsonutil.CanonicalValue     `json:"outerState,omitempty"`
+	StateOwner              *WorkflowStateOwner         `json:"stateOwner,omitempty"`
+	TargetSets              []WorkflowTargetSetState    `json:"targetSets,omitempty"`
+	OuterOutcomes           []WorkflowStepOutcome       `json:"outerOutcomes,omitempty"`
+	CausalEffectWorkItemIDs []WorkItemID                `json:"causalEffectWorkItemIDs,omitempty"`
+	OuterSubscriptions      []WorkflowSubscriptionState `json:"outerSubscriptions,omitempty"`
+	Context                 *jsonutil.CanonicalValue    `json:"context,omitempty"`
+	Item                    *jsonutil.CanonicalValue    `json:"item,omitempty"`
+	Index                   *int                        `json:"index,omitempty"`
+	Result                  *jsonutil.CanonicalValue    `json:"result,omitempty"`
+	Event                   *jsonutil.CanonicalValue    `json:"event,omitempty"`
+	Error                   *jsonutil.CanonicalValue    `json:"error,omitempty"`
+	Outcome                 *jsonutil.CanonicalValue    `json:"outcome,omitempty"`
+	Operation               *jsonutil.CanonicalValue    `json:"operation,omitempty"`
+	Completed               *jsonutil.CanonicalValue    `json:"completed,omitempty"`
+	Ports                   []PortInput                 `json:"ports,omitempty"`
+	ChannelAliases          map[string]string           `json:"channelAliases,omitempty"`
+	Saga                    *WorkflowSagaScope          `json:"saga,omitempty"`
+	Cleanup                 bool                        `json:"cleanup,omitempty"`
 }
 
 func (s WorkflowScopeContext) Validate() error {
@@ -55,6 +56,9 @@ func (s WorkflowScopeContext) Validate() error {
 		}
 	}
 	if err := validateWorkflowTargetSetStates(s.TargetSets); err != nil {
+		return err
+	}
+	if err := validateWorkflowCausalEffectWorkItemIDs(s.CausalEffectWorkItemIDs); err != nil {
 		return err
 	}
 	if s.Context != nil && !s.Context.Valid() {
@@ -132,9 +136,10 @@ const (
 )
 
 type WorkflowBlockResult struct {
-	Exit  WorkflowExitKind        `json:"exit"`
-	Value jsonutil.CanonicalValue `json:"value"`
-	State jsonutil.CanonicalValue `json:"state"`
+	Exit                    WorkflowExitKind        `json:"exit"`
+	Value                   jsonutil.CanonicalValue `json:"value"`
+	State                   jsonutil.CanonicalValue `json:"state"`
+	CausalEffectWorkItemIDs []WorkItemID            `json:"causalEffectWorkItemIDs,omitempty"`
 }
 
 func (r WorkflowBlockResult) Validate() error {
@@ -149,6 +154,9 @@ func (r WorkflowBlockResult) Validate() error {
 	}
 	if !r.Value.Valid() || !r.State.Valid() {
 		return errors.New("Workflow block result contains invalid JSON")
+	}
+	if err := validateWorkflowCausalEffectWorkItemIDs(r.CausalEffectWorkItemIDs); err != nil {
+		return err
 	}
 	return nil
 }
@@ -277,11 +285,12 @@ func (s WorkflowChildState) terminal() bool {
 }
 
 type WorkflowChild struct {
-	Name   string               `json:"name"`
-	Path   string               `json:"path,omitempty"`
-	State  WorkflowChildState   `json:"state"`
-	Result *WorkflowBlockResult `json:"result,omitempty"`
-	Error  *SanitizedError      `json:"error,omitempty"`
+	Name                    string               `json:"name"`
+	Path                    string               `json:"path,omitempty"`
+	State                   WorkflowChildState   `json:"state"`
+	Result                  *WorkflowBlockResult `json:"result,omitempty"`
+	Error                   *SanitizedError      `json:"error,omitempty"`
+	CausalEffectWorkItemIDs []WorkItemID         `json:"causalEffectWorkItemIDs,omitempty"`
 }
 
 type WorkflowNamedOutcome struct {
@@ -447,6 +456,9 @@ func (p WorkflowPending) Validate() error {
 		if child.Error != nil && !child.Error.Details.Valid() {
 			return errors.New("Workflow pending child error details are invalid")
 		}
+		if err := validateWorkflowCausalEffectWorkItemIDs(child.CausalEffectWorkItemIDs); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -526,9 +538,10 @@ func (i *WorkflowInterpreter) completeWorkflowBlock(
 
 	if program.Scope.Child {
 		result := WorkflowBlockResult{
-			Exit:  exit,
-			Value: value.Clone(),
-			State: state.State.Clone(),
+			Exit:                    exit,
+			Value:                   value.Clone(),
+			State:                   state.State.Clone(),
+			CausalEffectWorkItemIDs: workflowCausalEffectWorkItemIDs(state),
 		}
 		if err := result.Validate(); err != nil {
 			return ProgramTransition{}, err
@@ -713,6 +726,7 @@ func (i *WorkflowInterpreter) startSingleChild(
 			DeclarationPath: firstText(block.DeclarationPath, state.PendingDeclarationPath),
 			Program:         snapshot,
 			Deadline:        cloneTime(state.Deadline),
+			Budget:          cloneBudget(step.Limits),
 		}},
 	)
 }
@@ -906,6 +920,7 @@ func (i *WorkflowInterpreter) startParallel(
 				DeclarationPath: firstText(branch.Do.DeclarationPath, state.PendingDeclarationPath),
 				Program:         snapshot,
 				Deadline:        cloneTime(state.Deadline),
+				Budget:          cloneBudget(step.Limits),
 			})
 		}
 		pending.Children = append(pending.Children, child)
@@ -1185,6 +1200,7 @@ func (i *WorkflowInterpreter) launchForeachChildren(
 			DeclarationPath: firstText(step.Foreach.Do.DeclarationPath, state.PendingDeclarationPath),
 			Program:         snapshot,
 			Deadline:        cloneTime(state.Deadline),
+			Budget:          cloneBudget(step.Limits),
 		})
 	}
 
@@ -1303,6 +1319,7 @@ func (i *WorkflowInterpreter) launchRepeatChild(
 			DeclarationPath: firstText(step.Repeat.Do.DeclarationPath, state.PendingDeclarationPath),
 			Program:         snapshot,
 			Deadline:        cloneTime(state.Deadline),
+			Budget:          cloneBudget(step.Limits),
 		}},
 	)
 }
@@ -1464,6 +1481,9 @@ func (i *WorkflowInterpreter) settleStructuredChild(
 	if child.State.terminal() {
 		return nil
 	}
+	child.CausalEffectWorkItemIDs = workflowFrameCausalEffectWorkItemIDs(
+		*childFrame,
+	)
 
 	result, childErr := workflowFrameResult(*childFrame)
 	if childErr != nil {
@@ -1572,6 +1592,10 @@ func (i *WorkflowInterpreter) settleSingleStructuredChild(
 	if pending.MergeState {
 		state.State = result.State.Clone()
 	}
+	setWorkflowCausalEffectWorkItemIDs(state, mergeWorkflowCausalEffectWorkItemIDs(
+		workflowCausalEffectWorkItemIDs(*state),
+		child.CausalEffectWorkItemIDs,
+	))
 	if err := i.validateStepOutput(program, *state, step, result.Value); err != nil {
 		return err
 	}
@@ -1640,6 +1664,19 @@ func workflowParallelSuccessNames(children []WorkflowChild) []string {
 		if workflowParallelSucceeded(child) {
 			output = append(output, child.Name)
 		}
+	}
+	return output
+}
+
+func workflowChildrenCausalEffectWorkItemIDs(
+	children []WorkflowChild,
+) []WorkItemID {
+	output := make([]WorkItemID, 0)
+	for _, child := range children {
+		output = mergeWorkflowCausalEffectWorkItemIDs(
+			output,
+			child.CausalEffectWorkItemIDs,
+		)
 	}
 	return output
 }
@@ -1848,6 +1885,10 @@ func (i *WorkflowInterpreter) finishParallel(
 	if err != nil {
 		return err
 	}
+	setWorkflowCausalEffectWorkItemIDs(state, mergeWorkflowCausalEffectWorkItemIDs(
+		workflowCausalEffectWorkItemIDs(*state),
+		workflowChildrenCausalEffectWorkItemIDs(children),
+	))
 	waiting, err := i.ensureParentStateMerge(frame, program, state, value)
 	if err != nil {
 		return err
@@ -2135,6 +2176,10 @@ func (i *WorkflowInterpreter) finishForeach(
 	if err != nil {
 		return err
 	}
+	setWorkflowCausalEffectWorkItemIDs(state, mergeWorkflowCausalEffectWorkItemIDs(
+		workflowCausalEffectWorkItemIDs(*state),
+		workflowChildrenCausalEffectWorkItemIDs(state.Pending.Children),
+	))
 	waiting, err := i.ensureParentStateMerge(frame, program, state, value)
 	if err != nil {
 		return err
@@ -2244,6 +2289,10 @@ func (i *WorkflowInterpreter) settleRepeatChild(
 		return errors.New("Workflow repeat child returned an invalid control value")
 	}
 
+	setWorkflowCausalEffectWorkItemIDs(state, mergeWorkflowCausalEffectWorkItemIDs(
+		workflowCausalEffectWorkItemIDs(*state),
+		child.CausalEffectWorkItemIDs,
+	))
 	progress.Result = result.Value.Clone()
 	progress.Iterations++
 
@@ -2436,26 +2485,27 @@ func workflowInheritedChildScope(
 
 	parent := cloneWorkflowScopeContext(program.Scope)
 	output := WorkflowScopeContext{
-		Child:              true,
-		MergeState:         mergeState,
-		OuterState:         state.State.Clone(),
-		StateOwner:         owner,
-		TargetSets:         cloneWorkflowTargetSetStates(state.TargetSets),
-		OuterOutcomes:      workflowScopeOutcomes(program, state),
-		OuterSubscriptions: cloneWorkflowSubscriptionStates(state.Subscriptions),
-		Context:            cloneWorkflowCanonicalPointer(parent.Context),
-		Item:               cloneWorkflowCanonicalPointer(parent.Item),
-		Index:              cloneWorkflowIndex(parent.Index),
-		Result:             cloneWorkflowCanonicalPointer(parent.Result),
-		Event:              cloneWorkflowCanonicalPointer(parent.Event),
-		Error:              cloneWorkflowCanonicalPointer(parent.Error),
-		Outcome:            cloneWorkflowCanonicalPointer(parent.Outcome),
-		Operation:          cloneWorkflowCanonicalPointer(parent.Operation),
-		Completed:          cloneWorkflowCanonicalPointer(parent.Completed),
-		Ports:              clonePortInputs(parent.Ports),
-		ChannelAliases:     cloneWorkflowChannelAliases(parent.ChannelAliases),
-		Saga:               cloneWorkflowSagaScope(parent.Saga),
-		Cleanup:            parent.Cleanup,
+		Child:                   true,
+		MergeState:              mergeState,
+		OuterState:              state.State.Clone(),
+		StateOwner:              owner,
+		TargetSets:              cloneWorkflowTargetSetStates(state.TargetSets),
+		OuterOutcomes:           workflowScopeOutcomes(program, state),
+		CausalEffectWorkItemIDs: workflowCausalEffectWorkItemIDs(state),
+		OuterSubscriptions:      cloneWorkflowSubscriptionStates(state.Subscriptions),
+		Context:                 cloneWorkflowCanonicalPointer(parent.Context),
+		Item:                    cloneWorkflowCanonicalPointer(parent.Item),
+		Index:                   cloneWorkflowIndex(parent.Index),
+		Result:                  cloneWorkflowCanonicalPointer(parent.Result),
+		Event:                   cloneWorkflowCanonicalPointer(parent.Event),
+		Error:                   cloneWorkflowCanonicalPointer(parent.Error),
+		Outcome:                 cloneWorkflowCanonicalPointer(parent.Outcome),
+		Operation:               cloneWorkflowCanonicalPointer(parent.Operation),
+		Completed:               cloneWorkflowCanonicalPointer(parent.Completed),
+		Ports:                   clonePortInputs(parent.Ports),
+		ChannelAliases:          cloneWorkflowChannelAliases(parent.ChannelAliases),
+		Saga:                    cloneWorkflowSagaScope(parent.Saga),
+		Cleanup:                 parent.Cleanup,
 	}
 
 	if len(override.OuterState) != 0 {
@@ -2466,6 +2516,9 @@ func workflowInheritedChildScope(
 	}
 	if len(override.TargetSets) != 0 {
 		output.TargetSets = cloneWorkflowTargetSetStates(override.TargetSets)
+	}
+	if len(override.CausalEffectWorkItemIDs) != 0 {
+		output.CausalEffectWorkItemIDs = append([]WorkItemID(nil), override.CausalEffectWorkItemIDs...)
 	}
 	if override.Context != nil {
 		output.Context = cloneWorkflowCanonicalPointer(override.Context)
@@ -2510,6 +2563,7 @@ func cloneWorkflowScopeContext(value WorkflowScopeContext) WorkflowScopeContext 
 	output.StateOwner = cloneWorkflowStateOwner(value.StateOwner)
 	output.TargetSets = cloneWorkflowTargetSetStates(value.TargetSets)
 	output.OuterOutcomes = cloneWorkflowStepOutcomes(value.OuterOutcomes)
+	output.CausalEffectWorkItemIDs = append([]WorkItemID(nil), value.CausalEffectWorkItemIDs...)
 	output.OuterSubscriptions = cloneWorkflowSubscriptionStates(value.OuterSubscriptions)
 	output.Context = cloneWorkflowCanonicalPointer(value.Context)
 	output.Item = cloneWorkflowCanonicalPointer(value.Item)

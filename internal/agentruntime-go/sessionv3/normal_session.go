@@ -26,6 +26,16 @@ func (r *Runtime) UpdateContinuationInput(
 			Message:     err.Error(),
 		}, nil
 	}
+	if receipt, found, lookupErr := r.FindCommandReceipt(
+		ctx,
+		command.SessionID,
+		command.Meta,
+		command,
+	); lookupErr != nil {
+		return nil, lookupErr
+	} else if found {
+		return receipt, nil
+	}
 
 	admitted, err := r.admitMessageAttachments(
 		ctx,
@@ -382,6 +392,16 @@ func (r *Runtime) EditAndResend(
 			SessionID: command.SessionID,
 			Message:   err.Error(),
 		}, nil
+	}
+	if receipt, found, lookupErr := r.FindCommandReceipt(
+		ctx,
+		command.SessionID,
+		command.Meta,
+		command,
+	); lookupErr != nil {
+		return nil, lookupErr
+	} else if found {
+		return receipt, nil
 	}
 
 	admitted, err := r.admitMessageAttachments(
@@ -874,7 +894,19 @@ func (r *Runtime) completeNormalToolCall(
 				item.FrameID,
 				item.ID,
 			)
+			execution = mutableSessionExecution(session, execution.ID)
+			if execution == nil {
+				return nil, ErrExecutionNotFound
+			}
+			item = mutableWorkItem(execution, workItemID)
+			if item == nil {
+				return nil, ErrExecutionNotFound
+			}
 			r.wakeCompletionWorkWaitsLocked(session, execution, *item)
+			execution = mutableSessionExecution(session, execution.ID)
+			if execution == nil {
+				return nil, ErrExecutionNotFound
+			}
 			r.refreshExecutionStateLocked(execution)
 			r.settleTerminalExecutionLocked(session, execution)
 			r.touchExecutionLocked(session, execution)

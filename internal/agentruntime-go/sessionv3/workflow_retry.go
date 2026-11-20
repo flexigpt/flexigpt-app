@@ -3,6 +3,8 @@ package sessionv3
 import (
 	"errors"
 	"strconv"
+
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 func (i *WorkflowInterpreter) startWorkflowRetry(
@@ -11,7 +13,7 @@ func (i *WorkflowInterpreter) startWorkflowRetry(
 	state WorkflowState,
 	step WorkflowStep,
 	path string,
-) (ProgramTransition, error) {
+) (pt ProgramTransition, err error) {
 	if step.Retry == nil || step.Retry.MaxAttempts <= 1 {
 		return ProgramTransition{}, errors.New(
 			"workflow retry boundary requires a retry policy",
@@ -22,6 +24,14 @@ func (i *WorkflowInterpreter) startWorkflowRetry(
 	childStep.When = nil
 	childStep.Retry = nil
 	childStep.Claims = nil
+	childStep, err = i.captureWorkflowRetryCall(
+		program,
+		state,
+		childStep,
+	)
+	if err != nil {
+		return workflowFailure(state, "workflow_retry_capture_failed", err.Error())
+	}
 
 	childBlock := WorkflowBlock{
 		DeclarationPath: step.DeclarationPath,
@@ -67,4 +77,66 @@ func (i *WorkflowInterpreter) startWorkflowRetry(
 	transition.Frames[0].Program = retryProgram
 	transition.Frames[0].DeclarationPath = state.PendingDeclarationPath
 	return transition, nil
+}
+
+// captureWorkflowRetryCall freezes call values at the first logical retry
+// boundary. Later attempts receive literal target, input, context, typed
+// messages, typed instructions, and keyed-effect values.
+func (i *WorkflowInterpreter) captureWorkflowRetryCall(
+	program WorkflowProgram,
+	state WorkflowState,
+	step WorkflowStep,
+) (WorkflowStep, error) {
+	if step.Call == nil {
+		return step, nil
+	}
+
+	output := jsonutil.CloneJSONInValue(step)
+	target, err := i.stringValue(output.Call.Target, program, state)
+	if err != nil {
+		return WorkflowStep{}, err
+	}
+	input, err := i.evaluate(output.Call.Input, program, state)
+	if err != nil {
+		return WorkflowStep{}, err
+	}
+	contextValue, err := i.evaluate(output.Call.Context, program, state)
+	if err != nil {
+		return WorkflowStep{}, err
+	}
+
+	output.Call.Target = WorkflowValue{
+		Kind:    WorkflowValueLiteral,
+		Literal: jsonutil.MustCanonicalValue(target),
+	}
+	output.Call.Input = WorkflowValue{
+		Kind:    WorkflowValueLiteral,
+		Literal: input.Clone(),
+	}
+	output.Call.Context = WorkflowValue{
+		Kind:    WorkflowValueLiteral,
+		Literal: contextValue.Clone(),
+	}
+	if output.Call.LLMInvocation != nil {
+		invocation, invocationErr := retryCaptureLLMInvocation(
+			program,
+			state,
+			*output.Call.LLMInvocation,
+		)
+		if invocationErr != nil {
+			return WorkflowStep{}, invocationErr
+		}
+		output.Call.LLMInvocation = invocation
+	}
+	if output.Effect != nil && output.Effect.Key != nil {
+		key, keyErr := i.evaluate(*output.Effect.Key, program, state)
+		if keyErr != nil {
+			return WorkflowStep{}, keyErr
+		}
+		output.Effect.Key = &WorkflowValue{
+			Kind:    WorkflowValueLiteral,
+			Literal: key.Clone(),
+		}
+	}
+	return output, nil
 }

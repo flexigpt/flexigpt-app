@@ -460,10 +460,9 @@ func (agentLoopInterpreter) Advance(
 		if item.Type == WorkItemTypeLLM {
 			state.LastLLMWorkItemID = item.ID
 			if item.State != WorkItemStateCompleted {
-				transition, transitionErr := failedAgentTransition(
+				transition, transitionErr := failedAgentWorkTransition(
 					state,
-					"llm_work_failed",
-					workItemFailureMessage(*item),
+					*item,
 				)
 				transition.Activities = interruptedAssistantActivities(*item)
 				return transition, transitionErr
@@ -790,6 +789,29 @@ func failedAgentTransition(state agentLoopProgramState, code, message string) (P
 	}, nil
 }
 
+func failedAgentWorkTransition(
+	state agentLoopProgramState,
+	item WorkItem,
+) (ProgramTransition, error) {
+	status := ProgramFrameStateFailed
+	if item.State == WorkItemStateCancelled {
+		status = ProgramFrameStateCancelled
+	}
+	failure := cloneWorkflowSanitizedError(item.Error)
+	if failure == nil {
+		failure = &SanitizedError{
+			Code:     "llm_work_failed",
+			Category: ErrorCategoryExecution,
+			Message:  workItemFailureMessage(item),
+		}
+	}
+	return ProgramTransition{
+		State:  encodeAgentLoopState(state),
+		Status: &status,
+		Error:  failure,
+	}, nil
+}
+
 func workItemFailureMessage(item WorkItem) string {
 	if item.Error != nil && strings.TrimSpace(item.Error.Message) != "" {
 		return item.Error.Message
@@ -958,14 +980,13 @@ func (singleModelInterpreter) Advance(
 			return ProgramTransition{State: encodeSingleModelState(state)}, nil
 		}
 		if item.State != WorkItemStateCompleted {
-			status := ProgramFrameStateFailed
-			transition := ProgramTransition{
-				State:  encodeSingleModelState(state),
-				Status: &status,
-				Error:  &SanitizedError{Code: "model_work_failed", Message: workItemFailureMessage(*item)},
-			}
+			transition, transitionErr := failedAgentWorkTransition(
+				agentLoopProgramState{},
+				*item,
+			)
+			transition.State = encodeSingleModelState(state)
 			transition.Activities = interruptedAssistantActivities(*item)
-			return transition, nil
+			return transition, transitionErr
 		}
 		if item.Output == nil || item.Output.LLM == nil {
 			status := ProgramFrameStateFailed

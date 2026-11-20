@@ -15,6 +15,7 @@ func (r *Runtime) deferFrameForkLocked(
 	intents []ProgramFrameIntent,
 	continueParent bool,
 	claims []ResourceClaim,
+	dependencies []WorkItemID,
 ) error {
 	if execution == nil || frame == nil {
 		return errors.New("fork boundary owner is unavailable")
@@ -91,6 +92,7 @@ func (r *Runtime) deferFrameForkLocked(
 		Claims:                 forkClaims,
 		ProgramPath:            frame.Path + "/fork",
 		DeclarationPath:        frame.DeclarationPath,
+		Dependencies:           append([]WorkItemID(nil), dependencies...),
 		Effect:                 EffectContract{Kind: EffectKindRead},
 		Automatic:              true,
 		Cleanup:                cleanup,
@@ -287,7 +289,7 @@ func (r *Runtime) materializeForkFramesLocked(
 		if budgetErr != nil {
 			return budgetErr
 		}
-		depth, budgetErr := childProgramFrameDepth(*parent, childBudget)
+		depth, budgetErr := childProgramFrameDepth(*parent, intent, childBudget)
 		if budgetErr != nil {
 			return budgetErr
 		}

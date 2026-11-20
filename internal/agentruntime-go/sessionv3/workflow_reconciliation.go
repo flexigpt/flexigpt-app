@@ -409,7 +409,10 @@ func (i *WorkflowInterpreter) settleReconciliationChild(
 		}
 
 		state.Pending = nil
-		state.LastEffectWorkItemID = original.ID
+		setWorkflowCausalEffectWorkItemIDs(
+			&state,
+			[]WorkItemID{original.ID},
+		)
 		state.Index++
 		state.clearPendingStep()
 
@@ -743,7 +746,5 @@ func cloneReconciliationReceipt(
 func cloneReconciliationBinding(
 	value SemanticBinding,
 ) SemanticBinding {
-	output := value
-	output.Artifacts = append([]ArtifactPin(nil), value.Artifacts...)
-	return output
+	return jsonutil.CloneJSONInValue(value)
 }

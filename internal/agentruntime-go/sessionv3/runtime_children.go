@@ -96,9 +96,13 @@ func narrowProgramFrameBudget(
 
 func childProgramFrameDepth(
 	parent ProgramFrame,
+	intent ProgramFrameIntent,
 	budget ExecutionBudget,
 ) (int, error) {
-	depth := programFrameDepth(parent) + 1
+	depth := programFrameDepth(parent)
+	if intent.WorkflowNesting {
+		depth++
+	}
 	if budget.WorkflowDepth > 0 &&
 		depth > budget.WorkflowDepth {
 		return 0, errors.New("workflow depth budget is exceeded")
@@ -237,7 +241,7 @@ func (r *Runtime) createIndependentChildExecutionLocked(
 		return nil, err
 	}
 
-	depth, err := childProgramFrameDepth(*parentFrame, effectiveBudget)
+	depth, err := childProgramFrameDepth(*parentFrame, intent, effectiveBudget)
 	if err != nil {
 		return nil, err
 	}

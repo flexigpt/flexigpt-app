@@ -205,6 +205,7 @@ func (i *WorkflowInterpreter) startSaga(
 			DeclarationPath: firstText(step.Saga.Do.DeclarationPath, state.PendingDeclarationPath),
 			Program:         snapshot,
 			Deadline:        cloneTime(state.Deadline),
+			Budget:          cloneBudget(step.Limits),
 		}},
 	)
 }
@@ -362,6 +363,17 @@ func workflowSagaHasOutstandingNormalWork(
 			continue
 		}
 		return true
+	}
+	for _, frame := range execution.ProgramFrames {
+		if frame.Status.Terminal() ||
+			frame.Program.InterpreterID != WorkflowInterpreterID {
+			continue
+		}
+		program, err := workflowProgramFromSnapshot(frame.Program)
+		if err == nil && program.Scope.Saga != nil &&
+			program.Scope.Saga.ID == sagaID {
+			return true
+		}
 	}
 	return false
 }
@@ -562,6 +574,7 @@ func (i *WorkflowInterpreter) settleSagaChild(
 				program,
 				state,
 				result,
+				workflowFrameCausalEffectWorkItemIDs(*child),
 			), true, nil
 		}
 		return i.beginSagaCompensation(
@@ -655,11 +668,16 @@ func (i *WorkflowInterpreter) settleSagaBodySuccess(
 	program WorkflowProgram,
 	state WorkflowState,
 	result WorkflowBlockResult,
+	causalEffects []WorkItemID,
 ) ProgramTransition {
 	if state.Pending == nil || state.Pending.Saga == nil {
 		return ProgramTransition{}
 	}
 	pending := state.Pending
+	setWorkflowCausalEffectWorkItemIDs(&state, mergeWorkflowCausalEffectWorkItemIDs(
+		workflowCausalEffectWorkItemIDs(state),
+		causalEffects,
+	))
 	switch result.Exit {
 	case WorkflowExitNormal, WorkflowExitReturnBlock:
 		step, err := workflowStepForPath(program.Root, pending.Path)
@@ -754,6 +772,15 @@ func (i *WorkflowInterpreter) beginSagaCompensation(
 	progress.Remaining = order
 	progress.Phase = WorkflowSagaPhaseCompensationIntent
 	if len(order) == 0 {
+		if workflowSagaHasOutstandingNormalWork(execution, progress.ID) {
+			transition, transitionErr := workflowTransition(
+				state,
+				nil,
+				nil,
+				nil,
+			)
+			return transition, true, transitionErr
+		}
 		return i.finishSaga(frame, program, state), true, nil
 	}
 	t, err := i.driveSaga(frame, execution, program, state)

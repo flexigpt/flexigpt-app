@@ -34,12 +34,20 @@ const (
 )
 
 type WorkflowCompletedOperationFacts struct {
-	OriginalWorkItemID WorkItemID              `json:"originalWorkItemID"`
-	EffectID           EffectRecordID          `json:"effectID"`
-	Input              jsonutil.CanonicalValue `json:"input"`
-	Output             jsonutil.CanonicalValue `json:"output"`
-	Receipt            *ExternalReceipt        `json:"receipt,omitempty"`
-	IdempotencyKey     string                  `json:"idempotencyKey,omitempty"`
+	OriginalWorkItemID     WorkItemID                   `json:"originalWorkItemID"`
+	OriginalAttemptID      AttemptID                    `json:"originalAttemptID"`
+	OriginalFrameID        ProgramFrameID               `json:"originalFrameID"`
+	EffectID               EffectRecordID               `json:"effectID"`
+	Target                 WorkflowOperationTargetFacts `json:"target"`
+	Effect                 EffectContract               `json:"effect"`
+	EffectState            EffectState                  `json:"effectState"`
+	Input                  jsonutil.CanonicalValue      `json:"input"`
+	Output                 jsonutil.CanonicalValue      `json:"output"`
+	IdempotencyKey         string                       `json:"idempotencyKey"`
+	CompensationWorkItemID WorkItemID                   `json:"compensationWorkItemID"`
+	CompensationFrameID    ProgramFrameID               `json:"compensationFrameID"`
+
+	Receipt *ExternalReceipt `json:"receipt,omitempty"`
 }
 
 type EffectRecord struct {
@@ -104,6 +112,35 @@ func (f WorkflowCompletedOperationFacts) Validate() error {
 	if !f.Input.Valid() || !f.Output.Valid() {
 		return errors.New("completed operation facts are invalid")
 	}
+	if f.OriginalAttemptID != "" {
+		if err := validateID(
+			"completed operation attempt ID",
+			string(f.OriginalAttemptID),
+		); err != nil {
+			return err
+		}
+	}
+	if f.OriginalFrameID != "" {
+		if err := validateID(
+			"completed operation frame ID",
+			string(f.OriginalFrameID),
+		); err != nil {
+			return err
+		}
+	}
+	if f.Target.Name != "" {
+		if err := f.Target.Validate(); err != nil {
+			return err
+		}
+	}
+	if f.Effect.Kind != "" {
+		if err := f.Effect.Validate(); err != nil {
+			return err
+		}
+	}
+	if err := f.EffectState.Validate(); err != nil {
+		return err
+	}
 	if f.Receipt != nil {
 		return f.Receipt.Validate()
 	}
@@ -138,6 +175,17 @@ func (e EffectRecord) Validate() error {
 	if e.Completed.OriginalWorkItemID != e.OriginalWorkItemID ||
 		e.Completed.EffectID != e.ID {
 		return errors.New("effect record completed facts differ from identity")
+	}
+	if e.Completed.OriginalFrameID != "" &&
+		e.Completed.OriginalFrameID != e.OriginalFrameID {
+		return errors.New("effect record completed frame differs from identity")
+	}
+	if e.Completed.CompensationWorkItemID != "" &&
+		e.Completed.CompensationWorkItemID != e.CompensationWorkItemID {
+		return errors.New("effect record completed compensation work differs from identity")
+	}
+	if e.Completed.CompensationFrameID != e.CompensationFrameID {
+		return errors.New("effect record completed compensation frame differs from identity")
 	}
 	if e.Compensation == nil {
 		return errors.New("effect record has no compensation block")
@@ -232,6 +280,10 @@ func (r *Runtime) recordConfirmedEffectLocked(
 	if err != nil {
 		return err
 	}
+	target, err := completedOperationTarget(*item)
+	if err != nil {
+		return err
+	}
 
 	effectID := EffectRecordID("effect:" + string(item.ID))
 	record := EffectRecord{
@@ -243,7 +295,11 @@ func (r *Runtime) recordConfirmedEffectLocked(
 		Dependencies:       append([]WorkItemID(nil), item.Dependencies...),
 		Completed: WorkflowCompletedOperationFacts{
 			OriginalWorkItemID: item.ID,
+			OriginalFrameID:    item.FrameID,
 			EffectID:           effectID,
+			Target:             target,
+			Effect:             item.Effect,
+			EffectState:        item.EffectState,
 			Input:              input,
 			Output:             output,
 			Receipt:            cloneReconciliationReceipt(item.Output.Receipt),
@@ -253,11 +309,62 @@ func (r *Runtime) recordConfirmedEffectLocked(
 		CompensationPolicy: item.CompensationPolicy,
 		State:              CompensationStatePending,
 	}
+	if attempt := latestAttemptForWorkItem(*execution, item.ID); attempt != nil {
+		record.Completed.OriginalAttemptID = attempt.ID
+	}
 	if err := record.Validate(); err != nil {
 		return err
 	}
 	execution.Effects = append(execution.Effects, record)
 	return nil
+}
+
+func completedOperationTarget(
+	item WorkItem,
+) (WorkflowOperationTargetFacts, error) {
+	target := WorkflowOperationTargetFacts{
+		WorkItemType: item.Type,
+	}
+	if item.Binding != nil {
+		value := cloneReconciliationBinding(*item.Binding)
+		target.Binding = &value
+	}
+
+	switch item.Type {
+	case WorkItemTypeTool:
+		if item.Input.Tool == nil {
+			return WorkflowOperationTargetFacts{}, errors.New(
+				"completed tool target is unavailable",
+			)
+		}
+		target.Name = item.Input.Tool.Call.Name
+	case WorkItemTypeService:
+		if item.Input.Service == nil {
+			return WorkflowOperationTargetFacts{}, errors.New(
+				"completed service target is unavailable",
+			)
+		}
+		target.Name = item.Input.Service.ServiceID
+	case WorkItemTypeActivity:
+		if item.Input.Activity == nil {
+			return WorkflowOperationTargetFacts{}, errors.New(
+				"completed activity target is unavailable",
+			)
+		}
+		target.Name = item.Input.Activity.ActivityID
+	case WorkItemTypeChildCall:
+		if item.Input.ChildCall == nil {
+			return WorkflowOperationTargetFacts{}, errors.New(
+				"completed child-call target is unavailable",
+			)
+		}
+		target.Name = item.Input.ChildCall.Target
+	default:
+		return WorkflowOperationTargetFacts{}, errors.New(
+			"completed work item cannot have a compensation target",
+		)
+	}
+	return target, target.Validate()
 }
 
 func compensationInput(item WorkItem) (jsonutil.CanonicalValue, error) {
@@ -396,6 +503,8 @@ func (r *Runtime) markCompensationIntentLocked(
 
 	record.State = CompensationStateDispatching
 	record.CompensationWorkItemID = item.ID
+	record.Completed.CompensationWorkItemID = item.ID
+	record.Completed.CompensationFrameID = record.CompensationFrameID
 	original.EffectState = EffectStateCompensating
 	original.UpdatedAt = r.now()
 	return nil
@@ -436,6 +545,8 @@ func (r *Runtime) applyCompensationSettlementsLocked(
 		}
 		record.Receipt = cloneReconciliationReceipt(value.Receipt)
 		record.Error = cloneWorkflowSanitizedError(value.Error)
+		record.Completed.CompensationWorkItemID = record.CompensationWorkItemID
+		record.Completed.CompensationFrameID = record.CompensationFrameID
 
 		item := mutableWorkItem(execution, record.OriginalWorkItemID)
 		if item == nil {

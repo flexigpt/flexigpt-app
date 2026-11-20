@@ -734,6 +734,13 @@ func (i *WorkflowInterpreter) startMachineChild(
 			"workflow machine state is unavailable",
 		)
 	}
+	machineStep, err := workflowStepForPath(program.Root, pending.Path)
+	if err != nil {
+		return ProgramTransition{}, err
+	}
+	if machineStep.Machine == nil {
+		return ProgramTransition{}, errors.New("workflow machine step is unavailable")
+	}
 
 	progress := pending.Machine
 	childName := role + "-" + strconv.FormatUint(
@@ -753,11 +760,7 @@ func (i *WorkflowInterpreter) startMachineChild(
 		Outcome:            nil,
 	}
 	if progress.LocalState {
-		step, err := workflowStepForPath(program.Root, pending.Path)
-		if err != nil {
-			return ProgramTransition{}, err
-		}
-		if step.Machine == nil || step.Machine.State == nil {
+		if machineStep.Machine.State == nil {
 			return ProgramTransition{}, errors.New(
 				"workflow machine local state declaration is unavailable",
 			)
@@ -766,7 +769,7 @@ func (i *WorkflowInterpreter) startMachineChild(
 			frame.ID,
 			pending.Path,
 			"machine",
-			step.Machine.State.Schema,
+			machineStep.Machine.State.Schema,
 		)
 	}
 	childState := state
@@ -799,6 +802,7 @@ func (i *WorkflowInterpreter) startMachineChild(
 			DeclarationPath: firstText(block.DeclarationPath, state.PendingDeclarationPath),
 			Program:         snapshot,
 			Deadline:        cloneTime(state.Deadline),
+			Budget:          cloneBudget(machineStep.Limits),
 		}},
 	)
 }
@@ -1327,6 +1331,11 @@ func (i *WorkflowInterpreter) settleMachineChild(
 			"workflow machine child returned an invalid control result",
 		)
 	}
+
+	setWorkflowCausalEffectWorkItemIDs(state, mergeWorkflowCausalEffectWorkItemIDs(
+		workflowCausalEffectWorkItemIDs(*state),
+		child.CausalEffectWorkItemIDs,
+	))
 
 	if progress.ChildMergesState {
 		progress.State = result.State.Clone()

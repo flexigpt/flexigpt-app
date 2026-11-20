@@ -38,6 +38,11 @@ type WorkflowTriggerRegistrationCommand struct {
 	Workflow  sessionv3Runtime.ArtifactSelection `json:"workflow"`
 }
 
+type sessionV3CommandLookup struct {
+	Receipt *sessionv3Runtime.CommandReceipt
+	Found   bool
+}
+
 func InitSessionV3Wrapper(
 	wrapper *SessionV3Wrapper,
 	runtime *sessionv3Runtime.Runtime,
@@ -97,6 +102,25 @@ func (w *SessionV3Wrapper) SubmitMessage(
 func (w *SessionV3Wrapper) StartWorkflow(
 	command WorkflowStartCommand,
 ) (*sessionv3Runtime.CommandReceipt, error) {
+	identity := sessionv3Runtime.WorkflowStartCommandIdentity{
+		Meta:        command.Meta,
+		SessionID:   command.SessionID,
+		ExecutionID: command.ExecutionID,
+		Workflow:    command.Workflow,
+		Input:       command.Input.Clone(),
+	}
+	lookup, err := w.findCommandReceipt(
+		command.SessionID,
+		command.Meta,
+		identity,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if lookup.Found {
+		return lookup.Receipt, nil
+	}
+
 	preparation, err := w.workflowPreparation()
 	if err != nil {
 		return nil, err
@@ -131,10 +155,11 @@ func (w *SessionV3Wrapper) StartWorkflow(
 		return r.StartWorkflow(
 			context.Background(),
 			sessionv3Runtime.StartWorkflowCommand{
-				Meta:        command.Meta,
-				SessionID:   command.SessionID,
-				ExecutionID: command.ExecutionID,
-				Program:     program,
+				Meta:            command.Meta,
+				SessionID:       command.SessionID,
+				ExecutionID:     command.ExecutionID,
+				Program:         program,
+				CommandIdentity: &identity,
 			},
 		)
 	})
@@ -143,6 +168,23 @@ func (w *SessionV3Wrapper) StartWorkflow(
 func (w *SessionV3Wrapper) RegisterWorkflowTriggers(
 	command WorkflowTriggerRegistrationCommand,
 ) (*sessionv3Runtime.CommandReceipt, error) {
+	identity := sessionv3Runtime.WorkflowTriggerRegistrationCommandIdentity{
+		Meta:      command.Meta,
+		SessionID: command.SessionID,
+		Workflow:  command.Workflow,
+	}
+	lookup, err := w.findCommandReceipt(
+		command.SessionID,
+		command.Meta,
+		identity,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if lookup.Found {
+		return lookup.Receipt, nil
+	}
+
 	preparation, err := w.workflowPreparation()
 	if err != nil {
 		return nil, err
@@ -175,9 +217,10 @@ func (w *SessionV3Wrapper) RegisterWorkflowTriggers(
 		return r.RegisterWorkflowTriggers(
 			context.Background(),
 			sessionv3Runtime.RegisterWorkflowTriggersCommand{
-				Meta:      command.Meta,
-				SessionID: command.SessionID,
-				Program:   program,
+				Meta:            command.Meta,
+				SessionID:       command.SessionID,
+				Program:         program,
+				CommandIdentity: &identity,
 			},
 		)
 	})
@@ -560,6 +603,25 @@ func (w *SessionV3Wrapper) Session(
 	return withSessionV3(w, func(r *sessionv3Runtime.Runtime) (sessionv3Runtime.Session, error) {
 		return r.GetSession(context.Background(), id)
 	})
+}
+
+func (w *SessionV3Wrapper) findCommandReceipt(
+	sessionID sessionv3Runtime.SessionID,
+	meta sessionv3Runtime.CommandMeta,
+	payload any,
+) (sessionV3CommandLookup, error) {
+	return withSessionV3(
+		w,
+		func(r *sessionv3Runtime.Runtime) (sessionV3CommandLookup, error) {
+			receipt, found, err := r.FindCommandReceipt(
+				context.Background(),
+				sessionID,
+				meta,
+				payload,
+			)
+			return sessionV3CommandLookup{Receipt: receipt, Found: found}, err
+		},
+	)
 }
 
 func (w *SessionV3Wrapper) workflowPreparation() (

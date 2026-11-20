@@ -31,14 +31,15 @@ type retryProgramAttempt struct {
 }
 
 type retryProgramState struct {
-	Attempt         int                      `json:"attempt"`
-	ChildFrameID    ProgramFrameID           `json:"childFrameID,omitempty"`
-	RetryWorkItemID WorkItemID               `json:"retryWorkItemID,omitempty"`
-	RetryAt         *time.Time               `json:"retryAt,omitempty"`
-	LastError       *SanitizedError          `json:"lastError,omitempty"`
-	Attempts        []retryProgramAttempt    `json:"attempts,omitempty"`
-	TargetSets      []WorkflowTargetSetState `json:"targetSets,omitempty"`
-	CapturedChild   *ProgramSnapshot         `json:"capturedChild,omitempty"`
+	Attempt                 int                      `json:"attempt"`
+	ChildFrameID            ProgramFrameID           `json:"childFrameID,omitempty"`
+	RetryWorkItemID         WorkItemID               `json:"retryWorkItemID,omitempty"`
+	RetryAt                 *time.Time               `json:"retryAt,omitempty"`
+	LastError               *SanitizedError          `json:"lastError,omitempty"`
+	Attempts                []retryProgramAttempt    `json:"attempts,omitempty"`
+	TargetSets              []WorkflowTargetSetState `json:"targetSets,omitempty"`
+	CapturedChild           *ProgramSnapshot         `json:"capturedChild,omitempty"`
+	CausalEffectWorkItemIDs []WorkItemID             `json:"causalEffectWorkItemIDs,omitempty"`
 }
 
 func NewRetryBoundaryProgram(
@@ -275,6 +276,10 @@ func (i retryBoundaryInterpreter) settleChild(
 
 	failure := retryBoundaryFrameFailure(*child)
 	retryCaptureTargetSets(*child, &state)
+	state.CausalEffectWorkItemIDs = mergeWorkflowCausalEffectWorkItemIDs(
+		state.CausalEffectWorkItemIDs,
+		workflowFrameCausalEffectWorkItemIDs(*child),
+	)
 	if state.CapturedChild == nil {
 		captured, captureErr := retryCaptureChildCall(
 			execution,
@@ -423,6 +428,10 @@ func retryBoundaryReplaySafe(
 		}
 		if item.State == WorkItemStateUncertain ||
 			item.EffectState == EffectStateUncertain {
+			if effectReplaySafe(item.Effect) ||
+				item.EffectState == EffectStateConfirmedNotApplied {
+				continue
+			}
 			return false
 		}
 		if item.Effect.Kind == EffectKindRead {
@@ -825,6 +834,9 @@ func (s retryProgramState) Validate() error {
 			return errors.New("retry boundary attempt is duplicated")
 		}
 		seen[attempt.ID] = struct{}{}
+	}
+	if err := validateWorkflowCausalEffectWorkItemIDs(s.CausalEffectWorkItemIDs); err != nil {
+		return err
 	}
 	return validateWorkflowTargetSetStates(s.TargetSets)
 }

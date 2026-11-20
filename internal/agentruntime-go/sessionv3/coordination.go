@@ -107,6 +107,16 @@ func (r *Runtime) resolveReadyWaitLocked(
 	if wait == nil || wait.Status != WaitStatusPending {
 		return nil
 	}
+	executionID := execution.ID
+	reacquirePendingWait := func() (*Wait, bool) {
+		current := mutableSessionExecution(session, executionID)
+		if current == nil {
+			return nil, false
+		}
+		execution = current
+		value := mutableWait(execution, waitID)
+		return value, value != nil && value.Status == WaitStatusPending
+	}
 
 	switch wait.Request.Kind {
 	case WaitKindEvent:
@@ -114,7 +124,7 @@ func (r *Runtime) resolveReadyWaitLocked(
 			if err := r.wakeEventWaitsLocked(session, execution, signal); err != nil {
 				return err
 			}
-			if wait.Status != WaitStatusPending {
+			if _, pending := reacquirePendingWait(); !pending {
 				return nil
 			}
 		}
@@ -128,7 +138,7 @@ func (r *Runtime) resolveReadyWaitLocked(
 				if err := r.wakeChannelWaitsLocked(session, execution, message); err != nil {
 					return err
 				}
-				if wait.Status != WaitStatusPending {
+				if _, pending := reacquirePendingWait(); !pending {
 					return nil
 				}
 			}
@@ -138,18 +148,24 @@ func (r *Runtime) resolveReadyWaitLocked(
 		if wait.Request.Completion == nil {
 			return errors.New("completion wait has no completion handle")
 		}
-		handle := wait.Request.Completion
+		handle := *wait.Request.Completion
 		if handle.WorkItemID != "" {
 			item := executionWorkItem(*execution, handle.WorkItemID)
 			if item != nil && item.State.Terminal() {
 				r.wakeCompletionWorkWaitsLocked(session, execution, *item)
 			}
 		}
+		if _, pending := reacquirePendingWait(); !pending {
+			return nil
+		}
 		if handle.FrameID != "" {
 			frame := mutableFrame(execution, handle.FrameID)
 			if frame != nil && frame.Status.Terminal() {
 				r.wakeCompletionFrameWaitsLocked(session, execution, *frame)
 			}
+		}
+		if _, pending := reacquirePendingWait(); !pending {
+			return nil
 		}
 		if handle.ExecutionID != "" {
 			child := mutableSessionExecution(session, handle.ExecutionID)
@@ -259,6 +275,10 @@ func (r *Runtime) dispatchEmit(
 				Confirmed: true,
 			},
 		)
+		execution = mutableSessionExecution(session, executionID)
+		if execution == nil {
+			return
+		}
 
 		switch {
 		case signal != nil:
@@ -269,8 +289,16 @@ func (r *Runtime) dispatchEmit(
 				*session = previous
 				return
 			}
+			execution = mutableSessionExecution(session, executionID)
+			if execution == nil {
+				return
+			}
 			if err := r.wakeEventWaitsLocked(session, execution, *signal); err != nil {
 				*session = previous
+				return
+			}
+			execution = mutableSessionExecution(session, executionID)
+			if execution == nil {
 				return
 			}
 		case channelMessage != nil:
@@ -282,12 +310,20 @@ func (r *Runtime) dispatchEmit(
 				*session = previous
 				return
 			}
+			execution = mutableSessionExecution(session, executionID)
+			if execution == nil {
+				return
+			}
 			if err := r.forwardChannelMessageLocked(
 				session,
 				execution,
 				*channelMessage,
 			); err != nil {
 				*session = previous
+				return
+			}
+			execution = mutableSessionExecution(session, executionID)
+			if execution == nil {
 				return
 			}
 		}
@@ -542,8 +578,17 @@ func (r *Runtime) wakeEventWaitsLocked(
 		return errors.New("event wait owner is unavailable")
 	}
 
-	for index := range execution.Waits {
-		wait := &execution.Waits[index]
+	executionID := execution.ID
+	waitIDs := make([]WaitID, 0, len(execution.Waits))
+	for _, wait := range execution.Waits {
+		waitIDs = append(waitIDs, wait.ID)
+	}
+	for _, waitID := range waitIDs {
+		execution = mutableSessionExecution(session, executionID)
+		if execution == nil {
+			return errors.New("event wait execution disappeared")
+		}
+		wait := mutableWait(execution, waitID)
 		if wait.Status != WaitStatusPending ||
 			wait.Request.Kind != WaitKindEvent ||
 			wait.Request.Signal != signal.Name {
@@ -603,6 +648,11 @@ func (r *Runtime) wakeEventWaitsLocked(
 			return err
 		}
 
+		execution = mutableSessionExecution(session, executionID)
+		if execution == nil {
+			return errors.New("event wait execution disappeared")
+		}
+		wait = mutableWait(execution, waitID)
 		if wait.Request.Consume {
 			for signalIndex := range execution.Signals {
 				if execution.Signals[signalIndex].ID != signal.ID {
@@ -641,8 +691,17 @@ func (r *Runtime) wakeChannelWaitsLocked(
 		return errors.New("channel wait owner is unavailable")
 	}
 
-	for index := range execution.Waits {
-		wait := &execution.Waits[index]
+	executionID := execution.ID
+	waitIDs := make([]WaitID, 0, len(execution.Waits))
+	for _, wait := range execution.Waits {
+		waitIDs = append(waitIDs, wait.ID)
+	}
+	for _, waitID := range waitIDs {
+		execution = mutableSessionExecution(session, executionID)
+		if execution == nil {
+			return errors.New("channel wait execution disappeared")
+		}
+		wait := mutableWait(execution, waitID)
 		if wait.Status != WaitStatusPending ||
 			wait.Request.Kind != WaitKindChannel ||
 			wait.Request.Channel != message.Channel ||
@@ -691,6 +750,11 @@ func (r *Runtime) wakeChannelWaitsLocked(
 			return err
 		}
 
+		execution = mutableSessionExecution(session, executionID)
+		if execution == nil {
+			return errors.New("channel wait execution disappeared")
+		}
+		wait = mutableWait(execution, waitID)
 		if wait.Request.Consume {
 			for channelIndex := range execution.Channels {
 				channel := &execution.Channels[channelIndex]

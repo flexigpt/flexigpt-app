@@ -101,6 +101,9 @@ func (i *WorkflowInterpreter) recordTerminalWorkflowStepOutcome(
 	program WorkflowProgram,
 	before WorkflowState,
 	transition ProgramTransition,
+	execution Execution,
+	frame ProgramFrame,
+	event ProgramEvent,
 ) (ProgramTransition, error) {
 	if transition.Status == nil || !transition.Status.Terminal() {
 		return transition, nil
@@ -109,7 +112,7 @@ func (i *WorkflowInterpreter) recordTerminalWorkflowStepOutcome(
 	if err != nil {
 		return ProgramTransition{}, err
 	}
-	path := firstText(before.PendingPath, state.PendingPath)
+	path := firstText(state.PendingPath, before.PendingPath)
 	if path == "" {
 		return transition, nil
 	}
@@ -118,10 +121,33 @@ func (i *WorkflowInterpreter) recordTerminalWorkflowStepOutcome(
 		return transition, nil
 	}
 
+	for _, current := range state.Outcomes {
+		if current.ID == step.ID &&
+			current.Status != WorkflowStepOutcomeUncertain {
+			return transition, nil
+		}
+	}
+
 	outcome := WorkflowStepOutcome{
 		ID:              step.ID,
-		Target:          firstText(before.PendingTarget, state.PendingTarget),
+		Target:          firstText(state.PendingTarget, before.PendingTarget),
 		DeclarationPath: firstText(state.PendingDeclarationPath, step.DeclarationPath),
+	}
+	var settled *WorkItem
+	if event.WorkItemID != "" {
+		item := executionWorkItem(execution, event.WorkItemID)
+		if item != nil &&
+			item.FrameID == frame.ID &&
+			item.ProgramPath == path {
+			settled = item
+			outcome.Receipt = cloneReconciliationReceipt(
+				workItemOutputReceipt(item),
+			)
+			outcome.Effect = item.EffectState
+			if value, valueErr := workflowWorkValue(*item); valueErr == nil {
+				outcome.Output = value
+			}
+		}
 	}
 	switch *transition.Status {
 	case ProgramFrameStateCompleted:
@@ -131,33 +157,45 @@ func (i *WorkflowInterpreter) recordTerminalWorkflowStepOutcome(
 				value = result.Value.Clone()
 			}
 		}
-		if len(value) == 0 || !value.Valid() {
+		if len(value) != 0 && value.Valid() {
+			outcome.Output = value
+		}
+		if len(outcome.Output) == 0 || !outcome.Output.Valid() {
 			return transition, nil
 		}
 		outcome.Status = WorkflowStepOutcomeSucceeded
-		outcome.Output = value
 
 	case ProgramFrameStateCancelled:
 		outcome.Status = WorkflowStepOutcomeCancelled
 		outcome.Error = cloneWorkflowSanitizedError(transition.Error)
+		if outcome.Error == nil && settled != nil {
+			outcome.Error = cloneWorkflowSanitizedError(settled.Error)
+		}
 		if outcome.Error == nil {
 			outcome.Error = workflowTerminalFailure(
 				ProgramFrameStateCancelled,
 				nil,
 			)
 		}
-		outcome.Effect = outcome.Error.Effect
+		if outcome.Effect == "" {
+			outcome.Effect = outcome.Error.Effect
+		}
 
 	case ProgramFrameStateFailed:
 		outcome.Status = WorkflowStepOutcomeFailed
 		outcome.Error = cloneWorkflowSanitizedError(transition.Error)
+		if outcome.Error == nil && settled != nil {
+			outcome.Error = cloneWorkflowSanitizedError(settled.Error)
+		}
 		if outcome.Error == nil {
 			outcome.Error = workflowTerminalFailure(
 				ProgramFrameStateFailed,
 				nil,
 			)
 		}
-		outcome.Effect = outcome.Error.Effect
+		if outcome.Effect == "" {
+			outcome.Effect = outcome.Error.Effect
+		}
 	default:
 	}
 
@@ -235,4 +273,34 @@ func (r *Runtime) recordUncertainWorkflowStepOutcomeLocked(
 	frame.State = next
 	frame.UpdatedAt = r.now()
 	return nil
+}
+
+func recordInlineWorkflowStepOutcome(
+	state *WorkflowState,
+	step WorkflowStep,
+	status WorkflowStepOutcomeStatus,
+	value jsonutil.CanonicalValue,
+	failure *SanitizedError,
+) error {
+	if state == nil {
+		return errors.New("workflow state is unavailable")
+	}
+	outcome := WorkflowStepOutcome{
+		ID:              step.ID,
+		Status:          status,
+		Output:          value.Clone(),
+		Error:           cloneWorkflowSanitizedError(failure),
+		DeclarationPath: state.PendingDeclarationPath,
+	}
+	if failure != nil {
+		outcome.Effect = failure.Effect
+	}
+	return state.recordTerminalOutcome(outcome)
+}
+
+func workItemOutputReceipt(item *WorkItem) *ExternalReceipt {
+	if item == nil || item.Output == nil {
+		return nil
+	}
+	return item.Output.Receipt
 }

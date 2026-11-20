@@ -311,29 +311,30 @@ type WorkflowTargetSetResolution struct {
 type WorkflowState struct {
 	Version uint32 `json:"version"`
 
-	Index                  int                          `json:"index"`
-	PendingPath            string                       `json:"pendingPath,omitempty"`
-	PendingDeclarationPath string                       `json:"pendingDeclarationPath,omitempty"`
-	PendingTarget          string                       `json:"pendingTarget,omitempty"`
-	Pending                *WorkflowPending             `json:"pending,omitempty"`
-	Exit                   WorkflowExitKind             `json:"exit,omitempty"`
-	ExitValue              jsonutil.CanonicalValue      `json:"exitValue,omitempty"`
-	LogicalTime            time.Time                    `json:"logicalTime,omitzero"`
-	Deadline               *time.Time                   `json:"deadline,omitempty"`
-	State                  jsonutil.CanonicalValue      `json:"state"`
-	Messages               jsonutil.CanonicalValue      `json:"messages,omitempty"`
-	Outcomes               []WorkflowStepOutcome        `json:"outcomes"`
-	Subscriptions          []WorkflowSubscriptionState  `json:"subscriptions,omitempty"`
-	CancelChildPaths       []string                     `json:"cancelChildPaths,omitempty"`
-	CancelWorkItemIDs      []WorkItemID                 `json:"cancelWorkItemIDs,omitempty"`
-	ReleaseFrameClaims     bool                         `json:"releaseFrameClaims,omitempty"`
-	CancellationPending    bool                         `json:"cancellationPending,omitempty"`
-	Terminal               *WorkflowTerminalState       `json:"terminal,omitempty"`
-	Saga                   *WorkflowSagaScope           `json:"saga,omitempty"`
-	TargetSets             []WorkflowTargetSetState     `json:"targetSets,omitempty"`
-	TargetSetResolution    *WorkflowTargetSetResolution `json:"targetSetResolution,omitempty"`
-	ChildCallWorkItemID    WorkItemID                   `json:"childCallWorkItemID,omitempty"`
-	LastEffectWorkItemID   WorkItemID                   `json:"lastEffectWorkItemID,omitempty"`
+	Index                   int                          `json:"index"`
+	PendingPath             string                       `json:"pendingPath,omitempty"`
+	PendingDeclarationPath  string                       `json:"pendingDeclarationPath,omitempty"`
+	PendingTarget           string                       `json:"pendingTarget,omitempty"`
+	Pending                 *WorkflowPending             `json:"pending,omitempty"`
+	Exit                    WorkflowExitKind             `json:"exit,omitempty"`
+	ExitValue               jsonutil.CanonicalValue      `json:"exitValue,omitempty"`
+	LogicalTime             time.Time                    `json:"logicalTime,omitzero"`
+	Deadline                *time.Time                   `json:"deadline,omitempty"`
+	State                   jsonutil.CanonicalValue      `json:"state"`
+	Messages                jsonutil.CanonicalValue      `json:"messages,omitempty"`
+	Outcomes                []WorkflowStepOutcome        `json:"outcomes"`
+	Subscriptions           []WorkflowSubscriptionState  `json:"subscriptions,omitempty"`
+	CancelChildPaths        []string                     `json:"cancelChildPaths,omitempty"`
+	CancelWorkItemIDs       []WorkItemID                 `json:"cancelWorkItemIDs,omitempty"`
+	ReleaseFrameClaims      bool                         `json:"releaseFrameClaims,omitempty"`
+	CancellationPending     bool                         `json:"cancellationPending,omitempty"`
+	Terminal                *WorkflowTerminalState       `json:"terminal,omitempty"`
+	Saga                    *WorkflowSagaScope           `json:"saga,omitempty"`
+	TargetSets              []WorkflowTargetSetState     `json:"targetSets,omitempty"`
+	TargetSetResolution     *WorkflowTargetSetResolution `json:"targetSetResolution,omitempty"`
+	ChildCallWorkItemID     WorkItemID                   `json:"childCallWorkItemID,omitempty"`
+	LastEffectWorkItemID    WorkItemID                   `json:"lastEffectWorkItemID,omitempty"`
+	CausalEffectWorkItemIDs []WorkItemID                 `json:"causalEffectWorkItemIDs,omitempty"`
 }
 
 // WorkflowResourceClaim is a declaration-level resource claim template. Key
@@ -392,10 +393,6 @@ func (s *WorkflowState) Validate() error {
 			return err
 		}
 	}
-	if s.LastEffectWorkItemID != "" &&
-		validateID("workflow last effect work item ID", string(s.LastEffectWorkItemID)) != nil {
-		return errors.New("workflow last effect WorkItem ID is invalid")
-	}
 	if s.LastEffectWorkItemID != "" {
 		if err := validateID(
 			"workflow last effect work item ID",
@@ -403,6 +400,11 @@ func (s *WorkflowState) Validate() error {
 		); err != nil {
 			return err
 		}
+	}
+	if err := validateWorkflowCausalEffectWorkItemIDs(
+		s.CausalEffectWorkItemIDs,
+	); err != nil {
+		return err
 	}
 	for _, subscription := range s.Subscriptions {
 		if err := subscription.Validate(); err != nil {
@@ -466,6 +468,93 @@ func (s *WorkflowState) clearPendingStep() {
 	s.PendingTarget = ""
 	s.Deadline = nil
 	s.ChildCallWorkItemID = ""
+}
+
+func validateWorkflowCausalEffectWorkItemIDs(
+	values []WorkItemID,
+) error {
+	seen := make(map[WorkItemID]struct{}, len(values))
+	for _, value := range values {
+		if err := validateID(
+			"workflow causal effect work item ID",
+			string(value),
+		); err != nil {
+			return err
+		}
+		if _, duplicate := seen[value]; duplicate {
+			return errors.New("workflow causal effect work item ID is duplicated")
+		}
+		seen[value] = struct{}{}
+	}
+	return nil
+}
+
+func mergeWorkflowCausalEffectWorkItemIDs(
+	groups ...[]WorkItemID,
+) []WorkItemID {
+	seen := make(map[WorkItemID]struct{})
+	output := make([]WorkItemID, 0)
+	for _, group := range groups {
+		for _, value := range group {
+			if value == "" {
+				continue
+			}
+			if _, duplicate := seen[value]; duplicate {
+				continue
+			}
+			seen[value] = struct{}{}
+			output = append(output, value)
+		}
+	}
+	return output
+}
+
+func workflowCausalEffectWorkItemIDs(
+	state WorkflowState,
+) []WorkItemID {
+	return mergeWorkflowCausalEffectWorkItemIDs(
+		[]WorkItemID{state.LastEffectWorkItemID},
+		state.CausalEffectWorkItemIDs,
+	)
+}
+
+func setWorkflowCausalEffectWorkItemIDs(
+	state *WorkflowState,
+	values []WorkItemID,
+) {
+	if state == nil {
+		return
+	}
+	state.CausalEffectWorkItemIDs = mergeWorkflowCausalEffectWorkItemIDs(
+		values,
+	)
+	state.LastEffectWorkItemID = ""
+	if len(state.CausalEffectWorkItemIDs) != 0 {
+		state.LastEffectWorkItemID = state.CausalEffectWorkItemIDs[len(state.CausalEffectWorkItemIDs)-1]
+	}
+}
+
+func workflowFrameCausalEffectWorkItemIDs(
+	frame ProgramFrame,
+) []WorkItemID {
+	switch frame.Program.InterpreterID {
+	case WorkflowInterpreterID:
+		_, state, err := decodeWorkflowProgram(frame)
+		if err == nil {
+			return workflowCausalEffectWorkItemIDs(state)
+		}
+	case BuiltinRetryBoundaryInterpreterID:
+		state, err := jsonutil.DecodeCanonicalValue[retryProgramState](
+			frame.State.Data,
+		)
+		if err == nil {
+			return append(
+				[]WorkItemID(nil),
+				state.CausalEffectWorkItemIDs...,
+			)
+		}
+	}
+	return nil
 }
 
 func NewWorkflowInterpreter() (*WorkflowInterpreter, error) {
@@ -567,6 +656,10 @@ func (i *WorkflowInterpreter) InitialState(
 		Messages:    jsonutil.MustCanonicalValue(map[string][]WorkflowChannelMessageSnapshot{}),
 		LogicalTime: logicalTime.UTC(),
 	}
+	setWorkflowCausalEffectWorkItemIDs(
+		&state,
+		program.Scope.CausalEffectWorkItemIDs,
+	)
 	if program.Root.State != nil {
 		value, err := i.evaluate(
 			program.Root.State.Initial,
@@ -901,6 +994,9 @@ func (i *WorkflowInterpreter) Advance(
 		program,
 		state,
 		transition,
+		execution,
+		frame,
+		event,
 	)
 	if err != nil {
 		return ProgramTransition{}, err
@@ -1209,6 +1305,17 @@ func (i *WorkflowInterpreter) drive(
 					err.Error(),
 				)
 			}
+			if err := recordInlineWorkflowStepOutcome(
+				&state,
+				step,
+				WorkflowStepOutcomeSucceeded,
+				output,
+				nil,
+			); err != nil {
+				return workflowFailure(state, "workflow_state_invalid", err.Error())
+			}
+			state.Index++
+			state.clearPendingStep()
 
 			exit := WorkflowExitReturnBlock
 			if step.Return.To == WorkflowReturnDestinationWorkflow {
@@ -1238,35 +1345,70 @@ func (i *WorkflowInterpreter) drive(
 					err.Error(),
 				)
 			}
-			transition, err := workflowFailure(state, step.Fail.Code, message)
-			if err != nil {
-				return ProgramTransition{}, err
+			failure := &SanitizedError{
+				Code:      step.Fail.Code,
+				Category:  step.Fail.Category,
+				Message:   message,
+				Retryable: step.Fail.Retryable,
+				StepPath:  state.PendingDeclarationPath,
 			}
-			transition.Error.Category = step.Fail.Category
-			transition.Error.Retryable = step.Fail.Retryable
-			transition.Error.StepPath = path
 			if step.Fail.Details != nil {
 				details, err := i.evaluate(*step.Fail.Details, program, state)
 				if err != nil {
 					return workflowFailure(state, "workflow_fail_invalid", err.Error())
 				}
-				transition.Error.Details = details
+				failure.Details = details
 			}
-			return transition, nil
+			if err := recordInlineWorkflowStepOutcome(
+				&state,
+				step,
+				WorkflowStepOutcomeFailed,
+				nil,
+				failure,
+			); err != nil {
+				return workflowFailure(state, "workflow_state_invalid", err.Error())
+			}
+			state.Index++
+			state.clearPendingStep()
+			return workflowFailureTransition(state, failure)
 
 		case step.Break:
+			value := jsonutil.MustCanonicalValue(nil)
+			if err := recordInlineWorkflowStepOutcome(
+				&state,
+				step,
+				WorkflowStepOutcomeSucceeded,
+				value,
+				nil,
+			); err != nil {
+				return workflowFailure(state, "workflow_state_invalid", err.Error())
+			}
+			state.Index++
+			state.clearPendingStep()
 			return i.completeWorkflowBlock(
 				program,
 				state,
-				jsonutil.MustCanonicalValue(nil),
+				value,
 				WorkflowExitBreak,
 			)
 
 		case step.Continue:
+			value := jsonutil.MustCanonicalValue(nil)
+			if err := recordInlineWorkflowStepOutcome(
+				&state,
+				step,
+				WorkflowStepOutcomeSucceeded,
+				value,
+				nil,
+			); err != nil {
+				return workflowFailure(state, "workflow_state_invalid", err.Error())
+			}
+			state.Index++
+			state.clearPendingStep()
 			return i.completeWorkflowBlock(
 				program,
 				state,
-				jsonutil.MustCanonicalValue(nil),
+				value,
 				WorkflowExitContinue,
 			)
 
@@ -2073,7 +2215,20 @@ func (i *WorkflowInterpreter) settleWork(
 	}
 	if item.Effect.Kind != EffectKindRead &&
 		item.EffectState == EffectStateConfirmedApplied {
-		state.LastEffectWorkItemID = item.ID
+		setWorkflowCausalEffectWorkItemIDs(
+			state,
+			[]WorkItemID{item.ID},
+		)
+	}
+	if item.Type == WorkItemTypeChildCall &&
+		item.Input.ChildCall != nil &&
+		item.Input.ChildCall.Completion.FrameID != "" {
+		if child := mutableFrame(&execution, item.Input.ChildCall.Completion.FrameID); child != nil {
+			setWorkflowCausalEffectWorkItemIDs(state, mergeWorkflowCausalEffectWorkItemIDs(
+				workflowCausalEffectWorkItemIDs(*state),
+				workflowFrameCausalEffectWorkItemIDs(*child),
+			))
+		}
 	}
 	state.Index++
 	state.clearPendingStep()
@@ -3184,13 +3339,12 @@ func workflowWork(
 	path string,
 	intent WorkItemIntent,
 ) (ProgramTransition, error) {
-	if intent.Effect.Kind != EffectKindRead &&
-		state.LastEffectWorkItemID != "" &&
-		!slices.Contains(intent.Dependencies, state.LastEffectWorkItemID) {
-		intent.Dependencies = append(
-			intent.Dependencies,
-			state.LastEffectWorkItemID,
-		)
+	if intent.Effect.Kind != EffectKindRead {
+		for _, dependency := range workflowCausalEffectWorkItemIDs(state) {
+			if !slices.Contains(intent.Dependencies, dependency) {
+				intent.Dependencies = append(intent.Dependencies, dependency)
+			}
+		}
 	}
 	state.PendingPath = path
 	intent.DeclarationPath = state.PendingDeclarationPath
