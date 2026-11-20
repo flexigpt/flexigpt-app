@@ -7,10 +7,10 @@ ignore build
 // Tools are installed via the taskfile. Check the associated task.
 
 require (
-	cel.dev/cel-go v0.33.2
+	cel.dev/cel-go v0.33.4
 	github.com/adrg/xdg v0.5.3
 	github.com/flexigpt/agentskills-go v0.22.1
-	github.com/flexigpt/inference-go v0.28.7
+	github.com/flexigpt/inference-go v0.28.8
 	github.com/flexigpt/llmtools-go v0.25.1
 	github.com/flexigpt/mapstore-go v0.4.6
 	github.com/glebarez/go-sqlite v1.23.0
@@ -76,7 +76,7 @@ require (
 	github.com/mattn/go-colorable v0.1.15 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
-	github.com/openai/openai-go/v3 v3.99.0 // indirect
+	github.com/openai/openai-go/v3 v3.105.0 // indirect
 	github.com/pb33f/ordered-map/v2 v2.3.1 // indirect
 	github.com/pjbgf/sha1cd v0.7.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
@@ -88,7 +88,7 @@ require (
 	github.com/skeema/knownhosts v1.3.3 // indirect
 	github.com/standard-webhooks/standard-webhooks/libraries v0.0.1 // indirect
 	github.com/tetratelabs/wazero v1.12.0 // indirect
-	github.com/tidwall/gjson v1.20.0 // indirect
+	github.com/tidwall/gjson v1.20.1 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/tidwall/sjson v1.2.5 // indirect
@@ -114,7 +114,7 @@ require (
 	golang.org/x/text v0.43.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
 	google.golang.org/api v0.278.0 // indirect
-	google.golang.org/genai v1.77.0 // indirect
+	google.golang.org/genai v1.79.1 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260706201446-f0a921348800 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260706201446-f0a921348800 // indirect
 	google.golang.org/grpc v1.84.0 // indirect
