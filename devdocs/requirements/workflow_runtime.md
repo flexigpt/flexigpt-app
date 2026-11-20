@@ -47,77 +47,126 @@ Artifact Store handle, or invoke Workflow execution preparation.
         ->
     Model, Agent, Tool, MCP, Skill, Workspace, Service, Activity
 
-## Current implementation cycle constraints
+## Current implementation cycle
 
 This HLD and its implementation status are work in progress.
 
-The current source-backed status assessment covers the supplied SessionV3
-Runtime, Workflow preparation, V3 Session setup, Model, Tool, MCP, Skill,
-attachment, registered-binding, Store v3, bootstrap, wrapper, Workflow
-Inventory, and closure source. V2 source is used only as a backend functional
-replacement reference. Absence claims apply only to that supplied source set.
+The current source-backed assessment covers the supplied:
 
-No version identifier may be bumped by this implementation cycle. This includes
-Workflow `apiVersion`, ProgramFrame payload and interpreter versions, Artifact
-and Store schema versions, package or module versions, and public API versions.
+- SessionV3 commands, dispatch, settlement, recovery, interpreters, budgets,
+  resources, channels, ports, triggers, effects, and projections.
+- V3 Session setup and Model, Tool, MCP, Skill, attachment, and
+  registered-binding paths.
+- Workflow execution preparation and source-to-program conversion.
+- Session Store v3.
+- Application bootstrap and backend wrappers.
+- Workflow planning and Inventory where required to establish the preparation
+  boundary.
+- V2 behavior only as the backend functional replacement reference.
+
+The conclusions are source-based. Application execution and test results were
+not reviewed. Absence claims apply only to the supplied source set.
+
+The source-based engineering estimate is:
+
+- Workflow v1 declaration and Artifact planning: accepted as complete for this
+  audit.
+- Workflow v1, including execution preparation and Runtime behavior:
+  approximately 75 percent complete.
+- SessionV3 backend, including associated setup: approximately 80 percent
+  complete.
+
+These are estimates of functional coverage. They are not percentages of files,
+lines, or ledger rows. Repeated descriptions of the same behavior must not
+increase the completion estimate.
+
+The main remaining problem is not missing operation types. Most operation
+types exist. The remaining gaps are composed execution paths, especially
+recovery, cancellation, continuation, capability configuration, channel
+visibility, and settlement.
+
+### Scope exclusions
 
 This implementation cycle excludes:
 
 - Tests and all validation work.
+- Validation-only hardening and cleanup.
 - Frontend integration.
-- SessionV2 deletion, cleanup, migration, and stored-session conversion.
-- Version bumps, release work, and release notes.
-- Cost-budget metering. This capability is deferred and must not be implemented in this cycle.
+- SessionV2 deletion, replacement cleanup, migration, and stored-session
+  conversion.
+- Version changes, release work, and release notes.
+- Cost-budget metering.
 
-SessionV2 functional replacement gaps remain tracked when they prevent Session
-v3 from providing required backend behavior. An implementer must change an
-`Not implemented` or `Partial` status to `Implemented` only after the complete listed
-behavior exists in source. A status change alone is not completion.
+No version identifier may be changed in this cycle. This includes Workflow
+`apiVersion`, ProgramFrame payload and interpreter versions, Artifact and Store
+schema versions, package and module versions, public API versions, and release
+identifiers.
 
-The requested implementation is one substantial end-to-end functional delivery,
-not a sequence of small status-only edits. No phases or version changes are
-part of this handoff. The open functional register below is the actionable
-completion contract. Existing components are not evidence that every composed
-execution path is complete.
+### Completion discipline
 
-The inline completion registers in this document contain the current
-source-audited state. They supersede conflicting statuses and evidence in
-earlier component tables, including the ID mappings recorded there.
+This is one substantial end-to-end functional delivery. It is not a sequence
+of status-only edits, small phases, or isolated helper changes.
 
-## Functional-analysis guardrails for this WIP cycle
+An item can change from `Not implemented` or `Partial` to `Implemented` only
+when the full listed behavior exists in source. A status change alone is not
+completion.
+
+The single current Runtime and consumer-execution status authority is
+`Functional tasks` at the end of this document. It replaces former Runtime
+component ledgers, pending ledgers, task registers, subregisters, architecture
+status tables, and repeated Runtime status claims.
+
+This does not replace the separate source-planning completion record in
+`workflow_artifact.md`. That record is limited to Artifact admission,
+Inventory, closure, source identity, and read-only planning facts.
+
+## Functional guardrails
 
 This HLD tracks missing behavior and remaining functional work only.
 
 - Artifact and attachment admission own source and input admission behavior.
-- Do not add Runtime or setup work merely to repeat admission checks.
-- Do not create work for strictness, malformed-input handling, or validation-only changes.
-- Do not create tests or validation reports in this cycle.
-- A Session is a reproducible semantic checkpoint, not a serialization of live Runtime state.
-- Durable Session facts can include completed semantic messages, selected Artifact facts,
-  completed Tool and model outcomes, and approved next-message context needed to reproduce behavior.
-- Durable Session facts must not include live clients, timers, cancellation functions, private bindings,
-  credentials, OAuth tokens, Skill Runtime session IDs, callbacks, or partial in-flight loads.
-- All executable Model, Agent, Tool, Skill, MCP, Service, Activity, and Workflow capabilities in scope
-  are Artifact-backed or registered binding-backed.
+- Runtime and setup must not repeat admission checks without a functional
+  ownership reason.
+- Do not add strictness, malformed-input handling, or validation-only work.
+- Do not add tests or validation reports in this cycle.
+- A Session is a reproducible semantic checkpoint. It is not a serialization
+  of live Runtime state.
+- Durable Session facts can include completed semantic messages, selected
+  Artifact facts, completed Tool and Model outcomes, and approved next-message
+  context.
+- Durable Session facts must not include live clients, timers, cancellation
+  functions, private bindings, credentials, OAuth tokens, Skill Runtime session
+  IDs, callbacks, or partial in-flight loads.
+- All executable Model, Agent, Tool, Skill, MCP, Service, Activity, and
+  Workflow capabilities in scope are Artifact-backed or registered
+  binding-backed.
 - `session.DirectCapabilitySelection` is a legacy SessionV2 compatibility
   representation. It is not a SessionV3 replacement requirement.
-- Current application registration supplies no direct capability provider.
-  Current Tool Store mapping and resolution accept only Artifact-backed Tool
-  targets. Consequently, no fresh normal user, Agent, built-in Tool, SDK Tool,
-  MCP Tool, or Skill Tool path can create a usable direct Tool target.
-- Built-in Go Tools and provider SDK Tools are Tool Artifacts. MCP Tools are
-  discovered operations of selected MCP Server Artifacts. Skill lifecycle
-  Tools are supplied by selected Skill Runtime sessions. None of these are
-  direct capability targets.
-- Do not add direct Tool, Skill, Model, Agent, MCP, Service, Activity, or Workflow capability paths.
-- Inline Text remains content or declaration data. It is not a direct executable capability.
+- Current application registration provides no direct capability provider.
+- Current Tool Store mapping and resolution accept only Artifact-backed Tool
+  targets. Consequently, no fresh normal user, Agent, built-in Tool, provider
+  SDK Tool, MCP Tool, or Skill Tool path can create a usable direct Tool
+  target.
+- Built-in Go Tools and provider SDK Tools are Tool Artifacts.
+- MCP Tools are discovered operations of selected MCP Server Artifacts.
+- Skill lifecycle Tools are supplied by selected Skill Runtime sessions.
+- Do not add direct Tool, Skill, Model, Agent, MCP, Service, Activity, or
+  Workflow capability paths.
+- Inline Text remains content or declaration data. It is not a direct
+  executable capability.
 
-At eventual SessionV2 retirement, the legacy direct Tool compatibility fields
-can be removed without a direct-target migration or translation. No current
-implementation task is created for that future retirement because the supplied
-application has no active fresh-user producer for a direct Tool target.
+At eventual SessionV2 retirement, legacy direct Tool compatibility fields can
+be removed without a direct-target migration or translation. No current task is
+created for that future retirement because the supplied application has no
+fresh-user producer for a direct Tool target.
 
-## Separate Artifact planning from execution preparation
+## Execution architecture and ownership
+
+`workflow_artifact.md` defines Artifact source admission, declaration grammar,
+Inventory construction, read-only planning, and static closure construction.
+This document records only the consumer-facing Artifact handoff contract.
+
+### Separate Artifact planning from execution preparation
 
 Workflow Artifact planning owns static source facts.
 
@@ -130,7 +179,8 @@ It returns:
 - Callable target facts.
 - Requirement facts.
 - Unsupported direct-composition issue facts.
-- Source inventory facts for calls, contexts, ports, retries, effects, blocks, and triggers.
+- Source inventory facts for calls, contexts, ports, retries, effects, blocks,
+  and triggers.
 
 Workflow Artifact planning does not return:
 
@@ -153,7 +203,7 @@ Workflow execution preparation is setup-owned.
 It performs:
 
 - Invocation input validation.
-- Typed Workflow source to runtime program conversion.
+- Typed Workflow source-to-runtime conversion.
 - Runtime Artifact pin construction from the static closure.
 - Current binding registry checks.
 - Current target transport checks.
@@ -167,32 +217,128 @@ Execution preparation does not:
 - Reparse Workflow JSON.
 - Rebuild Artifact composition.
 - Re-resolve nested Workflow source relationships.
-- Recreate a second trigger or retry scheduler.
-- Mutate Session state.
+- Recreate a trigger or retry scheduler.
+- Create WorkItems.
+- Start timers.
+- Persist Session state.
+- Run inside Session Runtime.
 
-Core Runtime owns durable Session execution, logical evaluation boundaries,
-scheduling, settlement, cancellation, recovery, and lifecycle notification. It
-must not import Artifact Store or setup packages.
+The Runtime accepts only a typed `ProgramSnapshot`.
+
+The application setup boundary invokes execution preparation before it submits a
+Workflow start or trigger-registration command. Session Runtime persists and
+interprets the prepared snapshot only.
+
+### Core Runtime, setup, and domain ownership
+
+Core Runtime owns:
+
+- Durable Session execution.
+- Program interpretation.
+- Logical evaluation boundaries.
+- Scheduling.
+- Settlement.
+- Cancellation.
+- Recovery.
+- Lifecycle notification.
+- Durable command semantics.
+- Checkpointing.
+- Projection state.
+
+Core Runtime must not import Artifact Store or setup packages.
 
 Setup can consume existing generic Artifact facts and read-only Workflow plans.
-Artifact Store must not gain preparation, binding, dispatch, scheduling,
-recovery, or consumer-private APIs.
+Artifact Store remains a passive source-fact provider. It must not gain
+preparation, binding, dispatch, scheduling, recovery, or consumer-private APIs.
 
-Domain setup owns native request grammar, source-family contribution semantics,
-current private resources, native invocation, and native result conversion.
-Session and Workflow setup compose and orchestrate neutral domain facts.
+Domain setup owns:
+
+- Native request grammar.
+- Source-family contribution semantics.
+- Current private resources.
+- Native invocation.
+- Native result conversion.
+- Domain-specific authorization.
+
+Session and Workflow setup compose neutral domain facts. They must not become
+alternative implementations of domain behavior.
 
 An immutable origin-plan reference must preserve invocation meaning. Replacing
 a copied plan with a reference must not cause generated Tools to resolve current
-Session defaults. Shared Runtime helpers must replace equivalent algorithms
-without becoming a generic native-domain envelope. Lowered-tree traversal
-remains separate from Artifact-source interpretation.
+Session defaults.
 
-MCP connection, authorization, discovery, and their timers remain MCP-owned
-lifecycle behavior. They are separate from the Runtime orchestration due-time
-owner. V2 coexistence remains intact; this document does not authorize V2
-retirement. Ownership consolidation must not add repeated admission or a
-separate validation project.
+Shared Runtime helpers must replace equivalent algorithms without forming a
+generic native-domain envelope. Lowered-tree traversal remains separate from
+Artifact-source interpretation.
+
+MCP connection, authorization, discovery, and MCP-owned timers remain
+MCP-domain lifecycle behavior. They are separate from the Runtime orchestration
+due-time owner.
+
+V2 coexistence remains intact. This HLD does not authorize V2 retirement.
+
+Ownership consolidation must not add repeated admission or a separate
+validation project.
+
+Architecture completion must not introduce a second scheduler, second durable
+execution root, generic native-domain envelope, or Artifact Store execution API.
+
+### Retained source-backed behavior
+
+The following source-backed behavior is retained. These are component facts, not
+independent completion claims for composed execution paths.
+
+- Core Runtime has no Artifact Store or setup dependency.
+  `agentruntime-go/workbinding` provides neutral execution contracts.
+- Workflow direct composition for Model, Agent, Tool, MCP Tool, Skill Tool,
+  Service, Activity, and Nested Workflow is rejected before a
+  `ProgramSnapshot` exists.
+- Generic callable capability facts and `CallableInterface.capabilities` are
+  removed from Workflow v1 grammar and Runtime plumbing.
+- Root requirements remain static Artifact-backed or registered-binding
+  prerequisites. They are not callable target selections.
+- Service and Activity remain registered typed `WorkBinding` targets.
+- Explicit Model and Agent messages, instructions, defaults, and inline Text
+  remain declaration data. They are not generic native request envelopes.
+- Provider SDK Tools remain provider-managed typed Model-plan capabilities.
+  They do not become local Tool WorkItems or synthetic local results.
+- Provider SDK Tool configuration and an owner Model are retained through
+  `ToolSelection.UserArguments`, `ToolDispatchPlan.ProviderConfiguration`,
+  `ProviderManagedToolChoice.Configuration`, and owner-Model resolution.
+- Workflow MCP preparation retains selected server, operation, policy, and
+  discovery facts before ProgramSnapshot creation.
+- Static target sets and resolver-backed target sets have separate durable
+  representations. Resolver settlement resumes the preserved call.
+- Child-call WorkItem identities include the owning ProgramFrame and logical
+  child path.
+- Published nested Workflow port boundaries reject undeclared mappings.
+- Forward-only started-call wrappers retain routing facts and suppress duplicate
+  final delivery for covered paths.
+- Repeated local schedule-slot identity is retained to prevent duplicate local
+  calendar occurrences.
+- Attachment content and digest are admitted before message persistence.
+- Typed Model defaults and Store-owned semantic export exist.
+- Direct Workflow start and trigger registration are separate operations.
+- V3 MCP content adaptation has one MCP-domain conversion boundary.
+- WorkItems and child ProgramFrames retain canonical declaration paths and
+  `EvaluationBoundary` logical-time facts through normal, retry, structured,
+  cleanup, and recovery execution.
+- `resumeRestoredWork` rearms ordinary `RetryWaiting` WorkItems through the
+  Runtime due-time lifecycle after restore.
+- `consumeContinuationLocked` transfers staged
+  `Execution.Continuation.AppContext` into the next persisted message Activity
+  when it creates that Activity. `V3-CONTINUE-003` remains open because the
+  active owning Agent operation is not always resumed.
+- V3 consumes the selected Agent Model capability `IncludeSystemPrompt` during
+  Model patch composition while retaining explicit Session Model prompt
+  precedence.
+- Bound native Tool calls persist before invocation. Neutral registered-binding
+  results can request durable waits while their private resume state remains
+  outside Session persistence.
+- `cmd/agentgo/app.go` constructs dependencies before Store v3 and Runtime v3
+  restore. `SessionV3Wrapper.close` closes Runtime v3 before Store v3.
+- Runtime logical evaluation time is Runtime-owned.
+- Cost metering remains intentionally absent.
 
 ## Use one durable Session root
 
@@ -240,24 +386,25 @@ A durable Session document does not contain:
 Normal conversation is Session-scoped. `Session.ID` is the only durable
 normal-conversation identity.
 
-`ConversationOwnership.ConversationID` is a Workflow handoff semantic key.
-It does not create another Session root, another normal conversation identity,
-or a Message, Continuation, or Execution identity field. Normal conversation
-routing consults only the ownership record whose conversation key is
-`string(Session.ID)`. A Workflow can retain other ownership records for its
-own orchestration semantics, but they do not create frontend-facing
+`ConversationOwnership.ConversationID` is a Workflow handoff semantic key. It
+does not create another Session root, normal conversation identity, Message
+identity, Continuation identity, or Execution identity.
+
+Normal conversation routing consults only the ownership record whose
+conversation key is `string(Session.ID)`. A Workflow can retain other ownership
+records for orchestration semantics, but they do not create frontend-facing
 conversations in this cycle.
 
 ## Persist commands before external work
 
 Every mutating command has a command identity.
 
-The runtime:
+The Runtime:
 
-- Canonicalizes the command payload.
+- Canonicalizes the caller payload.
 - Computes a command fingerprint.
 - Returns the prior receipt for an identical command identity and payload.
-- Rejects a command identity reused with a different payload.
+- Rejects reuse of a command identity with a different payload.
 - Persists accepted command receipts.
 - Persists accepted Session deletion receipts in tombstones.
 
@@ -273,9 +420,13 @@ The command flow is:
         ->
     Command receipt
         ->
-    Asynchronous runtime work
+    Asynchronous Runtime work
 
-The runtime must not start new external work after a checkpoint failure.
+The Runtime must not start new external work after a checkpoint failure.
+
+Workflow preparation remains outside Runtime. Command replay must nevertheless
+return a prior accepted receipt without requiring old local files, source
+selection, or setup resources to remain available.
 
 ## Dispatch WorkItems through a durable lifecycle
 
@@ -298,7 +449,7 @@ A WorkItem has one durable lifecycle.
         -> Cancelled
         -> Blocked
 
-The runtime performs these operations:
+The Runtime performs these operations:
 
 - Persist WorkItem intent.
 - Stage authorized port inputs.
@@ -312,8 +463,18 @@ The runtime performs these operations:
 - Wake completion waits.
 - Update Execution state.
 - Checkpoint the Session.
+- Launch all newly ready Session work only after committed settlement.
 
-The runtime owns WorkItem state. A domain binder owns external execution.
+The Runtime owns WorkItem state. A domain binder owns external execution.
+
+A terminal result must use one complete Runtime lifecycle:
+
+- Settle Attempts and effect facts.
+- Release or transfer claims.
+- Wake completion and resource waiters.
+- Advance owners and settle Executions.
+- Persist the authoritative Session state.
+- Launch all newly ready work.
 
 ## Execute normal conversation in ProgramFrames
 
@@ -341,12 +502,10 @@ The normal conversation flow is:
 
 The built-in ProgramFrame interpreters are:
 
-| Interpreter              | Purpose                              |
-| ------------------------ | ------------------------------------ |
-| `builtin.conversation@1` | Routes visible conversation activity |
-| `builtin.agent-loop@1`   | Runs Agent Model and Tool cycles     |
-| `builtin.single-model@1` | Runs one direct Model request        |
-| `artifact.workflow.v1@1` | Runs typed Workflow behavior         |
+- `builtin.conversation@1`: routes visible conversation activity.
+- `builtin.agent-loop@1`: runs Agent Model and Tool cycles.
+- `builtin.single-model@1`: runs one direct Model request.
+- `artifact.workflow.v1@1`: runs typed Workflow behavior.
 
 The setup binder owns:
 
@@ -360,7 +519,7 @@ The setup binder owns:
 - Attachment conversion to provider content.
 - Provider output conversion.
 
-The runtime owns:
+The Runtime owns:
 
 - Activity persistence.
 - WorkItem lifecycle.
@@ -372,10 +531,22 @@ The runtime owns:
 - Projection state.
 
 Every LLM WorkItem retains its effective invocation configuration and
-capability facts. Tool WorkItems created from that LLM result retain the
-immutable origin facts required by their target binders. A binder must not
-replace those selected typed bindings or invocation facts with current Session
-defaults when it evaluates or executes the generated Tool WorkItem.
+capability facts. Tool WorkItems created from that LLM result retain immutable
+origin facts required by their target binders.
+
+A binder must not replace selected typed bindings or invocation facts with
+current Session defaults when it evaluates or executes a generated Tool
+WorkItem.
+
+### Canonical V3 Tool selection
+
+`SessionDefaults.ToolSelections` is the canonical V3 Tool-selection
+collection. It contains the Artifact selection plus Tool-only user arguments
+and automatic-execution facts.
+
+`ArtifactSelection` remains generic. V3 must not retain a second Artifact-only
+`Tools` collection because duplicate collections produce ambiguous precedence
+and duplicate Tool choices.
 
 ## Admit replay-safe attachments before persistence
 
@@ -390,7 +561,11 @@ The V3 attachment path:
 - Produces immutable semantic attachments.
 - Persists attachment content and digest rather than a live native path.
 
-Session Runtime v3 stores attachment snapshots. Historical replay does not reopen a local native file.
+Session Runtime v3 stores attachment snapshots. Historical replay does not
+reopen local native files.
+
+Provider conversion must preserve semantic attachment labels and stable
+directory-relative identity while continuing to use the admitted snapshot.
 
 ## Prepare Workflow execution from a static Artifact plan
 
@@ -413,22 +588,14 @@ Workflow execution preparation performs:
 - Target transport checks.
 - Runtime preparation fingerprint creation.
 
-Workflow execution preparation must not:
+Execution preparation must preserve the prepared target meaning. It must retain
+the source-backed immutable pins and domain-prepared contribution facts required
+to reproduce the prepared operation without retaining clients, credentials, or
+Artifact Store handles.
 
-- Re-run Artifact composition.
-- Resolve nested Workflow declarations independently.
-- Rebuild target relationships from `CapabilityPlan`.
-- Revalidate source grammar.
-- Create WorkItems.
-- Start timers.
-- Persist Session state.
-- Be invoked by Session Runtime.
-
-The runtime accepts only a typed `ProgramSnapshot`.
-
-The application setup boundary invokes execution preparation before it submits
-a Workflow start or trigger-registration command. Session Runtime persists and
-interprets the prepared snapshot only.
+Pure deterministic or registered-binding Workflows must not depend on unrelated
+Session conversation defaults. An owner Model is resolved only where
+provider-managed Tool lowering requires one.
 
 ## Execute Workflow control flow in ProgramFrames
 
@@ -459,9 +626,9 @@ It supports:
 - Reconciliation.
 - Compensation.
 
-The interpreter emits runtime transitions. It does not call a domain directly.
+The interpreter emits Runtime transitions. It does not call a domain directly.
 
-A runtime transition can contain:
+A Runtime transition can contain:
 
 - WorkItem intent.
 - Child ProgramFrame intent.
@@ -474,25 +641,36 @@ A runtime transition can contain:
 
 ### Persist callable operation facts
 
-Execution preparation lowers each callable declaration to typed runtime intent.
-Before target dispatch, Session Runtime persists:
+Execution preparation lowers each callable declaration to typed Runtime intent.
+
+Before dispatch or child materialization, Runtime persists the evaluated logical
+call boundary:
 
 - Prepared input and explicit context.
 - Selected target identity.
 - Resolved target-set membership.
+- Typed Model or Agent messages and instructions.
+- Relevant port input values.
 - Effect key and retry identity.
 - Deadline and port plans.
+- Logical evaluation time.
 - Immutable Artifact pins and semantic binding facts.
+- Captured retry, deadline, cleanup, effect, idempotency, and budget policy.
 
-A resolver-backed target set starts with a typed resolver WorkItem. The runtime
-persists normalized membership before target selection. Retries, waits,
-recovery, and resumption reuse the persisted membership and selected target.
+Retries, started calls, waits, recovery, and resumption reuse those persisted
+facts. They must not evaluate a different request from later channel contents,
+later state, or settlement time.
+
+A resolver-backed target set starts with a typed resolver WorkItem. Runtime
+persists normalized membership before target selection.
 
 A successful `start` call persists its completion handle and start receipt in
-the parent step outcome. A handoff persists its conversation ownership facts
-before its child ProgramFrame starts.
+the parent step outcome.
 
-## Preserve state ownership and Workflow outcomes
+A handoff persists conversation ownership facts before its child ProgramFrame
+starts.
+
+### Preserve state ownership and Workflow outcomes
 
 A state-owning scope provides:
 
@@ -504,17 +682,21 @@ A typed `StateUpdateWork` applies a state update atomically.
 
 Parallel and Foreach child frames receive isolated state.
 
-A parent state changes only through a declared parent-state merge. The runtime persists that merge as a typed StateUpdate WorkItem.
+A parent state changes only through a declared parent-state merge. Runtime
+persists that merge as a typed StateUpdate WorkItem.
 
 Workflow outcomes retain:
 
-- Step identity.
+- Actual step identity.
 - Outcome state.
 - Output.
 - Selected target.
 - Receipt.
 - Error.
 - Effect state.
+- Aggregate facts.
+- Declaration path.
+- Native typed error facts where available.
 
 Outcome states are:
 
@@ -526,33 +708,39 @@ Outcome states are:
 
 A skipped step has no output.
 
-An uncertain step records that an external effect can have occurred without durable confirmation.
+An uncertain step records that an external effect can have occurred without
+durable confirmation.
+
+Every actual terminal step boundary, including inline failures, return, break,
+continue, reconciliation, cancellation, and child settlement, must record its
+semantic outcome.
 
 ## Bind each target through its owning domain
 
-| Workflow target          | Runtime representation                                             | Setup owner                    |
-| ------------------------ | ------------------------------------------------------------------ | ------------------------------ |
-| Model                    | Child single-model ProgramFrame                                    | Model and Session setup        |
-| Agent                    | Child Agent-loop ProgramFrame                                      | Agent and Model setup          |
-| Tool Artifact            | Tool WorkItem                                                      | Tool runtime                   |
-| MCP Tool                 | Tool WorkItem                                                      | MCP runtime                    |
-| Skill Artifact selection | Typed Model or Agent child plan and its Skill lifecycle Tool calls | Skill runtime                  |
-| Provider SDK Tool        | Provider-managed Tool choice                                       | Model plan                     |
-| Service                  | Service WorkItem                                                   | Registered Service adapter     |
-| Activity                 | Activity WorkItem                                                  | Registered Activity adapter    |
-| Nested Workflow          | Child Workflow ProgramFrame                                        | Workflow execution preparation |
+Workflow target behavior is:
+
+- Model: a child single-model ProgramFrame. Model and Session setup own
+  preparation.
+- Agent: a child Agent-loop ProgramFrame. Agent and Model setup own
+  preparation.
+- Tool Artifact: a Tool WorkItem. Tool Runtime owns native execution.
+- MCP Tool: a Tool WorkItem. MCP Runtime owns native execution.
+- Skill Artifact selection: a typed Model or Agent child plan with Skill
+  lifecycle Tool calls. Skill Runtime owns lifecycle behavior.
+- Provider SDK Tool: a provider-managed Tool choice in a typed Model plan.
+- Service: a Service WorkItem. A registered Service adapter owns native work.
+- Activity: an Activity WorkItem. A registered Activity adapter owns native
+  work.
+- Nested Workflow: a child Workflow ProgramFrame. Workflow execution
+  preparation owns child preparation.
 
 A Skill Artifact is not a standalone Workflow callable target. A typed Model
-or Agent invocation can select artifact-backed Skills through its typed
-defaults. The resulting Skill lifecycle Tool calls belong to that Model or
-Agent plan. Do not add a direct Skill target or a non-Artifact Skill path.
+or Agent invocation can select Artifact-backed Skills through typed defaults.
+The resulting Skill lifecycle Tool calls belong to that Model or Agent plan.
 
-Standalone Tool selection is intentionally closed to built-in Tool Artifacts.
-Those declarations can contain only Go Tool or provider SDK Tool
-implementations. MCP Tools are discovered operations of selected MCP Server
-Artifacts. Skill lifecycle Tools are supplied by selected Skill Runtime
-sessions. Do not add arbitrary Tool Artifact creation, removal, direct Tool
-capabilities, or non-Artifact Tool routing.
+Standalone Tool selection is limited to built-in Tool Artifacts. Go Tools and
+provider SDK Tools remain Tool Artifacts. MCP Tools remain discovered MCP
+Server operations. Skill lifecycle Tools remain Skill Runtime operations.
 
 Workflow owns orchestration. It does not own native domain behavior.
 
@@ -564,43 +752,40 @@ A target adapter owns:
 - Domain-specific authorization.
 - Domain-private state.
 
-A target adapter must not use generic Workflow data as a replacement for a native domain request grammar.
+A target adapter must not use generic Workflow data as a replacement for native
+domain request grammar.
 
-## Convert Model and Agent Workflow calls before runtime execution
+## Convert Model and Agent Workflow calls before Runtime execution
 
 Workflow Model and Agent calls use explicit typed invocation data.
 
-The current supported forms are:
+Supported forms are:
 
-- Explicit message list.
+- Explicit message lists.
 - Explicit instructions.
 - Existing Session default overrides.
 - Final output ports.
 - Streamed output ports.
 - Agent handoff.
 
-The runtime must receive this data as typed runtime fields.
+Runtime receives typed fields. Runtime must not parse generic Workflow JSON to
+discover messages, instructions, Model defaults, Agent defaults, or provider
+request fields.
 
-The runtime must not parse a generic Workflow JSON envelope to discover:
-
-- Message structure.
-- Instruction structure.
-- Model defaults.
-- Agent defaults.
-- Provider request fields.
-
-The setup converter maps supported Workflow forms into typed runtime invocation fields. The runtime then creates child Agent-loop or single-model ProgramFrames.
+Setup converts supported Workflow forms into typed Runtime invocation fields.
+Runtime then creates child Agent-loop or single-model ProgramFrames.
 
 When a Model or Agent call accepts a final-output or streamed-output port, the
-lowered child ProgramFrame contains the accepted port plans before child work
-starts. A valid port mapping must not disappear between call lowering and child
-frame creation.
+lowered child ProgramFrame contains accepted port plans before child work starts.
 
 Arbitrary Workflow JSON must never become fallback Model or Agent chat text.
 
+Native Model and Agent failures must retain their typed category and cause
+through child settlement so retry and catch can use actual domain meaning.
+
 ## Enforce ports, channels, and target transport
 
-The runtime owns:
+Runtime owns:
 
 - Port plans.
 - Channel logs.
@@ -613,12 +798,18 @@ The runtime owns:
 - Durable replay facts.
 
 Each Workflow WorkItem and child ProgramFrame retains its planning-owned
-declaration path separately from its runtime path. Channel permissions and
-port authorization use the declaration path.
+declaration path separately from its runtime path.
+
+Channel permissions and port authorization use declaration paths.
+
+Private channel storage names are invocation-local. Declaration-visible channel
+names remain available to expressions. A declaration expression such as
+`messages.review` must continue to use its declared alias even when the
+underlying channel log has a private nested Workflow namespace.
 
 Setup owns target transport capability.
 
-A target transport check must validate:
+A target transport check validates:
 
 - Context support.
 - Input port support.
@@ -628,19 +819,20 @@ A target transport check must validate:
 - Channel authorization.
 - Current target capability.
 
-Target transport matrix:
+Target transport behavior is:
 
-| Target family       | Workflow context                                         | Input ports                                | Final output port                    | Streamed output port |
-| ------------------- | -------------------------------------------------------- | ------------------------------------------ | ------------------------------------ | -------------------- |
-| Model               | Explicit `messages`, `instructions`, and `defaults` only | Unavailable                                | Supported                            | Supported            |
-| Agent               | Explicit `messages`, `instructions`, and `defaults` only | Unavailable                                | Supported                            | Supported            |
-| Nested Workflow     | Child ProgramFrame scope                                 | Supported                                  | Supported                            | Supported            |
-| Port-aware Service  | Supported when the registered binding declares it        | Supported when the registered binding does | Supported                            | Supported            |
-| Port-aware Activity | Supported when the registered binding declares it        | Supported when the registered binding does | Supported                            | Supported            |
-| Go Tool             | Unavailable                                              | Unavailable                                | Supported after confirmed settlement | Unavailable          |
-| MCP Tool            | Unavailable                                              | Unavailable                                | Supported after confirmed settlement | Unavailable          |
-| Skill Tool          | Unavailable                                              | Unavailable                                | Supported after confirmed settlement | Unavailable          |
-| Provider SDK Tool   | Typed Model-plan only                                    | Typed Model-plan only                      | Provider-managed                     | Provider-managed     |
+- Model and Agent calls support only explicit `messages`, `instructions`, and
+  `defaults` as Workflow context. They do not accept generic input ports. They
+  support final and streamed output ports.
+- Nested Workflows use child ProgramFrame scope and support input, final-output,
+  and streamed-output ports.
+- Port-aware Service and Activity targets support only the context and ports
+  declared by their registered binding.
+- Go Tool, MCP Tool, and Skill Tool targets do not accept Workflow context or
+  input ports. They support final output only after confirmed settlement. They
+  do not support streamed output ports.
+- Provider SDK Tools exist only inside typed Model plans. Their input and output
+  behavior is provider-managed.
 
 Native target contracts remain authoritative:
 
@@ -655,87 +847,15 @@ context sidecars, MCP metadata, MCP extensions, Skill sidecars, provider
 metadata, or Artifact-domain imports.
 
 A final call output remains separate from a streamed port. A streamed port
-contains ordered stream records only. If terminal stream signalling is needed,
-it uses a distinct durable stream record.
+contains ordered stream records only. Terminal stream signaling, if needed,
+uses a distinct durable stream record.
 
 A provider-managed Tool target is lowered only through a typed Model child
-plan. It never becomes a local Tool WorkItem or a synthetic local result.
-
-## Architecture ownership and duplication register
-
-This register records cross-cutting ownership and duplication work. It is
-separate from the functional completion ledger because one architecture issue
-can affect several target families and Workflow operations.
-
-| ID                        | Current status | Required end state before marking `Implemented`                                                                                                                                                                                        | Current source evidence                                                                                                                                                                                                                                                                                                               |
-| ------------------------- | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ARC-CORE-001`            | Implemented    | Session Runtime v3 receives only runtime-neutral snapshots, pins, semantic bindings, and durable state. It imports no Artifact Store or setup package.                                                                                 | `internal/agentruntime-go/sessionv3/` has no Artifact Store or setup dependency, and `agentruntime-go/workbinding` supplies neutral execution contracts. Setup must retain this boundary while it prepares native domain semantics.                                                                                                   |
-| `ARC-DIRECT-001`          | Implemented    | Workflow rejects direct composition for Model, Agent, Tool, MCP, Skill, Service, Activity, and Nested Workflow before ProgramSnapshot creation.                                                                                        | `workflow/closure.go` rejects restricted direct results. `workflowruntime/direct_targets.go` is removed. `sessionv3` has no direct target, plan, payload, semantic-binding, or Tool-origin fields.                                                                                                                                    |
-| `ARC-TRANSPORT-001`       | Partial        | Preserve the prepared transport matrix and connect nested published ports to their actual child-local channels.                                                                                                                        | `sessionv3/ports_runtime.go` installs published-port bridges, but private channel names leak into declaration expression lookup and shared mutation paths remain incomplete. See `WF-CHANNEL-003` and `RT-SETTLE-003`.                                                                                                                |
-| `ARC-PROVIDER-001`        | Implemented    | A provider SDK Tool is represented only by an owning typed Model plan and never by a local Tool WorkItem or local Tool result.                                                                                                         | `toolruntime/v3.go` prepares `ProviderManagedToolChoice`; `workflow_program.go` lowers it through a single-model child ProgramFrame only.                                                                                                                                                                                             |
-| `ARC-ORIGIN-001`          | Implemented    | A Tool WorkItem emitted from LLM output retains immutable effective invocation and selected typed bindings. Target binders never fall back to current Session defaults.                                                                | `sessionv3/workflow_target_facts.go` stores `LLMToolOrigin.Plan`; `skillruntime/v3.go` consumes retained plan selections; Go and MCP binders use retained typed bindings.                                                                                                                                                             |
-| `ARC-SCHEDULER-001`       | Partial        | Keep one Runtime due-time owner and complete work launch, deadline arming, restored resource wakeup, and trigger-queue resumption.                                                                                                     | `due_time.go` remains the sole private timer registry, but cleanup-aware callbacks, concurrency-slot wakeup, and trigger-registration reactivation remain incomplete. See `RT-CLEANUP-003`, `RT-BUDGET-003`, and `RT-TRIGGER-003`.                                                                                                    |
-| `ARC-STATIC-001`          | Not applicable | Repeated-admission and source-check cleanup is not functional work in this cycle.                                                                                                                                                      | Artifact admission is sufficient for this cycle; no validation-only work is requested.                                                                                                                                                                                                                                                |
-| `ARC-COMPAT-001`          | Not applicable | Compatibility naming cleanup is not functional work in this cycle.                                                                                                                                                                     | `PreparationRequest`, `Admission`, and `WorkflowAdmissionRequest` coexist without a demonstrated missing behavior.                                                                                                                                                                                                                    |
-| `ARC-V3-001`              | Partial        | Complete artifact-backed conversation configuration, controls, replay, and setup capability forwarding.                                                                                                                                | Conversation controls, setup capability forwarding, and Provider SDK Tool user configuration have implemented components, but collection policy, contribution precedence, active-operation continuation, and owning-domain preparation remain incomplete. See `V3-CONFIG-003`, `V3-CONTINUE-003`, `V3-API-003`, and `ARC-DOMAIN-003`. |
-| `ARC-REPLAY-001`          | Partial        | Reproduce each message's retained semantic context and complete assistant/Tool rounds across isolation and Execution boundaries.                                                                                                       | History count, audit exclusion, isolated Agent assistant rounds, prior Execution Tool results, and retained context replay exist. Recovery clears retained bindings before reuse and rebuilds parts of requests from current facts. See `V3-REPLAY-003`.                                                                              |
-| `ARC-SKILL-001`           | Partial        | Reconstruct and update Skill state for the correct invocation owner without one parallel Agent replacing another's private session.                                                                                                    | Skill Runtime sessions have Execution and ProgramFrame keys, but LLM active-state reconstruction is Execution-wide and natural owner cleanup is incomplete. See `DOMAIN-SKILL-003`.                                                                                                                                                   |
-| `ARC-TOOL-SCOPE-001`      | Implemented    | Standalone Tool selection is limited to built-in Artifact-backed Go and provider SDK Tool declarations. Go Tools remain Tool Runtime work; provider SDK Tools remain typed Model-plan choices.                                         | `tool/api.go` intentionally requires the protected built-in Tool root. `toolcatalog/packages.go` creates both Go and SDK Tool Artifacts.                                                                                                                                                                                              |
-| `ARC-PROVIDER-CONFIG-001` | Implemented    | Provider SDK Tool configuration for built-in SDK Tool Artifacts is typed, immutable in the Model dispatch plan, and available to Workflow provider Tool lowering. An owning Model can derive from an explicit Model or selected Agent. | `ToolSelection.UserArguments`, `ToolDispatchPlan.ProviderConfiguration`, `ProviderManagedToolChoice.Configuration`, and `ResolveWorkflowAgentOwnerModel` retain typed configuration and owner Model pins.                                                                                                                             |
-| `ARC-MCP-PREPARATION-001` | Implemented    | Workflow preparation resolves current MCP server readiness, discovered Tool operation, policy, and discovery facts before it emits a ProgramSnapshot. MCP Tools remain discovered MCP Server operations, not Tool Artifacts.           | `mcpruntime.WorkflowTargetPreparer` prepares the current operation. `WorkflowMCP` retains server, provider Tool, policy, and discovery facts; dispatch rejects a changed prepared target.                                                                                                                                             |
-
-The owning domain constructs native requests, resolves current domain state,
-and converts native results. Session Runtime owns durable orchestration,
-checkpointing, retries, waits, cancellation, and settlement. Workflow remains
-an orchestration language and must not become a generic native-domain envelope.
-
-| ID                    | Current status | Required end state                                                                                                                                                                                     | Current source evidence                                                                                                                                                                                                                                     |
-| --------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ARC-INVOCATION-002`  | Implemented    | Setup lowers supported Workflow Model, Agent, and provider-managed Tool invocation forms into typed runtime fields. Core Runtime does not decode generic Workflow envelopes.                           | `workflowruntime/compiler_invocation.go` lowers supported forms into `WorkflowLLMInvocation`; Runtime evaluates typed templates only.                                                                                                                       |
-| `ARC-CALL-POLICY-001` | Partial        | Apply one captured logical call policy consistently to local work, child work, retry, and cleanup.                                                                                                     | Some WorkItems and child-call boundaries retain policy facts, but outer child-call reservation and admission can occur after child native work becomes ready, and terminal accounting is not common to every path. See `RT-BUDGET-003` and `RT-SETTLE-003`. |
-| `ARC-PATH-001`        | Implemented    | Preserve declaration identity in admitted descriptors and synthetic execution blocks.                                                                                                                  | `EvaluationBoundary` persists canonical declaration path and logical evaluation time on generated WorkItems and ProgramFrames, including structured child and retry-created boundaries.                                                                     |
-| `ARC-V2-COEXIST-001`  | Not applicable | SessionV2 and SessionV3 coexistence removal is outside this cycle. New V3 work must not add a third orchestration path or restore direct capabilities.                                                 | `cmd/agentgo/app.go` composes both runtimes. SessionV2 cleanup and migration remain excluded.                                                                                                                                                               |
-| `ARC-START-PORT-001`  | Implemented    | A started call has one authoritative port-delivery boundary. Final output is delivered once, streamed output remains ordered, and independent child execution routes to the true parent channel owner. | Forward-only wrapper frames retain routing facts but suppress duplicate final delivery. Recursive channel ownership resolves inherited parent port plans across independent Executions.                                                                     |
-| `ARC-NESTED-PORT-001` | Implemented    | A nested Workflow target with mapped ports must publish compatible root ports. A target with no published ports accepts no mapping.                                                                    | `ProgramFramePortBoundaryPublishedWorkflow` invokes `validateWorkflowFramePortBoundary`, which rejects a mapped target with no published ports.                                                                                                             |
-| `ARC-DUP-MCP-001`     | Implemented    | V3 MCP content adaptation has one MCP-domain implementation. Session Runtime receives only converted semantic values.                                                                                  | `mcpruntime.MCPContentText` and `MCPContentsText` are now the shared V3 MCP conversion boundary.                                                                                                                                                            |
-| `ARC-OWNERSHIP-002`   | Partial        | Domain owners prepare domain semantics through neutral execution contracts; Session and Workflow setup compose them.                                                                                   | Attachment, Text, Service, and Activity use neutral work-binding contracts, but `sessionv3runtime/llm_plan.go` and `workflowruntime/model_agent_adapter.go` still duplicate source-family contribution interpretation. See `ARC-DOMAIN-003`.                |
-| `ARC-DUP-002`         | Partial        | Use one implementation for shared execution semantics and one authoritative immutable effective plan.                                                                                                  | `ModelDispatchPlan` is the intended immutable plan, but `enrichDurableLLMDispatchPlan` copies effective state into owner records, Tool origins deep-copy plans, and equivalent Runtime algorithms remain replicated. See `ARC-DUP-003`.                     |
-
-### Workflow direct-capability and callable-capability decision
-
-Workflow does not support direct capability targets. A direct composition
-result for Model, Agent, Tool, MCP Tool, Skill Tool, Service, Activity, or
-Nested Workflow is rejected during planning before a ProgramSnapshot exists.
-
-Service and Activity are registered typed `WorkBinding` targets keyed by their
-declared binding IDs. They are not Artifacts by default and are not direct
-capabilities.
-
-Inline Workflow literal values, explicit Model and Agent messages,
-instructions, and defaults remain declaration data. They are not a direct
-capability, Artifact pin, or generic native request envelope.
-
-`CallableInterface.capabilities` has no owning vocabulary or runtime meaning.
-The field is removed from Workflow v1 grammar. Because callable interface
-objects are closed, contract admission rejects the former field once. Runtime
-does not repeat this check.
-
-Root Workflow `requirements` remain separate named Artifact-backed or
-registered-binding prerequisites. They are never callable target selections.
-
-| Cleanup task                             | Status      | Completion evidence                                                                                                                                                                   |
-| ---------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Reject direct Workflow composition       | Implemented | `internal/llmartifactory-go/workflow/closure.go` returns `UnsupportedDirectCapabilityError` before `workflow.Service.ResolvePlan` returns a usable plan.                              |
-| Remove direct runtime data and routing   | Implemented | Removed `internal/agentruntimesetup/workflowruntime/direct_targets.go`; `sessionv3` payloads, semantic bindings, targets, dispatch plans, and Tool origins contain no direct plan.    |
-| Remove generic callable capability facts | Implemented | Removed `internal/agentruntimesetup/workflowruntime/capabilities.go`; no `WorkflowCapabilityFact`, resolver, target field, retry field, recovery field, or Tool-origin field remains. |
-| Remove callable capability strings       | Implemented | `internal/llmartifactory-go/workflow/contract/v1/types.go` and `workflow-v1.schema.json` remove `CallableInterface.capabilities`.                                                     |
-| Preserve root requirements               | Implemented | `internal/agentruntimesetup/workflowruntime/target_preparation.go` prepares named Artifact pins or registered binding facts without inserting them into `WorkflowProgram.Targets`.    |
-| Preserve Service and Activity bindings   | Implemented | `internal/agentruntimesetup/workflowruntime/admission.go` and `binder.go` retain registered `WorkBinding` routing and typed transport checks.                                         |
-| Preserve inline text                     | Implemented | `internal/agentruntime-go/sessionv3/workflow_invocation.go` accepts only explicit typed messages, instructions, and defaults. It has no fallback chat-text conversion.                |
+plan. It never becomes a local Tool WorkItem or synthetic local result.
 
 ## Persist waits, events, channels, and triggers
 
-The runtime owns durable wait state.
+Runtime owns durable wait state.
 
 A Wait can represent:
 
@@ -750,11 +870,11 @@ A Wait can represent:
 - Child Execution completion.
 - Recovery review.
 
-The runtime persists timer facts, not timer objects.
+Runtime persists timer facts, not timer objects.
 
-The runtime recreates timers from persisted facts after restore.
+Runtime recreates timers from persisted facts after restore.
 
-The runtime owns:
+Runtime owns:
 
 - Event source and identity deduplication.
 - Subscription state.
@@ -767,7 +887,20 @@ The runtime owns:
 - Trigger overlap behavior.
 - Missed-trigger behavior.
 
-The runtime has one scheduler for:
+Runtime deduplicates accepted external events by `(source, id)`.
+
+A Runtime channel record contains message identity, sequence, channel identity,
+kind, data, correlation, deduplication key, creation time, and consumption
+facts. Channel cursors and consumption facts remain Runtime state.
+
+An emit persists a durable receipt. A duplicate deduplication key for the same
+destination returns the stored receipt and does not append another message.
+
+Human-wait resolution is accepted only when the response actor satisfies
+persisted assignment facts. A business rejection remains response data unless
+the Workflow explicitly fails.
+
+Runtime has one scheduler for:
 
 - Wait expiry.
 - Retry delays.
@@ -778,24 +911,35 @@ The runtime has one scheduler for:
 
 Workflow setup must not create another scheduler.
 
-Trigger registration is explicit and independent from direct Workflow start.
-A direct start creates one Execution only. It does not activate event or
-schedule registrations. Trigger registration persists an input-unbound program
-template and is the only operation that activates or changes trigger lifecycle
-state.
+Trigger registration is explicit and independent from direct Workflow start. A
+direct start creates one Execution only. It does not activate event or schedule
+registrations.
+
+Trigger registration persists an input-unbound program template and is the only
+operation that activates or changes trigger lifecycle state.
+
+Trigger, ordinary event wait, and Machine expressions must expose the same
+semantic event projection:
+
+- `type`
+- source
+- identity
+- data
+- correlation
+- time
 
 ## Preserve effect safety during retry and recovery
 
 A WorkItem has an effect contract and effect state.
 
-Effect kinds:
+Effect kinds are:
 
 - `read`
 - `idempotent`
 - `keyed`
 - `nonIdempotent`
 
-Effect states:
+Effect states are:
 
 - `notApplicable`
 - `notStarted`
@@ -807,6 +951,9 @@ Effect states:
 - `compensated`
 - `compensationFailed`
 
+Workflow source effect values must map explicitly to Runtime effect values. In
+particular, source `non-idempotent` maps to Runtime `nonIdempotent`.
+
 Retry behavior follows effect safety:
 
 - Read, idempotent, and keyed work can replay according to declared policy.
@@ -814,6 +961,9 @@ Retry behavior follows effect safety:
 - Non-idempotent uncertain work does not replay automatically.
 - Confirmed non-application can enable a retry.
 - Recovery creates review work when certainty is unavailable.
+- Declared retry matching, including schema matching, remains available.
+- Replay decisions consider declared effect safety before rejecting or allowing
+  an uncertain result.
 
 Workflow retry uses a durable retry ProgramFrame boundary.
 
@@ -826,6 +976,7 @@ The retry boundary retains:
 - Last error.
 - Resolved target-set facts.
 - Child settlement facts.
+- Original logical-call snapshot.
 
 ## Reconcile uncertain external effects
 
@@ -863,6 +1014,14 @@ It does not receive:
 - Credentials.
 - Callbacks.
 
+MCP execution must report the strongest actual domain evidence. A confirmed
+successful MCP response must not automatically become effect-uncertain. An MCP
+error must not automatically prove non-application.
+
+Normal Tool continuation, Workflow outcomes, reconciliation eligibility,
+historical Tool reconstruction, and Saga recording consume the same settled
+effect facts.
+
 ## Compensate confirmed effects through durable work
 
 A Saga records confirmed compensatable effects.
@@ -884,9 +1043,27 @@ The compensation flow is:
     Failed or uncertain compensation
         -> attach typed compensation cause
 
-The runtime preserves primary failure or cancellation as the primary outcome.
+Runtime preserves primary failure or cancellation as the primary outcome.
 
-Unknown effects do not enter automatic compensation until reconciliation confirms application.
+Unknown effects do not enter automatic compensation until reconciliation confirms
+application.
+
+Compensation dependencies preserve causal order from ordinary ordered calls and
+structured boundaries. Independent effects can compensate concurrently only when
+their persisted dependencies permit it.
+
+Compensation receives declared operation facts without private state:
+
+- Original operation identity.
+- Original target.
+- Original Attempt.
+- Original receipt.
+- Original effect facts.
+- Compensation identity.
+
+A Saga that can receive a late external effect confirmation remains available
+until eligible in-flight work settles or its cleanup allowance expires. An empty
+initial compensation order is not proof that later compensation is unnecessary.
 
 ## Cancel, close, and recover safely
 
@@ -900,10 +1077,24 @@ Cancellation:
 - Preserves uncertainty for dispatched mutating work.
 - Allows bounded cleanup work.
 - Preserves cancellation as the primary terminal meaning.
+- Runs finalization.
+- Starts eligible reconciliation and compensation.
+
+Cancellation does not prove that a dispatched mutating target did not apply its
+effect. Cancellation remains cancellation through catch and finally behavior.
+A catch handler can return an explicit allowed result only after cancellation
+cleanup completes.
+
+Cleanup work uses its effective cleanup deadline through binding, execution,
+retry, resource acquisition, waits, emits, streams, and settlement. Normal work
+stops. Eligible cleanup continues through the bounded cleanup allowance.
+
+Synthetic frames, including retry wrappers, retain the cleanup classification of
+the work that they contain.
 
 Runtime close:
 
-- Marks the runtime closed.
+- Marks the Runtime closed.
 - Cancels lifecycle context.
 - Cancels dispatch contexts.
 - Cancels timers.
@@ -915,6 +1106,7 @@ Recovery:
 
 - Restores Session documents.
 - Removes process-private state.
+- Retains immutable semantic dispatch facts for replay-safe interrupted work.
 - Marks in-flight external work uncertain unless replay-safe.
 - Requeues replay-safe work.
 - Starts reconciliation when declared and applicable.
@@ -922,9 +1114,14 @@ Recovery:
 - Rearms timers only after complete restore.
 - Resumes dispatchable work.
 
+Recovery reconstructs private resources from retained semantic operation facts.
+It does not substitute current Session defaults, current Model overlays, current
+contribution selection, or current message activity selection for a retained
+operation.
+
 ## Persist projections and expose wrapper reads
 
-The runtime provides durable projections for:
+Runtime provides durable projections for:
 
 - Conversation.
 - Activities.
@@ -950,375 +1147,1003 @@ The wrapper does not own:
 - Domain binding.
 - Persistence semantics.
 
-## Functional completion ledger
+## Validation ownership
 
-This ledger records remaining functional behavior. It does not prescribe
-phases, milestones, or implementation waves.
+Validation ownership remains:
 
-| Functional capability                                                                                   | Status         | Current evidence or required result                                                                                                                                                                                                                                                     |
-| ------------------------------------------------------------------------------------------------------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Durable Session, Execution, ProgramFrame, WorkItem, Attempt, Wait, effect, and trigger state            | Partial        | `sessionv3/` and `sessionstorev3/` persist the durable execution model, but authoritative terminal mutation and deletion commitment remain incomplete. See `RT-SETTLE-003` and `RT-PERSIST-003`.                                                                                        |
-| Immutable V3 attachment content admission                                                               | Implemented    | `sessionv3runtime/attachments.go` produces content and digests before message persistence. Semantic labels and owning-package placement remain open in `DOMAIN-ATTACH-003` and `ARC-DOMAIN-003`.                                                                                        |
-| Ordered work, state updates, scopes, branching, collection work, repeat, machines, and child boundaries | Partial        | Durable structured state exists, but Repeat condition indices, empty collection settlement, Machine lifetime behavior, and exact evaluation snapshots remain incomplete. See `WF-CONTROL-003` and `WF-CHANNEL-003`.                                                                     |
-| Durable Fork and Join intent, explicit trigger registration, and prepared Workflow commands             | Implemented    | Runtime persists typed child intent; direct Workflow start and trigger registration are separate operations; core Workflow commands receive prepared snapshots. Shared lifecycle defects remain tracked separately.                                                                     |
-| Timers, events, human work, channel waits, and child-completion waits                                   | Partial        | Runtime owns durable wait and timer facts, but cleanup-aware callbacks, slot wakeup, registration reactivation, and one event envelope remain incomplete. See `RT-CLEANUP-003`, `RT-BUDGET-003`, and `RT-TRIGGER-003`.                                                                  |
-| Planning-owned declaration path in runtime descriptors                                                  | Implemented    | WorkItems and child ProgramFrames retain planning-owned declaration paths and `EvaluationBoundary` logical-time facts through normal, retry, structured, cleanup, and recovery execution.                                                                                               |
-| Channel permission and port authorization semantics                                                     | Partial        | Canonical declaration paths exist and `ports_runtime.go` maps nested invocations to private channels, but private storage names leak into expression maps and snapshots can be captured at the wrong boundary. See `WF-CHANNEL-003`.                                                    |
-| Model and Agent Workflow calls with final and streamed ports                                            | Partial        | Typed lowering and literal-call target-use planning exist, but original-boundary retry capture, typed child failure preservation, active continuation, and composed settlement remain incomplete. See `WF-RETRY-003`, `V3-CONTINUE-003`, and `RT-SETTLE-003`.                           |
-| Typed Model-default field surface and Store-owned semantic export                                       | Implemented    | `sessionv3/normal_model_defaults.go`, `modelruntime/runtime_request_patch.go`, and `sessionstorev3.Store.ExportSession` provide this component. Collection inheritance and exact replay remain open in `V3-CONFIG-003` and `V3-REPLAY-003`.                                             |
-| Direct capability targets                                                                               | Implemented    | Unsupported by design. `workflow/closure.go` rejects direct composition for Model, Agent, Tool, MCP, Skill, Service, Activity, and Nested Workflow before ProgramSnapshot creation.                                                                                                     |
-| Callable capability requirements                                                                        | Implemented    | `CallableInterface.capabilities` is removed from Workflow v1 grammar and all generic capability-fact runtime plumbing is removed.                                                                                                                                                       |
-| Provider-managed Tool calls from Workflow                                                               | Implemented    | Provider SDK Tool Artifacts lower to a typed single-model child plan, retain typed user configuration, derive an owner Model from an explicit Model or Agent, and never become local Tool WorkItems.                                                                                    |
-| Service and Activity context, ports, and stream delivery                                                | Implemented    | Registered binding transport facts are checked in preparation and again at dispatch; final output remains Runtime-owned.                                                                                                                                                                |
-| Target-family transport behavior                                                                        | Partial        | Setup preserves most of the target transport matrix, but nested Workflow expression aliases and common settlement behavior remain incomplete. See `WF-CHANNEL-003` and `RT-SETTLE-003`.                                                                                                 |
-| `start` and handoff durable results                                                                     | Partial        | `workflow_call_lifecycle.go` stores a started-call receipt and handle, but queued-message causality and successful handoff completion or relinquish behavior remain incomplete. See `WF-HANDOFF-003`.                                                                                   |
-| Started-call port routing and exactly-once final-output delivery                                        | Partial        | Forward-only wrappers preserve routing and suppress duplicate delivery for covered paths, but declaration-visible channel identity and shared mutation paths remain incomplete. See `WF-CHANNEL-003` and `RT-SETTLE-003`.                                                               |
-| Child-frame call policy inheritance                                                                     | Partial        | Child-call WorkItems retain policy facts, but the outer logical operation is not reserved before child native work can launch. See `RT-BUDGET-003.c`.                                                                                                                                   |
-| Trigger lifecycle separation                                                                            | Implemented    | `StartWorkflow` creates one Execution only. `RegisterWorkflowTriggers` is the only command that creates or changes trigger registrations.                                                                                                                                               |
-| Calendar repeated-local-time trigger identity                                                           | Implemented    | Actual fired local slots are retained by local-day slot identity during firing and restore, and successor calculation skips every already-fired repeated local slot.                                                                                                                    |
-| Effective invocation configuration for Tool WorkItems emitted by LLM work                               | Implemented    | `LLMToolOrigin` persists the effective dispatch plan, target fingerprint, capability facts, and selected bindings for generated Tool WorkItems.                                                                                                                                         |
-| Effects, retries, reconciliation, compensation, and saga execution                                      | Partial        | Durable effect, retry, reconciliation, and compensation structures exist, but source effect translation, MCP certainty, original call capture, causality, and cleanup execution remain incomplete. See `WF-EFFECT-003`, `WF-RETRY-003`, and `RT-CLEANUP-003`.                           |
-| Recover persisted ordinary retry delays                                                                 | Implemented    | `resumeRestoredWork` now invokes the Runtime due-time lifecycle for every nonterminal Execution, including `RetryWaiting` WorkItems.                                                                                                                                                    |
-| Nested Workflow retry policy semantics                                                                  | Implemented    | `workflow_program.go` permits a valid one-attempt retry declaration on a nested Workflow call.                                                                                                                                                                                          |
-| Runtime-owned Workflow logical evaluation time                                                          | Implemented    | `ProgramInterpreter.InitialState` receives Runtime logical time. `WorkflowInterpreter` no longer reads the process clock during initialization.                                                                                                                                         |
-| One authoritative Runtime scheduler                                                                     | Partial        | `due_time.go` remains the one private timer registry, but cleanup-aware lifecycle decisions, slot wakeup, and trigger reactivation are incomplete. See `RT-CLEANUP-003`, `RT-BUDGET-003`, and `RT-TRIGGER-003`.                                                                         |
-| Semantic reproduction of normal model and Tool continuation                                             | Partial        | Durable activity history, provider output, Tool origin, retained context, and dispatch plans exist, but recovery discards retained bindings before reuse and rebuilds parts of requests from current facts. See `V3-REPLAY-003`.                                                        |
-| Approved App context in continuation                                                                    | Implemented    | `consumeContinuationLocked` transfers staged `Execution.Continuation.AppContext` into the next persisted message Activity and clears the staged context in the same checkpoint mutation.                                                                                                |
-| Durable semantic Skill lifecycle                                                                        | Partial        | Skill Runtime sessions have Execution and ProgramFrame keys and generated lifecycle Tools serialize in provider order, but active-state selection is Execution-wide and natural terminal cleanup is incomplete. See `DOMAIN-SKILL-003`.                                                 |
-| Agent Model system-prompt behavior                                                                      | Implemented    | V3 consumes the selected Agent Model capability `IncludeSystemPrompt` fact during Model patch composition while retaining explicit Session Model prompt precedence.                                                                                                                     |
-| Artifact-backed Tool execution and manual triggering                                                    | Implemented    | Standalone built-in Artifact-backed Go and provider SDK Tool declarations are supported. MCP discovered Tools are prepared by MCP Runtime. Skill lifecycle Tools are prepared by Skill Runtime. The standalone Tool scope intentionally excludes arbitrary Tool additions and removals. |
-| Normal SessionV2 functional replacement surface                                                         | Partial        | Provider SDK Tool configuration, selected Artifact facts, and several durable V3 components exist, but replay, configuration, continuation, handoff, settlement, persistence, and shared backend defects prevent a complete replacement claim.                                          |
-| Cost budget execution                                                                                   | Not applicable | Deferred. Do not implement cost metering in this cycle. Current unsupported behavior remains outside the functional handoff scope.                                                                                                                                                      |
+- Workflow source grammar and static semantic validity: Workflow Artifact
+  contract.
+- Static Artifact relationship closure: Workflow Artifact planning.
+- Workflow execution preparation and source-to-program conversion: Workflow
+  setup.
+- Invocation input validation: Workflow setup.
+- Current Artifact pin and enablement: Workflow setup or target-specific binder.
+- Direct composition rejection for Workflow targets: Workflow Artifact planning
+  and Workflow setup.
+- Domain readiness and native request validity: owning domain adapter.
+- Durable Session and execution integrity: Session Runtime v3.
+- Session document and tombstone persistence: Session Store v3.
+- Wails request transport: wrapper and frontend transport.
 
-The table above is a component summary, not proof of composed completion.
-The inline current task register below controls this cycle.
-Each open parent task requires its complete functional behavior, not an
-isolated helper or status edit.
+Runtime validates durable Runtime objects. It does not revalidate Workflow
+source grammar.
 
-`SessionDefaults.ToolSelections` is the canonical V3 Tool-selection collection.
-It contains the Artifact selection plus Tool-only user arguments and automatic
-execution facts. `ArtifactSelection` remains generic. V3 must not retain a
-second Artifact-only `Tools` collection, because two collections produce
-ambiguous precedence and duplicate Tool choices.
+## Completion and replacement readiness
 
-The implemented rows describe their named components, not immunity from a shared
-dispatch defect. Common settlement, recovery, cleanup, and configuration defects
-remain in the supplied source. The current register reopens affected older IDs
-and records missing tasks that those IDs did not cover. Full Runtime completion
-requires every open inline parent task and subtask to be complete.
+Status meanings are:
 
-## Pending functional work
+- `Implemented`: the inspected source contains the complete listed behavior.
+  Test execution was not reviewed.
+- `Partial`: the inspected source contains part of the behavior or has an
+  identified functional boundary gap.
+- `Not implemented`: the required behavior is absent from the inspected source.
+- `Not applicable`: the behavior is explicitly excluded from this cycle or is
+  not a Runtime task.
 
-The following work is functional work only. It excludes tests, validation-only
-hardening, frontend integration, SessionV2 cleanup and migration, version
-changes, release work, and cost metering. Do not add direct capability paths.
+Every open parent and subtask must be completed in one substantial end-to-end
+functional delivery.
 
-| ID                    | Functional task and required result                                                                                                                                                                                                         | Status      | Current source evidence                                                                                                                                                                                                                                    |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `DOMAIN-PROVIDER-001` | Preserve typed configuration for built-in provider SDK Tool Artifacts and derive a pinned owner Model from an explicit Model or selected Agent. Carry immutable facts through normal Model dispatch plans and Workflow provider Tool plans. | Implemented | `toolruntime/provider_sdk.go`, `toolruntime/v3.go`, and `workflowruntime/target_preparation.go` retain `ToolSelection.UserArguments`, provider configuration, and the owner Model. This component does not close unrelated preparation or settlement work. |
-| `DOMAIN-MCP-001`      | Prepare the current MCP Server Artifact and selected discovered MCP Tool operation before Workflow ProgramSnapshot creation. Persist prepared domain facts without placing MCP clients or Artifact Store handles in Session Runtime.        | Implemented | `WorkflowTargetPreparer` prepares and snapshots MCP Tool identity, policy, and discovery facts before Workflow lowering. MCP business-effect certainty remains open in `WF-EFFECT-003`.                                                                    |
-| `WF-CHILD-001`        | Scope each child-call WorkItem identity to its owning ProgramFrame and logical child instance. Repeats, foreach items, parallel branches, and nested child frames must not collide.                                                         | Implemented | `workflowChildCallWorkID` includes the ProgramFrame identity and logical path.                                                                                                                                                                             |
-| `WF-PORT-001`         | Give a started call one authoritative port delivery boundary. Deliver final output once and route independent-child ports through the correct parent Execution and frame.                                                                   | Implemented | Forward-only wrapper frames preserve routing but suppress duplicate final delivery; recursive port ownership reaches the correct parent Execution.                                                                                                         |
-| `WF-PORT-002`         | Require a mapped nested Workflow port to be published by the target Workflow and compatible with its declared direction, access, stream behavior, and schema.                                                                               | Implemented | Published Workflow port boundaries are explicit ProgramFrame intent facts and reject undeclared mappings.                                                                                                                                                  |
-| `WF-SCHEDULE-001`     | Persist the actual fired local schedule slot and use it to prevent duplicate occurrences for repeated local calendar times during normal operation and recovery.                                                                            | Implemented | Trigger registration, firing, and recovery persist actual local slots before computing successor occurrences.                                                                                                                                              |
+When every current task is implemented, V3 is intended to replace the supported
+Artifact-backed and registered-binding V2 backend behavior while adding Workflow
+orchestration.
 
-### Open functional task and subtask register
+This is a backend functional replacement decision. It does not claim that:
 
-Evidence abbreviations: `R` is `internal/agentruntime-go/sessionv3/`; `S` is
-`internal/agentruntimesetup/`. Paths below are relative to those directories.
-This is the sole current functional completion register. It records the
-source-backed status after the supplied Runtime, Workflow preparation, V3
-Session setup, Model, Tool, MCP, Skill, attachment, registered-binding, Store
-v3, bootstrap, wrapper, Workflow Inventory, and closure review. V2 source is
-used only as the backend functional replacement reference.
-
-Statuses describe inspected source behavior, not execution results. Each parent
-is complete only when all its subtasks are complete. An implementer can change a
-status to `Implemented` only after the complete listed behavior exists in
-source, and must replace required-result text with exact source evidence.
-Mapped earlier rows must receive the same current status, and obsolete
-contradictory completion claims must be removed. Do not add a second completion
-ledger. No tests, validation reports, frontend work, migration, V2 removal,
-cost metering, or version changes are required by this register.
-
-| ID                     | Functional task or subtask                                                                                                                                       | Status          | Evidence and required completed behavior                                                                                                                                                                                                                                                                                     |
-| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `RT-DISPATCH-001`      | Complete common WorkItem creation and settlement routing.                                                                                                        | Partial         | Several Runtime paths re-acquire authoritative objects, but coordination, manual settlement, binding failure, panic, and child dispatch do not cover every composed terminal path. See `RT-SETTLE-003` and `RT-BUDGET-003`.                                                                                                  |
-| `RT-DISPATCH-001.a`    | Route compensation-intent mutation only for a Compensation WorkItem.                                                                                             | Partial         | Compensation-intent mutation is restricted to Compensation WorkItems, but `R/coordination.go` retains wait pointers across durable resolution and related mutation paths require identity reacquisition.                                                                                                                     |
-| `RT-DISPATCH-001.b`    | Keep transition mutation attached to the authoritative Session objects.                                                                                          | Partial         | `advanceFrameLocked` and several lifecycle paths re-acquire durable identities, but binding error, port error, panic, invalid wait resolution, manual settlement, and cancellation do not use one complete terminal lifecycle.                                                                                               |
-| `RT-SETTLE-003`        | Complete authoritative mutation and terminal propagation.                                                                                                        | Partial         | Existing lifecycle helpers do not cover every composed terminal path.                                                                                                                                                                                                                                                        |
-| `RT-SETTLE-003.a`      | Reacquire Session-owned objects after mutation-capable calls.                                                                                                    | Partial         | `R/coordination.go` retains wait pointers across durable resolution; emit, manual result, and reconciliation paths can continue with earlier objects. Mutate by durable Session, Execution, frame, WorkItem, and wait identity after append, rollback, child creation, forwarding, or orchestration advancement.             |
-| `RT-SETTLE-003.b`      | Use one complete terminal lifecycle and committed ready-work launch.                                                                                             | Partial         | Binding error, port error, panic, invalid wait-resolution result, manual result, and cancellation paths differ. Settle Attempts and effects, release or transfer claims, wake completion waits, advance owners, settle Executions, persist, then launch all newly ready Session work.                                        |
-| `WF-RECOVERY-001`      | Complete reconciliation execution and settlement.                                                                                                                | Partial         | Reconciliation transitions and durable outcome structures exist, but source effect translation, MCP certainty, late Saga confirmation, compensation causality, cleanup execution, and common terminal propagation remain incomplete.                                                                                         |
-| `WF-RECOVERY-001.a`    | Apply every returned reconciliation transition.                                                                                                                  | Partial         | `Advance` applies reconciliation-start, intent-settlement, and child-settlement transitions for covered paths, but every terminal path must use the authoritative lifecycle in `RT-SETTLE-003`.                                                                                                                              |
-| `WF-RECOVERY-001.b`    | Complete applied, not-applied, and unknown outcomes.                                                                                                             | Partial         | Applied, confirmed-non-application, and unknown structures exist, but actual business-effect certainty and late cleanup behavior remain incomplete. See `WF-EFFECT-003` and `RT-CLEANUP-003`.                                                                                                                                |
-| `WF-OUTCOME-003`       | Preserve complete Workflow and conversation terminal meaning.                                                                                                    | Partial         | Some inline, child, failure, and interruption paths omit semantic outcomes or facts.                                                                                                                                                                                                                                         |
-| `WF-OUTCOME-003.a`     | Record every actual step boundary and retain complete settled facts.                                                                                             | Partial         | Inline failure can lack the earlier `PendingPath`; return, break, and continue bypass ordinary outcome recording. Record target, receipt, effect, aggregate, native typed error, and declaration facts from the actual operation through failure, cancellation, reconciliation, and child settlement.                        |
-| `WF-OUTCOME-003.b`     | Persist interrupted assistant output once without fabricating success.                                                                                           | Partial         | Failed or cancelled Agent LLM work can retain stream text only on the WorkItem; stream merging requires a final LLM payload. Preserve a semantic assistant Activity for usable partial output and retain actual provider-managed observations without inventing a successful local business result.                          |
-| `WF-CONTROL-001`       | Complete structured results, exits, state propagation, and aggregate outcomes.                                                                                   | Partial         | Structured child results and aggregate state exist, but Repeat condition indices, empty collection settlement, Machine lifetime behavior, and exact evaluation snapshots remain incomplete. See `WF-CONTROL-003` and `WF-CHANNEL-003`.                                                                                       |
-| `WF-CONTROL-001.a`     | Settle control exits and block values exactly once.                                                                                                              | Partial         | Child result wrapping exists, but return, break, continue, and inline failure paths do not all record and settle their actual boundary through the common outcome path. See `WF-OUTCOME-003`.                                                                                                                                |
-| `WF-CONTROL-001.b`     | Apply declared state and result semantics.                                                                                                                       | Partial         | Parallel and Foreach aggregate structures exist, but empty collection merge progress, explicit maxima, and Repeat condition scope remain incomplete. See `WF-CONTROL-003`.                                                                                                                                                   |
-| `WF-CONTROL-003`       | Complete remaining structured-control value and lifetime behavior.                                                                                               | Partial         | Structured operations exist but the following boundary cases remain functional gaps.                                                                                                                                                                                                                                         |
-| `WF-CONTROL-003.a`     | Supply the current Repeat index to `while` and `until`.                                                                                                          | Partial         | Body frames receive an index, but condition evaluation does not install the Repeat's current index. Preserve carried state and result semantics at the same boundary.                                                                                                                                                        |
-| `WF-CONTROL-003.b`     | Settle empty captured collections and preserve explicit maxima.                                                                                                  | Partial         | Empty Foreach merge can return idle with unapplied merge progress; non-`all` empty runtime collections can remain pending. Emit required merge work and settle the collection truthfully. Preserve omitted versus explicit zero `maxItems` and `maxIterations` during lowering.                                              |
-| `WF-CONTROL-003.c`     | Limit consecutive immediate Machine transitions, not lifetime event count.                                                                                       | Partial         | `Microsteps` increments for selected event transitions and is not reset at genuine suspension. Permit long-running event-driven Machines while retaining the immediate-transition bound.                                                                                                                                     |
-| `WF-SCOPE-001`         | Preserve the complete semantic evaluation scope across nested work.                                                                                              | Partial         | `workflowInheritedChildScope` exists, but channel aliases, boundary snapshots, inherited subscription ownership, and Repeat condition scope remain incomplete. See `WF-CHANNEL-003` and `WF-CONTROL-003`.                                                                                                                    |
-| `WF-SCOPE-001.a`       | Construct child scopes through one inheritance implementation.                                                                                                   | Partial         | `workflowInheritedChildScope` preserves several inherited facts, but controlling constructs do not consistently apply current Repeat indices and declaration-visible channel aliases.                                                                                                                                        |
-| `WF-SCOPE-001.b`       | Capture complete wait-filter and output evaluation facts.                                                                                                        | Partial         | `cloneWorkflowWaitFilter` retains scope and logical time, but `Advance` can evaluate another step or final output after a stale snapshot was captured.                                                                                                                                                                       |
-| `WF-CHANNEL-003`       | Preserve invocation-local coordination and declaration-visible evaluation meaning.                                                                               | Partial         | Storage namespaces and expression-visible identities are currently mixed.                                                                                                                                                                                                                                                    |
-| `WF-CHANNEL-003.a`     | Keep declared channel names available to expressions after private namespacing.                                                                                  | Partial         | `namespaceWorkflowProgramChannels` changes declaration names while `captureWorkflowMessages` uses those names as CEL map keys. Preserve source aliases such as `messages.review` while private logs remain invocation-local.                                                                                                 |
-| `WF-CHANNEL-003.b`     | Capture the authorized channel view at each step and block-output boundary.                                                                                      | Partial         | `Advance` captures once before settlement and `drive` can evaluate another step or final output in the same transition. Capture for the actual declaration boundary; retain the original snapshot for a captured logical call.                                                                                               |
-| `WF-CHANNEL-003.c`     | Preserve inherited subscription ownership and consumption identity.                                                                                              | Partial         | Outer subscriptions are copied into children and consumption is keyed to the waiting frame. Retain the originating subscription owner so child-scope changes do not make consumed events available again for that subscription.                                                                                              |
-| `WF-PREPARE-003`       | Preserve complete prepared target meaning without unrelated dependencies.                                                                                        | Partial         | Closure indexing exists, but not every transitive selected execution fact is retained.                                                                                                                                                                                                                                       |
-| `WF-PREPARE-003.a`     | Retain the complete required immutable source-pin and prepared contribution snapshot.                                                                            | Partial         | `S/workflowruntime/admission.go` retains direct target and requirement facts; Agent dispatch later resolves contributions again. Preserve prepared transitive Model, Agent, Text, Tool, Skill, MCP, Workspace, and nested Workflow meaning through neutral snapshots, without private clients or an Artifact execution API.  |
-| `WF-PREPARE-003.b`     | Resolve an owner Model only where provider-managed Tool execution needs it.                                                                                      | Partial         | `admitPlanned` eagerly calls `workflowOwnerModel`. Pure deterministic or registered-binding Workflows must not fail because unrelated Session conversation defaults are unavailable.                                                                                                                                         |
-| `WF-CALL-002`          | Complete static and resolver-backed callable selection.                                                                                                          | Implemented     | Static target sets lower only to static members; resolver-backed sets lower only to durable resolver state. Resolver settlement resumes the preserved call. Inventory literal target extraction is fixed in `workflowLiteralTargetName`.                                                                                     |
-| `WF-CALL-002.a`        | Lower allowed target sets to one canonical representation.                                                                                                       | Implemented     | Static target sets lower only to static members, and resolver-backed target sets lower only to durable resolver state.                                                                                                                                                                                                       |
-| `WF-CALL-002.b`        | Resume the call after accepted resolver membership.                                                                                                              | Implemented     | Resolver settlement resumes the preserved call with persisted membership and selection facts. `workflowLiteralTargetName` extracts literal targets for the planning inventory.                                                                                                                                               |
-| `WF-RETRY-002`         | Preserve one logical call through durable retry attempts.                                                                                                        | Partial         | Retry synthetic blocks retain declaration identity, but typed capture occurs after child settlement instead of at the original evaluation boundary. See `WF-RETRY-003`.                                                                                                                                                      |
-| `WF-RETRY-002.a`       | Make retry-created blocks executable and source-identifiable.                                                                                                    | Partial         | Synthetic retry blocks retain declaration identity and attempt runtime identities, but they must reuse the original call-boundary snapshot. See `WF-RETRY-003.a`.                                                                                                                                                            |
-| `WF-RETRY-002.b`       | Capture callable facts before the retry boundary.                                                                                                                | Partial         | `retryCaptureChildCall` stores typed invocation facts, but it captures after settlement rather than before dispatch or child materialization.                                                                                                                                                                                |
-| `WF-RETRY-003`         | Preserve one captured logical call through retry and started execution.                                                                                          | Partial         | Capture helpers exist but do not capture at the original evaluation boundary.                                                                                                                                                                                                                                                |
-| `WF-RETRY-003.a`       | Capture evaluated target, membership, input, context, typed messages, instructions, port inputs, key, and logical time before dispatch or child materialization. | Partial         | `retryCaptureChildCall` captures after settlement; started wrappers retain typed templates for later evaluation. Persist the original evaluated facts and reuse them without observing later channels or state.                                                                                                              |
-| `WF-RETRY-003.b`       | Apply complete retry selection and effect replay semantics.                                                                                                      | Partial         | `compileWorkflowRetry` drops `match.schema`; replay decisions reject uncertainty before considering replay-safe effects. Preserve declared matching and permit only policy-authorized read, idempotent, keyed, or confirmed-not-applied retries.                                                                             |
-| `WF-RETRY-003.c`       | Preserve native typed failure classification through Model and Agent child settlement.                                                                           | Partial         | Generic Agent and single-model failure replacement loses category and cause facts needed by retry and catch. Owning domain conversion supplies actual failure meaning; child orchestration retains it.                                                                                                                       |
-| `WF-EFFECT-002`        | Complete effect translation, domain invocation facts, and truthful settlement.                                                                                   | Partial         | Effect structures and invocation metadata exist, but declaration conversion, MCP certainty, causal operation facts, and common settlement remain incomplete. See `WF-EFFECT-003` and `RT-SETTLE-003`.                                                                                                                        |
-| `WF-EFFECT-002.a`      | Translate declaration effects and deliver stable invocation metadata.                                                                                            | Partial         | `WorkBinding.Request` receives durable execution, WorkItem, attempt, effect, idempotency, input, context, port, and stream facts, but source `non-idempotent` conversion is incorrect.                                                                                                                                       |
-| `WF-EFFECT-002.b`      | Preserve actual business-effect certainty.                                                                                                                       | Partial         | Go transport errors remain uncertain and registered bindings propagate explicit evidence, but `S/mcpruntime/v3.go:Execute` returns uncertainty even for confirmed success.                                                                                                                                                   |
-| `WF-EFFECT-003`        | Preserve declaration effects and actual domain business-effect facts.                                                                                            | Partial         | Effect types exist, but source conversion and MCP result certainty are incorrect.                                                                                                                                                                                                                                            |
-| `WF-EFFECT-003.a`      | Translate declaration `non-idempotent` to Runtime `nonIdempotent`.                                                                                               | Partial         | `compileWorkflowEffect` and `compileWorkflowStepEffect` compare source strings with Runtime enum strings. Complete the source-to-program mapping for admitted declarations.                                                                                                                                                  |
-| `WF-EFFECT-003.b`      | Settle MCP success and failure from actual domain evidence.                                                                                                      | Partial         | `S/mcpruntime/v3.go:Execute` always returns effect uncertainty. Preserve confirmed successful effects, conservative error certainty, receipts, normal Tool continuation, history, reconciliation eligibility, and Saga recording consistently.                                                                               |
-| `WF-EFFECT-003.c`      | Retain compensation causality and complete operation facts.                                                                                                      | Partial         | Ordinary ordered calls do not establish equivalent effect dependencies; compensation facts omit promised operation identities. Persist causal dependencies through ordered and structured work and expose original Attempt, target, effect, receipt, and compensation identity without private state.                        |
-| `RT-CLEANUP-002`       | Complete cancellation, finalization, reconciliation, and compensation under cleanup allowance.                                                                   | Implemented     | Cleanup WorkItems dispatch after cancellation or timeout. Late confirmed effects release resources, become Saga EffectRecords, and resume pending compensation. Root and child deadline-derived waits use Runtime due-time ownership.                                                                                        |
-| `RT-CLEANUP-002`       | Complete cancellation, finalization, reconciliation, and compensation under cleanup allowance.                                                                   | Partial         | Cleanup markers and allowance exist, but ordinary deadline and cancellation decisions still stop eligible cleanup. See `RT-CLEANUP-003`.                                                                                                                                                                                     |
-| `RT-CLEANUP-002.a`     | Permit and advance cleanup work after normal cancellation or timeout.                                                                                            | Partial         | Some Cleanup WorkItems remain dispatchable through a cleanup deadline, but binding, retry, resource, emit, stream, and synthetic-frame paths retain ordinary-work decisions.                                                                                                                                                 |
-| `RT-CLEANUP-002.b`     | Finish ownership only after eligible settlement and cleanup.                                                                                                     | Partial         | Cancellation preserves a primary outcome for covered paths, but Saga ownership can finish before late confirmed effects, reconciliation, compensation, completion wakeup, and final resource release settle.                                                                                                                 |
-| `RT-CLEANUP-003`       | Execute cleanup through every owning lifecycle.                                                                                                                  | Partial         | Cleanup markers and allowance exist, but ordinary deadlines and cancellation decisions still stop eligible cleanup.                                                                                                                                                                                                          |
-| `RT-CLEANUP-003.a`     | Carry cleanup classification and its effective deadline through binding, execution, retry, resource waits, emits, streams, and synthetic frames.                 | Partial         | `R/runtime.go`, `coordination.go`, `retry.go`, `runtime_resources.go`, and stream paths retain ordinary-work decisions. Stop normal work while dispatching eligible cleanup through its bounded allowance, including retry wrappers.                                                                                         |
-| `RT-CLEANUP-003.b`     | Retain Saga ownership until late external outcomes settle.                                                                                                       | Partial         | `beginSagaCompensation` finishes immediately for an empty initial order, before its outstanding-work check can apply. Keep pending cleanup available for late confirmed effects, reconciliation, compensation, completion wakeup, and final resource release without replacing primary cancellation.                         |
-| `WF-PORT-003`          | Connect published nested ports and preserve invocation-local coordination.                                                                                       | Partial         | `ports_runtime.go` installs private nested Workflow channel namespaces and durable forwarding, but private storage names leak into declaration evaluation and shared mutation paths remain incomplete. See `WF-CHANNEL-003` and `RT-SETTLE-003`.                                                                             |
-| `WF-PORT-003.a`        | Establish the declared caller-port to child-channel connection.                                                                                                  | Partial         | `preparePublishedWorkflowPortBoundaryLocked` copies staged input values and adds `ChannelForward` records, but declared source aliases must remain available to expressions.                                                                                                                                                 |
-| `WF-PORT-003.b`        | Scope channels and launch work woken across Execution boundaries.                                                                                                | Partial         | Child namespaces derive from Execution and ProgramFrame identity, but forwarding and ready-work launch must use the authoritative committed terminal lifecycle.                                                                                                                                                              |
-| `WF-MACHINE-002`       | Complete machine rearming and durable transition selection.                                                                                                      | Partial         | Machine waits and durable selection exist, but inherited subscription ownership, one event projection, and consecutive-immediate transition lifetime behavior remain incomplete. See `WF-CHANNEL-003`, `WF-CONTROL-003`, and `RT-TRIGGER-003`.                                                                               |
-| `WF-MACHINE-002.a`     | Rearm each consumed wait occurrence without losing other subscriptions.                                                                                          | Partial         | Consumed waits receive identities, but copied child subscriptions lose originating ownership and can make consumed events available again.                                                                                                                                                                                   |
-| `WF-MACHINE-002.b`     | Apply declared event and timer semantics.                                                                                                                        | Partial         | `WorkflowMachineProgress` persists ready facts, but event envelopes disagree on `name` versus `type`, and `Microsteps` counts lifetime event transitions.                                                                                                                                                                    |
-| `RT-TRIGGER-002`       | Complete trigger-created work launch, queue resumption, and local-slot identity.                                                                                 | Implemented     | Session mutations launch ready trigger work. Recovery and reactivation drain eligible queues. Repeated local schedule slots are retained by local-day slot identity and skipped during successor calculation.                                                                                                                |
-| `RT-TRIGGER-002.a`     | Dispatch accepted event-trigger work and resume eligible queues.                                                                                                 | Partial         | Session mutations and recovery launch some ready trigger work, but `SetTriggerRegistrationState` rearms timers without draining eligible queues.                                                                                                                                                                             |
-| `RT-TRIGGER-002.b`     | Deduplicate every repeated local calendar occurrence.                                                                                                            | Partial         | Repeated local slots are retained, but trigger, wait, and Machine expressions do not receive one consistent declared event `type`.                                                                                                                                                                                           |
-| `RT-TRIGGER-003`       | Resume trigger lifecycle changes and expose one event meaning.                                                                                                   | Partial         | Schedule occurrence state exists, but reactivation and trigger expression envelopes remain incomplete.                                                                                                                                                                                                                       |
-| `RT-TRIGGER-003.a`     | Drain eligible queued occurrences on reactivation and apply the intended missed-occurrence policy.                                                               | Partial         | `SetTriggerRegistrationState` rearms timers without draining queues. Persist queue and registration changes before the shared ready-work launch.                                                                                                                                                                             |
-| `RT-TRIGGER-003.b`     | Expose the declared event `type` consistently to trigger, wait, and Machine expressions.                                                                         | Partial         | `TriggerEventEnvelope` exposes `name`, while event-wait output supplies `type`. Preserve source, identity, data, correlation, and time through one semantic event projection.                                                                                                                                                |
-| `RT-LIMIT-002`         | Complete scoped budgets, concurrency scheduling, claims, and deadlines.                                                                                          | Implemented     | Shared Execution, ProgramFrame, and WorkItem counters enforce scoped limits. Parent-frame concurrency includes descendants; nested Workflow resources are isolated by invocation namespace.                                                                                                                                  |
-| `RT-LIMIT-002.a`       | Account for both local limits and shared parent usage.                                                                                                           | Partial         | `ExecutionBudgetUsage` records several shared counters, but structured frame intents do not consistently carry narrowed `step.Limits` and child depth counts synthetic frames.                                                                                                                                               |
-| `RT-LIMIT-002.b`       | Apply claims and lifecycle timing to every owning construct.                                                                                                     | Partial         | Claims and namespaces exist, but Binding-to-Waiting, binding failure, and related slot-release paths do not consistently wake budget waiters.                                                                                                                                                                                |
-| `RT-BUDGET-003`        | Complete scoped accounting and resource-ready scheduling.                                                                                                        | Partial         | Counters exist, but slot release, structured scope application, and child admission ordering remain incomplete.                                                                                                                                                                                                              |
-| `RT-BUDGET-003.a`      | Wake concurrency waiters whenever a counted slot becomes available.                                                                                              | Partial         | `Binding` to `Waiting`, binding failure, and related paths do not consistently wake budget waiters after the state change. A durable wait must not leave otherwise available work idle.                                                                                                                                      |
-| `RT-BUDGET-003.b`      | Apply structured step limits and semantic Workflow depth.                                                                                                        | Partial         | Scope, Choose, Parallel, Foreach, Repeat, Machine, and Saga frame intents do not consistently carry `step.Limits`. `childProgramFrameDepth` counts synthetic frames. Apply narrowed construct budgets and distinguish nested Workflow depth from internal frame depth.                                                       |
-| `RT-BUDGET-003.c`      | Reserve the outer child-call operation before child native work can launch.                                                                                      | Partial         | Child-call and Fork work are created as separately ready work. Persist the logical outer Attempt, effective policy, accounting, and ownership before permitting its child to dispatch; avoid a child performing work before its outer budget decision.                                                                       |
-| `V3-CONFIG-002`        | Complete effective artifact-backed invocation configuration.                                                                                                     | Implemented     | Explicit collection replacement or clearing, contribution ordering, selected Workspace MCP facts, immutable Model dispatch plans, and contribution provenance are retained through execution and recovery.                                                                                                                   |
-| `V3-CONFIG-002`        | Complete effective artifact-backed invocation configuration.                                                                                                     | Partial         | Typed fields and dispatch plans exist, but collection policy, contribution precedence, effective Workspace application, provenance, and owning-domain preparation remain incomplete. See `V3-CONFIG-003` and `ARC-DOMAIN-003`.                                                                                               |
-| `V3-CONFIG-002.a`      | Preserve contribution ownership and explicit override semantics.                                                                                                 | Partial         | Nil versus non-nil handling does not durably distinguish inherit, replace, and explicit empty clearing. Effective collections are later copied into unrelated owner records.                                                                                                                                                 |
-| `V3-CONFIG-002.b`      | Preserve the selected Workspace MCP configuration.                                                                                                               | Partial         | Workspace MCP facts exist, but `appendUniqueMCPSelection` can overwrite earlier explicit selection and Agent-contributed Workspace selection is not consistently applied through the effective value.                                                                                                                        |
-| `V3-CONFIG-003`        | Complete inherited and explicit invocation configuration semantics.                                                                                              | Partial         | Typed fields exist, but collection policy and precedence are incomplete.                                                                                                                                                                                                                                                     |
-| `V3-CONFIG-003.a`      | Preserve inherit, replace, explicit empty clearing, and supported per-item override intent durably.                                                              | Not implemented | Effective `omitempty` slices and empty-to-nil copying cannot retain the required collection policy. Carry policy separately from the resulting collections so Agent and Workspace inheritance cannot recreate explicitly removed Tools, Skills, MCP, or instructions.                                                        |
-| `V3-CONFIG-003.b`      | Apply inherited contributions before more-specific Session and invocation decisions.                                                                             | Partial         | `appendUniqueMCPSelection` overwrites earlier explicit selections; Agent-contributed Workspace selection is not applied through the effective value. Preserve selected MCP operations, resources, templates, prompts, and overrides and consume the effective Workspace.                                                     |
-| `V3-CONFIG-003.c`      | Retain accurate contribution ownership and ordering.                                                                                                             | Partial         | Instruction and capability facts are assembled centrally and later copied into unrelated owner records. Preserve actual Agent, Workspace, Session, and invocation provenance and the selected Model system-prompt behavior through domain-owned preparation.                                                                 |
-| `V3-HISTORY-002`       | Complete semantic conversation reconstruction.                                                                                                                   | Partial         | Durable history, provider output, Tool results, App context, and dispatch plans exist, but recovery removes retained bindings before reuse and reconstructs parts of requests from current facts. See `V3-REPLAY-003`.                                                                                                       |
-| `V3-HISTORY-002.a`     | Reconstruct the exact authorized message and Tool sequence.                                                                                                      | Partial         | Authorized history reconstruction exists for covered paths, but queued handoff rounds and interrupted assistant observations do not retain complete causal semantic activities. See `WF-HANDOFF-003` and `WF-OUTCOME-003`.                                                                                                   |
-| `V3-HISTORY-002.b`     | Reuse retained semantic context and provider outcomes.                                                                                                           | Partial         | Recovery retains some plan data, but `R/runtime.go:recoverLocked` clears `item.Binding` before its intended preservation condition and `bindRecoveredLLM` resolves current configuration.                                                                                                                                    |
-| `V3-REPLAY-003`        | Reconstruct private execution resources from the exact retained semantic operation.                                                                              | Partial         | A recovered-plan binder exists but the Runtime and request reconstruction paths do not preserve its complete contract.                                                                                                                                                                                                       |
-| `V3-REPLAY-003.a`      | Retain semantic LLM bindings while discarding private resources.                                                                                                 | Partial         | `R/runtime.go:recoverLocked` sets `item.Binding = nil` before its intended plan-preservation condition. Preserve the immutable plan for dispatched replay-safe work and the equivalent interrupted preparation path.                                                                                                         |
-| `V3-REPLAY-003.b`      | Reproduce captured message order and effective non-secret Model configuration.                                                                                   | Partial         | `bindRecoveredLLM` rebuilds activity selection and resolves current Model and overlay configuration. Use captured semantic message identities and order plus retained effective Provider, Model, capability, instruction, and context facts; resolve credentials and clients privately without current-default substitution. |
-| `V3-CONTROL-002`       | Complete normal conversation queuing and automation controls.                                                                                                    | Implemented     | Conversation activities queue while a Fork boundary is pending. Explicit Tool requests bypass automatic Tool holds. Disabling only Tool automation no longer requests continuation.                                                                                                                                          |
-| `V3-CONTROL-002`       | Complete normal conversation queuing and automation controls.                                                                                                    | Partial         | Queue and automation-control components exist, but staged continuation is not consumed by the active Agent operation and manual Tool mutations can address historical or unrelated work. See `V3-CONTINUE-003`.                                                                                                              |
-| `V3-CONTROL-002.a`     | Queue messages through the pending Fork and active Agent child boundary.                                                                                         | Partial         | Conversation activities queue through a pending Fork, but queued Agent messages retain IDs without each message's completed assistant round, defaults, budget, and isolated causal history.                                                                                                                                  |
-| `V3-CONTROL-002.b`     | Separate explicit execution from automatic Tool and continuation policy.                                                                                         | Partial         | Explicit Tool controls exist, but continuation broadcasts across Agent frames and normal Tool mutation can rewrite consumed historical results.                                                                                                                                                                              |
-| `V3-CONTINUE-003`      | Complete active-operation continuation and manual Tool lifecycle ownership.                                                                                      | Partial         | The command surface exists, but some commands address a conversation queue or whole Execution instead of the owning operation.                                                                                                                                                                                               |
-| `V3-CONTINUE-003.a`    | Consume staged input into the active conversation operation's next Model round.                                                                                  | Partial         | `consumeContinuationLocked` queues through the conversation frame and returns without resuming an Agent waiting for continuation. Carry staged text, attachments, defaults, budget, approved App context, and settled Tool results into the correct next round exactly once.                                                 |
-| `V3-CONTINUE-003.b`    | Scope manual retry, skip, completion, and continuation to the current unconsumed operation.                                                                      | Partial         | Normal Tool mutation can rewrite consumed historical results; continuation broadcasts across Agent frames. Retain consumed-result ownership, preserve actual effect certainty, and keep App-originated or unrelated Workflow work outside normal Tool-result continuation.                                                   |
-| `DOMAIN-SKILL-002`     | Complete invocation-owned Skill lifecycle state.                                                                                                                 | Partial         | Skill Runtime sessions have Execution and ProgramFrame keys and lifecycle ordering, but LLM active-state reconstruction is Execution-wide and natural owner cleanup is incomplete. See `DOMAIN-SKILL-003`.                                                                                                                   |
-| `DOMAIN-SKILL-002.a`   | Own private Skill sessions at the correct invocation scope.                                                                                                      | Partial         | Private sessions have frame keys, but LLM preparation selects active state through an unscoped Execution-wide lookup.                                                                                                                                                                                                        |
-| `DOMAIN-SKILL-002.b`   | Apply lifecycle operations in an authoritative semantic order.                                                                                                   | Partial         | Generated lifecycle Tools serialize in provider order, but long-lived conversation Executions retain completed Agent frame sessions because natural terminal paths do not consistently notify cleanup.                                                                                                                       |
-| `DOMAIN-SKILL-003`     | Reconstruct and release Skill resources for the exact invocation owner.                                                                                          | Partial         | Private sessions have frame keys, but semantic active-state lookup is still Execution-wide in LLM preparation.                                                                                                                                                                                                               |
-| `DOMAIN-SKILL-003.a`   | Select the latest applicable terminal Skill state for the owning frame and enabled set.                                                                          | Partial         | `prepareLLMPlan` calls unscoped `EffectiveActiveSelections`; lookup chooses the latest global result before checking enabled-set compatibility. Filter by semantic owner and enabled pins before selecting the latest result.                                                                                                |
-| `DOMAIN-SKILL-003.b`   | Close private Skill sessions at natural frame and Execution completion.                                                                                          | Partial         | Long-lived conversation Executions retain sessions for completed Agent frames; natural terminal paths do not consistently call binding cleanup. Runtime owns lifecycle notification; Skill owns private session release.                                                                                                     |
-| `DOMAIN-BINDING-002`   | Complete native Tool binding facts and registered binding waits.                                                                                                 | Implemented     | Bound native Tool calls persist before dispatch. Neutral registered-binding results can request durable waits while private resume state remains outside Session persistence.                                                                                                                                                |
-| `DOMAIN-BINDING-002.a` | Persist the owning domain's resolved typed Tool call before invocation.                                                                                          | Implemented     | Bound native Tool calls persist before dispatch without storing clients or authorization tokens.                                                                                                                                                                                                                             |
-| `DOMAIN-BINDING-002.b` | Let registered Service and Activity bindings request durable waits.                                                                                              | Implemented     | Neutral registered-binding results can request a durable wait and retain domain-private resume state outside Session persistence.                                                                                                                                                                                            |
-| `DOMAIN-ATTACH-003`    | Preserve semantic attachment identity in native Model inputs.                                                                                                    | Partial         | Content snapshots exist, but labels and root-relative directory identity are lost in conversion.                                                                                                                                                                                                                             |
-| `DOMAIN-ATTACH-003.a`  | Carry meaningful file labels and directory-relative names into provider content.                                                                                 | Partial         | `v3AttachmentFromContentBlock` stores raw text and `attachmentToContentItem` sends it without its label; directory children use basenames. Preserve semantic display and relative identity without reopening historical files or persisting live native handles.                                                             |
-| `V3-SETUP-002`         | Preserve optional backend capabilities through binder composition.                                                                                               | Partial         | Base optional capabilities exist, but the composed Workflow binder forwards App operations while omitting Skill template preparation and instruction preview. See `V3-API-003`.                                                                                                                                              |
-| `V3-SETUP-002.a`       | Forward user-message Skill template preparation.                                                                                                                 | Partial         | The base backend contract has the capability, but the composed Workflow binder does not delegate it.                                                                                                                                                                                                                         |
-| `V3-SETUP-002.b`       | Forward instruction Skill preview.                                                                                                                               | Partial         | The base backend contract has the capability, but the composed Workflow binder does not preserve it.                                                                                                                                                                                                                         |
-| `V3-API-003`           | Preserve optional backend capabilities through final binder composition.                                                                                         | Partial         | Base implementations exist, but Runtime discovers capabilities from the composed binder.                                                                                                                                                                                                                                     |
-| `V3-API-003.a`         | Forward user-message Skill template preparation and instruction Skill preview.                                                                                   | Not implemented | The supplied `S/workflowruntime/binder.go` forwards App operations but supplies neither Skill forwarding method. Delegate both capabilities to Base without another rendering implementation.                                                                                                                                |
-| `RT-PERSIST-002`       | Complete exact checkpoint and deletion commitment semantics.                                                                                                     | Partial         | Tombstone and checkpoint structures exist, but a committed tombstone can be treated as failed after derived-index deletion failure, and idle long-lived conversations cannot be deleted. See `RT-PERSIST-003`.                                                                                                               |
-| `RT-PERSIST-002.a`     | Commit deletion durably before exposing its accepted result.                                                                                                     | Partial         | Tombstones commit before in-memory deletion for covered store failures, but a post-commit index failure restores a live in-memory Session.                                                                                                                                                                                   |
-| `RT-PERSIST-002.b`     | Acknowledge the exact semantic mutation, including command-only updates.                                                                                         | Partial         | Checkpoint comparison includes event sequence and snapshot identity, but deletion commitment must explicitly distinguish a committed tombstone from a repairable derived-index failure.                                                                                                                                      |
-| `RT-COMMAND-003`       | Replay accepted commands independently of regenerated preparation.                                                                                               | Partial         | Several setup and attachment paths run before durable command receipt lookup.                                                                                                                                                                                                                                                |
-| `RT-COMMAND-003.a`     | Retain stable public command identity and return prior accepted receipts before repeating preparation.                                                           | Partial         | Submit, continuation attachment admission, edit, and Workflow wrappers can require old files or sources again. Preserve the original caller payload identity across prepared snapshots without moving Workflow preparation into Runtime.                                                                                     |
-| `RT-COMMAND-003.b`     | Keep generated occurrence time outside caller payload identity.                                                                                                  | Partial         | `AcceptTriggerEvent` fills `OccurredAt` before command fingerprinting. Resolve duplicate caller commands from the original payload and reuse persisted generated facts.                                                                                                                                                      |
-| `RT-PERSIST-003`       | Complete deletion commitment and normal idle Session deletion.                                                                                                   | Partial         | Live checkpoint commitment handling does not cover the complete deletion path.                                                                                                                                                                                                                                               |
-| `RT-PERSIST-003.a`     | Treat a committed tombstone as committed when derived-index deletion fails.                                                                                      | Partial         | `HandleSessionTombstone` returns an ordinary index error after document commitment, causing Runtime to restore a live in-memory Session. Report commitment explicitly, schedule derived repair, and preserve the deletion receipt and barrier.                                                                               |
-| `RT-PERSIST-003.b`     | Permit deletion of an idle long-lived normal conversation.                                                                                                       | Partial         | `DeleteSession` rejects every nonterminal Execution although the conversation root intentionally remains live. Retire only an idle conversation root within deletion; retain ownership of actual active Workflow, child, wait, cleanup, and external work.                                                                   |
-| `WF-HANDOFF-002`       | Make conversation ownership affect backend routing.                                                                                                              | Partial         | A live handoff record routes normal Session input to an Agent child, but queued-message facts and successful completion remain incomplete. See `WF-HANDOFF-003`.                                                                                                                                                             |
-| `WF-HANDOFF-002.a`     | Route subsequent normal Session work to the Session-scoped semantic owner.                                                                                       | Partial         | `conversationMessageExecutionLocked` routes to a live Agent frame, but queued Agent-loop messages retain IDs without completed assistant rounds, immutable defaults, budget, and causal isolated history.                                                                                                                    |
-| `WF-HANDOFF-002.b`     | Apply restore and retain behavior to future Session-scoped routing.                                                                                              | Partial         | `recoverConversationOwnershipLocked` handles stale records, but a successful no-Tool handoff has no successful completion or relinquish operation.                                                                                                                                                                           |
-| `WF-HANDOFF-003`       | Complete durable multi-message handoff ownership.                                                                                                                | Partial         | Routing exists, but queued message facts and successful completion remain incomplete.                                                                                                                                                                                                                                        |
-| `WF-HANDOFF-003.a`     | Preserve each queued message's assistant round, defaults, budget, and causal isolated history.                                                                   | Partial         | Agent-loop queues retain IDs only; the no-Tool handoff branch can discard its constructed assistant Activities when starting queued work. Retain completed Activities and use each accepted message's immutable invocation facts.                                                                                            |
-| `WF-HANDOFF-003.b`     | Provide successful backend handoff completion or relinquish behavior.                                                                                            | Not implemented | A successful no-Tool handoff round remains waiting and no successful completion operation is supplied. Add a typed backend lifecycle operation that settles the handoff successfully and applies restore or retain without using cancellation as success.                                                                    |
-| `ARC-OWNERSHIP-002`    | Complete domain ownership and dependency separation.                                                                                                             | Partial         | Runtime remains Artifact-independent and consumes neutral plans, but Session and Workflow setup still own duplicated source-family contribution interpretation. See `ARC-DOMAIN-003`.                                                                                                                                        |
-| `ARC-OWNERSHIP-002.a`  | Move contribution preparation to its owning domain.                                                                                                              | Partial         | `S/sessionv3runtime/llm_plan.go` interprets capability occurrences, insertion modes, Workspace overrides, and contribution selection; `S/workflowruntime/model_agent_adapter.go` independently selects Agent Models.                                                                                                         |
-| `ARC-OWNERSHIP-002.b`  | Separate neutral execution contracts from Artifact-dependent Workflow preparation.                                                                               | Partial         | Attachment and Text retain neutral `agentruntime-go/workbinding` contracts, but attachment materialization and native Model request conversion remain in Session setup rather than their owning domains.                                                                                                                     |
-| `ARC-DOMAIN-003`       | Complete owning-domain setup boundaries.                                                                                                                         | Partial         | Core Runtime separation is correct, but Session and Workflow setup still own duplicated domain interpretation.                                                                                                                                                                                                               |
-| `ARC-DOMAIN-003.a`     | Put Agent, Workspace, and Text contribution preparation in their owning setup domains.                                                                           | Not implemented | `S/sessionv3runtime/llm_plan.go` interprets capability occurrences, insertion modes, Workspace overrides, and contribution selection. `S/workflowruntime/model_agent_adapter.go` independently selects Agent Models. Supply neutral domain-prepared facts and compose them from Session and Workflow setup.                  |
-| `ARC-DOMAIN-003.b`     | Put attachment admission and native Model request conversion in owning setup domains.                                                                            | Partial         | Move V3 attachment materialization from Session setup to Attachment setup. Keep semantic history selection in Session orchestration; Model setup owns provider input, output, and Model-default adaptation. MCP, Skill, Tool, Text, Service, and Activity retain their native semantics.                                     |
-| `ARC-DUP-002`          | Remove duplicated execution behavior and replicated effective plans.                                                                                             | Partial         | One intended effective plan exists, but durable data and execution algorithms are still copied across owners. See `ARC-DUP-003`.                                                                                                                                                                                             |
-| `ARC-DUP-002.a`        | Consolidate shared algorithms and Runtime lifecycle paths.                                                                                                       | Partial         | WorkItem lifecycle helpers share some paths, but terminal scheduling, settlement, retry and catch matching, error cloning, and operation-input extraction remain replicated.                                                                                                                                                 |
-| `ARC-DUP-002.b`        | Retain one canonical effective plan with truthful contribution provenance.                                                                                       | Partial         | Fresh binding has an intended `ModelDispatchPlan`, but enriched copies are stored in Workspace and Agent records, and Tool origins deep-copy complete plans.                                                                                                                                                                 |
-| `ARC-DUP-003`          | Remove replicated effective state and duplicated execution algorithms.                                                                                           | Partial         | One intended effective plan exists, but durable data and execution algorithms are still copied across owners.                                                                                                                                                                                                                |
-| `ARC-DUP-003.a`        | Retain one canonical effective plan with truthful contribution provenance.                                                                                       | Partial         | `enrichDurableLLMDispatchPlan` copies effective collections into Workspace, Agent, and Agent.Workspace records. Retain owner references and actual contribution facts rather than full duplicated effective plans.                                                                                                           |
-| `ARC-DUP-003.b`        | Reference immutable origin plans and attachment content rather than copying them per consumer.                                                                   | Partial         | `LLMToolOriginForWorkItem` deep-copies the full plan into each Tool; message and attachment plans repeat content. Retain an immutable canonical operation-plan reference plus only required Tool-specific facts and one authoritative content snapshot.                                                                      |
-| `ARC-DUP-003.c`        | Share Runtime semantic algorithms and one lowered-tree traversal model.                                                                                          | Partial         | Consolidate `evaluate` and `evaluateWithActivation`, retry and catch matching, equivalent error cloning and operation-input extraction, channel and resource namespacing visitors, call lookup, and equivalent retention calculations. Keep terminal scheduling and settlement in the common Runtime lifecycle.              |
-
-Architecture completion must not introduce a second scheduler, a second durable
-execution root, native request interpretation in Workflow, or an Artifact Store
-execution API. Existing completed SDK Tool configuration, no-published-port
-rejection, forward-only start wrappers, and shared V3 MCP output conversion are
-retained; their presence does not close the distinct open tasks above.
-
-No item in this document authorizes a version bump, SessionV2 cleanup, frontend
-integration, test work, validation-only work, migration, stored-session
-conversion, release work, or cost metering.
-
-### Completion and replacement readiness
-
-Every current open parent and subtask must be completed in one substantial
-end-to-end functional delivery. A status can change to `Implemented` only when
-the complete listed behavior exists in source and the row contains exact source
-evidence. Earlier mapped parent and subtask rows must receive the same current
-status. This document has one completion authority and must not gain another
-competing ledger.
-
-When every current open task is implemented, V3 is intended to replace the
-supported Artifact-backed and registered-binding V2 backend behavior while
-adding Workflow orchestration. This is a backend functional replacement
-decision. It does not claim that application traffic or stored Sessions have
-migrated.
+- Frontend traffic has migrated.
+- Stored Sessions have migrated or been converted.
+- SessionV2 has been retired.
+- Release or migration work has completed.
 
 Frontend adaptation, stored-session conversion or archival policy, application
 traffic switching, and eventual V2 retirement remain separate migration work.
-Cost metering remains deferred. These exclusions do not authorize an in-scope
-functional task to remain open or any version identifier to change.
+They are not architectural blockers to beginning migration after the functional
+tasks are complete.
 
-## Validate at the owning boundary
+## Functional tasks
 
-| Validation class                                                | Owner                                         |
-| --------------------------------------------------------------- | --------------------------------------------- |
-| Workflow source grammar and static semantic validity            | Workflow Artifact contract                    |
-| Static Artifact relationship closure                            | Workflow Artifact planning                    |
-| Workflow execution preparation and source-to-program conversion | Workflow setup                                |
-| Invocation input validation                                     | Workflow setup                                |
-| Current Artifact pin and enablement                             | Workflow setup or target-specific binder      |
-| Direct composition rejection for Workflow targets               | Workflow Artifact planning and Workflow setup |
-| Domain readiness and native request validity                    | Owning domain adapter                         |
-| Durable Session and execution integrity                         | Session Runtime v3                            |
-| Session document and tombstone persistence                      | Session Store v3                              |
-| Wails request transport                                         | Wrapper and frontend transport                |
+This is the single current Runtime and consumer-execution status ledger.
 
-The runtime validates durable runtime objects. It does not revalidate Workflow source grammar.
+It replaces former Runtime completion tables, pending-work tables, status
+registers, subregisters, Runtime architecture status tables, and repeated
+Runtime component claims.
 
-## Implement and verify the durable runtime
+The separate Artifact source-planning record in `workflow_artifact.md` is not
+an execution-status ledger and does not create Runtime work.
 
-Status values:
+Each functional group contains parent tasks and their subtasks. A parent is
+complete only when every listed subtask is complete. Source evidence identifies
+the current observed gap. Required result identifies the complete behavior
+required before the status can change.
 
-| Status          | Meaning                                                                                  |
-| --------------- | ---------------------------------------------------------------------------------------- |
-| Implemented     | The inspected source contains the behavior. Test execution was not reviewed.             |
-| Partial         | The inspected source contains part of the behavior or has an identified boundary gap.    |
-| Not implemented | The required behavior is absent from the inspected source.                               |
-| Not applicable  | The item is explicitly excluded from this implementation cycle or is not a Runtime task. |
+`R` means `internal/agentruntime-go/sessionv3/`.
 
-### Persist and recover Session execution state
+`S` means `internal/agentruntimesetup/`.
 
-| Subtask                                                                                               | Status         | Evidence or required result                                                                                                                                                  |
-| ----------------------------------------------------------------------------------------------------- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Persist Session, Execution, ProgramFrame, WorkItem, Attempt, Wait, effect, channel, and trigger facts | Implemented    | `internal/agentruntime-go/sessionv3/`                                                                                                                                        |
-| Enforce checkpoint-before-dispatch behavior                                                           | Implemented    | Runtime checkpoint and dispatch gates                                                                                                                                        |
-| Persist and restore Session Store v3 documents and tombstones                                         | Partial        | `internal/sessionstorev3/store.go` persists documents and tombstones, but committed tombstone handling after derived-index failure remains incomplete. See `RT-PERSIST-003`. |
-| Verify restore behavior through integration tests                                                     | Not applicable | Tests are outside this implementation cycle.                                                                                                                                 |
+### Runtime settlement, cleanup, scheduling, commands, and persistence
 
-### Prepare Workflow execution from a complete static plan
+#### `RT-SETTLE-003` Authoritative mutation and terminal propagation
 
-| Subtask                                                             | Status         | Evidence or required result                                                                                                                                                                                      |
-| ------------------------------------------------------------------- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Separate callable targets from requirements                         | Implemented    | `workflow.Plan.Inventory`                                                                                                                                                                                        |
-| Consume planning-owned callable targets and requirements separately | Partial        | `workflowruntime/admission.go` separates direct target and requirement facts, but does not retain every transitive selected source pin and prepared contribution snapshot. See `WF-PREPARE-003`.                 |
-| Publish complete static Artifact closure with immutable pins        | Implemented    | `workflow.Plan.Closure` and `workflow/closure.go`                                                                                                                                                                |
-| Stop recursive nested Workflow plan resolution during setup         | Implemented    | `workflowruntime/admission.go` consumes closure `WorkflowPlanNode` facts                                                                                                                                         |
-| Keep execution preparation outside Session Runtime commands         | Implemented    | Wrapper invokes `workflowruntime.Admission.PrepareWorkflow` or `PrepareWorkflowTriggers` before Runtime receives `ProgramSnapshot`                                                                               |
-| Remove Workflow Artifact selections from core Workflow commands     | Implemented    | Core `StartWorkflowCommand` and `RegisterWorkflowTriggersCommand` accept prepared `ProgramSnapshot` only                                                                                                         |
-| Rename Workflow admission to execution preparation                  | Not applicable | This is naming cleanup only. It is not functional work in this cycle.                                                                                                                                            |
-| Lower one admitted static plan with canonical declaration paths     | Implemented    | `workflowruntime/declaration_paths.go` decorates the lowered tree. Structured child frames, WorkItems, handlers, retries, sagas, reconciliation, and uncertain outcomes retain planning-owned declaration paths. |
+- Status: Partial.
+- Corrected prior claims: `RT-DISPATCH-001`, `RT-DISPATCH-001.a`,
+  `RT-DISPATCH-001.b`, and `ARC-CALL-POLICY-001`.
+- Current evidence:
+  - `advanceFrameLocked` contains identity-based reacquisition.
+  - `wakeEventWaitsLocked` can retain a `Wait` pointer across
+    `resolveDurableWaitLocked`, which can call `finishWorkLocked` and advance
+    orchestration.
+  - `dispatchEmit` calls `finishWorkLocked` and can continue with an earlier
+    Execution pointer before later reacquisition.
+  - `completeNormalToolCall` can advance the owning frame and continue with
+    earlier WorkItem and Execution pointers.
+  - Reconciliation delivery can wake work and mutate Session execution state
+    before later mutation of the original operation.
+  - The `bindErr` branch in `dispatchOne` can create catch or finally work
+    without launching it.
+  - Port-failure branches can advance a frame and persist without the common
+    ready-work launch.
+  - `finishPanickedWork` persists settlement without launching next ready work.
+  - Invalid wait-resolution failure can bypass normal settlement.
+  - Early cancellation settlement in `finishWorkLocked` can return before
+    ordinary completion-wait wakeup.
+- Required result:
+  - Every mutation after an operation that can append, replace, restore, or
+    otherwise invalidate slice-backed Session objects reacquires the
+    authoritative Session, Execution, ProgramFrame, WorkItem, and Wait by
+    durable identity.
+  - Every terminal path uses one complete committed lifecycle: settle Attempt
+    and effect facts, release or transfer claims, wake completion waits, advance
+    owners, settle Executions, checkpoint, then launch all newly ready Session
+    work.
+  - Catch, finally, parent completion waits, resource waiters, forwarded
+    channels, independent children, and cross-Execution work do not remain idle
+    after a committed dependency settles.
 
-### Bind target domains without Workflow leakage
+##### `RT-SETTLE-003.a` Reacquire authoritative Session-owned objects
 
-| Subtask                                                                      | Status      | Evidence or required result                                                                                                                                                                    |
-| ---------------------------------------------------------------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Bind Model and Agent through existing setup APIs                             | Partial     | Typed Model and Agent invocation adapters exist, but prepared contribution meaning and Agent Model selection are reconstructed through setup paths. See `WF-PREPARE-003` and `ARC-DOMAIN-003`. |
-| Bind Go Tools, MCP Tools, and Skill Tools through native arguments           | Implemented | V3 Tool, MCP, and Skill setup executors                                                                                                                                                        |
-| Keep Provider SDK Tools provider-managed                                     | Implemented | Workflow SDK Tool targets produce a typed Model child plan and provider-managed choice only                                                                                                    |
-| Bind Service and Activity through registered adapters                        | Implemented | Workflow binding registry                                                                                                                                                                      |
-| Prepare Service and Activity context and port transport before work creation | Implemented | Binding capability facts are consumed by Workflow preparation and durable target descriptors                                                                                                   |
-| Preserve Model and Agent output and stream port plans                        | Partial     | Child intents retain accepted plans, but original call-boundary capture and declaration-visible channel snapshots remain incomplete. See `WF-RETRY-003` and `WF-CHANNEL-003`.                  |
-| Prepare target-family transport behavior before WorkItem creation            | Partial     | Preparation validates covered transport facts, but nested channel aliases and common settlement paths remain incomplete. See `WF-CHANNEL-003` and `RT-SETTLE-003`.                             |
-| Remove direct capability routing                                             | Implemented | `workflowruntime/direct_targets.go`, direct binder routing, direct bootstrap wiring, direct target payloads, and direct semantic binding fields are removed.                                   |
-| Remove generic callable capability framework                                 | Implemented | `WorkflowCapabilityRequirement`, `WorkflowCapabilityFact`, generic fact resolvers, and callable `capabilities` schema/model fields are removed.                                                |
-| Lower provider-managed Workflow Tools through typed Model child plans        | Implemented | SDK Tool choices remain inside typed Model plans and never enter local Tool dispatch                                                                                                           |
-| Move concrete URL and diff behavior out of generic Workflow setup            | Implemented | `attachmentruntime` and `textruntime` own behavior; Workflow composition only registers bindings                                                                                               |
+- Status: Partial.
+- Current evidence: `R/coordination.go` retains wait pointers across durable
+  resolution. Emit, manual result, and reconciliation paths can continue with
+  earlier objects.
+- Required result:
+  - Mutate through durable Session, Execution, ProgramFrame, WorkItem, and Wait
+    identities after append, rollback, child creation, forwarding, orchestration
+    advancement, or durable resolution.
+  - Do not use a stale pointer after a mutation-capable Runtime call.
 
-### Execute Workflow reliability behavior
+##### `RT-SETTLE-003.b` Use one terminal lifecycle and committed ready-work launch
 
-| Subtask                                                                   | Status         | Evidence or required result                                                                                                                                                                                                        |
-| ------------------------------------------------------------------------- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Persist state owner identity and schema                                   | Implemented    | Workflow state-owner runtime code                                                                                                                                                                                                  |
-| Persist Parallel and Foreach parent-state merges                          | Partial        | Durable StateUpdate merge WorkItems exist, but empty captured collections can leave merge progress unapplied. See `WF-CONTROL-003.b`.                                                                                              |
-| Persist failed and uncertain step outcomes                                | Partial        | Preserve complete target, receipt, effect, aggregate, native typed error, and declaration facts through ordinary, reconciliation, cancellation, interruption, and structured settlement. See `WF-OUTCOME-003` and `RT-SETTLE-003`. |
-| Make Workflow logical evaluation time Runtime-owned                       | Implemented    | Runtime supplies logical initialization time and `advanceFrameLocked` supplies transition time.                                                                                                                                    |
-| Persist retry boundaries and backoff waits                                | Implemented    | `RetryState` remains durable and Runtime re-arms its due-time callback after complete restore.                                                                                                                                     |
-| Preserve effects, reconciliation, and compensation                        | Partial        | Complete `WF-RECOVERY-001`, `WF-RETRY-003`, `WF-EFFECT-003`, `RT-CLEANUP-003`, and `RT-SETTLE-003`.                                                                                                                                |
-| Verify Service and Activity retry adaptation for every registered binding | Not applicable | Tests and validation work are excluded from this implementation cycle.                                                                                                                                                             |
-| Verify cancellation races for every mutating target family                | Not applicable | Tests and validation work are excluded from this implementation cycle.                                                                                                                                                             |
+- Status: Partial.
+- Current evidence: binding error, port error, panic, invalid wait-resolution
+  result, manual result, cancellation, reconciliation, and child completion use
+  different terminal consequences.
+- Required result:
+  - Route each terminal condition through the common lifecycle.
+  - Persist before launching dependency-ready work.
+  - Preserve the actual effect and error facts through settlement.
+  - Ensure a failure cannot leave catch, finally, completion, or resource work
+    dormant.
 
-### Complete normal conversation parity
+#### `RT-CLEANUP-003` Execute cleanup through every owning lifecycle
 
-| Subtask                                                               | Status      | Evidence or required result                                                                                                                                                                                                     |
-| --------------------------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Persist messages, Tool calls, waits, streaming, Apps, and projections | Implemented | Session Runtime v3 and V3 setup binder                                                                                                                                                                                          |
-| Persist typed Model defaults and selected Artifact facts              | Implemented | Session defaults and dispatch plans                                                                                                                                                                                             |
-| Support artifact-backed normal Session configuration                  | Partial     | Complete inherited collection policy, contribution precedence, effective Workspace application, and contribution provenance in `V3-CONFIG-003` and `ARC-DOMAIN-003`.                                                            |
-| Reproduce later artifact-backed conversation behavior                 | Partial     | Complete retained LLM bindings, captured message order, exact non-secret Model configuration, queued handoff rounds, and interrupted output semantics in `V3-REPLAY-003`, `WF-HANDOFF-003`, and `WF-OUTCOME-003`.               |
-| Map required artifact-backed Session behavior to V3                   | Partial     | Backend replacement requires the open settlement, cleanup, budget, preparation, effect, retry, replay, configuration, Skill, continuation, handoff, persistence, API composition, attachment, ownership, and duplication tasks. |
-| Migrate frontend traffic and stored Sessions                          | Excluded    | Frontend integration and Session v2 migration are outside this audit scope                                                                                                                                                      |
+- Status: Partial.
+- Corrected prior claims: `RT-CLEANUP-002` and cleanup-complete scheduler
+  claims.
+- Current evidence:
+  - `dispatchOne` builds binding context from `item.Deadline`, including an
+    expired ordinary deadline.
+  - Its post-binding deadline branch does not exclude cleanup work.
+  - `dispatchEmit` rejects cancellation-requested work, including cleanup
+    emits.
+  - Retry and resource timer callbacks cancel work on Execution cancellation
+    without cleanup ownership.
+  - Stream paths reject cancellation without distinguishing permitted cleanup
+    output.
+  - Cleanup detection examines a Workflow program directly. A retry wrapper
+    around cleanup work has a different representation.
+- Required result:
+  - Normal work stops after cancellation or ordinary deadline expiry.
+  - Eligible cleanup uses its effective cleanup deadline and continues through
+    the bounded cleanup allowance.
+  - Cleanup classification survives binding, execution, waits, retry, resource
+    acquisition, emits, streams, settlement, and synthetic frames.
+  - Cancellation remains the primary terminal meaning.
 
-### Remove repeated admission and setup layers
+##### `RT-CLEANUP-003.a` Carry cleanup classification and effective deadline
 
-| Removal item                                                | Status         | Required result                                                                                                                                                                                                                  |
-| ----------------------------------------------------------- | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Remove static declaration rechecks after Workflow admission | Not applicable | This is validation-only cleanup. Do not add it as independent work in this cycle; remove redundant checks only when functional ownership consolidation makes them unnecessary.                                                   |
-| Remove repeated source-tree walks during lowering           | Implemented    | Compiler lowers admitted source once; Inventory decorates the lowered runtime tree without another source traversal                                                                                                              |
-| Remove the runtime-owned Workflow preparation port          | Implemented    | Setup submits prepared snapshots; Session Runtime persists and interprets them                                                                                                                                                   |
-| Collapse duplicate Model dispatch-plan processing           | Partial        | `llmExecutionPlan.activities` has shared preparation, but owner records and Tool origins still copy complete effective plans. See `ARC-DUP-003`.                                                                                 |
-| Normalize MCP Tool exposure once                            | Implemented    | `normalizeMCPSelections` persists only `all`, `none`, or `selected` before dispatch-plan construction                                                                                                                            |
-| Assign one dispatch-time pin owner per target family        | Implemented    | Go Tool freshness remains in Tool Runtime; MCP freshness is verified by MCP Runtime; generic Workflow wrappers no longer read pins                                                                                               |
-| Remove generic Workflow concrete bindings                   | Partial        | URL normalization moved to Attachment Runtime and unified diff moved to Text Runtime, but Session and Workflow setup still duplicate Agent, Workspace, Text, attachment, and Model request interpretation. See `ARC-DOMAIN-003`. |
-| Remove runtime reconstruction of declaration permissions    | Partial        | Canonical declaration paths propagate, but private namespacing changes declaration-visible channel keys and snapshots are not always captured at the actual evaluation boundary. See `WF-CHANNEL-003`.                           |
+- Status: Partial.
+- Current evidence: `R/runtime.go`, `coordination.go`, `retry.go`,
+  `runtime_resources.go`, and stream paths retain ordinary-work decisions.
+- Required result:
+  - Apply the effective cleanup deadline from binding through external
+    invocation, retry, resource waiting, emits, streams, and final settlement.
+  - Ensure retry wrappers and other synthetic frames inherit cleanup
+    classification.
+  - Do not reject eligible cleanup only because ordinary work is cancelled or
+    expired.
 
-### Verify deployment composition
+##### `RT-CLEANUP-003.b` Retain Saga ownership until late outcomes settle
 
-| Subtask                                                 | Status      | Evidence or required result                                                                                                                                                               |
-| ------------------------------------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Verify Session Store v3 checkpoint and restore behavior | Partial     | `internal/sessionstorev3/` persists, restores, indexes, and projects Session v3 documents, but committed tombstone behavior after index failure remains incomplete. See `RT-PERSIST-003`. |
-| Verify application bootstrap ordering                   | Implemented | `cmd/agentgo/app.go` constructs dependencies before Store v3 and Runtime v3 restore                                                                                                       |
-| Verify runtime shutdown ordering                        | Implemented | `SessionV3Wrapper.close` closes Runtime v3 before Store v3                                                                                                                                |
-| Verify Wails command and projection compatibility       | Excluded    | Frontend integration is outside this audit scope                                                                                                                                          |
+- Status: Partial.
+- Current evidence:
+  - `workflow_saga.go:beginSagaCompensation` can finish a Saga immediately when
+    its initial compensation order is empty.
+  - Dispatched normal work can confirm an effect after that point.
+  - `resumeCancellationCleanupFramesLocked` resumes only nonterminal frames
+    with pending Saga progress.
+- Required result:
+  - Keep a Saga available while late effect confirmation, reconciliation,
+    compensation, completion wakeup, or final resource release remains
+    possible.
+  - Do not treat an empty initial compensation list as proof that no later
+    compensation is required.
+  - Preserve cancellation as the primary outcome.
+
+#### `RT-BUDGET-003` Complete scoped accounting and resource-ready scheduling
+
+- Status: Partial.
+- Corrected prior claims: `RT-LIMIT-002` and child-call policy completion
+  claims.
+- Current evidence:
+  - Budget concurrency counts `Binding` and `Dispatched` work.
+  - A WorkItem changing from `Binding` to `Waiting` frees a slot but does not
+    consistently wake budget-concurrency waiters.
+  - Binding failure can release resources before changing the WorkItem out of
+    `Binding`.
+  - Scope, Choose, Parallel, Foreach, Repeat, Machine, and Saga child-frame
+    construction do not consistently retain `step.Limits`.
+  - `childProgramFrameDepth` increments depth for synthetic orchestration
+    frames as well as nested Workflow frames.
+  - Child-call and Fork work can become separately ready before a durable outer
+    operation Attempt and budget reservation exist.
+- Required result:
+  - Slot release wakes eligible work regardless of whether release comes from
+    binding wait, success, failure, cancellation, or immediate settlement.
+  - Structured constructs apply declared narrowed budgets to owned work.
+  - Attached descendants consume intended aggregate counters.
+  - Workflow depth means Workflow nesting, not incidental Runtime frame depth.
+  - The durable outer child-call operation is reserved before child native work
+    can dispatch.
+
+##### `RT-BUDGET-003.a` Wake waiters when a counted slot becomes available
+
+- Status: Partial.
+- Current evidence: `budget.go:activeBudgetWork`,
+  `wakeBudgetConcurrencyWaitersLocked`, and `runtime.go:dispatchOne` do not
+  consistently wake waiters after `Binding` to `Waiting`, binding failure, or
+  similar state transitions.
+- Required result:
+  - Every counted-slot release runs eligible durable wakeup and ready-work
+    launch.
+  - A durable wait must not require an unrelated event to restart available
+    work.
+
+##### `RT-BUDGET-003.b` Apply structured limits and semantic Workflow depth
+
+- Status: Partial.
+- Current evidence: structured child-frame intents do not consistently carry
+  `step.Limits`; `childProgramFrameDepth` counts synthetic frames.
+- Required result:
+  - Apply construct-local narrowed limits to Scope, Choose, Parallel, Foreach,
+    Repeat, Machine, and Saga work.
+  - Preserve parent aggregate accounting.
+  - Count nested Workflow depth separately from internal Fork, retry, and
+    structured-block frames.
+
+##### `RT-BUDGET-003.c` Reserve outer child-call work before child dispatch
+
+- Status: Partial.
+- Current evidence: child-call and Fork work can be created as separately ready
+  work.
+- Required result:
+  - Persist the logical outer Attempt, effective policy, accounting, and
+    ownership before a child performs native work.
+  - A child must not bypass the outer budget decision.
+
+#### `RT-TRIGGER-003` Resume trigger lifecycle changes and expose one event meaning
+
+- Status: Partial.
+- Corrected prior claims: `RT-TRIGGER-002`, `ARC-SCHEDULER-001`, and complete
+  trigger queue resumption claims.
+- Current evidence:
+  - `SetTriggerRegistrationState` rearms schedule timers without draining
+    already eligible queued occurrences.
+  - Trigger expressions expose `event.name`.
+  - Ordinary event waits expose `type`.
+  - Machine expression behavior depends on the event projection it receives.
+- Required result:
+  - Registration reactivation drains eligible occurrences through the same
+    committed ready-work launch as other Runtime work.
+  - Missed-occurrence behavior follows the declared registration policy.
+  - Trigger, wait, and Machine expressions receive one semantic event
+    projection.
+
+##### `RT-TRIGGER-003.a` Drain eligible occurrences after reactivation
+
+- Status: Partial.
+- Current evidence: registration state changes rearm timers but do not drain
+  eligible queues.
+- Required result:
+  - Persist registration and queue changes.
+  - Apply missed-occurrence behavior.
+  - Launch eligible work through the shared Runtime path.
+
+##### `RT-TRIGGER-003.b` Use one declared event projection
+
+- Status: Partial.
+- Current evidence: `TriggerEventEnvelope` exposes `name`, while event-wait
+  output exposes `type`.
+- Required result:
+  - Preserve `type`, source, identity, data, correlation, and time through one
+    semantic event projection.
+
+#### `RT-COMMAND-003` Replay accepted commands independently of regenerated preparation
+
+- Status: Partial.
+- Current evidence:
+  - Message attachment admission can run before command receipt lookup.
+  - Continuation attachment admission and edit paths can require old local
+    sources before replay lookup.
+  - Workflow wrappers can prepare a ProgramSnapshot before Runtime replay
+    returns the prior receipt.
+  - `AcceptTriggerEvent` fills missing `OccurredAt` before command
+    fingerprinting.
+- Required result:
+  - An accepted command returns its prior receipt without requiring former
+    source files, attachments, selected Artifacts, or setup resources.
+  - Stable caller payload identity is preserved across preparation.
+  - Runtime does not own Workflow preparation.
+
+##### `RT-COMMAND-003.a` Preserve public command identity before preparation
+
+- Status: Partial.
+- Required result:
+  - Use the original caller identity to find prior accepted receipts.
+  - Preserve the caller identity across prepared snapshots.
+  - Do not repeat attachment admission or source preparation for an accepted
+    duplicate command.
+
+##### `RT-COMMAND-003.b` Keep generated occurrence time outside caller identity
+
+- Status: Partial.
+- Current evidence: `AcceptTriggerEvent` fills `OccurredAt` before
+  fingerprinting.
+- Required result:
+  - Fingerprint the original caller payload.
+  - Persist and reuse generated occurrence facts after acceptance.
+
+#### `RT-PERSIST-003` Complete deletion commitment and idle Session deletion
+
+- Status: Partial.
+- Corrected prior claims: `RT-PERSIST-002` and complete normal V2 replacement
+  claims.
+- Current evidence:
+  - `sessionstorev3/store.go:HandleSessionTombstone` can commit a tombstone and
+    then return an ordinary derived-index deletion error.
+  - `sessionv3/runtime.go:DeleteSession` can restore the live in-memory Session
+    after that committed tombstone.
+  - An idle normal conversation Execution is intentionally long-lived.
+  - `DeleteSession` rejects every nonterminal Execution.
+- Required result:
+  - Runtime and Store agree whether tombstone commitment occurred.
+  - Derived-index repair never resurrects a deleted Session.
+  - An idle long-lived normal conversation can be deleted while actual active
+    Workflow, child, wait, cleanup, or external work remains protected.
+
+##### `RT-PERSIST-003.a` Treat committed tombstones as committed
+
+- Status: Partial.
+- Required result:
+  - Report semantic tombstone commitment distinctly from a repairable
+    derived-index failure.
+  - Preserve deletion receipt and deletion barrier.
+  - Schedule derived-index repair without restoring the Session.
+
+##### `RT-PERSIST-003.b` Delete idle long-lived normal conversations
+
+- Status: Partial.
+- Required result:
+  - Retire an idle conversation root during normal Session deletion.
+  - Retain ownership of active Workflow, child, wait, cleanup, and external
+    work until it settles.
+  - Do not treat this as SessionV2 retirement cleanup.
+
+### Workflow preparation, captured calls, ports, and channels
+
+#### `WF-PREPARE-003` Preserve complete prepared target meaning
+
+- Status: Partial.
+- Current evidence:
+  - Workflow preparation receives a complete static closure.
+  - `S/workflowruntime/admission.go:admitPlanned` primarily retains pins through
+    targets and requirements.
+  - An Agent target retains the Agent pin.
+  - Dispatch later resolves Agent contributions through
+    `sessionv3runtime.applyAgentPlan`.
+  - There is no complete immutable transitive contribution snapshot on the
+    prepared Workflow program.
+  - `admitPlanned` calls `workflowOwnerModel` before it knows whether
+    provider-managed Tool lowering needs an owner Model.
+- Required result:
+  - Preserve prepared source-backed meaning for Agent, Model, Text, Tool,
+    Skill, MCP, Workspace, nested Workflow, and declared requirements.
+  - Do not retain private clients, credentials, or Artifact Store execution
+    handles.
+  - Do not silently resolve different transitive contributions at dispatch.
+  - Pure deterministic or registered-binding Workflows must not fail because
+    unrelated Session defaults are unavailable.
+
+##### `WF-PREPARE-003.a` Retain immutable pins and prepared contribution facts
+
+- Status: Partial.
+- Required result:
+  - Lower prepared transitive selections into neutral Runtime snapshots.
+  - Preserve exact prepared Model, Agent, Text, Tool, Skill, MCP, Workspace,
+    and nested Workflow meaning.
+  - Reconstruct only private current resources at dispatch.
+
+##### `WF-PREPARE-003.b` Resolve an owner Model only where required
+
+- Status: Partial.
+- Current evidence: `workflowOwnerModel` runs eagerly from `admitPlanned`.
+- Required result:
+  - Resolve an owner Model only for provider-managed Tool lowering.
+  - Do not require unrelated conversation Model or Agent defaults for pure
+    Workflow execution.
+
+#### `WF-RETRY-003` Preserve one captured logical call through retry and started execution
+
+- Status: Partial.
+- Corrected prior claims: `WF-RETRY-002` and complete logical-call capture
+  claims.
+- Current evidence:
+  - `retryCaptureChildCall` runs when a child settles.
+  - Typed message and instruction capture can evaluate templates against later
+    child state and later logical time.
+  - Started calls freeze generic input and context but retain typed LLM
+    templates for later wrapper-child evaluation.
+  - `compileWorkflowRetry` drops `match.schema`.
+  - Retry routing rejects uncertainty before considering declared replay-safe
+    effects.
+  - Generic Agent and single-model failure replacement can discard native typed
+    category and cause facts.
+- Required result:
+  - Capture one complete call snapshot before dispatch or child materialization.
+  - Reuse that snapshot through retry, started-child materialization, recovery,
+    and settlement.
+  - Preserve declared matching and effect-safe replay semantics.
+  - Preserve native typed Model and Agent failure classification.
+
+##### `WF-RETRY-003.a` Capture the original evaluation boundary
+
+- Status: Partial.
+- Required result:
+  - Capture evaluated target, target-set membership, input, context, typed
+    messages, instructions, relevant port inputs, key, effect policy, and
+    logical time.
+  - Capture before dispatch or child creation.
+  - Do not observe later channel contents, state, or settlement time.
+
+##### `WF-RETRY-003.b` Apply complete retry selection and effect replay semantics
+
+- Status: Partial.
+- Required result:
+  - Retain `match.schema`.
+  - Reuse declared retry matching.
+  - Permit only policy-authorized read, idempotent, keyed, or
+    confirmed-not-applied retries.
+  - Consider declared replay-safe effects before rejecting an uncertain result.
+
+##### `WF-RETRY-003.c` Preserve native Model and Agent failure classification
+
+- Status: Partial.
+- Required result:
+  - Retain native category, cause, and domain meaning through child ProgramFrame
+    settlement.
+  - Make those facts available to retry, catch, outcome, and projection logic.
+
+#### `WF-CHANNEL-003` Preserve invocation-local coordination and declaration-visible meaning
+
+- Status: Partial.
+- Corrected prior claims: `WF-PORT-003`, `ARC-TRANSPORT-001`,
+  `WF-SCOPE-001`, and parts of `WF-MACHINE-002`.
+- Current evidence:
+  - `ports_runtime.go:namespaceWorkflowProgramChannels` changes declaration
+    names to private names.
+  - CEL expressions are not renamed.
+  - `workflow_messages.go:captureWorkflowMessages` publishes namespaced names
+    as expression-map keys.
+  - `Advance` captures messages before settlement and before `drive` can move
+    to another step or root output.
+  - Inherited subscriptions are copied into child frames and consumption is
+    keyed to the waiting child frame.
+- Required result:
+  - Separate invocation-private storage identity from declaration-visible
+    expression identity.
+  - Capture an authorized channel view for each actual step and block-output
+    boundary.
+  - Preserve original subscription ownership through inherited child scopes.
+  - Reuse a captured call snapshot for retry and started work.
+
+##### `WF-CHANNEL-003.a` Preserve declared channel aliases
+
+- Status: Partial.
+- Required result:
+  - Keep declared aliases such as `messages.review` visible to expressions.
+  - Keep private nested Workflow channel logs invocation-local.
+  - Do not expose private storage namespaces as declaration vocabulary.
+
+##### `WF-CHANNEL-003.b` Capture each evaluation boundary
+
+- Status: Partial.
+- Required result:
+  - Capture a new authorized channel snapshot for the declaration boundary
+    actually being evaluated.
+  - Do not allow a later step or root output to inherit a prior boundary's
+    authorization or snapshot.
+  - Retain the original snapshot for a captured logical call.
+
+##### `WF-CHANNEL-003.c` Preserve inherited subscription identity
+
+- Status: Partial.
+- Required result:
+  - Retain the originating subscription owner when a child inherits a
+    subscription.
+  - Do not make an already consumed event available again because execution
+    entered a child scope.
+
+### Workflow effects, recovery, structured control, and outcomes
+
+#### `WF-EFFECT-003` Preserve declaration effects and actual business-effect facts
+
+- Status: Partial.
+- Corrected prior claims: `WF-EFFECT-002`, `WF-RECOVERY-001`, and portions of
+  `RT-CLEANUP-002`.
+- Current evidence:
+  - Source declarations use `non-idempotent`.
+  - Runtime uses `nonIdempotent`.
+  - `compileWorkflowEffect` and `compileWorkflowStepEffect` compare source
+    strings with Runtime enum strings.
+  - `S/mcpruntime/v3.go:Execute` returns `EffectStateUncertain` for every MCP
+    response, including confirmed success.
+  - `completedSemanticToolOutput` excludes effect-uncertain Tool results from
+    historical reconstruction.
+  - Ordinary sequential Workflow calls do not establish equivalent causal effect
+    dependencies.
+  - `WorkflowCompletedOperationFacts` lacks promised original-operation and
+    compensation identity facts.
+- Required result:
+  - Explicitly translate declaration effects.
+  - Preserve effect contracts through dispatch, retry, reconciliation, and
+    compensation.
+  - Use strongest actual domain certainty for MCP settlement.
+  - Preserve causal dependencies and full compensation operation facts.
+  - Use the same settled facts for continuation, outcome, recovery,
+    reconciliation, history, and Saga recording.
+
+##### `WF-EFFECT-003.a` Translate `non-idempotent`
+
+- Status: Partial.
+- Required result:
+  - Map admitted source `non-idempotent` explicitly to Runtime
+    `nonIdempotent`.
+  - Do not treat this as a validation-only issue.
+
+##### `WF-EFFECT-003.b` Settle MCP from actual domain evidence
+
+- Status: Partial.
+- Required result:
+  - Mark confirmed successful MCP responses as confirmed application where
+    domain evidence supports that result.
+  - Preserve uncertainty for errors that do not prove non-application.
+  - Preserve receipts and settled Tool results for normal continuation, history,
+    reconciliation, and Saga recording.
+
+##### `WF-EFFECT-003.c` Preserve compensation causality and operation facts
+
+- Status: Partial.
+- Required result:
+  - Establish effect dependencies across ordered work and structured boundaries.
+  - Compensate independent effects concurrently only when dependencies permit
+    it.
+  - Supply original operation, target, Attempt, receipt, effect, and
+    compensation identities without private state.
+
+#### `WF-CONTROL-003` Complete structured-control value and lifetime behavior
+
+- Status: Partial.
+- Corrected prior claims: `WF-CONTROL-001`, `WF-SCOPE-001`, and
+  `WF-MACHINE-002`.
+- Current evidence:
+  - Repeat body frames receive an iteration index, but `while` and `until`
+    evaluation do not explicitly install the current Repeat index.
+  - Empty Foreach with parent-state merge can create merge progress and return
+    idle without emitting required merge work.
+  - Empty runtime collections under non-`all` completion can remain pending.
+  - Lowering loses the difference between omitted and explicit zero
+    `maxItems` or `maxIterations`.
+  - Machine `Microsteps` increments for event-driven transitions and is not
+    reset at a genuine suspension boundary.
+- Required result:
+  - Apply current Repeat index at every Repeat condition boundary.
+  - Execute empty-collection merge behavior.
+  - Settle empty collections truthfully.
+  - Preserve explicit maximum values.
+  - Limit consecutive immediate Machine transitions without limiting the
+    lifetime count of accepted events.
+
+##### `WF-CONTROL-003.a` Apply Repeat index to condition evaluation
+
+- Status: Partial.
+- Required result:
+  - Install the current Repeat index for `while` and `until`.
+  - Preserve carried state and result semantics at the same boundary.
+
+##### `WF-CONTROL-003.b` Settle empty collections and preserve maxima
+
+- Status: Partial.
+- Required result:
+  - Emit required merge work for empty Foreach results.
+  - Settle non-`all` empty collections according to declared result behavior.
+  - Preserve omitted versus explicit zero `maxItems` and `maxIterations`.
+
+##### `WF-CONTROL-003.c` Limit immediate Machine transitions only
+
+- Status: Partial.
+- Required result:
+  - Reset the immediate-transition counter at genuine suspension.
+  - Permit long-lived event-driven Machines.
+  - Retain the immediate-transition safety bound.
+
+#### `WF-OUTCOME-003` Preserve complete Workflow and conversation terminal meaning
+
+- Status: Partial.
+- Current evidence:
+  - `recordTerminalWorkflowStepOutcome` can use an earlier `PendingPath`.
+  - Inline failure reached while `drive` selects a new step can lack the actual
+    failing-step outcome.
+  - Successful `return`, `break`, and `continue` can bypass ordinary
+    step-outcome recording.
+  - Failed outcomes do not consistently retain receipt and effect facts from
+    the settled WorkItem.
+  - Failed or cancelled Agent LLM work can retain stream text only on the
+    WorkItem.
+  - Current stream merge behavior requires a final LLM payload.
+- Required result:
+  - Record the actual active step boundary.
+  - Retain target, receipt, effect, aggregate, error, and declaration facts.
+  - Persist interrupted assistant output once without fabricating successful
+    business execution.
+  - Preserve actual typed failures through child ProgramFrames.
+
+##### `WF-OUTCOME-003.a` Record complete settled step facts
+
+- Status: Partial.
+- Required result:
+  - Record actual step identity for ordinary, inline, child, reconciliation,
+    failure, cancellation, return, break, and continue paths.
+  - Retain target, receipt, effect, aggregate, native typed error, and
+    declaration facts.
+
+##### `WF-OUTCOME-003.b` Persist interrupted assistant output truthfully
+
+- Status: Partial.
+- Required result:
+  - Persist a semantic assistant Activity for usable partial output.
+  - Preserve actual provider observations and actual failure or cancellation.
+  - Do not create a fabricated successful Model or Tool result.
+
+### Conversation replay, configuration, continuation, handoff, and Skill state
+
+#### `V3-REPLAY-003` Reconstruct private resources from the exact retained operation
+
+- Status: Partial.
+- Corrected prior claims: `V3-HISTORY-002` and `ARC-REPLAY-001`.
+- Current evidence:
+  - `R/runtime.go:recoverLocked` sets `item.Binding = nil` before the later
+    plan-preservation condition.
+  - `bindRecoveredLLM` calls `buildInputs` without retained activity sequence.
+  - Recovered activity selection is recomputed.
+  - Model resolution uses current source and overlay-derived configuration.
+  - Retaining only a Model Artifact pin does not retain all effective Provider,
+    overlay, capability, instruction, and prompt facts.
+  - Private execution fingerprint can differ from retained semantic binding
+    fingerprint.
+- Required result:
+  - Retain immutable semantic dispatch facts while discarding private resources.
+  - Preserve exact semantic message order.
+  - Retain effective non-secret Model and Provider configuration.
+  - Reconstruct credentials and clients privately.
+  - Never substitute current defaults or current contribution assembly.
+
+##### `V3-REPLAY-003.a` Retain semantic LLM bindings
+
+- Status: Partial.
+- Required result:
+  - Preserve immutable plans for dispatched replay-safe work and equivalent
+    interrupted preparation paths.
+  - Clear only private resources.
+
+##### `V3-REPLAY-003.b` Reproduce captured message order and configuration
+
+- Status: Partial.
+- Required result:
+  - Rebuild from captured message identities and causal order.
+  - Retain effective Provider, Model, capability, instruction, context, and
+    non-secret overlay facts.
+  - Resolve credentials and clients privately without current-default
+    substitution.
+
+#### `V3-CONFIG-003` Complete inherited and explicit invocation configuration
+
+- Status: Partial.
+- Corrected prior claims: `V3-CONFIG-002`, `ARC-V3-001`, and
+  `ARC-OWNERSHIP-002`.
+- Current evidence:
+  - `SessionDefaults` uses `omitempty` slices.
+  - JSON cloning and collection-copy helpers can convert explicit empty
+    collections to `nil`.
+  - Agent and Workspace contributions can append after initial Session
+    collections.
+  - `appendUniqueMCPSelection` can replace a more-specific explicit selection
+    with a later inherited selection.
+  - An Agent-contributed Workspace can be assigned to
+    `plan.defaults.Workspace` while Workspace application checks an earlier
+    local `defaults.Workspace`.
+  - `sessionv3runtime/llm_plan.go` centrally interprets Agent capability
+    occurrences, Skill use modes, Text insertion behavior, Workspace overrides,
+    and Workspace contribution assembly.
+- Required result:
+  - Preserve inheritance, replacement, explicit empty clearing, and supported
+    per-item removals and overrides.
+  - Apply inherited contributions before more-specific Session and invocation
+    decisions.
+  - Preserve explicit MCP Tools, resources, templates, prompts, and overrides.
+  - Apply the effective selected Workspace.
+  - Preserve accurate Agent, Workspace, Session, and invocation provenance.
+  - Preserve selected Model system-prompt behavior.
+
+##### `V3-CONFIG-003.a` Preserve collection policy durably
+
+- Status: Not implemented.
+- Required result:
+  - Carry collection policy separately from resulting collections.
+  - Distinguish inherit, replace, explicit empty clearing, per-item removal,
+    and supported override behavior.
+  - Prevent Agent and Workspace inheritance from recreating explicitly removed
+    Tools, Skills, MCP selections, or instructions.
+
+##### `V3-CONFIG-003.b` Apply effective contribution precedence
+
+- Status: Partial.
+- Required result:
+  - Preserve specific explicit MCP selections over inherited selections.
+  - Apply the effective selected Workspace.
+  - Preserve selected Tools, resources, templates, prompts, instructions, and
+    overrides in their intended order.
+
+##### `V3-CONFIG-003.c` Retain truthful ownership and ordering
+
+- Status: Partial.
+- Required result:
+  - Preserve actual contribution provenance instead of copying complete
+    effective collections into unrelated owner records.
+  - Keep Agent, Workspace, Session, and invocation ownership explicit.
+  - Move source-family contribution interpretation to owning domains.
+
+#### `DOMAIN-SKILL-003` Reconstruct and release Skill resources for the exact owner
+
+- Status: Partial.
+- Corrected prior claims: `DOMAIN-SKILL-002` and `ARC-SKILL-001`.
+- Current evidence:
+  - Private Skill sessions are keyed by Execution and ProgramFrame.
+  - `prepareLLMPlan` calls unscoped `EffectiveActiveSelections`.
+  - Active-state lookup searches across the Execution.
+  - Lookup selects a latest global result before checking enabled-set
+    compatibility.
+  - Long-lived conversation Executions retain sessions for completed Agent
+    frames because natural terminal paths do not consistently notify cleanup.
+- Required result:
+  - Reconstruct active Skill state for the exact invocation owner.
+  - Select the latest applicable terminal semantic result for the owner and
+    enabled pins.
+  - Keep parallel Agent invocations independent.
+  - Release private Skill sessions at natural ProgramFrame and Execution
+    completion.
+
+##### `DOMAIN-SKILL-003.a` Select applicable active Skill state
+
+- Status: Partial.
+- Required result:
+  - Filter by semantic owner and enabled pin set before selecting the latest
+    result.
+  - Do not allow another frame or incompatible enabled set to hide an
+    applicable earlier state.
+
+##### `DOMAIN-SKILL-003.b` Release Skill sessions on natural completion
+
+- Status: Partial.
+- Required result:
+  - Runtime sends lifecycle notification at natural frame and Execution
+    termination.
+  - Skill Runtime releases the exact corresponding private session.
+
+#### `V3-CONTINUE-003` Complete active-operation continuation and manual Tool ownership
+
+- Status: Partial.
+- Corrected prior claims: `V3-CONTROL-002` and parts of `WF-HANDOFF-002`.
+- Current evidence:
+  - `normal_session.go:consumeContinuationLocked` submits staged input through
+    the conversation frame.
+  - A live Agent child waiting for explicit continuation can leave that input
+    queued behind the Agent that must consume it.
+  - `ContinueExecution` can return after consuming staged input without
+    resuming the active Agent round.
+  - Manual Tool controls can address a conversation queue or whole Execution.
+  - Normal Tool mutation can rewrite consumed historical results.
+  - Continuation can broadcast across Agent frames.
+- Required result:
+  - Consume staged text, attachments, defaults, budget, approved App context,
+    and settled Tool results in the next round of the active owning operation.
+  - Scope manual retry, skip, completion-as-error, and continuation to the
+    current unconsumed operation.
+  - Preserve actual effect certainty.
+  - Keep App-originated and unrelated Workflow work outside normal Tool-result
+    continuation.
+
+##### `V3-CONTINUE-003.a` Resume the active conversation operation
+
+- Status: Partial.
+- Required result:
+  - Do not queue continuation behind the Agent round that needs it.
+  - Consume staged input exactly once into the correct next Model round.
+  - Include settled Tool results and approved App context.
+
+##### `V3-CONTINUE-003.b` Scope manual controls to the current operation
+
+- Status: Partial.
+- Required result:
+  - Preserve consumed-result ownership.
+  - Do not mutate historical Tool results already consumed by a later Model
+    round.
+  - Do not broadcast continuation into unrelated Agent frames.
+  - Do not replace confirmed-applied effect facts with synthetic
+    confirmed-not-applied facts.
+
+#### `WF-HANDOFF-003` Complete durable multi-message handoff ownership
+
+- Status: Partial.
+- Corrected prior claims: `WF-HANDOFF-002`.
+- Current evidence:
+  - Agent-loop queues retain activity IDs but not each message's effective
+    defaults and budget.
+  - When a no-Tool handoff Agent has queued work, it can return
+    `startQueuedAgentLLM` without retaining assistant Activities already
+    constructed for the completed round.
+  - A successful no-Tool handoff round remains waiting.
+  - No typed successful completion or relinquish operation exists.
+- Required result:
+  - Preserve each queued message's assistant round, immutable configuration,
+    budget, and causal isolated history.
+  - Complete or relinquish handoff successfully.
+  - Apply `restore` or `retain` without using cancellation as success.
+
+##### `WF-HANDOFF-003.a` Preserve queued message semantic facts
+
+- Status: Partial.
+- Required result:
+  - Retain each completed assistant Activity exactly once.
+  - Retain immutable defaults and budget for each accepted message.
+  - Extend isolated history causally across messages handled by the handoff
+    owner.
+
+##### `WF-HANDOFF-003.b` Complete or relinquish handoff successfully
+
+- Status: Not implemented.
+- Required result:
+  - Add a typed backend lifecycle operation that settles successful handoff.
+  - Apply restore or retain behavior.
+  - Do not use cancellation as a successful completion substitute.
+
+### Domain setup ownership, binder composition, attachment meaning, and duplication
+
+#### `ARC-DOMAIN-003` Complete owning-domain setup boundaries
+
+- Status: Partial.
+- Corrected prior claims: `ARC-OWNERSHIP-002`.
+- Current evidence:
+  - `S/sessionv3runtime/llm_plan.go` interprets capability occurrences,
+    insertion modes, Workspace overrides, and contribution selection.
+  - `S/workflowruntime/model_agent_adapter.go` independently selects Agent
+    Models.
+  - V3 attachment materialization remains in Session setup.
+  - Native Model request conversion and Model-default adaptation are not fully
+    owned by Model setup.
+- Required result:
+  - Agent setup owns Agent contribution semantics and Model selection.
+  - Workspace setup owns Workspace selection and contribution semantics.
+  - Text setup owns Text contribution preparation.
+  - Attachment setup owns admission and content materialization.
+  - Model setup owns provider input, output, and Model-default adaptation.
+  - Session setup composes domain facts.
+  - Workflow setup lowers orchestration intent.
+  - Core Runtime receives only neutral semantic facts.
+
+##### `ARC-DOMAIN-003.a` Move contribution preparation to owning domains
+
+- Status: Not implemented.
+- Required result:
+  - Remove duplicated Agent Model selection.
+  - Provide neutral Agent, Workspace, Text, Skill, and Model contribution facts
+    from their owning setup domains.
+  - Keep Session and Workflow setup as compositional consumers.
+
+##### `ARC-DOMAIN-003.b` Move attachment and Model conversion to owning domains
+
+- Status: Partial.
+- Required result:
+  - Move V3 attachment materialization to Attachment setup.
+  - Keep semantic history selection in Session orchestration.
+  - Move native provider request and output conversion, including Model-default
+    adaptation, to Model setup.
+  - Preserve MCP, Skill, Tool, Text, Service, and Activity native semantics.
+
+#### `V3-API-003` Preserve optional backend capabilities through final binder composition
+
+- Status: Partial.
+- Corrected prior claims: `V3-SETUP-002`.
+- Current evidence:
+  - The base V3 binder implements `PrepareUserMessageSkillTemplate` and
+    `PreviewInstructionSkill`.
+  - `S/workflowruntime/binder.go` forwards App operations but does not supply
+    those Skill forwarding methods.
+  - Runtime discovers optional capability interfaces from the composed binder.
+- Required result:
+  - The composed Workflow binder delegates both optional Skill capabilities to
+    Base.
+  - Do not create a second rendering implementation.
+
+##### `V3-API-003.a` Forward Skill template preparation and preview
+
+- Status: Not implemented.
+- Required result:
+  - Forward `PrepareUserMessageSkillTemplate`.
+  - Forward `PreviewInstructionSkill`.
+  - Preserve existing base implementation ownership.
+
+#### `DOMAIN-ATTACH-003` Preserve semantic attachment identity in native Model input
+
+- Status: Partial.
+- Current evidence:
+  - `sessionv3runtime/attachments.go` snapshots content and digests.
+  - `v3AttachmentFromContentBlock` stores raw text.
+  - `inputs.go:attachmentToContentItem` can send text without its label.
+  - Directory children can use only basenames.
+- Required result:
+  - Preserve meaningful file labels in provider content.
+  - Preserve stable root-relative directory identity.
+  - Distinguish same-named files from different directories.
+  - Continue replaying admitted snapshots rather than reopening native paths.
+
+##### `DOMAIN-ATTACH-003.a` Carry labels and directory-relative names
+
+- Status: Partial.
+- Required result:
+  - Retain semantic display labels during provider conversion.
+  - Retain root-relative identity for directory children.
+  - Keep one authoritative admitted content snapshot.
+
+#### `ARC-DUP-003` Remove replicated effective state and duplicated execution algorithms
+
+- Status: Partial.
+- Corrected prior claims: `ARC-DUP-002`.
+- Current evidence:
+  - `enrichDurableLLMDispatchPlan` copies effective collections into Workspace,
+    Agent, and Agent.Workspace records.
+  - `LLMToolOriginForWorkItem` deep-copies a complete Model plan into each
+    generated Tool.
+  - Message and attachment plans repeat attachment content.
+  - `evaluate` and `evaluateWithActivation` duplicate recursive Workflow value
+    evaluation.
+  - Retry and catch matching duplicate failure matching behavior.
+  - Error cloning and operation-input extraction have equivalent
+    implementations.
+  - Channel namespacing, resource namespacing, and call lookup repeat
+    lowered-tree traversal.
+  - Several failure paths independently release claims, advance frames, and
+    launch work.
+- Required result:
+  - Retain one canonical immutable effective plan with truthful provenance.
+  - Reference immutable origin plans and authoritative attachment content rather
+    than deep-copying them for every consumer.
+  - Consolidate shared Runtime semantic algorithms.
+  - Retain one authoritative settlement and ready-work launch lifecycle.
+  - Do not create a generic native-domain envelope.
+
+##### `ARC-DUP-003.a` Retain one canonical effective plan
+
+- Status: Partial.
+- Required result:
+  - Retain owner references and actual contribution facts instead of complete
+    copied effective collections in Workspace, Agent, and Agent.Workspace
+    records.
+  - Preserve exact immutable invocation meaning.
+
+##### `ARC-DUP-003.b` Reference canonical origin plans and attachment content
+
+- Status: Partial.
+- Required result:
+  - Replace per-Tool complete plan copies with immutable canonical origin-plan
+    references plus required Tool-specific facts.
+  - Retain one authoritative content snapshot for messages and attachments.
+  - Do not reintroduce current-default lookup for generated Tools.
+
+##### `ARC-DUP-003.c` Consolidate Runtime algorithms and lowered-tree traversal
+
+- Status: Partial.
+- Required result:
+  - Consolidate recursive evaluation, retry and catch matching, error cloning,
+    operation-input extraction, channel and resource namespacing, call lookup,
+    and equivalent retention calculations.
+  - Keep shared algorithms Runtime-owned where they are semantic orchestration
+    behavior.
+  - Retain domain-native request grammar in owning domains.

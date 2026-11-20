@@ -39,15 +39,18 @@ other version identifier is to be bumped in this implementation cycle.
 Interpreter and execution-payload contracts belong in `workflow_runtime.md`.
 A Workflow source document is stored as an Artifact definition. The standalone source field `apiVersion` is admission metadata and is not stored in the canonical definition body.
 
-This cycle excludes tests, all validation work, frontend integration, and
-SessionV2 migration, conversion, deletion, and replacement cleanup.
-Source-planning functional defects remain in scope.
+This cycle excludes tests, all validation work, frontend integration, SessionV2
+migration, conversion, deletion, and replacement cleanup.
+
+Workflow declaration and static Artifact planning are accepted as complete for
+this audit. Runtime and consumer-execution gaps remain in
+`workflow_runtime.md`.
 
 ## 3. Responsibility boundaries
 
 ### 3.1 Workflow responsibilities
 
-A Workflow declaration owns orchestration semantics:
+A Workflow declaration owns source-level orchestration semantics:
 
 - Ordered work.
 - Typed callable orchestration declarations.
@@ -65,7 +68,11 @@ A Workflow declaration owns orchestration semantics:
 - Cancellation and cleanup behavior.
 
 Workflow Artifact planning exposes admitted static facts and deterministic
-source-backed relationships. This document does not specify how a consumer
+source-backed relationships. These are declaration meanings and planning facts.
+Runtime persistence, frame construction, binding, dispatch, settlement,
+scheduling, recovery, and cancellation execution are not Artifact behavior.
+
+This document does not specify how a consumer
 lowers, binds, schedules, persists, or executes those facts.
 
 A Workflow does not own:
@@ -393,9 +400,9 @@ The declaration distinguishes a retry from a new Repeat iteration or Foreach
 item. Execution identity, attempt identity, and persistence of those meanings
 belong in `workflow_runtime.md`.
 
-### 6.3 Terminal step outcomes
+### 6.3 Terminal step outcome vocabulary
 
-A Workflow step has one durable terminal outcome:
+A Workflow step declares one semantic terminal outcome:
 
 ```text
 succeeded
@@ -417,6 +424,10 @@ A false `when` condition produces `skipped`.
 A skipped outcome has no output.
 
 An uncertain outcome means an external effect can have happened but the runtime has no durable confirmation.
+
+Runtime creation, persistence, settlement, and projection of terminal outcomes
+belong in `workflow_runtime.md`. Artifact planning retains only the source
+declaration and static outcome-related planning facts.
 
 ## 7. Values, schemas, and expressions
 
@@ -873,21 +884,12 @@ channels:
       - draft
 ```
 
-A channel message contains:
+The declaration defines channel schema, retention limits, and reader and writer
+authorization. Artifact planning retains those static facts.
 
-- Message identity.
-- Sequence.
-- Channel identity.
-- Kind.
-- Data.
-- Correlation.
-- Deduplication key.
-- Creation time.
-- Consumption facts.
-
-Channel reads are non-destructive unless a wait consumes a message.
-
-Consumption is scoped to a wait or subscription identity. It does not globally remove a message.
+Runtime creates channel message records, sequence values, cursors,
+deduplication facts, and consumption records. Channel read and consumption
+behavior belongs in `workflow_runtime.md`.
 
 ### 11.4 Emit
 
@@ -909,9 +911,9 @@ An emit can target:
 - A local channel.
 - A Workflow event.
 
-An emit returns a durable receipt.
-
-A duplicate deduplication key for the same destination returns the stored receipt and does not append another message.
+An emit declaration identifies its destination, kind, data template, and
+deduplication-key template. Runtime receipt persistence and duplicate-key
+behavior belong in `workflow_runtime.md`.
 
 ## 12. Structured operations
 
@@ -1095,6 +1097,9 @@ Foreach:
 
 A Foreach item identity includes its captured source index.
 
+The admitted definition preserves omission separately from an explicit zero
+`maxItems` value. Planning does not normalize either form.
+
 ### 12.7 Repeat
 
 ```yaml
@@ -1131,6 +1136,9 @@ result
 iterations
 exhausted
 ```
+
+The admitted definition preserves omission separately from an explicit zero
+`maxIterations` value. Planning does not normalize either form.
 
 A body-local state initializes once per iteration.
 
@@ -1243,7 +1251,8 @@ correlation
 time
 ```
 
-Duplicate event identity is `(source, id)`.
+The source event identity contract is `(source, id)`. Runtime event acceptance
+and deduplication belong in `workflow_runtime.md`.
 
 An event contract controls:
 
@@ -1324,7 +1333,8 @@ a response schema. Artifact planning retains those source facts.
 Assignment snapshots, deadlines, resolution identities, and received responses
 belong to the Runtime HLD.
 
-A response is accepted only when the response actor satisfies persisted assignment facts.
+Runtime accepts a response only when the response actor satisfies persisted
+assignment facts.
 
 A business rejection remains response data unless the Workflow explicitly fails.
 
@@ -1494,6 +1504,11 @@ retry:
   perAttemptTimeout: PT10S
 ```
 
+`match.schema`, when declared, is a source-level error-schema matcher. The
+admitted retry declaration and Inventory preserve it without evaluating error
+matching. Runtime evaluates matching behavior according to
+`workflow_runtime.md`.
+
 Automatic retry requires:
 
 1. A matching retry policy.
@@ -1545,15 +1560,9 @@ A reconciliation result distinguishes:
 }
 ```
 
-Reconciliation behavior:
-
-| Decision     | Runtime behavior                                                  |
-| ------------ | ----------------------------------------------------------------- |
-| `applied`    | Confirm the original WorkItem and continue with confirmed output. |
-| `notApplied` | Mark confirmed non-application and evaluate retry eligibility.    |
-| `unknown`    | Keep the original WorkItem uncertain and open recovery review.    |
-
-Reconciliation execution and persistence are specified in `workflow_runtime.md`.
+The declaration decision vocabulary is `applied`, `notApplied`, and `unknown`.
+Runtime maps those decisions to original WorkItem settlement, retry
+eligibility, or recovery review according to `workflow_runtime.md`.
 
 ### 16.5 Saga
 
@@ -1569,7 +1578,8 @@ saga:
 
 A Saga defines a business compensation boundary.
 
-A Saga records confirmed compensatable effects in dependency and confirmation order.
+Runtime records confirmed compensatable effects in dependency and confirmation
+order. Artifact planning retains the declared Saga boundary and policy only.
 
 A Saga does not compensate:
 
@@ -1583,32 +1593,15 @@ An uncertain effect enters automatic compensation only after reconciliation conf
 
 ### 16.6 Compensation
 
-Compensation runs in reverse effect order while preserving dependency constraints.
+Compensation declarations define reverse-dependency intent, a compensation
+block, concurrency intent, and error policy. A compensation expression can use
+typed `completed` facts supplied by Runtime.
 
-A compensation operation receives typed `completed` facts.
-
-`completed` contains:
-
-- Original operation facts.
-- Confirmed output.
-- Receipt.
-- Effect identity.
-- Compensation identity.
-
-Compensation intent, execution ordering, and settlement are specified in `workflow_runtime.md`.
-
-Compensation policy:
-
-| Policy     | Meaning                                            |
-| ---------- | -------------------------------------------------- |
-| `continue` | Record failure and continue eligible compensation. |
-| `stop`     | Record failure and stop later compensation.        |
-
-A compensation failure does not replace primary failure or cancellation.
-
-Primary failure remains primary.
-
-Compensation failures attach as typed causes.
+Artifact planning retains the declared compensation facts and canonical source
+paths. Runtime supplies actual completed-operation facts, selects eligible
+effects, performs ordering, persists settlement, and retains primary failure or
+cancellation semantics. These behaviors are specified in
+`workflow_runtime.md`.
 
 ### 16.7 Cleanup allowance
 
@@ -1626,22 +1619,13 @@ Cleanup work uses declared cleanup duration.
 
 ## 17. Cancellation
 
-Cancellation:
+The `cancel` operation declares cancellation intent and its typed child-work
+relationship. Artifact planning retains the declaration, expression templates,
+and canonical declaration path.
 
-- Stops queued normal work.
-- Requests cancellation from active targets.
-- Resolves ordinary waits as cancelled.
-- Propagates to attached children.
-- Propagates to independent children when `cancelWithParent` is true.
-- Runs finalization.
-- Starts eligible reconciliation and compensation.
-- Retains uncertainty when cancellation races with external mutation.
-
-Cancellation does not prove that a dispatched mutating target did not apply its effect.
-
-Cancellation remains cancellation through catch and finally behavior.
-
-A catch handler can return an explicit allowed result only after cancellation cleanup.
+Runtime cancellation, target cancellation request, ordinary-wait settlement,
+child propagation, finalization, cleanup allowance, uncertainty, reconciliation,
+compensation, and catch or fin
 
 ## 18. Resources and limits
 
