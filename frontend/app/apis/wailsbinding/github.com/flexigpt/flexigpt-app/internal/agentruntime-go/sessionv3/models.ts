@@ -719,6 +719,16 @@ export enum ErrorCategory {
     ErrorCategoryUncertainty = "uncertainty",
 };
 
+/**
+ * EvaluationBoundary records the declaration identity and Runtime logical
+ * time at which a Workflow intent was evaluated. It contains no compiled CEL
+ * program, source document, callback, or setup-private value.
+ */
+export interface EvaluationBoundary {
+    "declarationPath": string;
+    "logicalTime": string;
+}
+
 export interface ExecuteAppToolCommand {
     "meta": CommandMeta;
     "sessionID": SessionID;
@@ -1367,6 +1377,7 @@ export interface ProgramFrame {
     "updatedAt": string;
     "deadline"?: string | null;
     "budget"?: ExecutionBudget | null;
+    "usage": ExecutionBudgetUsage;
     "childFrameIDs"?: ProgramFrameID[] | null;
     "childExecutionIDs"?: ExecutionID[] | null;
     "workItemIDs"?: WorkItemID[] | null;
@@ -1379,6 +1390,7 @@ export interface ProgramFrame {
     "handoffID"?: string;
     "fork"?: ForkBoundary | null;
     "joins"?: JoinBoundary[] | null;
+    "evaluation"?: EvaluationBoundary | null;
 }
 
 export type ProgramFrameID = string;
@@ -1398,6 +1410,7 @@ export interface ProgramFrameIntent {
     "portDelivery"?: FramePortDeliveryMode;
     "portBoundary"?: ProgramFramePortBoundary;
     "handoff"?: ConversationHandoffIntent | null;
+    "evaluation"?: EvaluationBoundary | null;
 }
 
 export enum ProgramFramePortBoundary {
@@ -2290,6 +2303,7 @@ export interface WorkItem {
     "retry"?: RetryPolicy | null;
     "retryState"?: RetryState | null;
     "budget"?: ExecutionBudget | null;
+    "usage": ExecutionBudgetUsage;
     "cleanup"?: boolean;
     "sagaID"?: string;
     "compensationPolicy"?: CompensationErrorPolicy;
@@ -2313,6 +2327,7 @@ export interface WorkItem {
     "dispatchedAt"?: string | null;
     "completedAt"?: string | null;
     "waitID"?: WaitID;
+    "evaluation"?: EvaluationBoundary | null;
 }
 
 export type WorkItemID = string;

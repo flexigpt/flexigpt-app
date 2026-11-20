@@ -3,13 +3,13 @@
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import * as model$0 from "../../artifactory-go/store/artifact/model/models.js";
+import * as model$1 from "../../artifactory-go/store/artifact/model/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
 import * as model$2 from "../../artifactory-go/store/root/model/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import * as model$1 from "../../artifactory-go/store/source/model/models.js";
+import * as model$0 from "../../artifactory-go/store/source/model/models.js";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
 import * as spec$0 from "../../artifactory-go/store/spec/models.js";
@@ -33,15 +33,15 @@ import * as contextengine$0 from "./contextengine/models.js";
 import * as domain$0 from "./domain/models.js";
 
 export interface WorkspaceArtifactView {
-    "artifact": model$0.ArtifactRef;
+    "artifact": model$1.ArtifactRef;
     "revision": number;
     "displayName": string;
-    "kind": model$0.ArtifactKind;
+    "kind": model$1.ArtifactKind;
     "logicalName": spec$0.LogicalName;
     "logicalVersion"?: spec$0.LogicalVersion;
     "enabled": boolean;
-    "state": model$0.State;
-    "sourceID": model$1.SourceID;
+    "state": model$1.State;
+    "sourceID": model$0.SourceID;
     "locator": spec$0.Locator;
     "subresourceLocator"?: spec$0.SubresourceLocator;
 }
@@ -63,7 +63,7 @@ export interface WorkspaceDirectoryListItem {
     "rootID": model$2.RootID;
     "rootDisplayName": string;
     "enabled": boolean;
-    "directorySourceID": model$1.SourceID;
+    "directorySourceID": model$0.SourceID;
     "directorySourceRevision": number;
     "policyID": string;
     "policyVersion": string;
@@ -87,7 +87,7 @@ export interface WorkspaceDirectoryRef {
 export interface WorkspaceDirectoryView {
     "ref": WorkspaceDirectoryRef;
     "root": model$2.Root;
-    "directorySource": model$1.Summary;
+    "directorySource": model$0.Summary;
     "enabled": boolean;
     "policyID": string;
     "policyVersion": string;
@@ -103,7 +103,7 @@ export interface WorkspaceDirectoryWorkspace {
 }
 
 export interface WorkspaceMCPServer {
-    "artifact": model$0.ArtifactRef;
+    "artifact": model$1.ArtifactRef;
     "artifactRevision": number;
     "definitionDigest": cryptoutil$0.Digest;
     "name": spec$0.LogicalName;
@@ -115,7 +115,7 @@ export interface WorkspaceMCPServer {
 }
 
 export interface WorkspaceMCPServerLoadPlan {
-    "workspace": model$0.ArtifactRef;
+    "workspace": model$1.ArtifactRef;
     "servers": WorkspaceMCPServer[] | null;
 }
 
@@ -130,10 +130,10 @@ export interface WorkspacePageRequest {
 }
 
 export interface WorkspacePromptContribution {
-    "artifact": model$0.ArtifactRef;
+    "artifact": model$1.ArtifactRef;
     "artifactRevision": number;
     "definitionDigest": cryptoutil$0.Digest;
-    "kind": model$0.ArtifactKind;
+    "kind": model$1.ArtifactKind;
     "name": string;
     "insert": declaration$0.InsertTarget;
     "mediaType"?: string;
@@ -145,7 +145,7 @@ export interface WorkspacePromptContribution {
 }
 
 export interface WorkspacePromptDecision {
-    "artifact": model$0.ArtifactRef;
+    "artifact": model$1.ArtifactRef;
     "status": contextengine$0.CompositionStatus;
     "code"?: string;
     "originalBytes": number;
@@ -153,7 +153,7 @@ export interface WorkspacePromptDecision {
 }
 
 export interface WorkspacePromptPlan {
-    "workspace": model$0.ArtifactRef;
+    "workspace": model$1.ArtifactRef;
     "contributions": WorkspacePromptContribution[] | null;
     "instructions": string;
     "userMessage": string;
@@ -176,14 +176,14 @@ export interface WorkspaceRuntimePlan {
 }
 
 export interface WorkspaceRuntimeSelection {
-    "promptArtifacts"?: model$0.ArtifactRef[] | null;
-    "skillArtifacts"?: model$0.ArtifactRef[] | null;
-    "mcpArtifacts"?: model$0.ArtifactRef[] | null;
+    "promptArtifacts"?: model$1.ArtifactRef[] | null;
+    "skillArtifacts"?: model$1.ArtifactRef[] | null;
+    "mcpArtifacts"?: model$1.ArtifactRef[] | null;
     "requireComplete"?: boolean;
 }
 
 export interface WorkspaceSkill {
-    "artifact": model$0.ArtifactRef;
+    "artifact": model$1.ArtifactRef;
     "artifactRevision": number;
     "definitionDigest": cryptoutil$0.Digest;
     "name": string;
@@ -194,7 +194,7 @@ export interface WorkspaceSkill {
 }
 
 export interface WorkspaceSkillLoadPlan {
-    "workspace": model$0.ArtifactRef;
+    "workspace": model$1.ArtifactRef;
     "skills": WorkspaceSkill[] | null;
 }
 

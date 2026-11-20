@@ -180,8 +180,8 @@ not Artifacts and are not direct composition capabilities.
 An Artifact-backed requirement receives ordinary composition resolution. A
 Service or Activity requirement remains a typed registered-binding
 prerequisite. It does not receive a synthetic Artifact resolution.
-Requirements never enter `WorkflowProgram.Targets`, target-set selection, or
-callable dispatch.
+Requirements are static prerequisites, separate from the callable-target
+inventory and target-set membership facts.
 
 `Plan.Capabilities` remains a recursive composition and diagnostic projection.
 Consumers must use the separate callable-target and requirement collections.
@@ -766,20 +766,12 @@ Durable resolver execution is specified in `workflow_runtime.md`.
 
 ### 9.6 Provider-managed Tool Artifacts
 
-A provider SDK Tool Artifact is a provider-managed Model capability.
+A provider SDK Tool Artifact declares a provider-managed capability.
+Its admitted interface and source identity remain ordinary Artifact facts.
 
-It appears only in a typed Model execution plan.
-
-It does not become:
-
-- A local Tool WorkItem.
-- A synthetic local result.
-- A fabricated local success.
-- A local retry target.
-
-Artifact planning records the provider-managed target relationship and callable
-interface. It does not choose a Model plan, choose a provider Tool, or create
-local Tool work.
+Workflow Artifact planning records only the declared relationship, callable
+interface, and static source-backed dependency. It does not specify
+consumer request construction, execution representation, or invocation.
 
 ## 10. Declaration transport contract
 
