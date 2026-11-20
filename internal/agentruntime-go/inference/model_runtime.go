@@ -38,15 +38,13 @@ func (v RuntimeConfiguration) Validate() error {
 		{"provider origin", v.ProviderParam.Origin},
 		{"provider completion path", v.ProviderParam.ChatCompletionPathPrefix},
 		{"provider API key header", v.ProviderParam.APIKeyHeaderKey},
-		{"model name", string(v.ModelParam.Name)},
 	}
 
 	for _, field := range required {
 		if strings.TrimSpace(field.value) == "" ||
 			!utf8.ValidString(field.value) ||
-			len(field.value) > maximumProviderConfigurationTextBytes ||
-			strings.ContainsRune(field.value, 0) {
-			return fmt.Errorf("invalid prepared %s", field.name)
+			len(field.value) > maximumProviderConfigurationTextBytes {
+			return fmt.Errorf("invalid prepared - field name: %s field value: %+v", field.name, field.value)
 		}
 	}
 
