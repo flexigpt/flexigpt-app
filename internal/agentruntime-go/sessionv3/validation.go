@@ -787,6 +787,14 @@ func (p ProgramFrame) Validate() error {
 			return err
 		}
 	}
+	if err := p.Usage.Validate(); err != nil {
+		return err
+	}
+	if p.Evaluation != nil {
+		if err := p.Evaluation.Validate(); err != nil {
+			return err
+		}
+	}
 	if err := p.PortDelivery.Validate(); err != nil {
 		return err
 	}
@@ -876,6 +884,11 @@ func validateDeferredFrameIntent(value ProgramFrameIntent) error {
 	if err := value.PortBoundary.Validate(); err != nil {
 		return err
 	}
+	if value.Evaluation != nil {
+		if err := value.Evaluation.Validate(); err != nil {
+			return err
+		}
+	}
 	if value.PortBoundary == ProgramFramePortBoundaryPublishedWorkflow &&
 		value.Program.InterpreterID != WorkflowInterpreterID {
 		return errors.New("published workflow port boundary requires a workflow program")
@@ -911,6 +924,14 @@ func (w WorkItem) Validate() error {
 	}
 	if w.Budget != nil {
 		if err := w.Budget.Validate(); err != nil {
+			return err
+		}
+	}
+	if err := w.Usage.Validate(); err != nil {
+		return err
+	}
+	if w.Evaluation != nil {
+		if err := w.Evaluation.Validate(); err != nil {
 			return err
 		}
 	}
@@ -1021,6 +1042,19 @@ func (e EffectContract) Validate() error {
 	}
 	if e.Kind != EffectKindKeyed && e.IdempotencyKey != "" {
 		return errors.New("non-keyed work item has an idempotency key")
+	}
+	return nil
+}
+
+func (e EvaluationBoundary) Validate() error {
+	if err := validateID(
+		"workflow evaluation declaration path",
+		e.DeclarationPath,
+	); err != nil {
+		return err
+	}
+	if e.LogicalTime.IsZero() {
+		return errors.New("workflow evaluation has no logical time")
 	}
 	return nil
 }

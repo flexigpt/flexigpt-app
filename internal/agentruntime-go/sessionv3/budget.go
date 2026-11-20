@@ -207,57 +207,30 @@ func narrowExecutionBudget(
 
 func (r *Runtime) reserveStepExecutionLocked(
 	execution *Execution,
-	itemBudget *ExecutionBudget,
+	item *WorkItem,
 ) error {
-	if execution == nil {
-		return errors.New("execution budget owner is unavailable")
+	if item == nil {
+		return errors.New("work item budget owner is unavailable")
 	}
-	if err := checkBudgetCount(
-		execution.Budget.StepExecutions,
-		execution.Usage.StepExecutions,
-		1,
-		"step executions",
-	); err != nil {
-		return err
-	}
-	if itemBudget != nil {
-		if err := checkBudgetCount(
-			itemBudget.StepExecutions,
-			execution.Usage.StepExecutions,
-			1,
-			"step executions",
-		); err != nil {
-			return err
-		}
-	}
-	execution.Usage.StepExecutions++
-	return nil
+	return r.reserveScopedBudgetLocked(
+		execution,
+		item,
+		item.FrameID,
+		budgetMetricRequest{
+			Metric:    budgetMetricStepExecutions,
+			Increment: 1,
+			Label:     "step executions",
+		},
+	)
 }
 
 func (r *Runtime) reserveCallAttemptLocked(
 	execution *Execution,
-	item WorkItem,
+	item *WorkItem,
 ) error {
-	if execution == nil || !workConsumesCallAttempt(item.Type) {
+	if execution == nil || item == nil ||
+		!workConsumesCallAttempt(item.Type) {
 		return nil
-	}
-	if err := checkBudgetCount(
-		execution.Budget.CallAttempts,
-		execution.Usage.CallAttempts,
-		1,
-		"call attempts",
-	); err != nil {
-		return err
-	}
-	if item.Budget != nil {
-		if err := checkBudgetCount(
-			item.Budget.CallAttempts,
-			execution.Usage.CallAttempts,
-			1,
-			"call attempts",
-		); err != nil {
-			return err
-		}
 	}
 
 	// Cost is the only declared budget that this Runtime cannot account for
@@ -271,9 +244,16 @@ func (r *Runtime) reserveCallAttemptLocked(
 			Message:  "cost budgeting requires a setup-owned cost meter",
 		}
 	}
-
-	execution.Usage.CallAttempts++
-	return nil
+	return r.reserveScopedBudgetLocked(
+		execution,
+		item,
+		item.FrameID,
+		budgetMetricRequest{
+			Metric:    budgetMetricCallAttempts,
+			Increment: 1,
+			Label:     "call attempts",
+		},
+	)
 }
 
 func workConsumesCallAttempt(kind WorkItemType) bool {
@@ -385,13 +365,16 @@ func (r *Runtime) workConcurrencyAvailableLocked(
 		return false
 	}
 
-	frame := mutableFrame(&execution, item.FrameID)
-	if frame == nil || frame.Budget == nil ||
-		frame.Budget.Concurrency == 0 {
-		return true
+	for _, frame := range budgetFrameChain(&execution, item.FrameID) {
+		if frame.Budget == nil || frame.Budget.Concurrency == 0 {
+			continue
+		}
+		if activeFrameBudgetWork(execution, frame.ID) >=
+			frame.Budget.Concurrency {
+			return false
+		}
 	}
-	return activeFrameBudgetWork(execution, frame.ID) <
-		frame.Budget.Concurrency
+	return true
 }
 
 func (r *Runtime) setBudgetConcurrencyWaitingLocked(
@@ -448,7 +431,12 @@ func (r *Runtime) reserveActivityBudgetLocked(
 	if err != nil {
 		return err
 	}
-	return r.reserveMessageBudgetLocked(execution, bytes)
+	item := mutableWorkItem(execution, activity.WorkItemID)
+	return r.reserveMessageBudgetForWorkLocked(
+		execution,
+		item,
+		bytes,
+	)
 }
 
 func (r *Runtime) reserveChannelMessageBudgetLocked(
@@ -469,25 +457,11 @@ func (r *Runtime) reserveMessageBudgetLocked(
 	if execution == nil {
 		return errors.New("execution budget owner is unavailable")
 	}
-	if err := checkBudgetCount(
-		execution.Budget.MessageCount,
-		execution.Usage.MessageCount,
-		1,
-		"messages",
-	); err != nil {
-		return err
-	}
-	if err := checkBudgetCount(
-		execution.Budget.MessageBytes,
-		execution.Usage.MessageBytes,
+	return r.reserveMessageBudgetForWorkLocked(
+		execution,
+		nil,
 		bytes,
-		"message bytes",
-	); err != nil {
-		return err
-	}
-	execution.Usage.MessageCount++
-	execution.Usage.MessageBytes += bytes
-	return nil
+	)
 }
 
 func activityBudgetBytes(activity Activity) (int, error) {
@@ -507,33 +481,19 @@ func (r *Runtime) reserveEventBudgetLocked(
 		return errors.New("execution budget owner is unavailable")
 	}
 	bytes := len(data) + len(correlation)
-	if err := checkBudgetCount(
-		execution.Budget.EventCount,
-		execution.Usage.EventCount,
-		1,
-		"events",
-	); err != nil {
-		return err
-	}
-	if err := checkBudgetCount(
-		execution.Budget.EventBytes,
-		execution.Usage.EventBytes,
+	return r.reserveEventBudgetForWorkLocked(
+		execution,
+		nil,
 		bytes,
-		"event bytes",
-	); err != nil {
-		return err
-	}
-	execution.Usage.EventCount++
-	execution.Usage.EventBytes += bytes
-	return nil
+	)
 }
 
 func (r *Runtime) consumeLLMUsageLocked(
 	execution *Execution,
-	item WorkItem,
+	item *WorkItem,
 	output *WorkItemOutput,
 ) error {
-	if execution == nil {
+	if execution == nil || item == nil {
 		return errors.New("execution budget owner is unavailable")
 	}
 
@@ -574,26 +534,16 @@ func (r *Runtime) consumeLLMUsageLocked(
 	if tokens < 0 {
 		return errors.New("provider usage has a negative token count")
 	}
-	if err := checkBudgetCount(
-		execution.Budget.ModelTokens,
-		execution.Usage.ModelTokens,
-		tokens,
-		"model tokens",
-	); err != nil {
-		return err
-	}
-	if item.Budget != nil {
-		if err := checkBudgetCount(
-			item.Budget.ModelTokens,
-			execution.Usage.ModelTokens,
-			tokens,
-			"model tokens",
-		); err != nil {
-			return err
-		}
-	}
-	execution.Usage.ModelTokens += tokens
-	return nil
+	return r.reserveScopedBudgetLocked(
+		execution,
+		item,
+		item.FrameID,
+		budgetMetricRequest{
+			Metric:    budgetMetricModelTokens,
+			Increment: tokens,
+			Label:     "model tokens",
+		},
+	)
 }
 
 func budgetFailure(

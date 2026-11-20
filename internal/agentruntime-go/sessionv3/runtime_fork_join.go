@@ -122,6 +122,7 @@ func cloneForkIntent(value ProgramFrameIntent) (ProgramFrameIntent, error) {
 	output := value
 	output.Deadline = cloneTime(value.Deadline)
 	output.Program.Payload = value.Program.Payload.Clone()
+	output.Evaluation = cloneEvaluationBoundary(value.Evaluation)
 	output.Budget = cloneBudget(value.Budget)
 	output.Claims = append([]ResourceClaim(nil), value.Claims...)
 	if value.Program.Artifact != nil {
@@ -227,6 +228,18 @@ func (r *Runtime) materializeForkFramesLocked(
 				intent.Program.InterpreterID,
 			)
 		}
+		if intent.PortBoundary ==
+			ProgramFramePortBoundaryPublishedWorkflow &&
+			intent.Program.InterpreterID == WorkflowInterpreterID {
+			namespaced, namespaceErr := namespaceWorkflowProgramResources(
+				intent.Program,
+				workflowResourceNamespace(execution.ID, intent.ID),
+			)
+			if namespaceErr != nil {
+				return namespaceErr
+			}
+			intent.Program = namespaced
+		}
 		if intent.Program.InterpreterID == WorkflowInterpreterID {
 			childProgram, err := workflowProgramFromSnapshot(intent.Program)
 			if err != nil {
@@ -326,6 +339,8 @@ func (r *Runtime) materializeForkFramesLocked(
 			UpdatedAt:       now,
 			HandoffID:       handoffID,
 			Deadline:        deadline,
+			Usage:           ExecutionBudgetUsage{},
+			Evaluation:      cloneEvaluationBoundary(intent.Evaluation),
 			Budget:          cloneBudget(&childBudget),
 			Ports:           ports,
 			PortDelivery:    intent.PortDelivery,

@@ -387,10 +387,16 @@ func (r *Runtime) applyEmitLocked(
 		if channel.Bytes+len(payload.Data)+len(payload.Correlation) > channel.MaxBytes {
 			return EmitReceipt{}, nil, nil, errors.New("channel byte limit exceeded")
 		}
-		if err := r.reserveChannelMessageBudgetLocked(
+		item := mutableWorkItem(execution, workItemID)
+		if item == nil {
+			return EmitReceipt{}, nil, nil, errors.New(
+				"emit WorkItem is unavailable",
+			)
+		}
+		if err := r.reserveMessageBudgetForWorkLocked(
 			execution,
-			payload.Data,
-			payload.Correlation,
+			item,
+			len(payload.Data)+len(payload.Correlation),
 		); err != nil {
 			return EmitReceipt{}, nil, nil, err
 		}
@@ -416,10 +422,16 @@ func (r *Runtime) applyEmitLocked(
 		if len(execution.Signals) >= maximumCoordinationRecords {
 			return EmitReceipt{}, nil, nil, errors.New("execution signal retention limit exceeded")
 		}
-		if err := r.reserveEventBudgetLocked(
+		item := mutableWorkItem(execution, workItemID)
+		if item == nil {
+			return EmitReceipt{}, nil, nil, errors.New(
+				"emit WorkItem is unavailable",
+			)
+		}
+		if err := r.reserveEventBudgetForWorkLocked(
 			execution,
-			payload.Data,
-			payload.Correlation,
+			item,
+			len(payload.Data)+len(payload.Correlation),
 		); err != nil {
 			return EmitReceipt{}, nil, nil, err
 		}

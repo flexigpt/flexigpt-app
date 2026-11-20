@@ -616,6 +616,14 @@ type ProgramState struct {
 	Data    jsonutil.CanonicalValue `json:"data,omitempty"`
 }
 
+// EvaluationBoundary records the declaration identity and Runtime logical
+// time at which a Workflow intent was evaluated. It contains no compiled CEL
+// program, source document, callback, or setup-private value.
+type EvaluationBoundary struct {
+	DeclarationPath string    `json:"declarationPath"`
+	LogicalTime     time.Time `json:"logicalTime"`
+}
+
 type ChildFrameLifetime string
 
 const (
@@ -654,6 +662,7 @@ type ProgramFrame struct {
 	UpdatedAt         time.Time               `json:"updatedAt"`
 	Deadline          *time.Time              `json:"deadline,omitempty"`
 	Budget            *ExecutionBudget        `json:"budget,omitempty"`
+	Usage             ExecutionBudgetUsage    `json:"usage"`
 	ChildFrameIDs     []ProgramFrameID        `json:"childFrameIDs,omitempty"`
 	ChildExecutionIDs []ExecutionID           `json:"childExecutionIDs,omitempty"`
 	WorkItemIDs       []WorkItemID            `json:"workItemIDs,omitempty"`
@@ -666,6 +675,7 @@ type ProgramFrame struct {
 	HandoffID         string                  `json:"handoffID,omitempty"`
 	Fork              *ForkBoundary           `json:"fork,omitempty"`
 	Joins             []JoinBoundary          `json:"joins,omitempty"`
+	Evaluation        *EvaluationBoundary     `json:"evaluation,omitempty"`
 }
 
 // ForkBoundary is a durable child-scheduling boundary. The parent frame
@@ -966,6 +976,7 @@ type WorkItem struct {
 	Retry                  *RetryPolicy            `json:"retry,omitempty"`
 	RetryState             *RetryState             `json:"retryState,omitempty"`
 	Budget                 *ExecutionBudget        `json:"budget,omitempty"`
+	Usage                  ExecutionBudgetUsage    `json:"usage"`
 	Cleanup                bool                    `json:"cleanup,omitempty"`
 	SagaID                 string                  `json:"sagaID,omitempty"`
 	CompensationPolicy     CompensationErrorPolicy `json:"compensationPolicy,omitempty"`
@@ -989,6 +1000,7 @@ type WorkItem struct {
 	DispatchedAt           *time.Time              `json:"dispatchedAt,omitempty"`
 	CompletedAt            *time.Time              `json:"completedAt,omitempty"`
 	WaitID                 WaitID                  `json:"waitID,omitempty"`
+	Evaluation             *EvaluationBoundary     `json:"evaluation,omitempty"`
 }
 
 // WorkItemPayload is a closed tagged union. It must contain exactly one
@@ -1548,6 +1560,7 @@ type ProgramFrameIntent struct {
 	PortDelivery    FramePortDeliveryMode      `json:"portDelivery,omitempty"`
 	PortBoundary    ProgramFramePortBoundary   `json:"portBoundary,omitempty"`
 	Handoff         *ConversationHandoffIntent `json:"handoff,omitempty"`
+	Evaluation      *EvaluationBoundary        `json:"evaluation,omitempty"`
 }
 
 type WorkItemIntent struct {
@@ -1570,6 +1583,7 @@ type WorkItemIntent struct {
 	RetainClaimsForFrame bool                    `json:"retainClaimsForFrame,omitempty"`
 	Ports                []PortPlan              `json:"ports,omitempty"`
 	Input                WorkItemPayload         `json:"input"`
+	Evaluation           *EvaluationBoundary     `json:"evaluation,omitempty"`
 }
 
 type ProgramTransition struct {

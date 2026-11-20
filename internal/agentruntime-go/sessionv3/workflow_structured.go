@@ -560,6 +560,15 @@ func workflowStructuredTransition(
 	state WorkflowState,
 	frames []ProgramFrameIntent,
 ) (ProgramTransition, error) {
+	for index := range frames {
+		if frames[index].Evaluation == nil &&
+			state.PendingDeclarationPath != "" {
+			frames[index].Evaluation = &EvaluationBoundary{
+				DeclarationPath: state.PendingDeclarationPath,
+				LogicalTime:     state.LogicalTime.UTC(),
+			}
+		}
+	}
 	forkClaims := []ResourceClaim(nil)
 	if state.Pending != nil &&
 		!state.Pending.ClaimsBound &&

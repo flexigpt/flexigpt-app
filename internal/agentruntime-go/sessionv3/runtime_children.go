@@ -290,6 +290,8 @@ func (r *Runtime) createIndependentChildExecutionLocked(
 			UpdatedAt:       now,
 			Deadline:        deadline,
 			Budget:          cloneBudget(&effectiveBudget),
+			Usage:           ExecutionBudgetUsage{},
+			Evaluation:      cloneEvaluationBoundary(intent.Evaluation),
 			HandoffID:       handoffID,
 			Ports:           ports,
 			PortDelivery:    intent.PortDelivery,

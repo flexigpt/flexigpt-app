@@ -38,16 +38,17 @@ func (r *Runtime) appendLLMStream(
 		return context.Canceled
 	}
 
-	if execution.Budget.MessageBytes > 0 {
-		if err := checkBudgetCount(
-			execution.Budget.MessageBytes,
-			execution.Usage.MessageBytes,
-			len(value),
-			"message bytes",
-		); err != nil {
-			return err
-		}
-		execution.Usage.MessageBytes += len(value)
+	if err := r.reserveScopedBudgetLocked(
+		execution,
+		item,
+		item.FrameID,
+		budgetMetricRequest{
+			Metric:    budgetMetricMessageBytes,
+			Increment: len(value),
+			Label:     "message bytes",
+		},
+	); err != nil {
+		return err
 	}
 
 	now := r.now()

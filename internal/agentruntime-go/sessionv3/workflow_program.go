@@ -3078,6 +3078,19 @@ func workflowTransition(
 	releaseClaims := state.ReleaseFrameClaims
 	state.ReleaseFrameClaims = false
 
+	for index := range work {
+		if work[index].DeclarationPath == "" {
+			work[index].DeclarationPath = state.PendingDeclarationPath
+		}
+		if work[index].Evaluation == nil &&
+			state.PendingDeclarationPath != "" {
+			work[index].Evaluation = &EvaluationBoundary{
+				DeclarationPath: state.PendingDeclarationPath,
+				LogicalTime:     state.LogicalTime.UTC(),
+			}
+		}
+	}
+
 	if state.Pending != nil &&
 		!state.Pending.ClaimsBound &&
 		len(state.Pending.Claims) != 0 &&
@@ -3133,6 +3146,12 @@ func workflowWork(
 ) (ProgramTransition, error) {
 	state.PendingPath = path
 	intent.DeclarationPath = state.PendingDeclarationPath
+	if state.PendingDeclarationPath != "" {
+		intent.Evaluation = &EvaluationBoundary{
+			DeclarationPath: state.PendingDeclarationPath,
+			LogicalTime:     state.LogicalTime.UTC(),
+		}
+	}
 	intent.Deadline = earlierDeadline(intent.Deadline, state.Deadline)
 	return workflowTransition(
 		state,

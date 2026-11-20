@@ -603,6 +603,10 @@ func (r *Runtime) StartWorkflow(ctx context.Context, command StartWorkflowComman
 				CreatedAt:       now,
 				UpdatedAt:       now,
 				Deadline:        cloneTime(deadline),
+				Evaluation: &EvaluationBoundary{
+					DeclarationPath: workflowProgram.Root.DeclarationPath,
+					LogicalTime:     now,
+				},
 			},
 		},
 		WorkItems:      []WorkItem{},
@@ -1927,6 +1931,7 @@ func (r *Runtime) advanceFrameLocked(
 			Dependencies:         append([]WorkItemID(nil), intent.Dependencies...),
 			Budget:               itemBudget,
 			Cleanup:              intent.Cleanup,
+			Evaluation:           cloneEvaluationBoundary(intent.Evaluation),
 			SagaID:               intent.SagaID,
 			CompensationPolicy:   intent.CompensationPolicy,
 			RetainClaimsForFrame: intent.RetainClaimsForFrame,
@@ -1934,6 +1939,7 @@ func (r *Runtime) advanceFrameLocked(
 			Input:                intent.Input,
 			CreatedAt:            now,
 			UpdatedAt:            now,
+			Usage:                ExecutionBudgetUsage{},
 		}
 		if item.ID == "" {
 			item.ID = WorkItemID(r.newID())
@@ -2601,7 +2607,7 @@ func (r *Runtime) reserveWorkStepLocked(
 	if item == nil || item.StepExecutionReserved {
 		return item != nil
 	}
-	if err := r.reserveStepExecutionLocked(execution, item.Budget); err != nil {
+	if err := r.reserveStepExecutionLocked(execution, item); err != nil {
 		failure, found := budgetFailure(err)
 		if !found {
 			failure = &SanitizedError{
@@ -2684,7 +2690,7 @@ func (r *Runtime) startDispatchedLocked(
 	if item.Deadline != nil && !now.Before(*item.Deadline) {
 		return errors.New("work deadline elapsed before dispatch")
 	}
-	if err := r.reserveCallAttemptLocked(execution, *item); err != nil {
+	if err := r.reserveCallAttemptLocked(execution, item); err != nil {
 		//nolint:errorlint // We are taking error val.
 		if failure, ok := err.(*SanitizedError); ok {
 			return failure
@@ -2728,7 +2734,7 @@ func (r *Runtime) beginChildCallAttemptLocked(
 		activeAttempt(execution, item.ID) != nil {
 		return nil
 	}
-	if err := r.reserveCallAttemptLocked(execution, *item); err != nil {
+	if err := r.reserveCallAttemptLocked(execution, item); err != nil {
 		return err
 	}
 
@@ -2945,7 +2951,7 @@ func (r *Runtime) finishWorkLocked(
 	if result.Error == nil && item.Type == WorkItemTypeLLM {
 		if err := r.consumeLLMUsageLocked(
 			execution,
-			*item,
+			item,
 			item.Output,
 		); err != nil {
 			if failure, found := budgetFailure(err); found {
@@ -3939,6 +3945,16 @@ func cloneBudget(value *ExecutionBudget) *ExecutionBudget {
 		return nil
 	}
 	output := cloneExecutionBudget(*value)
+	return &output
+}
+
+func cloneEvaluationBoundary(
+	value *EvaluationBoundary,
+) *EvaluationBoundary {
+	if value == nil {
+		return nil
+	}
+	output := *value
 	return &output
 }
 
