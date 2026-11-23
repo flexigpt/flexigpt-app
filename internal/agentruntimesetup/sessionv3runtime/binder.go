@@ -106,6 +106,8 @@ func New(deps Dependencies) (*Binder, error) {
 		deps.Agents,
 		deps.Workspaces,
 		deps.Texts,
+		contributionruntime.WithInstructionSkillRenderer(skillTools),
+		contributionruntime.WithMCPContributionPreparer(mcpTools),
 	)
 	if err != nil {
 		return nil, err

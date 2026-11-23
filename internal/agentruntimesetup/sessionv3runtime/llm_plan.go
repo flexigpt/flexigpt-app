@@ -23,6 +23,44 @@ type llmExecutionPlan struct {
 	artifacts                     []sessionv3Runtime.ArtifactPin
 	activities                    []sessionv3Runtime.Activity
 	agentModelIncludeSystemPrompt *bool
+	preparedMCP                   map[string]sessionv3Runtime.WorkflowPreparedMCP
+}
+
+func (p *llmExecutionPlan) setPreparedMCP(
+	value sessionv3Runtime.WorkflowPreparedMCP,
+) {
+	if p == nil || !value.Prepared {
+		return
+	}
+	if p.preparedMCP == nil {
+		p.preparedMCP = make(map[string]sessionv3Runtime.WorkflowPreparedMCP)
+	}
+	p.preparedMCP[value.Server.RootID+"\x00"+value.Server.ArtifactID] = jsonutil.CloneJSONInValue(value)
+}
+
+func (p *llmExecutionPlan) reconcilePreparedMCP(
+	specific []sessionv3Runtime.MCPServerSelection,
+) {
+	if p == nil || len(p.preparedMCP) == 0 {
+		return
+	}
+	effective := make(map[string]struct{}, len(p.defaults.MCP))
+	for _, selection := range p.defaults.MCP {
+		effective[selectionKey(selection.Server)] = struct{}{}
+	}
+	overridden := make(map[string]struct{}, len(specific))
+	for _, selection := range specific {
+		overridden[selectionKey(selection.Server)] = struct{}{}
+	}
+	for key := range p.preparedMCP {
+		if _, kept := effective[key]; !kept {
+			delete(p.preparedMCP, key)
+			continue
+		}
+		if _, replaced := overridden[key]; replaced {
+			delete(p.preparedMCP, key)
+		}
+	}
 }
 
 func (p *llmExecutionPlan) applySpecificInstructionPolicy(
@@ -95,7 +133,6 @@ func (b *Binder) prepareLLMPlan(
 
 	if payload.PreparedInvocation != nil {
 		if err := b.applyPreparedContributionPlan(
-			ctx,
 			&plan,
 			*payload.PreparedInvocation,
 		); err != nil {
@@ -118,11 +155,12 @@ func (b *Binder) prepareLLMPlan(
 		if prepareErr != nil {
 			return llmExecutionPlan{}, prepareErr
 		}
-		if err := b.applyPreparedContributionPlan(ctx, &plan, prepared); err != nil {
+		if err := b.applyPreparedContributionPlan(&plan, prepared); err != nil {
 			return llmExecutionPlan{}, err
 		}
 	}
 	applySpecificCollections(&plan.defaults, specificCollections)
+	plan.reconcilePreparedMCP(specificCollections.MCP)
 	plan.applySpecificInstructionPolicy(
 		specificCollections.CollectionPolicies.SystemInstructions,
 	)
@@ -218,6 +256,7 @@ func (b *Binder) prepareLLMPlan(
 
 	plan.defaults.MCP, pins, err = b.pinMCPSelections(
 		ctx,
+		plan.preparedMCP,
 		plan.defaults.MCP,
 	)
 	if err != nil {
@@ -238,7 +277,14 @@ func (b *Binder) prepareLLMPlan(
 		return llmExecutionPlan{}, err
 	}
 
-	if len(plan.defaults.MCP) != 0 {
+	for _, selection := range plan.defaults.MCP {
+		if prepared, found := plan.preparedMCP[selectionKey(selection.Server)]; found &&
+			prepared.Prepared {
+			for _, value := range prepared.Context {
+				plan.addContext(value)
+			}
+			continue
+		}
 		if b.mcpTools == nil {
 			return llmExecutionPlan{}, errors.New(
 				"session v3 mcp runtime is unavailable",
@@ -246,7 +292,7 @@ func (b *Binder) prepareLLMPlan(
 		}
 		contextValues, contextErr := b.mcpTools.Context(
 			ctx,
-			plan.defaults.MCP,
+			[]sessionv3Runtime.MCPServerSelection{selection},
 		)
 		if contextErr != nil {
 			return llmExecutionPlan{}, contextErr
@@ -461,6 +507,7 @@ func (b *Binder) pinToolSelections(
 
 func (b *Binder) pinMCPSelections(
 	ctx context.Context,
+	preparedMCP map[string]sessionv3Runtime.WorkflowPreparedMCP,
 	selections []sessionv3Runtime.MCPServerSelection,
 ) ([]sessionv3Runtime.MCPServerSelection, []sessionv3Runtime.ArtifactPin, error) {
 	if len(selections) == 0 {
@@ -478,6 +525,19 @@ func (b *Binder) pinMCPSelections(
 		len(selections),
 	)
 	for _, selection := range selections {
+		if prepared, found := preparedMCP[selectionKey(selection.Server)]; found &&
+			prepared.Prepared {
+			value := jsonutil.CloneJSONInValue(selection)
+			value.Server = sessionv3Runtime.ArtifactSelection{
+				RootID:           prepared.Server.RootID,
+				ArtifactID:       prepared.Server.ArtifactID,
+				ExpectedRevision: prepared.Server.Revision,
+				ExpectedDigest:   prepared.Server.Digest,
+			}
+			output = appendUniqueMCPSelection(output, value)
+			pins = append(pins, prepared.Server)
+			continue
+		}
 		pin, err := b.pinSelection(ctx, selection.Server)
 		if err != nil {
 			return nil, nil, err

@@ -585,7 +585,20 @@ func retryCaptureChildCall(
 		Kind:    WorkflowValueLiteral,
 		Literal: contextValue.Clone(),
 	}
-	call.PortInputs = clonePortInputs(item.PortInputs)
+	if len(call.PortInputs) == 0 {
+		if len(item.PortInputs) != 0 {
+			call.PortInputs = clonePortInputs(item.PortInputs)
+		} else if item.Type == WorkItemTypeChildCall &&
+			item.Input.ChildCall != nil &&
+			item.Input.ChildCall.Completion.FrameID != "" {
+			if childFrame := mutableFrame(
+				&execution,
+				item.Input.ChildCall.Completion.FrameID,
+			); childFrame != nil && len(childFrame.PortInputs) != 0 {
+				call.PortInputs = clonePortInputs(childFrame.PortInputs)
+			}
+		}
+	}
 	if call.LLMInvocation != nil {
 		invocation, invocationErr := retryCaptureLLMInvocation(
 			program,

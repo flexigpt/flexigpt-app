@@ -923,33 +923,12 @@ func (r *Runtime) waitForExecutionDeadline(
 			r.releaseFrameResourcesLocked(execution, frame.ID)
 			frame.CancellationRequested = true
 		}
-		_ = r.settlePendingFrameCancellationsLocked(
-			session,
-			execution,
-		)
 	}
-	execution = mutableSessionExecution(session, executionID)
-	if execution == nil {
-		return
-	}
-	r.touchExecutionLocked(session, execution)
-	if err := r.settlePendingFrameCancellationsLocked(session, execution); err != nil {
-		return
-	}
-	execution = mutableSessionExecution(session, executionID)
-	if err := r.persistLocked(persistContext, "executionDeadlineElapsed", session); err != nil {
-		return
-	}
-	r.publishLocked(
+	_ = r.commitTerminalMutationLocked(
 		persistContext,
 		session,
-		execution.ID,
+		executionID,
+		checkpointReasonExecutionDeadlineElapsed,
 		RuntimeEventExecutionChanged,
-	)
-	r.armCleanupDeadlineLocked(
-		persistContext,
-		session.ID,
-		execution.ID,
-		*execution,
 	)
 }

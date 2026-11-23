@@ -101,6 +101,7 @@ type MCPDispatchPlan struct {
 	Server                    ArtifactPin                       `json:"server"`
 	IncludeServerInstructions bool                              `json:"includeServerInstructions,omitempty"`
 	ToolExposure              MCPToolExposure                   `json:"toolExposure"`
+	DiscoveryDigest           string                            `json:"discoveryDigest,omitempty"`
 	Tools                     []MCPToolDispatchPlan             `json:"tools,omitempty"`
 	Resources                 []MCPResourceDispatchPlan         `json:"resources,omitempty"`
 	ResourceTemplates         []MCPResourceTemplateDispatchPlan `json:"resourceTemplates,omitempty"`

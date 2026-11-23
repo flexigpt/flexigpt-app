@@ -315,10 +315,13 @@ func (r *Runtime) settleTimerLocked(
 		},
 		Confirmed: true,
 	})
-	if err := r.persistLocked(ctx, "timerFired", session); err != nil {
-		return true
-	}
-	r.publishLocked(ctx, session, execution.ID, RuntimeEventWaitChanged)
+	_ = r.commitTerminalMutationLocked(
+		ctx,
+		session,
+		execution.ID,
+		checkpointReasonTimerFired,
+		RuntimeEventWaitChanged,
+	)
 	return true
 }
 
@@ -371,24 +374,13 @@ func (r *Runtime) settleUnstartedAttemptLocked(
 		activeAttempt(execution, item.ID),
 		WorkExecutionResult{Error: failure, Confirmed: true},
 	)
-	execution = mutableSessionExecution(session, execution.ID)
-	if execution == nil {
-		return
-	}
-	if execution.Controls.CancellationRequested &&
-		!hasDispatched(*execution) &&
-		!hasOutstandingCleanup(*execution) {
-		r.completeExecutionLocked(ctx, session, execution, ExecutionOutcome{
-			Kind:        ExecutionOutcomeCancelled,
-			Code:        string(ExecutionOutcomeCancelled),
-			Message:     "execution was cancelled",
-			CompletedAt: r.now(),
-		})
-	}
-	if err := r.persistLocked(ctx, "workNotInvoked", session); err != nil {
-		return
-	}
-	r.publishLocked(ctx, session, execution.ID, RuntimeEventWorkChanged)
+	_ = r.commitTerminalMutationLocked(
+		ctx,
+		session,
+		execution.ID,
+		checkpointReasonWorkNotInvoked,
+		RuntimeEventWorkChanged,
+	)
 }
 
 // settleUndispatchedWorkLocked settles work that has not crossed the native
@@ -496,28 +488,13 @@ func (r *Runtime) settleUndispatchedWorkLocked(
 	}
 	r.wakeCompletionWorkWaitsLocked(session, execution, *item)
 
-	execution = mutableSessionExecution(session, executionID)
-	if execution == nil {
-		return nil
-	}
-	if err := r.settlePendingFrameCancellationsLocked(session, execution); err != nil {
-		return nil
-	}
-	r.resumeSagaCompensationFramesLocked(session, execution)
-
-	execution = mutableSessionExecution(session, executionID)
-	if execution == nil {
-		return nil
-	}
-	r.refreshExecutionStateLocked(execution)
-	r.settleTerminalExecutionLocked(session, execution)
-
-	execution = mutableSessionExecution(session, executionID)
-	if execution == nil {
-		return nil
-	}
-	execution = mutableSessionExecution(session, executionID)
-	if execution == nil {
+	execution, err := r.finalizeExecutionSettlementLocked(
+		context.Background(),
+		session,
+		executionID,
+		failure,
+	)
+	if err != nil || execution == nil {
 		return nil
 	}
 	r.touchExecutionLocked(session, execution)

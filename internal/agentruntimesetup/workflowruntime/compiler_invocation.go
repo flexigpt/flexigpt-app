@@ -347,97 +347,17 @@ func workflowCallAtDeclarationPath(
 	if block == nil || strings.TrimSpace(path) == "" {
 		return nil
 	}
-	for index := range block.Steps {
-		step := &block.Steps[index]
-		if step.Call != nil && step.Call.DeclarationPath == path {
-			return step.Call
-		}
-		if step.Effect != nil {
-			if value := workflowCallAtDeclarationPath(
-				step.Effect.Reconcile,
-				path,
-			); value != nil {
-				return value
+	var found *sessionv3Runtime.WorkflowCall
+	_ = sessionv3Runtime.WalkWorkflowBlock(block, sessionv3Runtime.WorkflowTreeVisitor{
+		OnStep: func(node sessionv3Runtime.WorkflowStepNode) error {
+			if node.Step.Call != nil && node.Step.Call.DeclarationPath == path {
+				found = node.Step.Call
+				return sessionv3Runtime.ErrStopWorkflowWalk
 			}
-			if value := workflowCallAtDeclarationPath(
-				step.Effect.Compensate,
-				path,
-			); value != nil {
-				return value
-			}
-		}
-		if step.Scope != nil {
-			if value := workflowCallAtDeclarationPath(step.Scope, path); value != nil {
-				return value
-			}
-		}
-		if step.Choose != nil {
-			for caseIndex := range step.Choose.Cases {
-				if value := workflowCallAtDeclarationPath(
-					&step.Choose.Cases[caseIndex].Do,
-					path,
-				); value != nil {
-					return value
-				}
-			}
-			if value := workflowCallAtDeclarationPath(
-				step.Choose.Default,
-				path,
-			); value != nil {
-				return value
-			}
-		}
-		if step.Parallel != nil {
-			for branchIndex := range step.Parallel.Branches {
-				if value := workflowCallAtDeclarationPath(
-					&step.Parallel.Branches[branchIndex].Do,
-					path,
-				); value != nil {
-					return value
-				}
-			}
-		}
-		if step.Foreach != nil {
-			if value := workflowCallAtDeclarationPath(&step.Foreach.Do, path); value != nil {
-				return value
-			}
-		}
-		if step.Repeat != nil {
-			if value := workflowCallAtDeclarationPath(&step.Repeat.Do, path); value != nil {
-				return value
-			}
-		}
-		if step.Machine != nil {
-			for stateIndex := range step.Machine.States {
-				machineState := &step.Machine.States[stateIndex]
-				if value := workflowCallAtDeclarationPath(machineState.Entry, path); value != nil {
-					return value
-				}
-				if value := workflowCallAtDeclarationPath(machineState.Exit, path); value != nil {
-					return value
-				}
-				for transitionIndex := range machineState.Transitions {
-					if value := workflowCallAtDeclarationPath(
-						machineState.Transitions[transitionIndex].Do,
-						path,
-					); value != nil {
-						return value
-					}
-				}
-			}
-		}
-		if step.Saga != nil {
-			if value := workflowCallAtDeclarationPath(&step.Saga.Do, path); value != nil {
-				return value
-			}
-		}
-	}
-	for index := range block.Catch {
-		if value := workflowCallAtDeclarationPath(&block.Catch[index].Do, path); value != nil {
-			return value
-		}
-	}
-	return workflowCallAtDeclarationPath(block.Finally, path)
+			return nil
+		},
+	})
+	return found
 }
 
 func prepareWorkflowLLMInvocations(

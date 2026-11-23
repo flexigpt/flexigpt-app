@@ -23,23 +23,49 @@ type ModelAgentInvocationAdapter struct {
 	contributions *contributionruntime.Preparer
 }
 
+type ModelAgentAdapterOption func(*[]contributionruntime.Option)
+
+func WithInstructionSkillRenderer(
+	renderer contributionruntime.InstructionSkillRenderer,
+) ModelAgentAdapterOption {
+	return func(options *[]contributionruntime.Option) {
+		*options = append(*options, contributionruntime.WithInstructionSkillRenderer(renderer))
+	}
+}
+
+func WithMCPContributionPreparer(
+	preparer contributionruntime.MCPContributionPreparer,
+) ModelAgentAdapterOption {
+	return func(options *[]contributionruntime.Option) {
+		*options = append(*options, contributionruntime.WithMCPContributionPreparer(preparer))
+	}
+}
+
 func NewModelAgentInvocationAdapter(
 	models *modelruntime.SourceResolver,
 	agents *agentAPI.Service,
 	artifacts artifact.API,
 	workspaces *workspaceAPI.Service,
 	texts *textAPI.Service,
+	options ...ModelAgentAdapterOption,
 ) (*ModelAgentInvocationAdapter, error) {
 	if models == nil {
 		return nil, errors.New(
 			"workflow model invocation adapter dependencies are incomplete",
 		)
 	}
+	contributionOptions := make([]contributionruntime.Option, 0, len(options))
+	for _, option := range options {
+		if option != nil {
+			option(&contributionOptions)
+		}
+	}
 	contributions, err := contributionruntime.New(
 		artifacts,
 		agents,
 		workspaces,
 		texts,
+		contributionOptions...,
 	)
 	if err != nil {
 		return nil, err
@@ -195,6 +221,14 @@ func (a *ModelAgentInvocationAdapter) PrepareWorkflowAgentInvocation(
 		return sessionv3Runtime.WorkflowPreparedInvocation{}, err
 	}
 	return value, nil
+}
+
+func (a *ModelAgentInvocationAdapter) setDefaultMCPPreparer(
+	preparer contributionruntime.MCPContributionPreparer,
+) {
+	if a != nil && a.contributions != nil {
+		a.contributions.SetDefaultMCPPreparer(preparer)
+	}
 }
 
 func workflowInvocationArtifactRef(

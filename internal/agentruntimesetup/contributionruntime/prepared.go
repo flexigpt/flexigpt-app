@@ -23,6 +23,45 @@ import (
 
 const preparedContributionKeySeparator = "\x00"
 
+// InstructionSkillRenderer is the Skill-domain boundary used during
+// contribution preparation to render instruction-mode Skills.
+type InstructionSkillRenderer interface {
+	Instruction(
+		ctx context.Context,
+		selection sessionv3Runtime.ArtifactSelection,
+	) (string, error)
+}
+
+// MCPContributionPreparer is the MCP-domain boundary used during contribution
+// preparation to capture immutable MCP prompt context, discovery identity,
+// policy, and provider Tool plans.
+type MCPContributionPreparer interface {
+	PrepareWorkflowMCPContribution(
+		ctx context.Context,
+		server sessionv3Runtime.ArtifactPin,
+		selection sessionv3Runtime.MCPServerSelection,
+		owner sessionv3Runtime.ConfigurationOwner,
+	) (sessionv3Runtime.WorkflowPreparedMCP, error)
+}
+
+type Option func(*Preparer)
+
+func WithInstructionSkillRenderer(renderer InstructionSkillRenderer) Option {
+	return func(p *Preparer) {
+		if p != nil {
+			p.skillInstructions = renderer
+		}
+	}
+}
+
+func WithMCPContributionPreparer(preparer MCPContributionPreparer) Option {
+	return func(p *Preparer) {
+		if p != nil {
+			p.mcpPreparer = preparer
+		}
+	}
+}
+
 type Request struct {
 	Agent              *sessionv3Runtime.ArtifactSelection
 	Workspace          *sessionv3Runtime.ArtifactSelection
@@ -30,10 +69,12 @@ type Request struct {
 }
 
 type Preparer struct {
-	artifacts  artifact.API
-	agents     *agentAPI.Service
-	workspaces *workspaceAPI.Service
-	texts      *textAPI.Service
+	artifacts         artifact.API
+	agents            *agentAPI.Service
+	workspaces        *workspaceAPI.Service
+	texts             *textAPI.Service
+	skillInstructions InstructionSkillRenderer
+	mcpPreparer       MCPContributionPreparer
 }
 
 func New(
@@ -41,18 +82,33 @@ func New(
 	agents *agentAPI.Service,
 	workspaces *workspaceAPI.Service,
 	texts *textAPI.Service,
+	options ...Option,
 ) (*Preparer, error) {
 	if artifacts == nil || agents == nil || workspaces == nil || texts == nil {
 		return nil, errors.New(
 			"prepared contribution dependencies are incomplete",
 		)
 	}
-	return &Preparer{
+	preparer := &Preparer{
 		artifacts:  artifacts,
 		agents:     agents,
 		workspaces: workspaces,
 		texts:      texts,
-	}, nil
+	}
+	for _, option := range options {
+		if option != nil {
+			option(preparer)
+		}
+	}
+	return preparer, nil
+}
+
+// SetDefaultMCPPreparer installs an MCP contribution preparer only when one
+// was not explicitly supplied during construction.
+func (p *Preparer) SetDefaultMCPPreparer(preparer MCPContributionPreparer) {
+	if p != nil && p.mcpPreparer == nil {
+		p.mcpPreparer = preparer
+	}
 }
 
 func (p *Preparer) Prepare(
@@ -190,16 +246,40 @@ func (p *Preparer) prepareAgent(
 			)
 
 		case declaration.TypeSkill:
+			instructions := occurrence.SkillUseMode == agentAPI.AgentSkillUseModeInstructions
+			instructionContent := ""
+			if instructions {
+				if p.skillInstructions == nil {
+					return nil, errors.New(
+						"instruction skill renderer is unavailable",
+					)
+				}
+				rendered, renderErr := p.skillInstructions.Instruction(
+					ctx,
+					selectionForPin(targetPin),
+				)
+				if renderErr != nil {
+					return nil, renderErr
+				}
+				if strings.TrimSpace(rendered) == "" {
+					return nil, errors.New(
+						"instruction skill rendered no content",
+					)
+				}
+				instructionContent = rendered
+			}
 			appendPreparedSkill(
 				output,
 				targetPin,
 				occurrence.SkillUseMode == agentAPI.AgentSkillUseModeActive,
-				occurrence.SkillUseMode == agentAPI.AgentSkillUseModeInstructions,
+				instructions,
+				instructionContent,
 				sessionv3Runtime.ConfigurationOwnerAgent,
 			)
 
 		case declaration.TypeMCP:
-			appendPreparedMCP(
+			if err := p.appendMCP(
+				ctx,
 				output,
 				targetPin,
 				sessionv3Runtime.MCPServerSelection{
@@ -208,7 +288,9 @@ func (p *Preparer) prepareAgent(
 					ToolExposure:              sessionv3Runtime.MCPToolExposureAll,
 				},
 				sessionv3Runtime.ConfigurationOwnerAgent,
-			)
+			); err != nil {
+				return nil, err
+			}
 
 		case declaration.TypeWorkspace:
 			if workspace == nil {
@@ -356,6 +438,7 @@ func (p *Preparer) prepareWorkspace(
 				pin,
 				false,
 				false,
+				"",
 				sessionv3Runtime.ConfigurationOwnerWorkspace,
 			)
 		}
@@ -382,12 +465,15 @@ func (p *Preparer) prepareWorkspace(
 		}
 		if included {
 			mcpSelection.Server = selectionForPin(pin)
-			appendPreparedMCP(
+			if err := p.appendMCP(
+				ctx,
 				output,
 				pin,
 				mcpSelection,
 				sessionv3Runtime.ConfigurationOwnerWorkspace,
-			)
+			); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -591,6 +677,7 @@ func appendPreparedSkill(
 	pin sessionv3Runtime.ArtifactPin,
 	active bool,
 	instructions bool,
+	instructionContent string,
 	owner sessionv3Runtime.ConfigurationOwner,
 ) {
 	for _, current := range output.Skills {
@@ -600,10 +687,11 @@ func appendPreparedSkill(
 		}
 	}
 	output.Skills = append(output.Skills, sessionv3Runtime.WorkflowPreparedSkill{
-		Artifact:     pin,
-		Active:       active,
-		Instructions: instructions,
-		Owner:        owner,
+		Artifact:           pin,
+		Active:             active,
+		Instructions:       instructions,
+		InstructionContent: instructionContent,
+		Owner:              owner,
 	})
 	appendContributionOrder(
 		output,
@@ -616,31 +704,32 @@ func appendPreparedSkill(
 	)
 }
 
-func appendPreparedMCP(
+func (p *Preparer) appendMCP(
+	ctx context.Context,
 	output *sessionv3Runtime.PreparedContributionPlan,
 	pin sessionv3Runtime.ArtifactPin,
 	selection sessionv3Runtime.MCPServerSelection,
 	owner sessionv3Runtime.ConfigurationOwner,
-) {
+) error {
 	for _, current := range output.MCP {
 		if current.Server.RootID == pin.RootID &&
 			current.Server.ArtifactID == pin.ArtifactID {
-			return
+			return nil
 		}
 	}
-	output.MCP = append(output.MCP, sessionv3Runtime.WorkflowPreparedMCP{
-		Server:                    pin,
-		IncludeServerInstructions: selection.IncludeServerInstructions,
-		ToolExposure:              selection.ToolExposure,
-		Tools:                     append([]sessionv3Runtime.MCPToolSelection(nil), selection.SelectedTools...),
-		Resources:                 append([]sessionv3Runtime.MCPResourceSelection(nil), selection.Resources...),
-		ResourceTemplates: append(
-			[]sessionv3Runtime.MCPResourceTemplateSelection(nil),
-			selection.ResourceTemplates...,
-		),
-		Prompts: append([]sessionv3Runtime.MCPPromptSelection(nil), selection.Prompts...),
-		Owner:   owner,
-	})
+	if p == nil || p.mcpPreparer == nil {
+		return errors.New("mcp contribution preparer is unavailable")
+	}
+	prepared, err := p.mcpPreparer.PrepareWorkflowMCPContribution(
+		ctx,
+		pin,
+		selection,
+		owner,
+	)
+	if err != nil {
+		return err
+	}
+	output.MCP = append(output.MCP, prepared)
 	appendContributionOrder(
 		output,
 		sessionv3Runtime.PreparedContributionKindMCP,
@@ -650,6 +739,7 @@ func appendPreparedMCP(
 		),
 		owner,
 	)
+	return nil
 }
 
 func appendContributionOrder(

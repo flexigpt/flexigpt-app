@@ -2,6 +2,7 @@ package sessionv3
 
 import (
 	"errors"
+	"slices"
 	"strconv"
 
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
@@ -39,9 +40,11 @@ func (i *WorkflowInterpreter) startWorkflowRetry(
 	childStep.Retry = nil
 	childStep.Claims = nil
 	childStep, err = i.captureWorkflowRetryCall(
+		frame,
 		program,
 		state,
 		execution,
+		path,
 		childStep,
 	)
 	if err != nil {
@@ -105,9 +108,11 @@ func (i *WorkflowInterpreter) startWorkflowRetry(
 // boundary. Later attempts receive literal target, input, context, typed
 // messages, typed instructions, and keyed-effect values.
 func (i *WorkflowInterpreter) captureWorkflowRetryCall(
+	frame ProgramFrame,
 	program WorkflowProgram,
 	state WorkflowState,
 	execution Execution,
+	path string,
 	step WorkflowStep,
 ) (WorkflowStep, error) {
 	if step.Call == nil {
@@ -115,9 +120,27 @@ func (i *WorkflowInterpreter) captureWorkflowRetryCall(
 	}
 
 	output := jsonutil.CloneJSONInValue(step)
-	target, err := i.stringValue(output.Call.Target, program, state)
+	targetName, err := i.stringValue(output.Call.Target, program, state)
 	if err != nil {
 		return WorkflowStep{}, err
+	}
+	allowedTargets, err := i.resolveWorkflowCallTargets(
+		program,
+		&state,
+		*output.Call,
+	)
+	if err != nil {
+		return WorkflowStep{}, err
+	}
+	if len(allowedTargets) != 0 &&
+		!slices.Contains(allowedTargets, targetName) {
+		return WorkflowStep{}, errors.New(
+			"workflow target is outside its allowed target set",
+		)
+	}
+	target, found := program.Targets[targetName]
+	if !found {
+		return WorkflowStep{}, errors.New("workflow target is unavailable")
 	}
 	input, err := i.evaluate(output.Call.Input, program, state)
 	if err != nil {
@@ -127,10 +150,21 @@ func (i *WorkflowInterpreter) captureWorkflowRetryCall(
 	if err != nil {
 		return WorkflowStep{}, err
 	}
+	ports, err := i.workflowCallPortPlans(
+		frame,
+		program,
+		state,
+		path,
+		*output.Call,
+		target,
+	)
+	if err != nil {
+		return WorkflowStep{}, err
+	}
 
 	output.Call.Target = WorkflowValue{
 		Kind:    WorkflowValueLiteral,
-		Literal: jsonutil.MustCanonicalValue(target),
+		Literal: jsonutil.MustCanonicalValue(targetName),
 	}
 	output.Call.Input = WorkflowValue{
 		Kind:    WorkflowValueLiteral,
@@ -143,7 +177,7 @@ func (i *WorkflowInterpreter) captureWorkflowRetryCall(
 	output.Call.PortInputs = capturedWorkflowCallPortInputs(
 		execution,
 		*output.Call,
-		nil,
+		ports,
 	)
 	if output.Call.LLMInvocation != nil {
 		invocation, invocationErr := retryCaptureLLMInvocation(

@@ -1,7 +1,6 @@
 package sessionv3runtime
 
 import (
-	"context"
 	"errors"
 	"strings"
 
@@ -11,10 +10,9 @@ import (
 
 // applyPreparedContributionPlan consumes the neutral source-pinned
 // contribution contract. It never traverses current Agent or Workspace
-// capability graphs. Text and Workspace prompt values are already immutable;
-// Skill private resources can be reconstructed only from their captured pins.
+// capability graphs. Text, Workspace prompt, instruction Skill, and MCP
+// semantic values are consumed directly from captured facts.
 func (b *Binder) applyPreparedContributionPlan(
-	ctx context.Context,
 	plan *llmExecutionPlan,
 	value sessionv3Runtime.PreparedContributionPlan,
 ) error {
@@ -177,25 +175,16 @@ func (b *Binder) applyPreparedContributionPlan(
 			}
 			selection := selectionForPreparedPin(prepared.Artifact)
 			if prepared.Instructions {
-				content := prepared.InstructionContent
-				if strings.TrimSpace(content) == "" {
-					if b.skillTools == nil {
-						return errors.New("session v3 skill runtime is unavailable")
-					}
-					var instructionErr error
-					content, instructionErr = b.skillTools.Instruction(
-						ctx,
-						selection,
+				if strings.TrimSpace(prepared.InstructionContent) == "" {
+					return errors.New(
+						"prepared instruction skill has no captured instruction content",
 					)
-					if instructionErr != nil {
-						return instructionErr
-					}
 				}
 				plan.addInstruction(sessionv3Runtime.Instruction{
 					ID: "prepared-skill:" + prepared.Artifact.RootID + ":" +
 						prepared.Artifact.ArtifactID,
 					Label:     prepared.Artifact.ArtifactID,
-					Content:   content,
+					Content:   prepared.InstructionContent,
 					Owner:     prepared.Owner,
 					SourceKey: order.Key,
 				})
@@ -217,6 +206,11 @@ func (b *Binder) applyPreparedContributionPlan(
 			if !found {
 				return errors.New("prepared mcp contribution is unavailable")
 			}
+			if !prepared.Prepared {
+				return errors.New(
+					"prepared mcp contribution has no immutable discovery and tool facts",
+				)
+			}
 			if err := plan.addArtifact(prepared.Server); err != nil {
 				return err
 			}
@@ -232,6 +226,7 @@ func (b *Binder) applyPreparedContributionPlan(
 					Prompts:                   jsonutil.CloneJSONInValue(prepared.Prompts),
 				},
 			)
+			plan.setPreparedMCP(prepared)
 
 		default:
 			return errors.New("prepared contribution kind is unavailable")

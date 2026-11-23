@@ -91,6 +91,8 @@ func newSessionV3WorkflowAdmission(
 	mcpRuntime *mcpConnection.MCPRuntimeManager,
 	workspaces *workspaceAPI.Service,
 	texts *textAPI.Service,
+	skillResolver *skillruntime.Resolver,
+	skillService *skillRuntime.Service,
 ) (
 	*workflowruntime.Admission,
 	*workflowruntime.BindingRegistry,
@@ -102,13 +104,11 @@ func newSessionV3WorkflowAdmission(
 		toolCaller == nil ||
 		models == nil ||
 		agents == nil ||
-		mcpRuntime == nil {
-		return nil, nil, errSessionV3Deps
-	}
-	if workspaces == nil {
-		return nil, nil, errSessionV3Deps
-	}
-	if texts == nil {
+		mcpRuntime == nil ||
+		workspaces == nil ||
+		texts == nil ||
+		skillResolver == nil ||
+		skillService == nil {
 		return nil, nil, errSessionV3Deps
 	}
 	workflows, err := workflowAPI.NewService(resolver)
@@ -119,19 +119,27 @@ func newSessionV3WorkflowAdmission(
 	if err != nil {
 		return nil, nil, err
 	}
+	skillExecutor, err := skillruntime.NewV3Executor(
+		skillResolver,
+		skillService,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+	mcpPreparer, err := mcpruntime.NewWorkflowTargetPreparer(
+		mcpRuntime,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
 	invocations, err := workflowruntime.NewModelAgentInvocationAdapter(
 		models,
 		agents,
 		artifacts,
 		workspaces,
 		texts,
-	)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	mcpPreparer, err := mcpruntime.NewWorkflowTargetPreparer(
-		mcpRuntime,
+		workflowruntime.WithInstructionSkillRenderer(skillExecutor),
+		workflowruntime.WithMCPContributionPreparer(mcpPreparer),
 	)
 	if err != nil {
 		return nil, nil, err

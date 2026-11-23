@@ -242,17 +242,27 @@ func (r *Runtime) dispatchEmit(
 		return
 	}
 	if item.Input.Emit == nil {
-		now := r.now()
-		item.State = WorkItemStateBlocked
-		item.Error = &SanitizedError{
-			Code:     "emit_payload_missing",
-			Category: ErrorCategoryValidation,
-			Message:  "emit WorkItem has no payload",
+		execution = r.settleUndispatchedWorkLocked(
+			session,
+			execution,
+			item,
+			WorkItemStateBlocked,
+			&SanitizedError{
+				Code:     "emit_payload_missing",
+				Category: ErrorCategoryValidation,
+				Message:  "emit work item has no payload",
+			},
+			true,
+		)
+		if execution != nil {
+			_ = r.commitTerminalMutationLocked(
+				ctx,
+				session,
+				execution.ID,
+				checkpointReasonEmitBlocked,
+				RuntimeEventWorkChanged,
+			)
 		}
-		item.CompletedAt = &now
-		item.UpdatedAt = now
-		r.touchExecutionLocked(session, execution)
-		_ = r.persistLocked(ctx, "emitBlocked", session)
 		return
 	}
 
@@ -367,19 +377,13 @@ func (r *Runtime) dispatchEmit(
 		}
 	}
 
-	execution = mutableSessionExecution(session, executionID)
-	if execution == nil {
-		return
-	}
-	item = mutableWorkItem(execution, workItemID)
-	if item == nil {
-		return
-	}
-	if err := r.persistLocked(ctx, "emitFinished", session); err != nil {
-		return
-	}
-	r.armExecutionRetriesLocked(ctx, session.ID, execution.ID, *execution)
-	r.publishLocked(ctx, session, execution.ID, RuntimeEventWorkChanged)
+	_ = r.commitTerminalMutationLocked(
+		ctx,
+		session,
+		executionID,
+		checkpointReasonEmitFinished,
+		RuntimeEventWorkChanged,
+	)
 }
 
 func (r *Runtime) applyEmitLocked(

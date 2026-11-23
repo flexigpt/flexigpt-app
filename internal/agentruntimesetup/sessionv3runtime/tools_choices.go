@@ -14,7 +14,7 @@ import (
 func (b *Binder) toolChoices(
 	ctx context.Context,
 	req sessionv3Runtime.WorkDispatchRequest,
-	defaults sessionv3Runtime.SessionDefaults,
+	plan llmExecutionPlan,
 	skillChoices []toolruntime.V3PreparedChoice,
 ) (
 	[]inferenceSpec.ToolChoice,
@@ -22,6 +22,7 @@ func (b *Binder) toolChoices(
 	[]preparedChoice,
 	error,
 ) {
+	defaults := plan.defaults
 	choices := []inferenceSpec.ToolChoice{}
 	bindings := map[string]sessionv3Runtime.ToolCall{}
 	prepared := []preparedChoice{}
@@ -90,18 +91,38 @@ func (b *Binder) toolChoices(
 			return nil, nil, nil, err
 		}
 	}
-	if b.mcpTools == nil {
-		return nil, nil, nil, errors.New(
-			"session v3 MCP runtime is unavailable",
+	for _, selection := range defaults.MCP {
+		if preparedMCP, found := plan.preparedMCP[selectionKey(selection.Server)]; found &&
+			preparedMCP.Prepared {
+			preparedMCPChoices, decodeErr := preparedChoicesFromDispatchPlans(
+				preparedMCP.PreparedTools,
+			)
+			if decodeErr != nil {
+				return nil, nil, nil, decodeErr
+			}
+			for _, c := range preparedMCPChoices {
+				if err := register(c); err != nil {
+					return nil, nil, nil, err
+				}
+			}
+			continue
+		}
+		if b.mcpTools == nil {
+			return nil, nil, nil, errors.New(
+				"session v3 mcp runtime is unavailable",
+			)
+		}
+		mcpChoices, err := b.mcpTools.Choices(
+			ctx,
+			[]sessionv3Runtime.MCPServerSelection{selection},
 		)
-	}
-	mcpChoices, err := b.mcpTools.Choices(ctx, defaults.MCP)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	for _, c := range preparedChoicesFromDomain(mcpChoices) {
-		if err := register(c); err != nil {
+		if err != nil {
 			return nil, nil, nil, err
+		}
+		for _, c := range preparedChoicesFromDomain(mcpChoices) {
+			if err := register(c); err != nil {
+				return nil, nil, nil, err
+			}
 		}
 	}
 	return choices, bindings, prepared, nil
@@ -122,4 +143,37 @@ func preparedChoicesFromDomain(
 		output[index].ProviderConfiguration = values[index].ProviderConfiguration.Clone()
 	}
 	return output
+}
+
+func preparedChoicesFromDispatchPlans(
+	values []sessionv3Runtime.ToolDispatchPlan,
+) ([]preparedChoice, error) {
+	output := make([]preparedChoice, 0, len(values))
+	for _, value := range values {
+		if len(value.Choice) == 0 {
+			return nil, errors.New(
+				"prepared tool dispatch plan has no provider choice",
+			)
+		}
+		choice, err := jsonutil.DecodeCanonicalValue[inferenceSpec.ToolChoice](
+			value.Choice,
+		)
+		if err != nil {
+			return nil, err
+		}
+		if choice.ID == "" ||
+			choice.Name == "" ||
+			choice.ID != value.Call.ChoiceID ||
+			choice.Name != value.Call.Name {
+			return nil, errors.New(
+				"prepared provider choice differs from its durable tool call",
+			)
+		}
+		output = append(output, preparedChoice{
+			Choice:                choice,
+			Call:                  jsonutil.CloneJSONInValue(value.Call),
+			ProviderConfiguration: value.ProviderConfiguration.Clone(),
+		})
+	}
+	return output, nil
 }

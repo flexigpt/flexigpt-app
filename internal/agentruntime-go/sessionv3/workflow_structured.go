@@ -20,6 +20,54 @@ const (
 	firstFastStr      = "fail-fast"
 )
 
+// WorkflowBlockRole identifies the structural position of a lowered
+// WorkflowBlock in the runtime-neutral Workflow tree.
+type WorkflowBlockRole string
+
+const (
+	WorkflowBlockRoleRoot              WorkflowBlockRole = "root"
+	WorkflowBlockRoleScope             WorkflowBlockRole = "scope"
+	WorkflowBlockRoleChooseCase        WorkflowBlockRole = "chooseCase"
+	WorkflowBlockRoleChooseDefault     WorkflowBlockRole = "chooseDefault"
+	WorkflowBlockRoleParallelBranch    WorkflowBlockRole = "parallelBranch"
+	WorkflowBlockRoleForeach           WorkflowBlockRole = "foreach"
+	WorkflowBlockRoleRepeat            WorkflowBlockRole = "repeat"
+	WorkflowBlockRoleMachineEntry      WorkflowBlockRole = "machineEntry"
+	WorkflowBlockRoleMachineExit       WorkflowBlockRole = "machineExit"
+	WorkflowBlockRoleMachineTransition WorkflowBlockRole = "machineTransition"
+	WorkflowBlockRoleSaga              WorkflowBlockRole = "saga"
+	WorkflowBlockRoleEffectReconcile   WorkflowBlockRole = "effectReconcile"
+	WorkflowBlockRoleEffectCompensate  WorkflowBlockRole = "effectCompensate"
+	WorkflowBlockRoleCatch             WorkflowBlockRole = "catch"
+	WorkflowBlockRoleFinally           WorkflowBlockRole = "finally"
+)
+
+// ErrStopWorkflowWalk terminates WalkWorkflowBlock early without error.
+var ErrStopWorkflowWalk = errors.New("stop workflow tree walk")
+
+type WorkflowBlockNode struct {
+	Block       *WorkflowBlock
+	ParentBlock *WorkflowBlock
+	ParentStep  *WorkflowStep
+	Role        WorkflowBlockRole
+	Name        string
+	Index       int
+}
+
+type WorkflowStepNode struct {
+	Block *WorkflowBlock
+	Step  *WorkflowStep
+	Index int
+}
+
+// WorkflowTreeVisitor receives every lowered WorkflowBlock and WorkflowStep
+// in deterministic pre-order. Runtime and setup share this one traversal
+// contract without moving source parsing or Artifact planning into Runtime.
+type WorkflowTreeVisitor struct {
+	OnBlock func(node WorkflowBlockNode) error
+	OnStep  func(node WorkflowStepNode) error
+}
+
 // WorkflowScopeContext is the durable parent visibility envelope for an
 // interpreter-created child block frame. It contains semantic values only.
 type WorkflowScopeContext struct {
@@ -2855,4 +2903,195 @@ func workflowReleasePendingClaims(
 		return
 	}
 	state.ReleaseFrameClaims = true
+}
+
+// WalkWorkflowBlock visits a lowered WorkflowBlock tree in deterministic
+// pre-order. It is the single traversal mechanism shared by channel
+// namespacing, resource namespacing, and setup declaration-path application.
+func WalkWorkflowBlock(
+	root *WorkflowBlock,
+	visitor WorkflowTreeVisitor,
+) error {
+	if root == nil {
+		return nil
+	}
+	err := walkWorkflowBlock(
+		WorkflowBlockNode{
+			Block: root,
+			Role:  WorkflowBlockRoleRoot,
+		},
+		visitor,
+	)
+	if errors.Is(err, ErrStopWorkflowWalk) {
+		return nil
+	}
+	return err
+}
+
+func walkWorkflowBlock(
+	node WorkflowBlockNode,
+	visitor WorkflowTreeVisitor,
+) error {
+	if node.Block == nil {
+		return nil
+	}
+	if visitor.OnBlock != nil {
+		if err := visitor.OnBlock(node); err != nil {
+			return err
+		}
+	}
+
+	block := node.Block
+	for stepIndex := range block.Steps {
+		step := &block.Steps[stepIndex]
+		if visitor.OnStep != nil {
+			if err := visitor.OnStep(WorkflowStepNode{
+				Block: block,
+				Step:  step,
+				Index: stepIndex,
+			}); err != nil {
+				return err
+			}
+		}
+		if step.Effect != nil {
+			if err := walkWorkflowBlock(WorkflowBlockNode{
+				Block:       step.Effect.Reconcile,
+				ParentBlock: block,
+				ParentStep:  step,
+				Role:        WorkflowBlockRoleEffectReconcile,
+			}, visitor); err != nil {
+				return err
+			}
+			if err := walkWorkflowBlock(WorkflowBlockNode{
+				Block:       step.Effect.Compensate,
+				ParentBlock: block,
+				ParentStep:  step,
+				Role:        WorkflowBlockRoleEffectCompensate,
+			}, visitor); err != nil {
+				return err
+			}
+		}
+
+		switch {
+		case step.Scope != nil:
+			if err := walkWorkflowBlock(WorkflowBlockNode{
+				Block:       step.Scope,
+				ParentBlock: block,
+				ParentStep:  step,
+				Role:        WorkflowBlockRoleScope,
+			}, visitor); err != nil {
+				return err
+			}
+		case step.Choose != nil:
+			for caseIndex := range step.Choose.Cases {
+				if err := walkWorkflowBlock(WorkflowBlockNode{
+					Block:       &step.Choose.Cases[caseIndex].Do,
+					ParentBlock: block,
+					ParentStep:  step,
+					Role:        WorkflowBlockRoleChooseCase,
+					Index:       caseIndex,
+				}, visitor); err != nil {
+					return err
+				}
+			}
+			if err := walkWorkflowBlock(WorkflowBlockNode{
+				Block:       step.Choose.Default,
+				ParentBlock: block,
+				ParentStep:  step,
+				Role:        WorkflowBlockRoleChooseDefault,
+			}, visitor); err != nil {
+				return err
+			}
+		case step.Parallel != nil:
+			for branchIndex := range step.Parallel.Branches {
+				branch := &step.Parallel.Branches[branchIndex]
+				if err := walkWorkflowBlock(WorkflowBlockNode{
+					Block:       &branch.Do,
+					ParentBlock: block,
+					ParentStep:  step,
+					Role:        WorkflowBlockRoleParallelBranch,
+					Name:        branch.Name,
+					Index:       branchIndex,
+				}, visitor); err != nil {
+					return err
+				}
+			}
+		case step.Foreach != nil:
+			if err := walkWorkflowBlock(WorkflowBlockNode{
+				Block:       &step.Foreach.Do,
+				ParentBlock: block,
+				ParentStep:  step,
+				Role:        WorkflowBlockRoleForeach,
+			}, visitor); err != nil {
+				return err
+			}
+		case step.Repeat != nil:
+			if err := walkWorkflowBlock(WorkflowBlockNode{
+				Block:       &step.Repeat.Do,
+				ParentBlock: block,
+				ParentStep:  step,
+				Role:        WorkflowBlockRoleRepeat,
+			}, visitor); err != nil {
+				return err
+			}
+		case step.Machine != nil:
+			for stateIndex := range step.Machine.States {
+				machineState := &step.Machine.States[stateIndex]
+				if err := walkWorkflowBlock(WorkflowBlockNode{
+					Block:       machineState.Entry,
+					ParentBlock: block,
+					ParentStep:  step,
+					Role:        WorkflowBlockRoleMachineEntry,
+					Name:        machineState.Name,
+				}, visitor); err != nil {
+					return err
+				}
+				if err := walkWorkflowBlock(WorkflowBlockNode{
+					Block:       machineState.Exit,
+					ParentBlock: block,
+					ParentStep:  step,
+					Role:        WorkflowBlockRoleMachineExit,
+					Name:        machineState.Name,
+				}, visitor); err != nil {
+					return err
+				}
+				for transitionIndex := range machineState.Transitions {
+					if err := walkWorkflowBlock(WorkflowBlockNode{
+						Block:       machineState.Transitions[transitionIndex].Do,
+						ParentBlock: block,
+						ParentStep:  step,
+						Role:        WorkflowBlockRoleMachineTransition,
+						Name:        machineState.Name,
+						Index:       transitionIndex,
+					}, visitor); err != nil {
+						return err
+					}
+				}
+			}
+		case step.Saga != nil:
+			if err := walkWorkflowBlock(WorkflowBlockNode{
+				Block:       &step.Saga.Do,
+				ParentBlock: block,
+				ParentStep:  step,
+				Role:        WorkflowBlockRoleSaga,
+			}, visitor); err != nil {
+				return err
+			}
+		}
+	}
+	for catchIndex := range block.Catch {
+		if err := walkWorkflowBlock(WorkflowBlockNode{
+			Block:       &block.Catch[catchIndex].Do,
+			ParentBlock: block,
+			Role:        WorkflowBlockRoleCatch,
+			Index:       catchIndex,
+		}, visitor); err != nil {
+			return err
+		}
+	}
+	return walkWorkflowBlock(WorkflowBlockNode{
+		Block:       block.Finally,
+		ParentBlock: block,
+		Role:        WorkflowBlockRoleFinally,
+	}, visitor)
 }

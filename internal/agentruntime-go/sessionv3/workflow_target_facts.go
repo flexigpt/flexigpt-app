@@ -107,6 +107,12 @@ type WorkflowPreparedMCP struct {
 	ResourceTemplates         []MCPResourceTemplateSelection `json:"resourceTemplates,omitempty"`
 	Prompts                   []MCPPromptSelection           `json:"prompts,omitempty"`
 	Owner                     ConfigurationOwner             `json:"owner"`
+
+	Prepared        bool               `json:"prepared,omitempty"`
+	DiscoveryDigest string             `json:"discoveryDigest,omitempty"`
+	ServerDisplay   string             `json:"serverDisplay,omitempty"`
+	Context         []string           `json:"context,omitempty"`
+	PreparedTools   []ToolDispatchPlan `json:"preparedTools,omitempty"`
 }
 
 // PreparedContributionPlan is the neutral domain-owned, source-pinned
@@ -427,6 +433,43 @@ func (v WorkflowPreparedMCP) Validate() error {
 	case MCPToolExposureNone, MCPToolExposureAll, MCPToolExposureSelected:
 	default:
 		return errors.New("prepared workflow mcp exposure is invalid")
+	}
+	if v.Prepared {
+		if err := validateID(
+			"prepared workflow mcp discovery digest",
+			v.DiscoveryDigest,
+		); err != nil {
+			return err
+		}
+		if err := validateDispatchTools(v.PreparedTools); err != nil {
+			return err
+		}
+		for _, tool := range v.PreparedTools {
+			if tool.ProviderManaged ||
+				tool.Call.Binding.Kind != ToolBindingKindMCP ||
+				tool.Call.Binding.MCP == nil ||
+				tool.Call.Binding.MCP.ServerArtifact == nil ||
+				*tool.Call.Binding.MCP.ServerArtifact != v.Server ||
+				len(tool.Choice) == 0 {
+				return errors.New(
+					"prepared workflow mcp tool does not match its server pin",
+				)
+			}
+		}
+		for _, value := range v.Context {
+			if strings.TrimSpace(value) == "" {
+				return errors.New(
+					"prepared workflow mcp context is empty",
+				)
+			}
+		}
+	} else if v.DiscoveryDigest != "" ||
+		v.ServerDisplay != "" ||
+		len(v.Context) != 0 ||
+		len(v.PreparedTools) != 0 {
+		return errors.New(
+			"unprepared workflow mcp contribution contains prepared facts",
+		)
 	}
 	return PreparedContributionOrder{
 		Kind:  PreparedContributionKindMCP,

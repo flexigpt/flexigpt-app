@@ -279,12 +279,11 @@ func (r *Runtime) waitForRetry(
 		if execution == nil {
 			return
 		}
-		_ = r.persistLocked(persistContext, "retryCancelled", session)
-		r.armSessionExecutionTimersLocked(persistContext, session)
-		r.publishLocked(
+		_ = r.commitTerminalMutationLocked(
 			persistContext,
 			session,
 			execution.ID,
+			checkpointReasonRetryCancelled,
 			RuntimeEventWorkChanged,
 		)
 		return
@@ -302,14 +301,11 @@ func (r *Runtime) waitForRetry(
 		if execution == nil {
 			return
 		}
-		if err := r.persistLocked(persistContext, "retryDeadlineElapsed", session); err != nil {
-			return
-		}
-		r.armSessionExecutionTimersLocked(persistContext, session)
-		r.publishLocked(
+		_ = r.commitTerminalMutationLocked(
 			persistContext,
 			session,
 			execution.ID,
+			checkpointReasonRetryDeadlineElapsed,
 			RuntimeEventWorkChanged,
 		)
 		return

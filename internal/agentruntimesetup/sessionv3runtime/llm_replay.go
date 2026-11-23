@@ -213,42 +213,27 @@ func recoveredToolChoices(
 	map[string]sessionv3Runtime.ToolCall,
 	error,
 ) {
-	choices := make([]inferenceSpec.ToolChoice, 0, len(plan.Tools))
-	bindings := make(map[string]sessionv3Runtime.ToolCall, len(plan.Tools)*2)
+	prepared, err := preparedChoicesFromDispatchPlans(plan.Tools)
+	if err != nil {
+		return nil, nil, err
+	}
 
-	for _, value := range plan.Tools {
-		if len(value.Choice) == 0 {
-			return nil, nil, errors.New(
-				"recovered tool dispatch plan has no provider choice",
-			)
-		}
-		choice, err := jsonutil.DecodeCanonicalValue[inferenceSpec.ToolChoice](
-			value.Choice,
-		)
-		if err != nil {
-			return nil, nil, err
-		}
-		if choice.ID == "" ||
-			choice.Name == "" ||
-			choice.ID != value.Call.ChoiceID ||
-			choice.Name != value.Call.Name {
-			return nil, nil, errors.New(
-				"recovered provider choice differs from its durable tool call",
-			)
-		}
-		if _, duplicate := bindings[choice.ID]; duplicate {
+	choices := make([]inferenceSpec.ToolChoice, 0, len(prepared))
+	bindings := make(map[string]sessionv3Runtime.ToolCall, len(prepared)*2)
+	for _, value := range prepared {
+		if _, duplicate := bindings[value.Choice.ID]; duplicate {
 			return nil, nil, errors.New(
 				"recovered provider tool choice identity is duplicated",
 			)
 		}
-		if _, duplicate := bindings[choice.Name]; duplicate {
+		if _, duplicate := bindings[value.Choice.Name]; duplicate {
 			return nil, nil, errors.New(
 				"recovered provider tool name is duplicated",
 			)
 		}
-		choices = append(choices, choice)
-		bindings[choice.ID] = jsonutil.CloneJSONInValue(value.Call)
-		bindings[choice.Name] = jsonutil.CloneJSONInValue(value.Call)
+		choices = append(choices, value.Choice)
+		bindings[value.Choice.ID] = value.Call
+		bindings[value.Choice.Name] = value.Call
 	}
 	return choices, bindings, nil
 }

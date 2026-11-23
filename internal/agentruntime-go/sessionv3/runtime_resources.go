@@ -569,12 +569,11 @@ func (r *Runtime) waitForResource(
 		if execution == nil {
 			return
 		}
-		_ = r.persistLocked(persistContext, "resourceWaitCancelled", session)
-		r.armSessionExecutionTimersLocked(persistContext, session)
-		r.publishLocked(
+		_ = r.commitTerminalMutationLocked(
 			persistContext,
 			session,
 			execution.ID,
+			checkpointReasonResourceWaitCancelled,
 			RuntimeEventWorkChanged,
 		)
 		return
@@ -592,14 +591,11 @@ func (r *Runtime) waitForResource(
 		if execution == nil {
 			return
 		}
-		if err := r.persistLocked(persistContext, "resourceDeadlineElapsed", session); err != nil {
-			return
-		}
-		r.armSessionExecutionTimersLocked(persistContext, session)
-		r.publishLocked(
+		_ = r.commitTerminalMutationLocked(
 			persistContext,
 			session,
 			execution.ID,
+			checkpointReasonResourceDeadlineElapsed,
 			RuntimeEventWorkChanged,
 		)
 		return

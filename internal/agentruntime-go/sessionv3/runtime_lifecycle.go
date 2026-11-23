@@ -3,7 +3,56 @@ package sessionv3
 import (
 	"context"
 	"errors"
+	"strings"
 )
+
+const (
+	maxExecutionSettlementPasses = 64
+	executionCancelledMessage    = "execution was cancelled"
+
+	checkpointReasonWorkFinished             = "workFinished"
+	checkpointReasonWorkBindingInvalid       = "workBindingInvalid"
+	checkpointReasonWorkNotInvoked           = "workNotInvoked"
+	checkpointReasonWorkPanicked             = "workPanicked"
+	checkpointReasonWorkBudgetBlocked        = "workBudgetBlocked"
+	checkpointReasonWorkStepBudgetBlocked    = "workStepBudgetBlocked"
+	checkpointReasonChildCallBudgetBlocked   = "childCallBudgetBlocked"
+	checkpointReasonPortInputBlocked         = "portInputBlocked"
+	checkpointReasonResourceClaimInvalid     = "resourceClaimInvalid"
+	checkpointReasonPortBindingUnavailable   = "portBindingUnavailable"
+	checkpointReasonWorkBlocked              = "workBlocked"
+	checkpointReasonWorkDeadlineElapsed      = "workDeadlineElapsed"
+	checkpointReasonWaitResolved             = "waitResolved"
+	checkpointReasonWaitExpired              = "waitExpired"
+	checkpointReasonTimerFired               = "timerFired"
+	checkpointReasonEmitBlocked              = "emitBlocked"
+	checkpointReasonEmitFinished             = "emitFinished"
+	checkpointReasonRetryCancelled           = "retryCancelled"
+	checkpointReasonRetryDeadlineElapsed     = "retryDeadlineElapsed"
+	checkpointReasonResourceWaitCancelled    = "resourceWaitCancelled"
+	checkpointReasonResourceDeadlineElapsed  = "resourceDeadlineElapsed"
+	checkpointReasonExecutionDeadlineElapsed = "executionDeadlineElapsed"
+	checkpointReasonExecutionChanged         = "executionChanged"
+)
+
+type executionSettlementSignature struct {
+	state             ExecutionState
+	cleanupActive     bool
+	frames            int
+	terminalFrames    int
+	workItems         int
+	terminalWorkItems int
+	waits             int
+	effects           int
+}
+
+func executionCancellationMessage(execution Execution) string {
+	if execution.Cleanup.Primary != nil &&
+		strings.TrimSpace(execution.Cleanup.Primary.Message) != "" {
+		return execution.Cleanup.Primary.Message
+	}
+	return executionCancelledMessage
+}
 
 // settlePendingFrameCancellationsLocked keeps a cancelled frame alive until
 // every owned WorkItem, child frame, retained claim, and cancellation-delivery
@@ -171,40 +220,170 @@ func (r *Runtime) scheduleCommittedFrameClosuresLocked(session *Session) {
 	if r == nil || session == nil {
 		return
 	}
-	closer, supported := r.deps.Binder.(ProgramFrameBindingCloser)
-	if !supported || closer == nil {
+	frameCloser, frameCloseSupported := r.deps.Binder.(ProgramFrameBindingCloser)
+	executionCloser, executionCloseSupported := r.deps.Binder.(ExecutionBindingCloser)
+	if (!frameCloseSupported || frameCloser == nil) &&
+		(!executionCloseSupported || executionCloser == nil) {
 		return
 	}
 	if r.closedFrameBindings == nil {
 		r.closedFrameBindings = make(map[string]struct{})
 	}
+	if r.closedExecutionBindings == nil {
+		r.closedExecutionBindings = make(map[ExecutionID]struct{})
+	}
 	for index := range session.Executions {
 		execution := &session.Executions[index]
-		for _, frame := range execution.ProgramFrames {
-			if !frame.Status.Terminal() ||
-				r.frameHasLiveOwnedWorkLocked(session, *execution, frame.ID) {
+		if frameCloseSupported && frameCloser != nil {
+			for _, frame := range execution.ProgramFrames {
+				if !frame.Status.Terminal() ||
+					r.frameHasLiveOwnedWorkLocked(session, *execution, frame.ID) {
+					continue
+				}
+				key := string(execution.ID) + "\x00" + string(frame.ID)
+				if _, alreadyClosed := r.closedFrameBindings[key]; alreadyClosed {
+					continue
+				}
+				r.closedFrameBindings[key] = struct{}{}
+				executionID := execution.ID
+				frameID := frame.ID
+				r.launchAsync(
+					"session-v3 committed program frame binding cleanup",
+					func() {
+						_ = frameCloser.CloseProgramFrameBinding(
+							context.WithoutCancel(r.lifecycleCtx),
+							executionID,
+							frameID,
+						)
+					},
+					nil,
+				)
+			}
+		}
+		if executionCloseSupported && executionCloser != nil && execution.State.Terminal() {
+			if _, alreadyClosed := r.closedExecutionBindings[execution.ID]; alreadyClosed {
 				continue
 			}
-			key := string(execution.ID) + "\x00" + string(frame.ID)
-			if _, alreadyClosed := r.closedFrameBindings[key]; alreadyClosed {
-				continue
-			}
-			r.closedFrameBindings[key] = struct{}{}
+			r.closedExecutionBindings[execution.ID] = struct{}{}
 			executionID := execution.ID
-			frameID := frame.ID
 			r.launchAsync(
-				"session-v3 committed program frame binding cleanup",
+				"session-v3 committed execution binding cleanup",
 				func() {
-					_ = closer.CloseProgramFrameBinding(
+					_ = executionCloser.CloseExecutionBinding(
 						context.WithoutCancel(r.lifecycleCtx),
 						executionID,
-						frameID,
 					)
 				},
 				nil,
 			)
 		}
 	}
+}
+
+func computeExecutionSettlementSignature(
+	execution Execution,
+) executionSettlementSignature {
+	signature := executionSettlementSignature{
+		state:         execution.State,
+		cleanupActive: execution.Cleanup.Active,
+		frames:        len(execution.ProgramFrames),
+		workItems:     len(execution.WorkItems),
+		waits:         len(execution.Waits),
+		effects:       len(execution.Effects),
+	}
+	for _, frame := range execution.ProgramFrames {
+		if frame.Status.Terminal() {
+			signature.terminalFrames++
+		}
+	}
+	for _, item := range execution.WorkItems {
+		if item.State.Terminal() {
+			signature.terminalWorkItems++
+		}
+	}
+	return signature
+}
+
+// finalizeExecutionSettlementLocked converges all pre-checkpoint Saga,
+// cleanup, frame-cancellation, child, wait, and Execution terminal mutations
+// before the authoritative checkpoint commits.
+func (r *Runtime) finalizeExecutionSettlementLocked(
+	ctx context.Context,
+	session *Session,
+	executionID ExecutionID,
+	primaryError *SanitizedError,
+) (*Execution, error) {
+	if session == nil || executionID == "" {
+		return nil, ErrExecutionNotFound
+	}
+
+	for range maxExecutionSettlementPasses {
+		execution := mutableSessionExecution(session, executionID)
+		if execution == nil {
+			return nil, ErrExecutionNotFound
+		}
+		before := computeExecutionSettlementSignature(*execution)
+
+		r.resumeSagaCompensationFramesLocked(session, execution)
+		execution = mutableSessionExecution(session, executionID)
+		if execution == nil {
+			return nil, ErrExecutionNotFound
+		}
+
+		r.beginFailureDrivenCleanupLocked(execution, primaryError)
+		execution = mutableSessionExecution(session, executionID)
+		if execution == nil {
+			return nil, ErrExecutionNotFound
+		}
+
+		if err := r.settlePendingFrameCancellationsLocked(session, execution); err != nil {
+			return nil, err
+		}
+		execution = mutableSessionExecution(session, executionID)
+		if execution == nil {
+			return nil, ErrExecutionNotFound
+		}
+
+		if !execution.State.Terminal() &&
+			execution.Controls.CancellationRequested &&
+			executionTerminalReadyLocked(session, *execution) {
+			r.completeExecutionLocked(
+				context.WithoutCancel(ctx),
+				session,
+				execution,
+				ExecutionOutcome{
+					Kind:        ExecutionOutcomeCancelled,
+					Code:        string(ExecutionOutcomeCancelled),
+					Message:     executionCancellationMessage(*execution),
+					CompletedAt: r.now(),
+				},
+			)
+			execution = mutableSessionExecution(session, executionID)
+			if execution == nil {
+				return nil, ErrExecutionNotFound
+			}
+		}
+
+		wasTerminal := execution.State.Terminal()
+		r.refreshExecutionStateLocked(execution)
+		if !wasTerminal && execution.State.Terminal() {
+			r.settleTerminalExecutionLocked(session, execution)
+			execution = mutableSessionExecution(session, executionID)
+			if execution == nil {
+				return nil, ErrExecutionNotFound
+			}
+		}
+
+		if computeExecutionSettlementSignature(*execution) == before {
+			return execution, nil
+		}
+	}
+
+	execution := mutableSessionExecution(session, executionID)
+	if execution == nil {
+		return nil, ErrExecutionNotFound
+	}
+	return execution, nil
 }
 
 func (r *Runtime) commitTerminalMutationLocked(
@@ -214,21 +393,13 @@ func (r *Runtime) commitTerminalMutationLocked(
 	reason string,
 	event RuntimeEventKind,
 ) bool {
-	execution := mutableSessionExecution(session, executionID)
-	if execution == nil {
-		return false
-	}
-	if err := r.settlePendingFrameCancellationsLocked(session, execution); err != nil {
-		return false
-	}
-	execution = mutableSessionExecution(session, executionID)
-	if execution == nil {
-		return false
-	}
-	r.refreshExecutionStateLocked(execution)
-	r.settleTerminalExecutionLocked(session, execution)
-	execution = mutableSessionExecution(session, executionID)
-	if execution == nil {
+	execution, err := r.finalizeExecutionSettlementLocked(
+		ctx,
+		session,
+		executionID,
+		nil,
+	)
+	if err != nil || execution == nil {
 		return false
 	}
 	r.touchExecutionLocked(session, execution)

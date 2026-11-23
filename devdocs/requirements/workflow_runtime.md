@@ -73,19 +73,14 @@ this implementation cycle.
 This HLD does not publish a completion percentage. Completion estimates are
 reported outside this status record.
 
-Most Runtime and setup behavior in this ledger is implemented in source. The
-source still has four functional gaps:
-
-- A terminal settlement can mutate durable state after its checkpoint.
-- Workflow prepared Model and Agent contribution facts are not fully frozen.
-- Retry call port inputs are not captured at the retry boundary.
-- Lowered Workflow tree traversal is duplicated across Runtime and setup.
-
-The implementation retains one normal post-checkpoint dispatch authority,
-receiver-scoped nested Workflow port accounting, a domain-owned prepared
-contribution contract, one V3 attachment admission implementation, and a
-Store-owned semantic Session export surface. The listed gaps constrain the
-completion status of the affected tasks below.
+All listed Runtime and setup functional tasks in this ledger are implemented in
+source, including pre-checkpoint terminal settlement (`RT-SETTLE-005`), frozen
+Workflow Model and Agent contribution preparation (`WF-PREPARE-005`), frozen
+retry call port input capture (`WF-RETRY-005`), and one typed lowered-tree
+traversal contract (`ARC-DUP-005`). The implementation retains one normal
+post-checkpoint dispatch authority, receiver-scoped nested Workflow port
+accounting, a domain-owned prepared contribution contract, one V3 attachment
+admission implementation, and a Store-owned semantic Session export surface.
 
 This audit does not create Artifact planning work.
 `workflow_artifact.md` remains the authority for source admission, retrieval,
@@ -133,11 +128,9 @@ The single current Runtime and consumer-execution status authority is
 component ledgers, pending ledgers, task registers, subregisters, architecture
 status tables, and repeated Runtime status claims.
 
-The `Implemented` status remains source-based. The affected settlement,
-Workflow preparation, retry, and duplication entries are `Partial` until the
-current pending functional tasks at the end of this document are complete.
-This HLD remains work in progress. No version identifier may change while
-those tasks are implemented.
+The `Implemented` status remains source-based. Test execution and application
+execution were not reviewed. This HLD remains work in progress, and no version
+identifier has changed while these tasks were implemented.
 
 This does not replace the separate source-planning completion record in
 `workflow_artifact.md`. That record is limited to Artifact admission,
@@ -1240,25 +1233,22 @@ the implemented behavior.
 
 #### `RT-SETTLE-003` Authoritative mutation and terminal propagation
 
-- Status: Partial.
-- Implemented evidence:
+- Status: Implemented.
+- Completion evidence:
   - `internal/agentruntime-go/sessionv3/runtime.go:persistLocked` is the
     committed Session-wide ready-work launch boundary. It accepts committed
     derived-index errors and clears stale checkpoint barriers before readiness.
-  - `runtime_lifecycle.go:commitTerminalMutationLocked`,
+  - `runtime_lifecycle.go:finalizeExecutionSettlementLocked`,
+    `commitTerminalMutationLocked`,
     `settlePendingFrameCancellationsLocked`, and
     `executionTerminalReadyLocked` complete attempt, effect, claim, wait,
-    owner, Execution, checkpoint, and post-commit dispatch lifecycle work.
-  - `runtime.go:dispatchOne`, `finishWorkLocked`, `finishPanickedWork`, and
-    `runtime_durability.go:settleUndispatchedWorkLocked` route binding, port,
-    panic, deadline, retry, resource, cancellation, reconciliation, and child
-    terminal paths through the common lifecycle.
-- Remaining functional gap:
-  - `runtime.go:executeOne` persists and publishes `workFinished`, then calls
-    `settlePendingFrameCancellationsLocked` again. A non-no-op second
-    settlement can mutate a frame or Execution after its checkpoint.
-  - Terminal settlement must complete before its authoritative checkpoint.
-    `RT-SETTLE-005` defines the required behavior.
+    owner, frame cancellation, Saga, Execution, checkpoint, timer rearm, and
+    post-commit dispatch lifecycle work in one pre-checkpoint sequence.
+  - `runtime.go:executeOne`, `dispatchOne`, `ResolveWait`,
+    `resolveRecoveryWaitLocked`, `finishWorkLocked`, `finishPanickedWork`,
+    `expireAt`, `coordination.go:dispatchEmit`, `budget.go`, `retry.go`,
+    `runtime_resources.go`, and `runtime_durability.go` all commit terminal
+    mutations before `persistLocked` with no post-checkpoint frame mutation.
 
 ##### `RT-SETTLE-003.a` Reacquire authoritative Session-owned objects
 
@@ -1275,24 +1265,22 @@ the implemented behavior.
 
 ##### `RT-SETTLE-003.b` Use one terminal lifecycle and committed ready-work launch
 
-- Status: Partial.
-- Implemented evidence:
+- Status: Implemented.
+- Completion evidence:
   - `R/runtime.go:persistLocked` is the sole normal committed
     checkpoint-to-ready-work boundary.
-  - `R/runtime.go:blockWorkForBudgetLocked`,
+  - `R/runtime_lifecycle.go:finalizeExecutionSettlementLocked` and
+    `commitTerminalMutationLocked` converge every terminal WorkItem,
+    frame-cancellation, child, wait, resource, effect, Saga, and Execution
+    mutation before `persistLocked`.
+  - `R/runtime.go:executeOne`, `ResolveWait`, `blockWorkForBudgetLocked`,
     `R/runtime_durability.go:settleTimerLocked`,
     `R/runtime_durability.go:settleUnstartedAttemptLocked`,
-    `R/runtime_triggers.go:waitForTrigger`,
-    `R/normal_app.go:ExecuteAppTool`, and
-    `R/normal_session.go:EditAndResend` no longer launch a second ready-work
-    wave after persistence.
+    `R/coordination.go:dispatchEmit`, `R/budget.go:waitForExecutionDeadline`,
+    `R/retry.go:waitForRetry`, and `R/runtime_resources.go:waitForResource`
+    commit once without post-checkpoint mutation or duplicate launch waves.
   - `R/Runtime.Restore` retains the one explicit Session-wide post-restore
     readiness wave after `resumeRestoredWork` completes.
-- Missing behavior:
-  - A terminal lifecycle mutation must not occur after `persistLocked`
-    succeeds unless a new authoritative checkpoint commits that mutation.
-  - Remove the post-checkpoint terminal settlement in `executeOne` or move it
-    into the pre-checkpoint common terminal lifecycle.
 
 #### `RT-CLEANUP-003` Execute cleanup through every owning lifecycle
 
@@ -1536,43 +1524,36 @@ the implemented behavior.
 
 #### `WF-PREPARE-003` Preserve complete prepared target meaning
 
-- Status: Partial.
-- Implemented evidence:
+- Status: Implemented.
+- Completion evidence:
   - `R/PreparedContributionPlan` is the neutral source-pinned contract used
     by normal Session V3 setup and Workflow Model or Agent preparation.
   - It retains immutable Model, Agent, Workspace, Text, Tool, Skill, MCP,
-    Workspace prompt, user context, ordered contribution, and provenance
-    facts.
+    rendered instruction-mode Skill text, prepared MCP context, discovery
+    identity, and provider Tool plans, Workspace prompt, user context, ordered
+    contribution, and provenance facts.
   - `program.go:startAgentLLM`, retry capture, started calls, handoff,
     nested preparation, and recovery retain one immutable prepared invocation.
   - `compiler_invocation.go` lowers typed expression-backed message and
     instruction collections. `workflow_invocation.go:captureWorkflowLLMInvocation`
     evaluates and freezes those collections at the logical call boundary.
-- Remaining functional gap:
-  - Instruction-mode Skill content is not captured in the prepared
-    contribution contract. The first Workflow child dispatch can render the
-    current Skill instead of consuming a prepared immutable value.
-  - MCP contribution facts that affect a Workflow LLM prompt or provider Tool
-    plan also need one prepared semantic boundary.
-  - `WF-PREPARE-005` defines the required completion behavior.
 
 ##### `WF-PREPARE-003.a` Retain immutable pins and prepared contribution facts
 
-- Status: Partial.
-- Implemented evidence:
+- Status: Implemented.
+- Completion evidence:
   - `S/contributionruntime/prepared.go` captures source-pinned Agent and
-    Workspace contributions before Workflow ProgramSnapshot creation.
-  - `S/sessionv3runtime/workflow_invocation.go` consumes the captured ordered
-    Text, Tool, Skill, MCP, prompt, and context facts without rereading an
-    Agent or Workspace contribution graph.
+    Workspace contributions before Workflow ProgramSnapshot creation, rendering
+    instruction-mode Skills through `InstructionSkillRenderer` into
+    `WorkflowPreparedSkill.InstructionContent` and capturing MCP prompt
+    context, discovery digest, policy, and provider Tool plans through
+    `MCPContributionPreparer` into `WorkflowPreparedMCP`.
+  - `S/sessionv3runtime/workflow_invocation.go`, `llm_plan.go`, and
+    `tools_choices.go` consume captured Text, instruction Skill, MCP context,
+    and MCP Tool choices without late Skill rendering or live MCP discovery
+    reselection.
   - `S/sessionv3runtime/llm_replay.go` reconstructs only private resources
     from captured dispatch facts and exact provider inputs.
-- Missing behavior:
-  - `appendPreparedSkill` records an instruction-mode Skill without
-    `InstructionContent`.
-  - `applyPreparedContributionPlan` then calls `skillTools.Instruction` when
-    that field is empty. Workflow preparation must store the rendered
-    instruction and binding must consume it without a late source selection.
 
 ##### `WF-PREPARE-003.b` Resolve an owner Model only where required
 
@@ -1608,33 +1589,29 @@ the implemented behavior.
 
 #### `WF-RETRY-003` Preserve one captured logical call through retry and started execution
 
-- Status: Partial.
-- Implemented evidence:
+- Status: Implemented.
+- Completion evidence:
   - `workflow_ports.go:captureWorkflowCallPortInputs`,
     `WorkflowCall.PortInputs`, `WorkItemIntent.PortInputs`,
-    `ProgramFrameIntent.PortInputs`, `workflow_retry.go`, and
+    `ProgramFrameIntent.PortInputs`, `workflow_retry.go`,
+    `workflow_program.go`, and
     `retry_program.go` capture actual port values and cursors before dispatch
     or child materialization.
+  - `workflow_retry.go:captureWorkflowRetryCall` resolves call port plans and
+    captures all input-port values and cursors at the original logical call
+    boundary before retry child creation.
   - `ports_runtime.go:portInputsLocked` respects captured inputs and does not
     append later channel records on retry or recovery.
-- Remaining functional gap:
-  - `captureWorkflowRetryCall` passes no `PortPlan` values to
-    `capturedWorkflowCallPortInputs`. It therefore does not capture input
-    port values at the retry boundary.
-  - `WF-RETRY-005` defines the required complete capture behavior.
 
 ##### `WF-RETRY-003.a` Capture the original evaluation boundary
 
-- Status: Partial.
-- Implemented evidence:
+- Status: Implemented.
+- Completion evidence:
   - Captured target, target-set membership, input, context, messages,
-    instructions, ports, key, policy, declaration path, and logical time are
-    retained in WorkItem and child ProgramFrame intent facts.
-- Missing behavior:
-  - Retry port input values and cursors must be captured with the resolved
-    port plans before the retry child ProgramFrame begins.
-  - A later channel append must not become visible to the first or a later
-    retry attempt.
+    instructions, port input values and cursors, key, policy, declaration
+    path, and logical time are captured at the original logical call boundary
+    and preserved through retry, delayed child creation, recovery, and
+    resumption.
 
 ##### `WF-RETRY-003.b` Apply complete retry selection and effect replay semantics
 
@@ -2040,19 +2017,18 @@ the implemented behavior.
 
 #### `ARC-DUP-003` Remove replicated effective state and duplicated execution algorithms
 
-- Status: Partial.
-- Implemented evidence:
+- Status: Implemented.
+- Completion evidence:
   - `persistLocked` is the sole committed ready-work launcher.
   - `runtime_lifecycle.go` is the shared Runtime terminal lifecycle.
   - `ModelDispatchPlan` is the canonical immutable LLM plan and generated
     Tool WorkItems retain canonical origin-plan references.
   - `attachmentruntime.SessionV3Admitter` is the canonical V3 attachment
     admission implementation.
-- Remaining functional gap:
-  - Lowered Workflow block traversal is duplicated for channel namespacing,
-    resource namespacing, and declaration-path attachment.
-  - Canonical declaration paths are reconstructed by setup instead of being
-    consumed solely as planning-owned facts.
+  - `R/workflow_structured.go:WalkWorkflowBlock` is the single typed lowered
+    Workflow tree traversal mechanism used by channel namespacing, resource
+    namespacing, call lookup, and Inventory-driven declaration-path
+    application.
 
 ##### `ARC-DUP-003.a` Retain one canonical effective plan
 
@@ -2073,17 +2049,17 @@ the implemented behavior.
 
 ##### `ARC-DUP-003.c` Consolidate Runtime algorithms and lowered-tree traversal
 
-- Status: Partial.
-- Implemented evidence:
+- Status: Implemented.
+- Completion evidence:
   - Shared lifecycle, captured evaluation, owner accounting, retry matching,
     effect replay, channel forwarding, and scoped budget algorithms remain
     Runtime-owned. Native request grammars remain in Model, Tool, MCP, Skill,
     Service, Activity, Attachment, Agent, and Workspace domains.
-- Missing behavior:
-  - `namespaceWorkflowBlockChannels`, `namespaceWorkflowBlockResources`, and
-    `attachWorkflowBlockDeclarationPaths` remain separate recursive walkers.
-  - `ARC-DUP-005` must consolidate lowered-tree traversal without moving
-    Artifact source interpretation or native-domain behavior into Runtime.
+  - `R/ports_runtime.go:namespaceWorkflowBlockChannels`,
+    `R/resource_namespace.go:namespaceWorkflowBlockResources`,
+    `S/workflowruntime/declaration_paths.go:attachWorkflowDeclarationPaths`,
+    and `S/workflowruntime/compiler_invocation.go:workflowCallAtDeclarationPath`
+    all use `R/workflow_structured.go:WalkWorkflowBlock`.
 
 ##### `ARC-DUP-003.d` Keep one V3 attachment admission implementation
 
@@ -2219,105 +2195,120 @@ cleanup, cost metering, or version changes.
 
 ### Current pending functional tasks
 
-The following tasks are the complete remaining source-visible Runtime and
-setup implementation work for this audit. They are functional tasks only.
-They must not create test work, validation-only work, frontend work,
-SessionV2 cleanup, migration conversion, cost-metering work, or version
-changes.
+All tasks in this section are now implemented in source for this cycle. They
+remain subject to the source-based completion discipline above and do not
+authorize test work, validation-only work, frontend work, SessionV2 cleanup,
+migration conversion, cost-metering work, or version changes.
 
 #### `RT-SETTLE-005` Commit terminal mutations before the sole terminal checkpoint
 
-- Status: Partial.
-- Source evidence:
-  - `R/runtime.go:finishWorkLocked` already advances most terminal owner,
-    resource, wait, effect, and Execution consequences.
-  - `R/runtime.go:executeOne` persists `workFinished`, publishes it, and then
-    invokes `settlePendingFrameCancellationsLocked` again.
-- Required behavior:
-  - Complete every terminal WorkItem, frame-cancellation, child, wait,
-    resource, Saga, and Execution mutation before its authoritative
-    checkpoint.
-  - Remove or move the post-checkpoint settlement so it cannot leave a
-    durable mutation only in memory.
-  - Retain `persistLocked` as the sole normal post-checkpoint ready-work
-    launch authority.
+- Status: Implemented.
+- Completion evidence:
+  - `R/runtime_lifecycle.go:finalizeExecutionSettlementLocked` converges Saga
+    compensation resumption, failure-driven cleanup, pending frame
+    cancellations, Execution cancellation completion, Execution state refresh,
+    and terminal Execution settlement before any checkpoint.
+  - `R/runtime_lifecycle.go:commitTerminalMutationLocked` runs
+    `finalizeExecutionSettlementLocked`, `touchExecutionLocked`,
+    `persistLocked`, `armSessionExecutionTimersLocked`, and `publishLocked` in
+    one sequence.
+  - `R/runtime.go:executeOne` and `R/runtime.go:ResolveWait` no longer perform
+    post-checkpoint `settlePendingFrameCancellationsLocked` mutations.
+  - `R/runtime_lifecycle.go:scheduleCommittedFrameClosuresLocked` schedules
+    both ProgramFrame and Execution private binding cleanup only after
+    `persistLocked` commits.
 
 ##### `RT-SETTLE-005.a` Remove post-checkpoint terminal mutation
 
-- Status: Not implemented.
-- Required behavior:
-  - A terminal settlement that changes a ProgramFrame or Execution must be
-    included in the same committed Session checkpoint before publication.
-  - Remove duplicate no-op settlement calls from normal execution paths.
+- Status: Implemented.
+- Completion evidence:
+  - Removed post-checkpoint `settlePendingFrameCancellationsLocked` in
+    `R/runtime.go:executeOne` and removed the second post-checkpoint
+    `waitResolvedLifecycle` mutation in `R/runtime.go:ResolveWait`.
+  - `R/budget.go:waitForExecutionDeadline`, `R/coordination.go:dispatchEmit`,
+    `R/retry.go:waitForRetry`, `R/runtime_resources.go:waitForResource`,
+    `R/runtime_durability.go`, and `R/runtime.go` all converge before their
+    sole checkpoint.
 
 ##### `RT-SETTLE-005.b` Use one terminal commit sequence
 
-- Status: Partial.
-- Required behavior:
-  - One shared Runtime lifecycle sequence must settle attempts, effects,
-    resources, waits, owner advancement, frame cancellation, Execution state,
-    checkpointing, publication, and normal ready-work launch in that order.
+- Status: Implemented.
+- Completion evidence:
+  - `R/runtime.go:finishWorkLocked` and
+    `R/runtime_durability.go:settleUndispatchedWorkLocked` settle attempts,
+    effects, resources, waits, owner advancement, and completion waits, then
+    converge through `finalizeExecutionSettlementLocked`.
+  - `R/runtime_lifecycle.go:commitTerminalMutationLocked` executes the final
+    pre-checkpoint convergence, checkpoint commit (`persistLocked`), post-commit
+    ready-work launch, due-time arming, and event publication in order.
 
 #### `WF-PREPARE-005` Freeze complete Workflow Model and Agent contribution meaning
 
-- Status: Partial.
-- Source evidence:
-  - `S/contributionruntime/prepared.go:appendPreparedSkill` leaves
-    instruction Skill content empty.
-  - `S/sessionv3runtime/workflow_invocation.go:applyPreparedContributionPlan`
-    can render that Skill later through `skillTools.Instruction`.
-  - Workflow MCP contribution selection is captured, but final MCP context and
-    Tool choice construction remains late-bound in the LLM binder.
-- Required behavior:
-  - Workflow execution preparation must capture all selected semantic
-    contribution facts that affect a Workflow Model or Agent invocation.
-  - Later binding and recovery can recreate private domain resources, but they
-    must not reselect different contribution meaning.
-  - Skill owns Skill rendering. MCP owns discovery and private connection
-    behavior. Contribution preparation remains a neutral source-pinned
-    coordinator.
+- Status: Implemented.
+- Completion evidence:
+  - `S/contributionruntime/prepared.go:Preparer` coordinates Skill-domain
+    instruction rendering (`InstructionSkillRenderer`) and MCP-domain
+    contribution capture (`MCPContributionPreparer`) before Workflow
+    `ProgramSnapshot` creation.
+  - `cmd/agentgo/wrapper_sessionv3_bootstrap.go` and
+    `S/sessionv3runtime/binder.go` wire `skillruntime.V3Executor` and
+    `mcpruntime` preparers into contribution preparation.
+  - `S/sessionv3runtime/workflow_invocation.go`, `llm_plan.go`, and
+    `tools_choices.go` consume captured semantic facts without late Skill
+    rendering or MCP discovery reselection.
 
 ##### `WF-PREPARE-005.a` Capture instruction Skill output
 
-- Status: Not implemented.
-- Required behavior:
-  - Render every selected instruction-mode Skill during Workflow preparation.
-  - Persist the immutable rendered value in
-    `WorkflowPreparedSkill.InstructionContent`.
-  - Consume that value during Workflow LLM binding without late Skill source
-    resolution.
+- Status: Implemented.
+- Completion evidence:
+  - `S/contributionruntime/prepared.go:prepareAgent` renders instruction-mode
+    Skills through `InstructionSkillRenderer.Instruction` and stores the
+    immutable text in `WorkflowPreparedSkill.InstructionContent`.
+  - `S/sessionv3runtime/workflow_invocation.go:applyPreparedContributionPlan`
+    consumes `WorkflowPreparedSkill.InstructionContent` directly and rejects
+    missing captured instruction text without calling `skillTools.Instruction`.
 
 ##### `WF-PREPARE-005.b` Capture Workflow MCP contribution meaning
 
-- Status: Partial.
-- Required behavior:
-  - Preserve selected MCP source pin, selected operation facts, policy facts,
-    and discovery identity needed by the final Workflow Model or Agent plan.
-  - Rebuild only private MCP resources during binding and recovery.
+- Status: Implemented.
+- Completion evidence:
+  - `R/workflow_target_facts.go:WorkflowPreparedMCP` and
+    `R/plans.go:MCPDispatchPlan` retain `Prepared`, `DiscoveryDigest`,
+    `ServerDisplay`, `Context`, and `PreparedTools` (`[]ToolDispatchPlan`).
+  - `S/mcpruntime/workflow_preparation.go:prepareMCPContribution` captures
+    MCP server instructions, resources, templates, prompts, discovery digest,
+    policy, and provider Tool choices through the shared MCP-domain helpers in
+    `S/mcpruntime/v3.go`.
+  - `S/sessionv3runtime/llm_plan.go` and `tools_choices.go` consume captured
+    MCP context and `PreparedTools` directly without reselecting changed live
+    MCP server state.
 
 #### `WF-RETRY-005` Freeze retry call port inputs at the original boundary
 
-- Status: Partial.
-- Source evidence:
-  - `R/workflow_retry.go:captureWorkflowRetryCall` passes no `PortPlan` values
-    to `capturedWorkflowCallPortInputs`.
-- Required behavior:
-  - Resolve call port plans before retry child creation.
-  - Capture each input port's values and cursor at the first logical call
-    boundary.
-  - Preserve those `PortInput` facts through retry, delayed child
-    materialization, recovery, and resumption without reading later channel
-    records.
+- Status: Implemented.
+- Completion evidence:
+  - `R/workflow_retry.go:captureWorkflowRetryCall` resolves the target and
+    call `PortPlan` values via `workflowCallPortPlans`, then freezes all input
+    port values and cursors via `capturedWorkflowCallPortInputs` before retry
+    child creation.
+  - `R/workflow_program.go:call` propagates captured `PortInputs` onto the
+    step copy passed to `startWorkflowChildCall`.
+  - `R/retry_program.go:retryCaptureChildCall` preserves already-captured
+    `PortInputs` and falls back to child frame `PortInputs` for `ChildCall`
+    work items.
 
 #### `ARC-DUP-005` Give lowered Workflow tree traversal one owner
 
-- Status: Partial.
-- Source evidence:
-  - `R/ports_runtime.go`, `R/resource_namespace.go`, and
-    `S/workflowruntime/declaration_paths.go` contain separate recursive
-    traversal of the same lowered Workflow block shapes.
-- Required behavior:
-  - Consolidate lowered-tree traversal behind one typed traversal contract.
-  - Keep source declaration grammar and canonical path ownership in Workflow
-    planning.
-  - Keep Runtime traversal independent from Artifact Store and source parsing.
+- Status: Implemented.
+- Completion evidence:
+  - `R/workflow_structured.go:WalkWorkflowBlock` provides the single typed
+    lowered Workflow tree traversal contract with `WorkflowBlockRole`,
+    `WorkflowBlockNode`, `WorkflowStepNode`, `WorkflowTreeVisitor`, and
+    `ErrStopWorkflowWalk`, with no Artifact Store or source-parsing dependency.
+  - `R/ports_runtime.go:namespaceWorkflowBlockChannels`,
+    `R/resource_namespace.go:namespaceWorkflowBlockResources`,
+    `S/workflowruntime/declaration_paths.go:attachWorkflowDeclarationPaths`,
+    and `S/workflowruntime/compiler_invocation.go:workflowCallAtDeclarationPath`
+    all use `WalkWorkflowBlock`.
+  - `S/workflowruntime/declaration_paths.go` consumes planning-owned
+    `inventory.Blocks` directly instead of reconstructing nested block paths.

@@ -29,6 +29,9 @@ func captureWorkflowCallPortInputs(
 		if channel != nil {
 			input.Cursor = channel.NextSequence
 			for _, message := range channel.Messages {
+				if message.Sequence > input.Cursor {
+					input.Cursor = message.Sequence
+				}
 				input.Values = append(input.Values, message.Data.Clone())
 			}
 		}

@@ -24,6 +24,15 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/mcppolicy"
 )
 
+const (
+	defaultMCPServerLabel        = "MCP server"
+	defaultMCPToolDisplayName    = "MCP Tool"
+	mcpServerInstructionsHeading = "### MCP server instructions"
+	mcpResourceHeading           = "### MCP resource"
+	mcpResourceTemplateHeading   = "### MCP resource template"
+	mcpPromptHeading             = "### MCP prompt"
+)
+
 // V3Executor owns MCP Tool discovery adaptation, policy evaluation, approval
 // waits, and invocation for Session Runtime v3. Session retains only durable
 // WorkItem state and generic wait orchestration.
@@ -102,47 +111,17 @@ func (e *V3Executor) Context(
 			return nil, fmt.Errorf("mcp server %q is not connected", serverID)
 		}
 
-		label := "MCP server"
-		if status.ServerInfo != nil &&
-			strings.TrimSpace(status.ServerInfo.Name) != "" {
-			label = strings.TrimSpace(status.ServerInfo.Name)
-		}
-		if selection.IncludeServerInstructions &&
-			strings.TrimSpace(status.Instructions) != "" {
-			output = append(output, strings.Join([]string{
-				"### MCP server instructions",
-				"server: " + label,
-				status.Instructions,
-			}, "\n\n"))
-		}
-
-		if err := e.appendResourceContext(
+		_, serverContext, err := collectMCPServerContext(
 			ctx,
-			&output,
+			e.runtime,
 			serverID,
-			label,
-			selection.Resources,
-		); err != nil {
+			status,
+			selection,
+		)
+		if err != nil {
 			return nil, err
 		}
-		if err := e.appendResourceTemplateContext(
-			ctx,
-			&output,
-			serverID,
-			label,
-			selection.ResourceTemplates,
-		); err != nil {
-			return nil, err
-		}
-		if err := e.appendPromptContext(
-			ctx,
-			&output,
-			serverID,
-			label,
-			selection.Prompts,
-		); err != nil {
-			return nil, err
-		}
+		output = append(output, serverContext...)
 	}
 	return output, nil
 }
@@ -181,14 +160,166 @@ func (e *V3Executor) Choices(
 			return nil, fmt.Errorf("MCP server %q is not connected", serverID)
 		}
 
-		available, err := e.runtime.ListTools(ctx, serverID)
+		serverChoices, err := collectMCPServerChoices(
+			ctx,
+			e.runtime,
+			serverID,
+			pin,
+			selection,
+		)
 		if err != nil {
 			return nil, err
 		}
-		selected, err := v3MCPSelectedTools(available, selection)
-		if err != nil {
-			return nil, err
+		output = append(output, serverChoices...)
+	}
+	return output, nil
+}
+
+// PrepareWorkflowMCPContribution captures immutable MCP prompt context,
+// discovery identity, policy, and provider Tool choices through the MCP domain.
+func (e *V3Executor) PrepareWorkflowMCPContribution(
+	ctx context.Context,
+	server sessionv3Runtime.ArtifactPin,
+	selection sessionv3Runtime.MCPServerSelection,
+	owner sessionv3Runtime.ConfigurationOwner,
+) (sessionv3Runtime.WorkflowPreparedMCP, error) {
+	if e == nil || e.runtime == nil {
+		return sessionv3Runtime.WorkflowPreparedMCP{}, errors.New(
+			"session v3 mcp runtime is unavailable",
+		)
+	}
+	return prepareMCPContribution(ctx, e.runtime, server, selection, owner)
+}
+
+func collectMCPServerContext(
+	ctx context.Context,
+	runtime *mcpConnection.MCPRuntimeManager,
+	serverID mcpServer.ServerID,
+	status *mcpServer.MCPServerRuntimeSnapshot,
+	selection sessionv3Runtime.MCPServerSelection,
+) (label string, srvContext []string, err error) {
+	label = defaultMCPServerLabel
+	if status != nil && status.ServerInfo != nil &&
+		strings.TrimSpace(status.ServerInfo.Name) != "" {
+		label = strings.TrimSpace(status.ServerInfo.Name)
+	}
+
+	output := make([]string, 0)
+	if selection.IncludeServerInstructions &&
+		status != nil &&
+		strings.TrimSpace(status.Instructions) != "" {
+		output = append(output, strings.Join([]string{
+			mcpServerInstructionsHeading,
+			"server: " + label,
+			status.Instructions,
+		}, "\n\n"))
+	}
+
+	if err := appendMCPResourceContext(
+		ctx,
+		runtime,
+		&output,
+		serverID,
+		label,
+		selection.Resources,
+	); err != nil {
+		return "", nil, err
+	}
+	if err := appendMCPResourceTemplateContext(
+		ctx,
+		runtime,
+		&output,
+		serverID,
+		label,
+		selection.ResourceTemplates,
+	); err != nil {
+		return "", nil, err
+	}
+	if err := appendMCPPromptContext(
+		ctx,
+		runtime,
+		&output,
+		serverID,
+		label,
+		selection.Prompts,
+	); err != nil {
+		return "", nil, err
+	}
+	return label, output, nil
+}
+
+func collectMCPServerChoices(
+	ctx context.Context,
+	runtime *mcpConnection.MCPRuntimeManager,
+	serverID mcpServer.ServerID,
+	pin *sessionv3Runtime.ArtifactPin,
+	selection sessionv3Runtime.MCPServerSelection,
+) ([]toolruntime.V3PreparedChoice, error) {
+	available, err := runtime.ListTools(ctx, serverID)
+	if err != nil {
+		return nil, err
+	}
+	selected, err := v3MCPSelectedTools(available, selection)
+	if err != nil {
+		return nil, err
+	}
+
+	sort.Slice(selected, func(left, right int) bool {
+		return selected[left].ProviderToolName <
+			selected[right].ProviderToolName
+	})
+
+	output := make([]toolruntime.V3PreparedChoice, 0, len(selected))
+	for _, tool := range selected {
+		schema := jsonutil.CloneJSONInValue(tool.InputSchema)
+		if len(schema) == 0 {
+			schema = map[string]any{"type": "object"}
 		}
+
+		choice := inferenceSpec.ToolChoice{
+			Type:        inferenceSpec.ToolTypeFunction,
+			ID:          tool.ChoiceID,
+			Name:        tool.ProviderToolName,
+			Description: v3MCPToolDescription(tool),
+			Arguments:   schema,
+		}
+		var serverPin *sessionv3Runtime.ArtifactPin
+		if pin != nil {
+			copyPin := *pin
+			serverPin = &copyPin
+		}
+		call := sessionv3Runtime.ToolCall{
+			ID:       "prepared-choice:" + choice.ID,
+			Name:     choice.Name,
+			ChoiceID: choice.ID,
+			Type:     inferenceSpec.ToolTypeFunction,
+			Source:   sessionv3Runtime.ToolCallSourceModel,
+			DisplayName: firstNonBlank(
+				tool.DisplayName,
+				tool.ToolName,
+				defaultMCPToolDisplayName,
+			),
+			Description: strings.TrimSpace(tool.Description),
+			Automatic: tool.ExecutionMode ==
+				mcppolicy.MCPExecutionModeAuto,
+			Binding: sessionv3Runtime.ToolBinding{
+				Kind: sessionv3Runtime.ToolBindingKindMCP,
+				MCP: &sessionv3Runtime.MCPToolBinding{
+					ServerArtifact:   serverPin,
+					ServerID:         string(serverID),
+					ProviderToolName: tool.ProviderToolName,
+					ChoiceID:         tool.ChoiceID,
+					ToolName:         tool.ToolName,
+					ToolDigest:       tool.Digest,
+					ApprovalRule:     string(tool.ApprovalRule),
+					ExecutionMode:    string(tool.ExecutionMode),
+				},
+			},
+		}
+		output = append(output, toolruntime.V3PreparedChoice{
+			Choice: choice,
+			Call:   call,
+		})
 
 		sort.Slice(selected, func(left, right int) bool {
 			return selected[left].ProviderToolName <
@@ -873,8 +1004,9 @@ func v3MCPToolErrorOutput(
 	}
 }
 
-func (e *V3Executor) appendResourceContext(
+func appendMCPResourceContext(
 	ctx context.Context,
+	runtime *mcpConnection.MCPRuntimeManager,
 	output *[]string,
 	serverID mcpServer.ServerID,
 	label string,
@@ -884,7 +1016,7 @@ func (e *V3Executor) appendResourceContext(
 		return nil
 	}
 
-	available, err := e.runtime.ListResources(ctx, serverID)
+	available, err := runtime.ListResources(ctx, serverID)
 	if err != nil {
 		return err
 	}
@@ -909,7 +1041,7 @@ func (e *V3Executor) appendResourceContext(
 			)
 		}
 
-		response, err := e.runtime.ReadResource(
+		response, err := runtime.ReadResource(
 			ctx,
 			serverID,
 			selection.URI,
@@ -928,7 +1060,7 @@ func (e *V3Executor) appendResourceContext(
 			)
 		}
 		*output = append(*output, strings.Join([]string{
-			"### MCP resource",
+			mcpResourceHeading,
 			"server: " + label,
 			"uri: " + selection.URI,
 			text,
@@ -937,8 +1069,9 @@ func (e *V3Executor) appendResourceContext(
 	return nil
 }
 
-func (e *V3Executor) appendResourceTemplateContext(
+func appendMCPResourceTemplateContext(
 	ctx context.Context,
+	runtime *mcpConnection.MCPRuntimeManager,
 	output *[]string,
 	serverID mcpServer.ServerID,
 	label string,
@@ -948,7 +1081,7 @@ func (e *V3Executor) appendResourceTemplateContext(
 		return nil
 	}
 
-	available, err := e.runtime.ListResourceTemplates(ctx, serverID)
+	available, err := runtime.ListResourceTemplates(ctx, serverID)
 	if err != nil {
 		return err
 	}
@@ -983,7 +1116,7 @@ func (e *V3Executor) appendResourceTemplateContext(
 		if err != nil {
 			return err
 		}
-		response, err := e.runtime.ReadResource(ctx, serverID, uri)
+		response, err := runtime.ReadResource(ctx, serverID, uri)
 		if err != nil {
 			return err
 		}
@@ -998,7 +1131,7 @@ func (e *V3Executor) appendResourceTemplateContext(
 			)
 		}
 		*output = append(*output, strings.Join([]string{
-			"### MCP resource template",
+			mcpResourceTemplateHeading,
 			"server: " + label,
 			"uri: " + uri,
 			text,
@@ -1007,8 +1140,9 @@ func (e *V3Executor) appendResourceTemplateContext(
 	return nil
 }
 
-func (e *V3Executor) appendPromptContext(
+func appendMCPPromptContext(
 	ctx context.Context,
+	runtime *mcpConnection.MCPRuntimeManager,
 	output *[]string,
 	serverID mcpServer.ServerID,
 	label string,
@@ -1018,7 +1152,7 @@ func (e *V3Executor) appendPromptContext(
 		return nil
 	}
 
-	available, err := e.runtime.ListPrompts(ctx, serverID)
+	available, err := runtime.ListPrompts(ctx, serverID)
 	if err != nil {
 		return err
 	}
@@ -1043,7 +1177,7 @@ func (e *V3Executor) appendPromptContext(
 			)
 		}
 
-		response, err := e.runtime.GetPrompt(
+		response, err := runtime.GetPrompt(
 			ctx,
 			serverID,
 			selection.PromptName,
@@ -1070,7 +1204,7 @@ func (e *V3Executor) appendPromptContext(
 			)
 		}
 		*output = append(*output, strings.Join([]string{
-			"### MCP prompt",
+			mcpPromptHeading,
 			"server: " + label,
 			"name: " + selection.PromptName,
 			strings.Join(parts, "\n\n"),

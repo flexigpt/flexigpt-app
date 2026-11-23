@@ -1586,6 +1586,8 @@ func (i *WorkflowInterpreter) call(
 		}
 		call.LLMInvocation = &captured
 	}
+	capturedCall := call
+	step.Call = &capturedCall
 	if err := validateWorkflowInterfaceInput(
 		target.Contract,
 		input,

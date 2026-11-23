@@ -27,9 +27,15 @@ func enrichDurableLLMDispatchPlan(
 		return errors.New("model dispatch plan mcp selections are incomplete")
 	}
 	for index := range plan.defaults.MCP {
+		discoveryDigest := ""
+		if prepared, found := plan.preparedMCP[selectionKey(plan.defaults.MCP[index].Server)]; found &&
+			prepared.Prepared {
+			discoveryDigest = prepared.DiscoveryDigest
+		}
 		output.MCP[index] = mcpDispatchPlan(
 			output.MCP[index].Server,
 			plan.defaults.MCP[index],
+			discoveryDigest,
 		)
 	}
 
@@ -43,11 +49,13 @@ func enrichDurableLLMDispatchPlan(
 func mcpDispatchPlan(
 	pin sessionv3Runtime.ArtifactPin,
 	selection sessionv3Runtime.MCPServerSelection,
+	discoveryDigest string,
 ) sessionv3Runtime.MCPDispatchPlan {
 	output := sessionv3Runtime.MCPDispatchPlan{
 		Server:                    pin,
 		IncludeServerInstructions: selection.IncludeServerInstructions,
 		ToolExposure:              selection.ToolExposure,
+		DiscoveryDigest:           discoveryDigest,
 		Tools: make(
 			[]sessionv3Runtime.MCPToolDispatchPlan,
 			0,

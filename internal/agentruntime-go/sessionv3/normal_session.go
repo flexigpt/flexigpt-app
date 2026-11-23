@@ -925,12 +925,15 @@ func (r *Runtime) completeNormalToolCall(
 				return nil, ErrExecutionNotFound
 			}
 			r.wakeCompletionWorkWaitsLocked(session, execution, *item)
-			execution = mutableSessionExecution(session, execution.ID)
-			if execution == nil {
+			execution, err := r.finalizeExecutionSettlementLocked(
+				ctx,
+				session,
+				execution.ID,
+				nil,
+			)
+			if err != nil || execution == nil {
 				return nil, ErrExecutionNotFound
 			}
-			r.refreshExecutionStateLocked(execution)
-			r.settleTerminalExecutionLocked(session, execution)
 			r.touchExecutionLocked(session, execution)
 			return &CommandReceipt{
 				CommandID:         meta.ID,

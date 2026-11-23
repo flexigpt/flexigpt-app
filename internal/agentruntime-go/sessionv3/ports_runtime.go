@@ -535,134 +535,54 @@ func namespaceWorkflowBlockChannels(
 	block *WorkflowBlock,
 	aliases map[string]string,
 ) error {
-	if block == nil {
-		return nil
-	}
-	for index := range block.Steps {
-		step := &block.Steps[index]
-		if step.Call != nil {
-			for portIndex := range step.Call.Ports {
+	return WalkWorkflowBlock(block, WorkflowTreeVisitor{
+		OnStep: func(node WorkflowStepNode) error {
+			step := node.Step
+			if step.Call != nil {
+				for portIndex := range step.Call.Ports {
+					channel, err := namespaceWorkflowChannel(
+						aliases,
+						step.Call.Ports[portIndex].Channel,
+					)
+					if err != nil {
+						return err
+					}
+					step.Call.Ports[portIndex].Channel = channel
+				}
+				for inputIndex := range step.Call.PortInputs {
+					channel, err := namespaceWorkflowChannel(
+						aliases,
+						step.Call.PortInputs[inputIndex].Channel,
+					)
+					if err != nil {
+						return err
+					}
+					step.Call.PortInputs[inputIndex].Channel = channel
+				}
+			}
+			if step.Wait != nil && step.Wait.Channel != nil {
 				channel, err := namespaceWorkflowChannel(
 					aliases,
-					step.Call.Ports[portIndex].Channel,
+					step.Wait.Channel.Channel,
 				)
 				if err != nil {
 					return err
 				}
-				step.Call.Ports[portIndex].Channel = channel
+				step.Wait.Channel.Channel = channel
 			}
-		}
-		if step.Wait != nil && step.Wait.Channel != nil {
-			channel, err := namespaceWorkflowChannel(
-				aliases,
-				step.Wait.Channel.Channel,
-			)
-			if err != nil {
-				return err
-			}
-			step.Wait.Channel.Channel = channel
-		}
-		if step.Emit != nil && step.Emit.Destination.Channel != "" {
-			channel, err := namespaceWorkflowChannel(
-				aliases,
-				step.Emit.Destination.Channel,
-			)
-			if err != nil {
-				return err
-			}
-			step.Emit.Destination.Channel = channel
-		}
-		if step.Effect != nil {
-			if err := namespaceWorkflowBlockChannels(
-				step.Effect.Reconcile,
-				aliases,
-			); err != nil {
-				return err
-			}
-			if err := namespaceWorkflowBlockChannels(
-				step.Effect.Compensate,
-				aliases,
-			); err != nil {
-				return err
-			}
-		}
-
-		switch {
-		case step.Scope != nil:
-			if err := namespaceWorkflowBlockChannels(step.Scope, aliases); err != nil {
-				return err
-			}
-		case step.Choose != nil:
-			for caseIndex := range step.Choose.Cases {
-				if err := namespaceWorkflowBlockChannels(
-					&step.Choose.Cases[caseIndex].Do,
+			if step.Emit != nil && step.Emit.Destination.Channel != "" {
+				channel, err := namespaceWorkflowChannel(
 					aliases,
-				); err != nil {
+					step.Emit.Destination.Channel,
+				)
+				if err != nil {
 					return err
 				}
+				step.Emit.Destination.Channel = channel
 			}
-			if err := namespaceWorkflowBlockChannels(
-				step.Choose.Default,
-				aliases,
-			); err != nil {
-				return err
-			}
-		case step.Parallel != nil:
-			for branchIndex := range step.Parallel.Branches {
-				if err := namespaceWorkflowBlockChannels(
-					&step.Parallel.Branches[branchIndex].Do,
-					aliases,
-				); err != nil {
-					return err
-				}
-			}
-		case step.Foreach != nil:
-			if err := namespaceWorkflowBlockChannels(&step.Foreach.Do, aliases); err != nil {
-				return err
-			}
-		case step.Repeat != nil:
-			if err := namespaceWorkflowBlockChannels(&step.Repeat.Do, aliases); err != nil {
-				return err
-			}
-		case step.Machine != nil:
-			for stateIndex := range step.Machine.States {
-				machineState := &step.Machine.States[stateIndex]
-				if err := namespaceWorkflowBlockChannels(
-					machineState.Entry,
-					aliases,
-				); err != nil {
-					return err
-				}
-				if err := namespaceWorkflowBlockChannels(
-					machineState.Exit,
-					aliases,
-				); err != nil {
-					return err
-				}
-				for transitionIndex := range machineState.Transitions {
-					if err := namespaceWorkflowBlockChannels(
-						machineState.Transitions[transitionIndex].Do,
-						aliases,
-					); err != nil {
-						return err
-					}
-				}
-			}
-		case step.Saga != nil:
-			if err := namespaceWorkflowBlockChannels(&step.Saga.Do, aliases); err != nil {
-				return err
-			}
-		}
-	}
-	for index := range block.Catch {
-		if err := namespaceWorkflowBlockChannels(
-			&block.Catch[index].Do,
-			aliases,
-		); err != nil {
-			return err
-		}
-	}
-	return namespaceWorkflowBlockChannels(block.Finally, aliases)
+			return nil
+		},
+	})
 }
 
 func namespaceWorkflowChannel(

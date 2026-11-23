@@ -177,7 +177,7 @@ func (b *Binder) bindLLM(
 	choices, bindings, preparedChoices, err := b.toolChoices(
 		ctx,
 		req,
-		plan.defaults,
+		plan,
 		skillHydration.Choices,
 	)
 	if err != nil {

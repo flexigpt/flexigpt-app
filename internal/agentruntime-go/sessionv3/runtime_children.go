@@ -531,7 +531,7 @@ func (r *Runtime) settleTerminalExecutionLocked(
 		return
 	}
 	r.settleConversationHandoffLocked(session, execution.HandoffID)
-	r.cancelExecutionDeadlineLocked(execution.ID)
+	r.cancelExecutionDueTimesLocked(*execution)
 	if execution.Outcome != nil {
 		switch execution.Outcome.Kind {
 		case ExecutionOutcomeFailed, ExecutionOutcomeCancelled:

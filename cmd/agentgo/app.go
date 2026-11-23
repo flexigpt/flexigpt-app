@@ -727,6 +727,8 @@ func (a *App) initManagers() {
 		a.mcpRuntimeAPI.runtime,
 		a.workspaceStoreAPI.api,
 		a.textStoreAPI.service,
+		skillInference,
+		a.skillRuntimeAPI.service,
 	)
 	if err != nil {
 		panic(

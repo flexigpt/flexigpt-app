@@ -11,6 +11,7 @@ import (
 
 	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/workbinding"
+	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/contributionruntime"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
@@ -218,6 +219,11 @@ func NewAdmission(
 	var invocations WorkflowInvocationTargetAdapter
 	if len(invocationAdapters) == 1 {
 		invocations = invocationAdapters[0]
+		if adapter, ok := invocations.(*ModelAgentInvocationAdapter); ok && adapter != nil {
+			if preparer, ok := mcpTools.(contributionruntime.MCPContributionPreparer); ok && preparer != nil {
+				adapter.setDefaultMCPPreparer(preparer)
+			}
+		}
 	}
 	return &Admission{
 		workflows:   workflows,
