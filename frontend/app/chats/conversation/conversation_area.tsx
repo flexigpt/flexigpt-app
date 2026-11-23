@@ -669,6 +669,7 @@ const ConversationMessageList = memo(function ConversationMessageList(props: {
 
 		// A stream can replace messages many times before an idle callback
 		// executes. Keep one scheduled build alive and let it read messagesRef.
+		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-derived-state
 		scheduleDiffCandidatePathBuild();
 	}, [canBuildDiffCandidatePaths, messages, scheduleDiffCandidatePathBuild]);
 

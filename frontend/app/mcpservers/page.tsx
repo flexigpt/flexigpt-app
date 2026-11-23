@@ -673,6 +673,7 @@ export default function MCPServersPage() {
 			return;
 		}
 
+		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-derived-state
 		openAuthorizationURL(selectedOAuth.server.ref, url, true);
 	}, [oauthTarget, openAuthorizationURL, selectedOAuth]);
 

@@ -598,6 +598,7 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 	useEffect(() => {
 		for (const tab of tabs) {
 			if (tab.sessionID) {
+				// oxlint-disable-next-line react-you-might-not-need-an-effect/no-derived-state
 				ensureSessionObserver(tab.tabId, tab.sessionID);
 			}
 		}
