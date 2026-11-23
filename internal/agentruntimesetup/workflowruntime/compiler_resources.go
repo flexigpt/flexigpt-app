@@ -55,13 +55,6 @@ func compileWorkflowResources(
 			}
 			value.Rate = rate
 		}
-		if err := value.Validate(); err != nil {
-			return nil, fmt.Errorf(
-				"workflow resource %q: %w",
-				name,
-				err,
-			)
-		}
 		output = append(output, value)
 	}
 	return output, nil
@@ -102,9 +95,6 @@ func compileWorkflowResourceClaims(
 				return nil, err
 			}
 			claim.Key = &key
-		}
-		if err := claim.Validate(); err != nil {
-			return nil, err
 		}
 		output = append(output, claim)
 	}

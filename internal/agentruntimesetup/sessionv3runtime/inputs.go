@@ -11,6 +11,18 @@ import (
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
 
+const (
+	defaultImageMIMEType       = "image/png"
+	defaultFileMIMEType        = "application/octet-stream"
+	defaultToolCompletedText   = "Tool completed."
+	approvedAppContextSource   = "approved MCP App context"
+	approvedAppContextPreamble = "The following context was explicitly approved from a Session-scoped MCP App.\n\n"
+	runtimeContextIDFormat     = "runtime-context:%s:%d"
+	unavailableOutputIDFormat  = "runtime-unavailable-output:%d"
+	unavailableOutputTextFmt   = "[Provider output kind %q is not available in replay.]"
+	attachmentFileEnvelopeFmt  = "<<<FILE name=%q>>>\n%s\n<<<END FILE>>>"
+)
+
 func (b *Binder) buildInputs(
 	req sessionv3Runtime.WorkDispatchRequest,
 	defaults sessionv3Runtime.SessionDefaults,
@@ -19,7 +31,7 @@ func (b *Binder) buildInputs(
 ) ([]inferenceSpec.InputUnion, error) {
 	payload := req.WorkItem.Input.LLM
 	if payload == nil {
-		return nil, errors.New("LLM payload is missing")
+		return nil, errors.New("llm payload is missing")
 	}
 
 	execution := req.Execution
@@ -38,7 +50,7 @@ func (b *Binder) buildInputs(
 		}
 	}
 	if len(activities) == 0 {
-		return nil, errors.New("LLM has no semantic activities")
+		return nil, errors.New("llm has no semantic activities")
 	}
 
 	inputs := make([]inferenceSpec.InputUnion, 0, len(activities))
@@ -100,7 +112,7 @@ func (b *Binder) buildInputs(
 		}
 	}
 	if !contextInserted {
-		return nil, errors.New("LLM input activity is absent from its semantic sequence")
+		return nil, errors.New("llm input activity is absent from its semantic sequence")
 	}
 
 	for _, id := range payload.ContinuationWorkItemIDs {
@@ -115,7 +127,7 @@ func (b *Binder) buildInputs(
 		emittedToolResults[id] = struct{}{}
 	}
 	if len(inputs) == 0 {
-		return nil, errors.New("LLM has no inputs")
+		return nil, errors.New("llm has no inputs")
 	}
 	return inputs, nil
 }
@@ -136,37 +148,44 @@ func llmInputActivitySequence(
 	}
 	if currentIndex < 0 {
 		return nil, fmt.Errorf(
-			"LLM input activity %q not found",
+			"llm input activity %q not found",
 			payload.InputActivityID,
 		)
 	}
 	current := session.Timeline[currentIndex]
 	if payload.IsolatedInput {
-		output := make(
-			[]sessionv3Runtime.Activity,
-			0,
-			len(payload.HistoryActivityIDs)+1,
-		)
+		allowedIDs := make(map[sessionv3Runtime.ActivityID]struct{}, len(payload.HistoryActivityIDs)+1)
+		allowedIDs[payload.InputActivityID] = struct{}{}
 		for _, activityID := range payload.HistoryActivityIDs {
 			activity := findActivity(session, activityID)
 			if activity == nil {
 				return nil, fmt.Errorf(
-					"isolated LLM history activity %q not found",
+					"isolated llm history activity %q not found",
 					activityID,
 				)
 			}
-			output = append(output, *activity)
+			allowedIDs[activityID] = struct{}{}
 		}
-		output = append(output, current)
-		for _, activity := range session.Timeline[currentIndex+1:] {
-			if activity.Kind != sessionv3Runtime.ActivityKindMessage ||
-				activity.Message == nil ||
-				activity.Message.Role != sessionv3Runtime.MessageRoleAssistant ||
-				activity.ExecutionID != execution.ID ||
-				activity.FrameID != workItem.FrameID {
+		if frame := findProgramFrame(execution, workItem.FrameID); frame != nil {
+			for _, activityID := range sessionv3Runtime.AgentLoopCompletedInputActivityIDs(*frame) {
+				if findActivity(session, activityID) != nil {
+					allowedIDs[activityID] = struct{}{}
+				}
+			}
+		}
+		output := make([]sessionv3Runtime.Activity, 0, len(allowedIDs)+2)
+		for _, activity := range session.Timeline {
+			if _, allowed := allowedIDs[activity.ID]; allowed {
+				output = append(output, activity)
 				continue
 			}
-			output = append(output, activity)
+			if activity.Kind == sessionv3Runtime.ActivityKindMessage &&
+				activity.Message != nil &&
+				activity.Message.Role == sessionv3Runtime.MessageRoleAssistant &&
+				activity.ExecutionID == execution.ID &&
+				activity.FrameID == workItem.FrameID {
+				output = append(output, activity)
+			}
 		}
 		return output, nil
 	}
@@ -366,6 +385,19 @@ func findActivity(
 	return nil
 }
 
+func findProgramFrame(
+	execution sessionv3Runtime.Execution,
+	id sessionv3Runtime.ProgramFrameID,
+) *sessionv3Runtime.ProgramFrame {
+	for index := range execution.ProgramFrames {
+		if execution.ProgramFrames[index].ID == id {
+			value := execution.ProgramFrames[index]
+			return &value
+		}
+	}
+	return nil
+}
+
 func findWorkItem(
 	execution sessionv3Runtime.Execution,
 	id sessionv3Runtime.WorkItemID,
@@ -519,16 +551,13 @@ func providerOutputAsInput(
 		return &inferenceSpec.InputUnion{
 			Kind: inferenceSpec.InputKindOutputMessage,
 			OutputMessage: &inferenceSpec.InputOutputContent{
-				ID:     fmt.Sprintf("runtime-unavailable-output:%d", fallbackIndex),
+				ID:     fmt.Sprintf(unavailableOutputIDFormat, fallbackIndex),
 				Role:   inferenceSpec.RoleAssistant,
 				Status: inferenceSpec.StatusCompleted,
 				Contents: []inferenceSpec.InputOutputContentItemUnion{{
 					Kind: inferenceSpec.ContentItemKindText,
 					TextItem: &inferenceSpec.ContentItemText{
-						Text: fmt.Sprintf(
-							"[Provider output kind %q is not available in replay.]",
-							value.Kind,
-						),
+						Text: fmt.Sprintf(unavailableOutputTextFmt, value.Kind),
 					},
 				}},
 			},
@@ -638,12 +667,12 @@ func appContextInputText(
 		Content           []sessionv3Runtime.AppContextContent `json:"content,omitempty"`
 		StructuredContent jsonutil.CanonicalValue              `json:"structuredContent,omitempty"`
 	}{
-		Source:            "approved MCP App context",
+		Source:            approvedAppContextSource,
 		ResourceURI:       update.ResourceURI,
 		Content:           update.Content,
 		StructuredContent: update.StructuredContent.Clone(),
 	})
-	return "The following context was explicitly approved from a Session-scoped MCP App.\n\n" +
+	return approvedAppContextPreamble +
 		string(value)
 }
 
@@ -656,7 +685,7 @@ func injectedContextInput(
 		Kind: inferenceSpec.InputKindInputMessage,
 		InputMessage: &inferenceSpec.InputOutputContent{
 			ID: fmt.Sprintf(
-				"runtime-context:%s:%d",
+				runtimeContextIDFormat,
 				activityID,
 				index,
 			),
@@ -683,7 +712,7 @@ func attachmentToContentItem(a sessionv3Runtime.Attachment) (inferenceSpec.Input
 			TextItem: &inferenceSpec.ContentItemText{Text: attachmentTextForProvider(a)},
 		}, true
 	case sessionv3Runtime.AttachmentKindImage:
-		image := &inferenceSpec.ContentItemImage{ImageMIME: "image/png"}
+		image := &inferenceSpec.ContentItemImage{ImageMIME: defaultImageMIMEType}
 		if strings.TrimSpace(a.Label) != "" {
 			image.ImageName = a.Label
 		}
@@ -704,7 +733,7 @@ func attachmentToContentItem(a sessionv3Runtime.Attachment) (inferenceSpec.Input
 			ImageItem: image,
 		}, true
 	case sessionv3Runtime.AttachmentKindFile:
-		file := &inferenceSpec.ContentItemFile{FileMIME: "application/octet-stream"}
+		file := &inferenceSpec.ContentItemFile{FileMIME: defaultFileMIMEType}
 		if a.MIMEType != "" {
 			file.FileMIME = a.MIMEType
 		}
@@ -751,7 +780,7 @@ func attachmentTextForProvider(
 		return attachment.Text
 	}
 	return fmt.Sprintf(
-		"<<<FILE name=%q>>>\n%s\n<<<END FILE>>>",
+		attachmentFileEnvelopeFmt,
 		attachment.Label,
 		attachment.Text,
 	)
@@ -823,5 +852,5 @@ func toolOutputText(result sessionv3Runtime.ToolOutput) string {
 	if len(result.Structured) != 0 {
 		return string(result.Structured)
 	}
-	return "Tool completed."
+	return defaultToolCompletedText
 }

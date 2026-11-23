@@ -16,6 +16,11 @@ const (
 	budgetCleanupExpiredErrorCode   = "cleanup_deadline_elapsed"
 	executionDeadlineTimerOperation = "session-v3 execution deadline"
 	cleanupDeadlineTimerOperation   = "session-v3 cleanup deadline"
+	budgetLabelStepExecutions       = "step executions"
+	budgetLabelCallAttempts         = "call attempts"
+	budgetLabelModelTokens          = "model tokens"
+	budgetExceededPrefix            = "execution budget exceeded for "
+	executionDeadlineElapsedMessage = "execution deadline elapsed"
 )
 
 type ExecutionBudgetUsage struct {
@@ -217,7 +222,7 @@ func (r *Runtime) reserveStepExecutionLocked(
 		budgetMetricRequest{
 			Metric:    budgetMetricStepExecutions,
 			Increment: 1,
-			Label:     "step executions",
+			Label:     budgetLabelStepExecutions,
 		},
 	)
 }
@@ -249,7 +254,7 @@ func (r *Runtime) reserveCallAttemptLocked(
 		budgetMetricRequest{
 			Metric:    budgetMetricCallAttempts,
 			Increment: 1,
-			Label:     "call attempts",
+			Label:     budgetLabelCallAttempts,
 		},
 	)
 }
@@ -282,7 +287,7 @@ func checkBudgetCount(
 	return &SanitizedError{
 		Code:     budgetErrorCode,
 		Category: ErrorCategoryLimit,
-		Message:  "execution budget exceeded for " + label,
+		Message:  budgetExceededPrefix + label,
 	}
 }
 
@@ -501,7 +506,7 @@ func (r *Runtime) consumeLLMUsageLocked(
 		budgetMetricRequest{
 			Metric:    budgetMetricModelTokens,
 			Increment: tokens,
-			Label:     "model tokens",
+			Label:     budgetLabelModelTokens,
 		},
 	)
 }
@@ -693,6 +698,37 @@ func (r *Runtime) waitForCleanupDeadline(
 		Category: ErrorCategoryTimeout,
 		Message:  cleanupDeadlineExceededMessage,
 	}
+	r.expireExecutionCleanupLocked(
+		persistContext,
+		session,
+		executionID,
+		now,
+		expired,
+	)
+	_ = r.commitTerminalMutationLocked(
+		persistContext,
+		session,
+		executionID,
+		checkpointReasonCleanupDeadlineElapsed,
+		RuntimeEventExecutionChanged,
+	)
+}
+
+func (r *Runtime) expireExecutionCleanupLocked(
+	ctx context.Context,
+	session *Session,
+	executionID ExecutionID,
+	now time.Time,
+	expired *SanitizedError,
+) {
+	execution := mutableSessionExecution(session, executionID)
+	if execution == nil || execution.State.Terminal() {
+		return
+	}
+	if !execution.Cleanup.Active {
+		r.beginCleanupLocked(execution, expired)
+	}
+	execution.Cleanup.Expired = true
 	execution.Cleanup.Primary = appendCleanupCause(
 		execution.Cleanup.Primary,
 		*expired,
@@ -700,19 +736,74 @@ func (r *Runtime) waitForCleanupDeadline(
 
 	for index := range execution.WorkItems {
 		item := &execution.WorkItems[index]
-		if !item.Cleanup || item.State.Terminal() {
+		if item.State.Terminal() {
 			continue
 		}
 		r.expireCleanupWorkItemLocked(execution, item, now, expired)
 	}
+	for index := range execution.Waits {
+		wait := &execution.Waits[index]
+		if wait.Status != WaitStatusPending &&
+			wait.Status != WaitStatusResolving {
+			continue
+		}
+		wait.Status = WaitStatusCancelled
+		wait.Error = cloneWorkflowSanitizedError(expired)
+		wait.UpdatedAt = now
+		r.cancelWaitDeadlineLocked(wait.ID)
+		delete(r.privateWaits, wait.ID)
+	}
 	for index := range execution.ProgramFrames {
 		frame := &execution.ProgramFrames[index]
-		if frame.Status.Terminal() || !workflowFrameRunsCleanup(*frame) {
+		if frame.Status.Terminal() {
 			continue
 		}
 		frame.Status = ProgramFrameStateCancelled
 		frame.Error = cloneWorkflowSanitizedError(expired)
+		frame.Fork = nil
+		frame.Joins = nil
 		frame.UpdatedAt = now
+		r.releaseFrameResourcesLocked(execution, frame.ID)
+	}
+	execution.ResourceLeases = nil
+	for index := range execution.Effects {
+		record := &execution.Effects[index]
+		switch record.State {
+		case CompensationStatePending:
+			record.State = CompensationStateSkipped
+			record.Error = cloneWorkflowSanitizedError(expired)
+		case CompensationStateDispatching:
+			record.State = CompensationStateUncertain
+			record.Error = copyEffectError(expired, EffectStateCompensationFailed)
+			if original := mutableWorkItem(execution, record.OriginalWorkItemID); original != nil &&
+				original.EffectState == EffectStateCompensating {
+				original.EffectState = EffectStateCompensationFailed
+				original.UpdatedAt = now
+			}
+		default:
+		}
+	}
+
+	r.cancelOwnedChildExecutionsLocked(
+		ctx,
+		session,
+		executionID,
+		cleanupDeadlineExceededMessage,
+	)
+	execution = mutableSessionExecution(session, executionID)
+	if execution == nil {
+		return
+	}
+	childIDs := append([]ExecutionID(nil), execution.ChildExecutionIDs...)
+	for _, childID := range childIDs {
+		child := mutableSessionExecution(session, childID)
+		if child != nil && child.CancelWithParent && !child.State.Terminal() {
+			r.expireExecutionCleanupLocked(ctx, session, childID, now, expired)
+		}
+	}
+	execution = mutableSessionExecution(session, executionID)
+	if execution == nil || execution.State.Terminal() {
+		return
 	}
 
 	outcome := ExecutionOutcome{
@@ -725,20 +816,7 @@ func (r *Runtime) waitForCleanupDeadline(
 	if execution.Controls.CancellationRequested {
 		outcome.Kind = ExecutionOutcomeCancelled
 	}
-	r.completeExecutionLocked(persistContext, session, execution, outcome)
-	execution = mutableSessionExecution(session, executionID)
-	if execution == nil {
-		return
-	}
-	if err := r.persistLocked(persistContext, "cleanupDeadlineElapsed", session); err != nil {
-		return
-	}
-	r.publishLocked(
-		persistContext,
-		session,
-		execution.ID,
-		RuntimeEventExecutionChanged,
-	)
+	r.completeExecutionLocked(ctx, session, execution, outcome)
 }
 
 func (r *Runtime) expireCleanupWorkItemLocked(
@@ -862,9 +940,15 @@ func (r *Runtime) waitForExecutionDeadline(
 	primary := &SanitizedError{
 		Code:     budgetDeadlineErrorCode,
 		Category: ErrorCategoryTimeout,
-		Message:  "execution deadline elapsed",
+		Message:  executionDeadlineElapsedMessage,
 	}
 	r.beginCleanupLocked(execution, primary)
+	r.cancelOwnedChildExecutionsLocked(
+		persistContext,
+		session,
+		executionID,
+		executionDeadlineElapsedMessage,
+	)
 
 	workItemIDs := make([]WorkItemID, 0, len(execution.WorkItems))
 	for _, item := range execution.WorkItems {

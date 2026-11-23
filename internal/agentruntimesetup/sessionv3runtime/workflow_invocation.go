@@ -8,6 +8,14 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
+const (
+	preparedWorkspaceInstrPrefix = "workspace:"
+	preparedWorkspaceInstrSuffix = ":instructions"
+	preparedTextInstrPrefix      = "prepared-text:"
+	preparedSkillInstrPrefix     = "prepared-skill:"
+	preparedIDSeparator          = ":"
+)
+
 // applyPreparedContributionPlan consumes the neutral source-pinned
 // contribution contract. It never traverses current Agent or Workspace
 // capability graphs. Text, Workspace prompt, instruction Skill, and MCP
@@ -24,7 +32,7 @@ func (b *Binder) applyPreparedContributionPlan(
 	}
 
 	if value.Model != nil {
-		selection := selectionForPreparedPin(*value.Model)
+		selection := value.Model.Selection()
 		if plan.model == nil {
 			plan.model = &selection
 			plan.defaults.Model = &selection
@@ -34,14 +42,14 @@ func (b *Binder) applyPreparedContributionPlan(
 		}
 	}
 	if value.Agent != nil {
-		selection := selectionForPreparedPin(*value.Agent)
+		selection := value.Agent.Selection()
 		plan.defaults.Agent = &selection
 		if err := plan.addArtifact(*value.Agent); err != nil {
 			return err
 		}
 	}
 	if value.Workspace != nil {
-		selection := selectionForPreparedPin(*value.Workspace)
+		selection := value.Workspace.Selection()
 		plan.defaults.Workspace = &selection
 		if err := plan.addArtifact(*value.Workspace); err != nil {
 			return err
@@ -109,8 +117,8 @@ func (b *Binder) applyPreparedContributionPlan(
 			appliedWorkspacePrompt = true
 			if strings.TrimSpace(value.WorkspacePrompt.Instructions) != "" {
 				plan.addInstruction(sessionv3Runtime.Instruction{
-					ID: "workspace:" + value.Workspace.RootID + ":" +
-						value.Workspace.ArtifactID + ":instructions",
+					ID: preparedWorkspaceInstrPrefix + value.Workspace.RootID + preparedIDSeparator +
+						value.Workspace.ArtifactID + preparedWorkspaceInstrSuffix,
 					Content:   value.WorkspacePrompt.Instructions,
 					Owner:     sessionv3Runtime.ConfigurationOwnerWorkspace,
 					SourceKey: order.Key,
@@ -139,7 +147,7 @@ func (b *Binder) applyPreparedContributionPlan(
 			if prepared.Insert ==
 				sessionv3Runtime.TextDispatchInsertInstructions {
 				plan.addInstruction(sessionv3Runtime.Instruction{
-					ID: "prepared-text:" + prepared.Artifact.RootID + ":" +
+					ID: preparedTextInstrPrefix + prepared.Artifact.RootID + preparedIDSeparator +
 						prepared.Artifact.ArtifactID,
 					Label:     prepared.Label,
 					Content:   prepared.Content,
@@ -156,12 +164,13 @@ func (b *Binder) applyPreparedContributionPlan(
 			if err := plan.addArtifact(prepared.Artifact); err != nil {
 				return err
 			}
-			selection := selectionForPreparedPin(prepared.Artifact)
+			selection := prepared.Artifact.Selection()
 			plan.defaults.ToolSelections = appendUniqueLLMToolSelection(
 				plan.defaults.ToolSelections,
 				sessionv3Runtime.ToolSelection{
-					Artifact:    selection,
-					AutoExecute: cloneBool(prepared.AutoExecute),
+					Artifact:      selection,
+					UserArguments: prepared.UserArguments.Clone(),
+					AutoExecute:   cloneBool(prepared.AutoExecute),
 				},
 			)
 
@@ -173,7 +182,7 @@ func (b *Binder) applyPreparedContributionPlan(
 			if err := plan.addArtifact(prepared.Artifact); err != nil {
 				return err
 			}
-			selection := selectionForPreparedPin(prepared.Artifact)
+			selection := prepared.Artifact.Selection()
 			if prepared.Instructions {
 				if strings.TrimSpace(prepared.InstructionContent) == "" {
 					return errors.New(
@@ -181,14 +190,16 @@ func (b *Binder) applyPreparedContributionPlan(
 					)
 				}
 				plan.addInstruction(sessionv3Runtime.Instruction{
-					ID: "prepared-skill:" + prepared.Artifact.RootID + ":" +
+					ID: preparedSkillInstrPrefix + prepared.Artifact.RootID + preparedIDSeparator +
 						prepared.Artifact.ArtifactID,
 					Label:     prepared.Artifact.ArtifactID,
 					Content:   prepared.InstructionContent,
 					Owner:     prepared.Owner,
 					SourceKey: order.Key,
 				})
-				continue
+				if !prepared.Enabled {
+					continue
+				}
 			}
 			plan.defaults.Skills = appendUniqueLLMSelection(
 				plan.defaults.Skills,
@@ -217,7 +228,7 @@ func (b *Binder) applyPreparedContributionPlan(
 			plan.defaults.MCP = appendUniqueMCPSelection(
 				plan.defaults.MCP,
 				sessionv3Runtime.MCPServerSelection{
-					Server:                    selectionForPreparedPin(prepared.Server),
+					Server:                    prepared.Server.Selection(),
 					IncludeServerInstructions: prepared.IncludeServerInstructions,
 					ToolExposure:              prepared.ToolExposure,
 					SelectedTools:             jsonutil.CloneJSONInValue(prepared.Tools),
@@ -236,15 +247,4 @@ func (b *Binder) applyPreparedContributionPlan(
 		return errors.New("prepared workspace prompt was not applied in contribution order")
 	}
 	return nil
-}
-
-func selectionForPreparedPin(
-	value sessionv3Runtime.ArtifactPin,
-) sessionv3Runtime.ArtifactSelection {
-	return sessionv3Runtime.ArtifactSelection{
-		RootID:           value.RootID,
-		ArtifactID:       value.ArtifactID,
-		ExpectedRevision: value.Revision,
-		ExpectedDigest:   value.Digest,
-	}
 }

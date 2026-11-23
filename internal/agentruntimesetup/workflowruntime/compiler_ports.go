@@ -25,9 +25,6 @@ func compileWorkflowPorts(
 			Channel: value.Channel,
 			Access:  sessionv3Runtime.WorkflowPortAccess(value.Access),
 		}
-		if err := port.Validate(); err != nil {
-			return nil, fmt.Errorf("workflow port %q: %w", name, err)
-		}
 		output = append(output, port)
 	}
 	return output, nil
@@ -53,13 +50,6 @@ func compileWorkflowPortBindings(
 			Name:    name,
 			Channel: value.Channel,
 			Access:  sessionv3Runtime.WorkflowPortAccess(value.Access),
-		}
-		if err := binding.Validate(); err != nil {
-			return nil, fmt.Errorf(
-				"workflow call port %q: %w",
-				name,
-				err,
-			)
 		}
 		output = append(output, binding)
 	}
@@ -93,9 +83,6 @@ func compileWorkflowContextRequirements(
 		value := sessionv3Runtime.WorkflowContextRequirement{
 			Name:   name,
 			Schema: schema,
-		}
-		if err := value.Validate(); err != nil {
-			return nil, err
 		}
 		output = append(output, value)
 	}
@@ -132,9 +119,6 @@ func compileWorkflowCallablePorts(
 			Direction: sessionv3Runtime.WorkflowPortDirection(source.Direction),
 			Schema:    schema,
 			Stream:    source.Stream,
-		}
-		if err := value.Validate(); err != nil {
-			return nil, err
 		}
 		output = append(output, value)
 	}

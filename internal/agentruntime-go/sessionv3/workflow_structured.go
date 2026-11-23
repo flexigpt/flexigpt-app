@@ -11,13 +11,40 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
+type WorkflowCompletionMode string
+
 const (
-	quorumStr         = "quorum"
-	allStr            = "all"
-	cancelStr         = "cancel"
-	firstCompletedStr = "first-completed"
-	firstSuccessStr   = "first-success"
-	firstFastStr      = "fail-fast"
+	WorkflowCompletionModeAll            WorkflowCompletionMode = "all"
+	WorkflowCompletionModeFirstCompleted WorkflowCompletionMode = "first-completed"
+	WorkflowCompletionModeFirstSuccess   WorkflowCompletionMode = "first-success"
+	WorkflowCompletionModeQuorum         WorkflowCompletionMode = "quorum"
+)
+
+type WorkflowCollectionErrorPolicy string
+
+const (
+	WorkflowCollectionErrorFailFast WorkflowCollectionErrorPolicy = "fail-fast"
+	WorkflowCollectionErrorCollect  WorkflowCollectionErrorPolicy = "collect"
+)
+
+type WorkflowRemainingPolicy string
+
+const (
+	WorkflowRemainingCancel WorkflowRemainingPolicy = "cancel"
+	WorkflowRemainingWait   WorkflowRemainingPolicy = "wait"
+)
+
+type WorkflowRepeatLifetime string
+
+const (
+	WorkflowRepeatLifetimeUntilCancelled WorkflowRepeatLifetime = "until-cancelled"
+)
+
+type WorkflowRepeatExhaustedPolicy string
+
+const (
+	WorkflowRepeatOnExhaustedFail   WorkflowRepeatExhaustedPolicy = "fail"
+	WorkflowRepeatOnExhaustedReturn WorkflowRepeatExhaustedPolicy = "return"
 )
 
 // WorkflowBlockRole identifies the structural position of a lowered
@@ -96,7 +123,7 @@ type WorkflowScopeContext struct {
 
 func (s WorkflowScopeContext) Validate() error {
 	if !s.OuterState.Valid() {
-		return errors.New("Workflow scope outer state is invalid")
+		return errors.New("workflow scope outer state is invalid")
 	}
 	if s.StateOwner != nil {
 		if err := s.StateOwner.Validate(); err != nil {
@@ -110,28 +137,28 @@ func (s WorkflowScopeContext) Validate() error {
 		return err
 	}
 	if s.Context != nil && !s.Context.Valid() {
-		return errors.New("Workflow scope context is invalid")
+		return errors.New("workflow scope context is invalid")
 	}
 	if s.Item != nil && !s.Item.Valid() {
-		return errors.New("Workflow scope item is invalid")
+		return errors.New("workflow scope item is invalid")
 	}
 	if s.Result != nil && !s.Result.Valid() {
-		return errors.New("Workflow scope result is invalid")
+		return errors.New("workflow scope result is invalid")
 	}
 	if s.Event != nil && !s.Event.Valid() {
-		return errors.New("Workflow scope event is invalid")
+		return errors.New("workflow scope event is invalid")
 	}
 	if s.Error != nil && !s.Error.Valid() {
-		return errors.New("Workflow scope error is invalid")
+		return errors.New("workflow scope error is invalid")
 	}
 	if s.Outcome != nil && !s.Outcome.Valid() {
-		return errors.New("Workflow scope outcome is invalid")
+		return errors.New("workflow scope outcome is invalid")
 	}
 	if s.Operation != nil && !s.Operation.Valid() {
-		return errors.New("Workflow scope operation is invalid")
+		return errors.New("workflow scope operation is invalid")
 	}
 	if s.Completed != nil && !s.Completed.Valid() {
-		return errors.New("Workflow scope completed facts are invalid")
+		return errors.New("workflow scope completed facts are invalid")
 	}
 	if err := validateUniquePortInputs(s.Ports); err != nil {
 		return err
@@ -145,7 +172,7 @@ func (s WorkflowScopeContext) Validate() error {
 		}
 	}
 	if s.Index != nil && *s.Index < 0 {
-		return errors.New("Workflow scope index is invalid")
+		return errors.New("workflow scope index is invalid")
 	}
 
 	seen := make(map[string]struct{}, len(s.OuterOutcomes))
@@ -154,7 +181,7 @@ func (s WorkflowScopeContext) Validate() error {
 			return fmt.Errorf("workflow scope outcome: %w", err)
 		}
 		if _, duplicate := seen[outcome.ID]; duplicate {
-			return errors.New("Workflow scope outcome is duplicated")
+			return errors.New("workflow scope outcome is duplicated")
 		}
 		seen[outcome.ID] = struct{}{}
 	}
@@ -198,10 +225,10 @@ func (r WorkflowBlockResult) Validate() error {
 		WorkflowExitBreak,
 		WorkflowExitContinue:
 	default:
-		return errors.New("Workflow block result exit is invalid")
+		return errors.New("workflow block result exit is invalid")
 	}
 	if !r.Value.Valid() || !r.State.Valid() {
-		return errors.New("Workflow block result contains invalid JSON")
+		return errors.New("workflow block result contains invalid json")
 	}
 	if err := validateWorkflowCausalEffectWorkItemIDs(r.CausalEffectWorkItemIDs); err != nil {
 		return err
@@ -236,8 +263,8 @@ type WorkflowCase struct {
 }
 
 type WorkflowCompletion struct {
-	Mode   string `json:"mode,omitempty"`
-	Quorum int    `json:"quorum,omitempty"`
+	Mode   WorkflowCompletionMode `json:"mode,omitempty"`
+	Quorum int                    `json:"quorum,omitempty"`
 }
 
 type WorkflowBranch struct {
@@ -264,35 +291,35 @@ type WorkflowParentStateMergeProgress struct {
 }
 
 type WorkflowParallel struct {
-	Completion WorkflowCompletion        `json:"completion"`
-	Errors     string                    `json:"errors,omitempty"`
-	Remaining  string                    `json:"remaining,omitempty"`
-	Merge      *WorkflowParentStateMerge `json:"merge,omitempty"`
-	Branches   []WorkflowBranch          `json:"branches"`
+	Completion WorkflowCompletion            `json:"completion"`
+	Errors     WorkflowCollectionErrorPolicy `json:"errors,omitempty"`
+	Remaining  WorkflowRemainingPolicy       `json:"remaining,omitempty"`
+	Merge      *WorkflowParentStateMerge     `json:"merge,omitempty"`
+	Branches   []WorkflowBranch              `json:"branches"`
 }
 
 type WorkflowForeach struct {
-	Items       WorkflowValue             `json:"items"`
-	ItemSchema  jsonutil.CanonicalValue   `json:"itemSchema"`
-	Concurrency int                       `json:"concurrency,omitempty"`
-	MaxItems    *int                      `json:"maxItems,omitempty"`
-	Completion  WorkflowCompletion        `json:"completion"`
-	Errors      string                    `json:"errors,omitempty"`
-	Merge       *WorkflowParentStateMerge `json:"merge,omitempty"`
-	Remaining   string                    `json:"remaining,omitempty"`
-	Do          WorkflowBlock             `json:"do"`
+	Items       WorkflowValue                 `json:"items"`
+	ItemSchema  jsonutil.CanonicalValue       `json:"itemSchema"`
+	Concurrency int                           `json:"concurrency,omitempty"`
+	MaxItems    *int                          `json:"maxItems,omitempty"`
+	Completion  WorkflowCompletion            `json:"completion"`
+	Errors      WorkflowCollectionErrorPolicy `json:"errors,omitempty"`
+	Merge       *WorkflowParentStateMerge     `json:"merge,omitempty"`
+	Remaining   WorkflowRemainingPolicy       `json:"remaining,omitempty"`
+	Do          WorkflowBlock                 `json:"do"`
 }
 
 type WorkflowRepeat struct {
-	Count         *WorkflowValue     `json:"count,omitempty"`
-	While         *WorkflowValue     `json:"while,omitempty"`
-	Until         *WorkflowValue     `json:"until,omitempty"`
-	Lifetime      string             `json:"lifetime,omitempty"`
-	State         *WorkflowStateSpec `json:"state,omitempty"`
-	MaxIterations *int               `json:"maxIterations,omitempty"`
-	OnExhausted   string             `json:"onExhausted,omitempty"`
-	Timeout       WorkflowDuration   `json:"timeout,omitempty"`
-	Do            WorkflowBlock      `json:"do"`
+	Count         *WorkflowValue                `json:"count,omitempty"`
+	While         *WorkflowValue                `json:"while,omitempty"`
+	Until         *WorkflowValue                `json:"until,omitempty"`
+	Lifetime      WorkflowRepeatLifetime        `json:"lifetime,omitempty"`
+	State         *WorkflowStateSpec            `json:"state,omitempty"`
+	MaxIterations *int                          `json:"maxIterations,omitempty"`
+	OnExhausted   WorkflowRepeatExhaustedPolicy `json:"onExhausted,omitempty"`
+	Timeout       WorkflowDuration              `json:"timeout,omitempty"`
+	Do            WorkflowBlock                 `json:"do"`
 }
 
 type WorkflowPendingKind string
@@ -351,12 +378,12 @@ type WorkflowNamedOutcome struct {
 }
 
 type WorkflowParallelProgress struct {
-	Completion         WorkflowCompletion `json:"completion"`
-	Errors             string             `json:"errors,omitempty"`
-	Remaining          string             `json:"remaining,omitempty"`
-	Winners            []string           `json:"winners,omitempty"`
-	Cancelling         bool               `json:"cancelling,omitempty"`
-	CompletionSequence uint64             `json:"completionSequence,omitempty"`
+	Completion         WorkflowCompletion            `json:"completion"`
+	Errors             WorkflowCollectionErrorPolicy `json:"errors,omitempty"`
+	Remaining          WorkflowRemainingPolicy       `json:"remaining,omitempty"`
+	Winners            []string                      `json:"winners,omitempty"`
+	Cancelling         bool                          `json:"cancelling,omitempty"`
+	CompletionSequence uint64                        `json:"completionSequence,omitempty"`
 }
 
 type WorkflowItemOutcome struct {
@@ -368,17 +395,17 @@ type WorkflowItemOutcome struct {
 }
 
 type WorkflowForeachProgress struct {
-	Items              []jsonutil.CanonicalValue `json:"items"`
-	Outcomes           []WorkflowItemOutcome     `json:"outcomes"`
-	Next               int                       `json:"next"`
-	Concurrency        int                       `json:"concurrency"`
-	Completion         WorkflowCompletion        `json:"completion"`
-	Errors             string                    `json:"errors,omitempty"`
-	Remaining          string                    `json:"remaining,omitempty"`
-	Merge              *WorkflowParentStateMerge `json:"merge,omitempty"`
-	Winners            []int                     `json:"winners,omitempty"`
-	Cancelling         bool                      `json:"cancelling,omitempty"`
-	CompletionSequence uint64                    `json:"completionSequence,omitempty"`
+	Items              []jsonutil.CanonicalValue     `json:"items"`
+	Outcomes           []WorkflowItemOutcome         `json:"outcomes"`
+	Next               int                           `json:"next"`
+	Concurrency        int                           `json:"concurrency"`
+	Completion         WorkflowCompletion            `json:"completion"`
+	Errors             WorkflowCollectionErrorPolicy `json:"errors,omitempty"`
+	Remaining          WorkflowRemainingPolicy       `json:"remaining,omitempty"`
+	Merge              *WorkflowParentStateMerge     `json:"merge,omitempty"`
+	Winners            []int                         `json:"winners,omitempty"`
+	Cancelling         bool                          `json:"cancelling,omitempty"`
+	CompletionSequence uint64                        `json:"completionSequence,omitempty"`
 }
 
 type WorkflowRepeatProgress struct {
@@ -412,48 +439,48 @@ type WorkflowPending struct {
 
 func (p WorkflowPending) Validate() error {
 	if strings.TrimSpace(p.StepID) == "" || strings.TrimSpace(p.Path) == "" {
-		return errors.New("Workflow pending control has no step identity")
+		return errors.New("workflow pending control has no step identity")
 	}
 	switch p.Kind {
 	case WorkflowPendingScope, WorkflowPendingChoose:
 		if len(p.Children) != 1 {
-			return errors.New("Workflow pending block has an invalid child count")
+			return errors.New("workflow pending block has an invalid child count")
 		}
 	case WorkflowPendingParallel:
 		if p.Parallel == nil {
-			return errors.New("Workflow pending parallel state is missing")
+			return errors.New("workflow pending parallel state is missing")
 		}
 	case WorkflowPendingForeach:
 		if p.Foreach == nil {
-			return errors.New("Workflow pending foreach state is missing")
+			return errors.New("workflow pending foreach state is missing")
 		}
 	case WorkflowPendingRepeat:
 		if p.Repeat == nil {
-			return errors.New("Workflow pending repeat state is missing")
+			return errors.New("workflow pending repeat state is missing")
 		}
 	case WorkflowPendingMachine:
 		if p.Machine == nil {
-			return errors.New("Workflow pending machine state is missing")
+			return errors.New("workflow pending machine state is missing")
 		}
 		if err := p.Machine.Validate(); err != nil {
 			return err
 		}
 	case WorkflowPendingReconciliation:
 		if p.Reconciliation == nil {
-			return errors.New("Workflow pending reconciliation state is missing")
+			return errors.New("workflow pending reconciliation state is missing")
 		}
 		if err := p.Reconciliation.Validate(); err != nil {
 			return err
 		}
 	case WorkflowPendingSaga:
 		if p.Saga == nil || len(p.Children) != 1 {
-			return errors.New("Workflow pending saga state is invalid")
+			return errors.New("workflow pending saga state is invalid")
 		}
 		if err := p.Saga.Validate(); err != nil {
 			return err
 		}
 	default:
-		return errors.New("Workflow pending control kind is invalid")
+		return errors.New("workflow pending control kind is invalid")
 	}
 
 	if p.ParentStateMerge != nil {
@@ -492,13 +519,13 @@ func (p WorkflowPending) Validate() error {
 	seen := make(map[string]struct{}, len(p.Children))
 	for _, child := range p.Children {
 		if strings.TrimSpace(child.Name) == "" {
-			return errors.New("Workflow pending child has no name")
+			return errors.New("workflow pending child has no name")
 		}
 		if child.State == "" {
-			return errors.New("Workflow pending child has no state")
+			return errors.New("workflow pending child has no state")
 		}
 		if _, duplicate := seen[child.Name]; duplicate {
-			return errors.New("Workflow pending child is duplicated")
+			return errors.New("workflow pending child is duplicated")
 		}
 		seen[child.Name] = struct{}{}
 		if child.Result != nil {
@@ -507,7 +534,7 @@ func (p WorkflowPending) Validate() error {
 			}
 		}
 		if child.Error != nil && !child.Error.Details.Valid() {
-			return errors.New("Workflow pending child error details are invalid")
+			return errors.New("workflow pending child error details are invalid")
 		}
 		if err := validateWorkflowCausalEffectWorkItemIDs(child.CausalEffectWorkItemIDs); err != nil {
 			return err
@@ -582,7 +609,7 @@ func (i *WorkflowInterpreter) completeWorkflowBlock(
 	exit WorkflowExitKind,
 ) (ProgramTransition, error) {
 	if !value.Valid() {
-		return ProgramTransition{}, errors.New("Workflow block completion value is invalid")
+		return ProgramTransition{}, errors.New("workflow block completion value is invalid")
 	}
 
 	if exit == "" {
@@ -869,16 +896,16 @@ func (i *WorkflowInterpreter) startChoose(
 	)
 }
 
-func workflowCompletionMode(value WorkflowCompletion) string {
+func workflowCompletionMode(value WorkflowCompletion) WorkflowCompletionMode {
 	if value.Mode == "" {
-		return allStr
+		return WorkflowCompletionModeAll
 	}
 	return value.Mode
 }
 
-func workflowRemainingMode(value string) string {
+func workflowRemainingMode(value WorkflowRemainingPolicy) WorkflowRemainingPolicy {
 	if value == "" {
-		return cancelStr
+		return WorkflowRemainingCancel
 	}
 	return value
 }
@@ -1315,7 +1342,7 @@ func (i *WorkflowInterpreter) launchRepeatChild(
 	if !allowed {
 		if exhausted {
 			progress.Exhausted = true
-			if step.Repeat.OnExhausted != "return" {
+			if step.Repeat.OnExhausted != WorkflowRepeatOnExhaustedReturn {
 				return workflowFailure(
 					state,
 					"workflow_repeat_exhausted",
@@ -1572,16 +1599,17 @@ func (i *WorkflowInterpreter) settleStructuredChild(
 		progress := state.Pending.Parallel
 		mode := workflowCompletionMode(progress.Completion)
 		switch workflowCompletionMode(progress.Completion) {
-		case firstCompletedStr:
+		case WorkflowCompletionModeFirstCompleted:
 			if len(progress.Winners) == 0 {
 				progress.Winners = []string{child.Name}
 			}
-		case firstSuccessStr, quorumStr:
+		case WorkflowCompletionModeFirstSuccess, WorkflowCompletionModeQuorum:
 			if workflowParallelSucceeded(*child) &&
-				(mode != firstSuccessStr || len(progress.Winners) == 0) &&
+				(mode != WorkflowCompletionModeFirstSuccess || len(progress.Winners) == 0) &&
 				!slices.Contains(progress.Winners, child.Name) {
 				progress.Winners = append(progress.Winners, child.Name)
 			}
+		default:
 		}
 	}
 
@@ -1862,9 +1890,9 @@ func (i *WorkflowInterpreter) finishParallel(
 	allTerminal := workflowParallelAllTerminal(children)
 
 	switch mode {
-	case "all":
+	case WorkflowCompletionModeAll:
 		hasFailure := workflowParallelHasSelectedFailure(children)
-		if hasFailure && progress.Errors == firstFastStr {
+		if hasFailure && progress.Errors == WorkflowCollectionErrorFailFast {
 			workflowRequestParallelCancellation(state, children)
 		}
 		if !allTerminal {
@@ -1878,7 +1906,7 @@ func (i *WorkflowInterpreter) finishParallel(
 		}
 		progress.Winners = append([]string(nil), successes...)
 
-	case "first-completed":
+	case WorkflowCompletionModeFirstCompleted:
 		if len(progress.Winners) == 0 {
 			if allTerminal {
 				return workflowParallelAggregateFailure(
@@ -1888,7 +1916,7 @@ func (i *WorkflowInterpreter) finishParallel(
 			}
 			return nil
 		}
-		if workflowRemainingMode(progress.Remaining) == cancelStr {
+		if workflowRemainingMode(progress.Remaining) == WorkflowRemainingCancel {
 			workflowRequestParallelCancellation(state, children)
 		}
 		if !allTerminal {
@@ -1907,9 +1935,9 @@ func (i *WorkflowInterpreter) finishParallel(
 			break
 		}
 
-	case "first-success":
+	case WorkflowCompletionModeFirstSuccess:
 		if len(progress.Winners) != 0 &&
-			workflowRemainingMode(progress.Remaining) == cancelStr {
+			workflowRemainingMode(progress.Remaining) == WorkflowRemainingCancel {
 			workflowRequestParallelCancellation(state, children)
 		}
 		if !allTerminal {
@@ -1922,12 +1950,12 @@ func (i *WorkflowInterpreter) finishParallel(
 			)
 		}
 
-	case quorumStr:
+	case WorkflowCompletionModeQuorum:
 		if progress.Completion.Quorum <= 0 {
-			return errors.New("Workflow parallel quorum is invalid")
+			return errors.New("workflow parallel quorum is invalid")
 		}
 		if len(progress.Winners) >= progress.Completion.Quorum &&
-			workflowRemainingMode(progress.Remaining) == cancelStr {
+			workflowRemainingMode(progress.Remaining) == WorkflowRemainingCancel {
 			workflowRequestParallelCancellation(state, children)
 		}
 		if !allTerminal {
@@ -1946,7 +1974,7 @@ func (i *WorkflowInterpreter) finishParallel(
 		)
 
 	default:
-		return errors.New("Workflow parallel completion mode is invalid")
+		return errors.New("workflow parallel completion mode is invalid")
 	}
 
 	value, err := workflowParallelOutput(children, progress.Winners)
@@ -2118,7 +2146,7 @@ func (i *WorkflowInterpreter) settleForeachChild(
 	}
 
 	switch workflowCompletionMode(progress.Completion) {
-	case firstCompletedStr:
+	case WorkflowCompletionModeFirstCompleted:
 		if len(progress.Winners) == 0 {
 			outcomes := append([]WorkflowItemOutcome(nil), progress.Outcomes...)
 			slices.SortFunc(outcomes, compareWorkflowItemCompletionOrder)
@@ -2129,7 +2157,7 @@ func (i *WorkflowInterpreter) settleForeachChild(
 				}
 			}
 		}
-	case firstSuccessStr, quorumStr:
+	case WorkflowCompletionModeFirstSuccess, WorkflowCompletionModeQuorum:
 		outcomes := append([]WorkflowItemOutcome(nil), progress.Outcomes...)
 		slices.SortFunc(outcomes, compareWorkflowItemCompletionOrder)
 		for _, outcome := range outcomes {
@@ -2138,10 +2166,11 @@ func (i *WorkflowInterpreter) settleForeachChild(
 				continue
 			}
 			progress.Winners = append(progress.Winners, outcome.Index)
-			if workflowCompletionMode(progress.Completion) == firstSuccessStr {
+			if workflowCompletionMode(progress.Completion) == WorkflowCompletionModeFirstSuccess {
 				break
 			}
 		}
+	default:
 	}
 
 	step, err := workflowStepForPath(program.Root, pending.Path)
@@ -2188,10 +2217,10 @@ func (i *WorkflowInterpreter) finishForeach(
 	progress := state.Pending.Foreach
 	successes := workflowForeachSuccessIndexes(progress.Outcomes)
 	mode := workflowCompletionMode(progress.Completion)
-	if len(progress.Outcomes) == 0 && mode != allStr {
+	if len(progress.Outcomes) == 0 && mode != WorkflowCompletionModeAll {
 		code := "workflow_foreach_no_selected_item"
 		message := "foreach completion mode requires at least one item"
-		if mode == quorumStr {
+		if mode == WorkflowCompletionModeQuorum {
 			code = "workflow_foreach_quorum_unreachable"
 			message = "foreach success quorum cannot be reached by an empty collection"
 		}
@@ -2205,9 +2234,9 @@ func (i *WorkflowInterpreter) finishForeach(
 	}
 
 	switch mode {
-	case "all":
+	case WorkflowCompletionModeAll:
 		if workflowForeachHasFailure(progress.Outcomes) &&
-			progress.Errors == firstFastStr {
+			progress.Errors == WorkflowCollectionErrorFailFast {
 			workflowRequestForeachCancellation(state)
 		}
 		if !workflowForeachAllTerminal(progress) {
@@ -2218,11 +2247,11 @@ func (i *WorkflowInterpreter) finishForeach(
 		}
 		progress.Winners = append([]int(nil), successes...)
 
-	case "first-completed":
+	case WorkflowCompletionModeFirstCompleted:
 		if len(progress.Winners) == 0 {
 			return nil
 		}
-		if workflowRemainingMode(progress.Remaining) == cancelStr {
+		if workflowRemainingMode(progress.Remaining) == WorkflowRemainingCancel {
 			workflowRequestForeachCancellation(state)
 		}
 		if !workflowForeachAllTerminal(progress) {
@@ -2234,9 +2263,9 @@ func (i *WorkflowInterpreter) finishForeach(
 			return workflowForeachAggregateFailure(progress)
 		}
 
-	case "first-success":
+	case WorkflowCompletionModeFirstSuccess:
 		if len(progress.Winners) != 0 &&
-			workflowRemainingMode(progress.Remaining) == cancelStr {
+			workflowRemainingMode(progress.Remaining) == WorkflowRemainingCancel {
 			workflowRequestForeachCancellation(state)
 		}
 		if !workflowForeachAllTerminal(progress) {
@@ -2247,12 +2276,12 @@ func (i *WorkflowInterpreter) finishForeach(
 		}
 		progress.Winners = []int{progress.Winners[0]}
 
-	case quorumStr:
+	case WorkflowCompletionModeQuorum:
 		if progress.Completion.Quorum <= 0 {
-			return errors.New("Workflow foreach quorum is invalid")
+			return errors.New("workflow foreach quorum is invalid")
 		}
 		if len(progress.Winners) >= progress.Completion.Quorum &&
-			workflowRemainingMode(progress.Remaining) == cancelStr {
+			workflowRemainingMode(progress.Remaining) == WorkflowRemainingCancel {
 			workflowRequestForeachCancellation(state)
 		}
 		if !workflowForeachAllTerminal(progress) {
@@ -2267,7 +2296,7 @@ func (i *WorkflowInterpreter) finishForeach(
 		)
 
 	default:
-		return errors.New("Workflow foreach completion mode is invalid")
+		return errors.New("workflow foreach completion mode is invalid")
 	}
 
 	value, err := workflowForeachOutput(progress)
@@ -2480,7 +2509,7 @@ func (b WorkflowBlock) Validate() error {
 	}
 	if b.State != nil {
 		if !b.State.Schema.Valid() || len(b.State.Schema) == 0 {
-			return errors.New("Workflow state schema is invalid")
+			return errors.New("workflow state schema is invalid")
 		}
 		if err := b.State.Initial.Validate(); err != nil {
 			return err
@@ -2490,14 +2519,14 @@ func (b WorkflowBlock) Validate() error {
 	ids := make(map[string]struct{}, len(b.Steps))
 	for index, step := range b.Steps {
 		if strings.TrimSpace(step.ID) == "" {
-			return fmt.Errorf("Workflow step %d has no ID", index)
+			return fmt.Errorf("workflow step %d has no id", index)
 		}
 		if _, duplicate := ids[step.ID]; duplicate {
-			return fmt.Errorf("Workflow step %q is duplicated", step.ID)
+			return fmt.Errorf("workflow step %q is duplicated", step.ID)
 		}
 		ids[step.ID] = struct{}{}
 		if err := step.Validate(); err != nil {
-			return fmt.Errorf("Workflow step %q: %w", step.ID, err)
+			return fmt.Errorf("workflow step %q: %w", step.ID, err)
 		}
 	}
 	if err := validateWorkflowStepSagaDependencies(b.Steps); err != nil {
@@ -2506,7 +2535,7 @@ func (b WorkflowBlock) Validate() error {
 	for index := range b.Catch {
 		if err := b.Catch[index].Validate(); err != nil {
 			return fmt.Errorf(
-				"Workflow catch handler %d: %w",
+				"workflow catch handler %d: %w",
 				index,
 				err,
 			)
@@ -2514,7 +2543,7 @@ func (b WorkflowBlock) Validate() error {
 	}
 	if b.Finally != nil {
 		if err := b.Finally.Validate(); err != nil {
-			return fmt.Errorf("Workflow finally block: %w", err)
+			return fmt.Errorf("workflow finally block: %w", err)
 		}
 	}
 	return nil
@@ -2557,9 +2586,6 @@ func (i *WorkflowInterpreter) childBlockProgramWithScope(
 	child.Scope = inherited
 	child.Input = program.Input.Clone()
 	child.InputBound = true
-	if err := child.Validate(); err != nil {
-		return ProgramSnapshot{}, err
-	}
 	payload, err := canonicalWorkflowValue(child)
 	if err != nil {
 		return ProgramSnapshot{}, err
@@ -2744,10 +2770,10 @@ func cloneWorkflowSagaScope(
 func (c WorkflowChoose) Validate() error {
 	for index, candidate := range c.Cases {
 		if err := candidate.When.Validate(); err != nil {
-			return fmt.Errorf("Workflow choose case %d: %w", index, err)
+			return fmt.Errorf("workflow choose case %d: %w", index, err)
 		}
 		if err := candidate.Do.Validate(); err != nil {
-			return fmt.Errorf("Workflow choose case %d: %w", index, err)
+			return fmt.Errorf("workflow choose case %d: %w", index, err)
 		}
 	}
 	if c.Default != nil {
@@ -2758,16 +2784,18 @@ func (c WorkflowChoose) Validate() error {
 
 func (c WorkflowCompletion) Validate() error {
 	switch workflowCompletionMode(c) {
-	case allStr, firstCompletedStr, firstSuccessStr:
+	case WorkflowCompletionModeAll,
+		WorkflowCompletionModeFirstCompleted,
+		WorkflowCompletionModeFirstSuccess:
 		if c.Quorum != 0 {
-			return errors.New("Workflow completion quorum is valid only for quorum mode")
+			return errors.New("workflow completion quorum is valid only for quorum mode")
 		}
-	case quorumStr:
+	case WorkflowCompletionModeQuorum:
 		if c.Quorum <= 0 {
-			return errors.New("Workflow completion quorum must be positive")
+			return errors.New("workflow completion quorum must be positive")
 		}
 	default:
-		return errors.New("Workflow completion mode is invalid")
+		return errors.New("workflow completion mode is invalid")
 	}
 	return nil
 }
@@ -2777,26 +2805,26 @@ func (p WorkflowParallel) Validate() error {
 		return err
 	}
 	switch p.Errors {
-	case "", firstFastStr, "collect":
+	case "", WorkflowCollectionErrorFailFast, WorkflowCollectionErrorCollect:
 	default:
-		return errors.New("Workflow parallel error policy is invalid")
+		return errors.New("workflow parallel error policy is invalid")
 	}
 	switch workflowRemainingMode(p.Remaining) {
-	case "cancel", "wait":
+	case WorkflowRemainingCancel, WorkflowRemainingWait:
 	default:
-		return errors.New("Workflow parallel remaining policy is invalid")
+		return errors.New("workflow parallel remaining policy is invalid")
 	}
 	if len(p.Branches) == 0 {
-		return errors.New("Workflow parallel has no branches")
+		return errors.New("workflow parallel has no branches")
 	}
 
 	seen := make(map[string]struct{}, len(p.Branches))
 	for _, branch := range p.Branches {
 		if strings.TrimSpace(branch.Name) == "" {
-			return errors.New("Workflow parallel branch has no name")
+			return errors.New("workflow parallel branch has no name")
 		}
 		if _, duplicate := seen[branch.Name]; duplicate {
-			return errors.New("Workflow parallel branch is duplicated")
+			return errors.New("workflow parallel branch is duplicated")
 		}
 		seen[branch.Name] = struct{}{}
 		if branch.When != nil {
@@ -2816,26 +2844,26 @@ func (f WorkflowForeach) Validate() error {
 		return err
 	}
 	if !f.ItemSchema.Valid() || len(f.ItemSchema) == 0 {
-		return errors.New("Workflow foreach item schema is invalid")
+		return errors.New("workflow foreach item schema is invalid")
 	}
 	if f.Concurrency < 0 {
-		return errors.New("Workflow foreach limits are invalid")
+		return errors.New("workflow foreach limits are invalid")
 	}
 	if f.MaxItems != nil && *f.MaxItems < 0 {
-		return errors.New("Workflow foreach limits are invalid")
+		return errors.New("workflow foreach limits are invalid")
 	}
 	if err := f.Completion.Validate(); err != nil {
 		return err
 	}
 	switch f.Errors {
-	case "", firstFastStr, "collect":
+	case "", WorkflowCollectionErrorFailFast, WorkflowCollectionErrorCollect:
 	default:
-		return errors.New("Workflow foreach error policy is invalid")
+		return errors.New("workflow foreach error policy is invalid")
 	}
 	switch workflowRemainingMode(f.Remaining) {
-	case "cancel", "wait":
+	case WorkflowRemainingCancel, WorkflowRemainingWait:
 	default:
-		return errors.New("Workflow foreach remaining policy is invalid")
+		return errors.New("workflow foreach remaining policy is invalid")
 	}
 	return f.Do.Validate()
 }
@@ -2853,7 +2881,7 @@ func (r WorkflowRepeat) Validate() error {
 		}
 	}
 	if controls != 1 {
-		return errors.New("Workflow repeat requires exactly one control")
+		return errors.New("workflow repeat requires exactly one control")
 	}
 	if r.Count != nil {
 		if err := r.Count.Validate(); err != nil {
@@ -2870,24 +2898,24 @@ func (r WorkflowRepeat) Validate() error {
 			return err
 		}
 	}
-	if r.Lifetime != "" && r.Lifetime != "until-cancelled" {
-		return errors.New("Workflow repeat lifetime is invalid")
+	if r.Lifetime != "" && r.Lifetime != WorkflowRepeatLifetimeUntilCancelled {
+		return errors.New("workflow repeat lifetime is invalid")
 	}
 	if r.State != nil {
 		if !r.State.Schema.Valid() || len(r.State.Schema) == 0 {
-			return errors.New("Workflow repeat state schema is invalid")
+			return errors.New("workflow repeat state schema is invalid")
 		}
 		if err := r.State.Initial.Validate(); err != nil {
 			return err
 		}
 	}
 	if r.MaxIterations != nil && *r.MaxIterations < 0 {
-		return errors.New("Workflow repeat maxIterations is invalid")
+		return errors.New("workflow repeat maxiterations is invalid")
 	}
 	switch r.OnExhausted {
-	case "", "fail", "return":
+	case "", WorkflowRepeatOnExhaustedFail, WorkflowRepeatOnExhaustedReturn:
 	default:
-		return errors.New("Workflow repeat onExhausted is invalid")
+		return errors.New("workflow repeat onexhausted is invalid")
 	}
 	if err := validateWorkflowTimeout(r.Timeout); err != nil {
 		return err

@@ -2,6 +2,7 @@ package sessionv3
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
@@ -11,12 +12,46 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
+const (
+	manualToolResultReceiptSystem      = "session-v3-manual-tool-result"
+	defaultSkippedToolMessage          = "the tool call was intentionally skipped by the user."
+	defaultErrorToolMessage            = "the tool call failed without a usable result."
+	errContinuationNoOwner             = "continuation input has no active conversation owner"
+	errContinuationRevisionMismatchFmt = "continuation input revision mismatch: expected %d, current %d"
+	errTerminalToolControl             = "terminal or cancelling executions cannot mutate tool calls"
+	errRecoveryPendingToolControl      = "recovery review must be resolved before mutating tool calls"
+	errActiveLLMToolControl            = "tool calls cannot change while a model operation is active"
+	errNoReadyToolWorkItems            = "no ready tool work items are available"
+	errRequestedToolNotReady           = "requested tool work item is not ready"
+	errToolWorkItemUnavailable         = "tool work item is unavailable"
+	errProviderToolManualMutation      = "provider-managed tool calls cannot be changed manually"
+	errToolResultAlreadyConsumed       = "tool work item result was already consumed by a later model operation"
+	errToolOutsideCurrentBatch         = "tool work item does not belong to the current unconsumed tool batch"
+	errToolRetryDisallowed             = "tool work item cannot retry without confirmed non-application"
+	errActiveToolManualCompletion      = "active tool work item cannot be completed manually"
+	errSuccessfulToolOverwrite         = "successful tool work item cannot be overwritten"
+	errTerminalAutomationControl       = "terminal or cancelling executions cannot change automation"
+	errAutomationTargetRequired        = "automation hold must target tools, continuation, or both"
+	errAutomationScopeUnavailable      = "automation hold scope is unavailable"
+	errEditSafeBoundaryRequired        = "editing requires a safe terminal conversation boundary"
+	errReplaceUserMessageOnly          = "only a user message activity can be replaced"
+	errEditInputRequired               = "edit-and-resend requires text, attachments, or carried tool results"
+	errEditExecutionUnavailable        = "edit-and-resend execution is unavailable"
+	errConversationExecDisappeared     = "conversation execution disappeared during edit-and-resend"
+	errContinuationExecDisappeared     = "conversation execution disappeared while consuming continuation input"
+	errConversationFrameUnavailable    = "conversation frame is unavailable"
+	errAdvanceFrameExecDisappeared     = "conversation execution disappeared while advancing its message frame"
+	errConversationExecutionMissing    = "conversation execution is unavailable"
+	errCarriedToolIDRequired           = "carried tool work item identity is required"
+	errCarriedToolUnconfirmedFmt       = "carried tool work item %q has no confirmed tool result"
+)
+
 func (r *Runtime) UpdateContinuationInput(
 	ctx context.Context,
 	command UpdateContinuationInputCommand,
 ) (*CommandReceipt, error) {
 	if command.Meta.ID == "" {
-		return nil, errors.New("command ID is required")
+		return nil, errors.New(errCommandIDRequired)
 	}
 	if err := command.Input.Validate(); err != nil {
 		return &CommandReceipt{
@@ -62,10 +97,10 @@ func (r *Runtime) UpdateContinuationInput(
 	r.mu.RLock()
 	if !r.closed {
 		if session := r.sessions[command.SessionID]; session != nil {
-			if owner, ownerErr := r.conversationMessageExecutionLocked(session); ownerErr == nil &&
-				owner != nil && !owner.State.Terminal() {
-				command.ExecutionID = owner.ID
-			}
+			command.ExecutionID = r.resolveConversationControlExecutionIDLocked(
+				session,
+				command.ExecutionID,
+			)
 		}
 	}
 	r.mu.RUnlock()
@@ -77,13 +112,13 @@ func (r *Runtime) UpdateContinuationInput(
 		command.ExecutionID,
 		identity,
 		func(session *Session, execution *Execution) (*CommandReceipt, error) {
-			if active, err := r.conversationMessageExecutionLocked(session); err != nil ||
-				active == nil || active.ID != execution.ID {
+			active := r.findConversationOwnerExecutionLocked(session)
+			if active == nil || active.ID != execution.ID {
 				return &CommandReceipt{
 					CommandID:   command.Meta.ID,
 					SessionID:   session.ID,
 					ExecutionID: execution.ID,
-					Message:     "continuation input has no active conversation owner",
+					Message:     errContinuationNoOwner,
 				}, nil
 			}
 			if command.ExpectedInputRevision != nil &&
@@ -95,7 +130,7 @@ func (r *Runtime) UpdateContinuationInput(
 					SessionRevision:   session.Revision,
 					ExecutionRevision: execution.Revision,
 					Message: fmt.Sprintf(
-						"continuation input revision mismatch: expected %d, current %d",
+						errContinuationRevisionMismatchFmt,
 						*command.ExpectedInputRevision,
 						execution.Continuation.Revision,
 					),
@@ -136,51 +171,83 @@ func (r *Runtime) ExecuteToolCalls(
 	ctx context.Context,
 	command ExecuteToolCallsCommand,
 ) (*CommandReceipt, error) {
+	identity := command
+	r.mu.RLock()
+	if !r.closed {
+		if session := r.sessions[command.SessionID]; session != nil {
+			command.ExecutionID = r.resolveConversationControlExecutionIDLocked(
+				session,
+				command.ExecutionID,
+			)
+		}
+	}
+	r.mu.RUnlock()
+
 	return r.changeExecution(
 		ctx,
 		command.Meta,
 		command.SessionID,
 		command.ExecutionID,
-		command,
+		identity,
 		func(session *Session, execution *Execution) (*CommandReceipt, error) {
-			if execution.State.Terminal() ||
-				execution.Controls.CancellationRequested {
+			if message := validateManualToolControlExecution(*execution); message != "" {
 				return &CommandReceipt{
 					CommandID:   command.Meta.ID,
 					SessionID:   session.ID,
 					ExecutionID: execution.ID,
-					Message:     "terminal or cancelling executions cannot execute Tool calls",
+					Message:     message,
 				}, nil
 			}
 
 			ids := uniqueNormalWorkItemIDs(command.WorkItemIDs)
 			if len(ids) == 0 {
-				for _, item := range execution.WorkItems {
-					if item.Type == WorkItemTypeTool &&
-						item.State == WorkItemStateReady {
-						ids = append(ids, item.ID)
-					}
+				ownerFrame := activeConversationAgentFrame(execution)
+				if ownerFrame == nil {
+					ownerFrame = liveConversationAgentFrame(session, *execution)
 				}
+				if ownerFrame != nil && frameHasActiveLLMWork(*execution, ownerFrame.ID) {
+					return &CommandReceipt{
+						CommandID:   command.Meta.ID,
+						SessionID:   session.ID,
+						ExecutionID: execution.ID,
+						Message:     errActiveLLMToolControl,
+					}, nil
+				}
+				ids = readyCurrentBatchToolIDs(*execution, ownerFrame)
 			}
 			if len(ids) == 0 {
 				return &CommandReceipt{
 					CommandID:   command.Meta.ID,
 					SessionID:   session.ID,
 					ExecutionID: execution.ID,
-					Message:     "no ready Tool WorkItems are available",
+					Message:     errNoReadyToolWorkItems,
 				}, nil
 			}
 
 			for _, id := range ids {
 				item := mutableWorkItem(execution, id)
-				if item == nil ||
-					item.Type != WorkItemTypeTool ||
-					item.State != WorkItemStateReady {
+				if item == nil || item.Type != WorkItemTypeTool {
 					return &CommandReceipt{
 						CommandID:   command.Meta.ID,
 						SessionID:   session.ID,
 						ExecutionID: execution.ID,
-						Message:     "requested Tool WorkItem is not ready",
+						Message:     errToolWorkItemUnavailable,
+					}, nil
+				}
+				if message := validateManualToolBatchItem(*execution, *item); message != "" {
+					return &CommandReceipt{
+						CommandID:   command.Meta.ID,
+						SessionID:   session.ID,
+						ExecutionID: execution.ID,
+						Message:     message,
+					}, nil
+				}
+				if item.State != WorkItemStateReady {
+					return &CommandReceipt{
+						CommandID:   command.Meta.ID,
+						SessionID:   session.ID,
+						ExecutionID: execution.ID,
+						Message:     errRequestedToolNotReady,
 					}, nil
 				}
 				item.Requested = true
@@ -213,28 +280,48 @@ func (r *Runtime) RetryToolCall(
 	ctx context.Context,
 	command RetryToolCallCommand,
 ) (*CommandReceipt, error) {
+	identity := command
+	r.mu.RLock()
+	if !r.closed {
+		if session := r.sessions[command.SessionID]; session != nil {
+			command.ExecutionID = r.resolveConversationControlExecutionIDLocked(
+				session,
+				command.ExecutionID,
+			)
+		}
+	}
+	r.mu.RUnlock()
+
 	return r.changeExecution(
 		ctx,
 		command.Meta,
 		command.SessionID,
 		command.ExecutionID,
-		command,
+		identity,
 		func(session *Session, execution *Execution) (*CommandReceipt, error) {
+			if message := validateManualToolControlExecution(*execution); message != "" {
+				return &CommandReceipt{
+					CommandID:   command.Meta.ID,
+					SessionID:   session.ID,
+					ExecutionID: execution.ID,
+					Message:     message,
+				}, nil
+			}
 			item := mutableWorkItem(execution, command.WorkItemID)
 			if item == nil || item.Type != WorkItemTypeTool {
 				return &CommandReceipt{
 					CommandID:   command.Meta.ID,
 					SessionID:   session.ID,
 					ExecutionID: execution.ID,
-					Message:     "Tool WorkItem is unavailable",
+					Message:     errToolWorkItemUnavailable,
 				}, nil
 			}
-			if normalToolResultConsumed(*execution, item.ID) {
+			if message := validateManualToolBatchItem(*execution, *item); message != "" {
 				return &CommandReceipt{
 					CommandID:   command.Meta.ID,
 					SessionID:   session.ID,
 					ExecutionID: execution.ID,
-					Message:     "Tool WorkItem result was already consumed by a later Model operation",
+					Message:     message,
 				}, nil
 			}
 			if !manualToolRetryAllowed(*item) {
@@ -242,7 +329,7 @@ func (r *Runtime) RetryToolCall(
 					CommandID:   command.Meta.ID,
 					SessionID:   session.ID,
 					ExecutionID: execution.ID,
-					Message:     "Tool WorkItem cannot retry without confirmed non-application",
+					Message:     errToolRetryDisallowed,
 				}, nil
 			}
 
@@ -289,7 +376,7 @@ func (r *Runtime) SkipToolCall(
 		command.ExecutionID,
 		command.WorkItemID,
 		ToolOutputKindSkipped,
-		"The Tool call was intentionally skipped by the user.",
+		defaultSkippedToolMessage,
 	)
 }
 
@@ -299,7 +386,7 @@ func (r *Runtime) CompleteToolCallAsError(
 ) (*CommandReceipt, error) {
 	message := strings.TrimSpace(command.Error)
 	if message == "" {
-		message = "The Tool call failed without a usable result."
+		message = defaultErrorToolMessage
 	}
 	return r.completeNormalToolCall(
 		ctx,
@@ -316,12 +403,24 @@ func (r *Runtime) SetAutomationHold(
 	ctx context.Context,
 	command SetAutomationHoldCommand,
 ) (*CommandReceipt, error) {
+	identity := command
+	r.mu.RLock()
+	if !r.closed {
+		if session := r.sessions[command.SessionID]; session != nil {
+			command.ExecutionID = r.resolveConversationControlExecutionIDLocked(
+				session,
+				command.ExecutionID,
+			)
+		}
+	}
+	r.mu.RUnlock()
+
 	return r.changeExecution(
 		ctx,
 		command.Meta,
 		command.SessionID,
 		command.ExecutionID,
-		command,
+		identity,
 		func(session *Session, execution *Execution) (*CommandReceipt, error) {
 			if execution.State.Terminal() ||
 				execution.Controls.CancellationRequested {
@@ -329,7 +428,7 @@ func (r *Runtime) SetAutomationHold(
 					CommandID:   command.Meta.ID,
 					SessionID:   session.ID,
 					ExecutionID: execution.ID,
-					Message:     "terminal or cancelling executions cannot change automation",
+					Message:     errTerminalAutomationControl,
 				}, nil
 			}
 			if !command.Tools && !command.Continuation {
@@ -337,7 +436,7 @@ func (r *Runtime) SetAutomationHold(
 					CommandID:   command.Meta.ID,
 					SessionID:   session.ID,
 					ExecutionID: execution.ID,
-					Message:     "automation hold must target tools, continuation, or both",
+					Message:     errAutomationTargetRequired,
 				}, nil
 			}
 
@@ -351,14 +450,18 @@ func (r *Runtime) SetAutomationHold(
 					CommandID:   command.Meta.ID,
 					SessionID:   session.ID,
 					ExecutionID: execution.ID,
-					Message:     "automation hold scope is unavailable",
+					Message:     errAutomationScopeUnavailable,
 				}, nil
 			}
 
+			ownerFrame := activeConversationAgentFrame(execution)
+			if ownerFrame == nil {
+				ownerFrame = liveConversationAgentFrame(session, *execution)
+			}
 			hold := AutomationHold{
 				Enabled:          command.Enabled,
 				Scope:            scope,
-				TargetWorkItemID: latestNormalLLMWorkItemID(*execution),
+				TargetWorkItemID: latestScopedLLMWorkItemID(*execution, ownerFrame),
 				SetByCommandID:   command.Meta.ID,
 			}
 			if !command.Enabled {
@@ -397,7 +500,7 @@ func (r *Runtime) EditAndResend(
 	command EditAndResendCommand,
 ) (*CommandReceipt, error) {
 	if command.Meta.ID == "" {
-		return nil, errors.New("command ID is required")
+		return nil, errors.New(errCommandIDRequired)
 	}
 	if err := command.Input.Validate(); err != nil {
 		return &CommandReceipt{
@@ -464,7 +567,7 @@ func (r *Runtime) EditAndResend(
 			session,
 			command.Meta,
 			command,
-			"editing requires a safe terminal conversation boundary",
+			errEditSafeBoundaryRequired,
 		)
 		r.mu.Unlock()
 		return receipt, nil
@@ -486,7 +589,7 @@ func (r *Runtime) EditAndResend(
 			session,
 			command.Meta,
 			command,
-			"only a user message activity can be replaced",
+			errReplaceUserMessageOnly,
 		)
 		r.mu.Unlock()
 		return receipt, nil
@@ -498,7 +601,7 @@ func (r *Runtime) EditAndResend(
 			session,
 			command.Meta,
 			command,
-			"edit-and-resend requires text, attachments, or carried Tool results",
+			errEditInputRequired,
 		)
 		r.mu.Unlock()
 		return receipt, nil
@@ -526,7 +629,7 @@ func (r *Runtime) EditAndResend(
 				session,
 				command.Meta,
 				command,
-				"edit-and-resend execution is unavailable",
+				errEditExecutionUnavailable,
 			)
 			r.mu.Unlock()
 			return receipt, nil
@@ -561,7 +664,7 @@ func (r *Runtime) EditAndResend(
 	if current == nil {
 		*session = previous
 		r.mu.Unlock()
-		return nil, errors.New("conversation execution disappeared during edit-and-resend")
+		return nil, errors.New(errConversationExecDisappeared)
 	}
 	r.refreshExecutionStateLocked(current)
 	receipt := CommandReceipt{
@@ -574,7 +677,7 @@ func (r *Runtime) EditAndResend(
 		ActivityIDs:       []ActivityID{activity.ID},
 	}
 	r.rememberCommandLocked(session, command.Meta, command, receipt)
-	if err := r.persistLocked(ctx, "messageEditedAndResent", session); err != nil {
+	if err := r.persistLocked(ctx, checkpointReasonMessageEditedAndResent, session); err != nil {
 		*session = previous
 		r.mu.Unlock()
 		return nil, err
@@ -661,7 +764,7 @@ func (r *Runtime) consumeContinuationLocked(
 
 	execution = mutableSessionExecution(session, execution.ID)
 	if execution == nil {
-		return nil, false, errors.New("conversation execution disappeared while consuming continuation input")
+		return nil, false, errors.New(errContinuationExecDisappeared)
 	}
 	execution.Continuation.ConsumedRevision = staged.Revision
 	execution.Continuation.Text = ""
@@ -704,7 +807,7 @@ func (r *Runtime) submitNormalMessageWithDefaultsLocked(
 		frame = liveConversationAgentFrame(session, *execution)
 	}
 	if frame == nil || frame.Status.Terminal() {
-		return Activity{}, errors.New("conversation frame is unavailable")
+		return Activity{}, errors.New(errConversationFrameUnavailable)
 	}
 	return r.submitNormalMessageToFrameWithDefaultsLocked(
 		session,
@@ -728,7 +831,7 @@ func (r *Runtime) submitNormalMessageToFrameWithDefaultsLocked(
 ) (Activity, error) {
 	if session == nil || execution == nil || frame == nil ||
 		frame.Status.Terminal() {
-		return Activity{}, errors.New("conversation frame is unavailable")
+		return Activity{}, errors.New(errConversationFrameUnavailable)
 	}
 	if resolvedDefaults == nil {
 		value, err := resolveSessionInvocationDefaults(
@@ -758,7 +861,7 @@ func (r *Runtime) submitNormalMessageToFrameWithDefaultsLocked(
 		FrameID:     frame.ID,
 		Message: &MessageActivity{
 			Role:               MessageRoleUser,
-			Status:             "accepted",
+			Status:             MessageStatusAccepted,
 			Text:               input.Text,
 			Attachments:        append([]Attachment(nil), input.Attachments...),
 			ToolResults:        append([]ToolResultActivity(nil), carried...),
@@ -789,9 +892,7 @@ func (r *Runtime) submitNormalMessageToFrameWithDefaultsLocked(
 	if current := mutableSessionExecution(session, execution.ID); current != nil {
 		execution = current
 	} else {
-		return Activity{}, errors.New(
-			"conversation execution disappeared while advancing its message frame",
-		)
+		return Activity{}, errors.New(errAdvanceFrameExecDisappeared)
 	}
 	r.touchExecutionLocked(session, execution)
 	return activity, nil
@@ -806,11 +907,23 @@ func (r *Runtime) completeNormalToolCall(
 	kind ToolOutputKind,
 	message string,
 ) (*CommandReceipt, error) {
+	resolvedExecutionID := executionID
+	r.mu.RLock()
+	if !r.closed {
+		if session := r.sessions[sessionID]; session != nil {
+			resolvedExecutionID = r.resolveConversationControlExecutionIDLocked(
+				session,
+				executionID,
+			)
+		}
+	}
+	r.mu.RUnlock()
+
 	return r.changeExecution(
 		ctx,
 		meta,
 		sessionID,
-		executionID,
+		resolvedExecutionID,
 		struct {
 			Meta        CommandMeta
 			SessionID   SessionID
@@ -827,21 +940,29 @@ func (r *Runtime) completeNormalToolCall(
 			Message:     message,
 		},
 		func(session *Session, execution *Execution) (*CommandReceipt, error) {
+			if controlMessage := validateManualToolControlExecution(*execution); controlMessage != "" {
+				return &CommandReceipt{
+					CommandID:   meta.ID,
+					SessionID:   session.ID,
+					ExecutionID: execution.ID,
+					Message:     controlMessage,
+				}, nil
+			}
 			item := mutableWorkItem(execution, workItemID)
 			if item == nil || item.Type != WorkItemTypeTool {
 				return &CommandReceipt{
 					CommandID:   meta.ID,
 					SessionID:   session.ID,
 					ExecutionID: execution.ID,
-					Message:     "Tool WorkItem is unavailable",
+					Message:     errToolWorkItemUnavailable,
 				}, nil
 			}
-			if normalToolResultConsumed(*execution, item.ID) {
+			if batchMessage := validateManualToolBatchItem(*execution, *item); batchMessage != "" {
 				return &CommandReceipt{
 					CommandID:   meta.ID,
 					SessionID:   session.ID,
 					ExecutionID: execution.ID,
-					Message:     "Tool WorkItem result was already consumed by a later Model operation",
+					Message:     batchMessage,
 				}, nil
 			}
 			switch item.State {
@@ -854,7 +975,7 @@ func (r *Runtime) completeNormalToolCall(
 					CommandID:   meta.ID,
 					SessionID:   session.ID,
 					ExecutionID: execution.ID,
-					Message:     "active Tool WorkItem cannot be completed manually",
+					Message:     errActiveToolManualCompletion,
 				}, nil
 			}
 			if item.State == WorkItemStateCompleted &&
@@ -865,7 +986,7 @@ func (r *Runtime) completeNormalToolCall(
 					CommandID:   meta.ID,
 					SessionID:   session.ID,
 					ExecutionID: execution.ID,
-					Message:     "successful Tool WorkItem cannot be overwritten",
+					Message:     errSuccessfulToolOverwrite,
 				}, nil
 			}
 
@@ -894,7 +1015,7 @@ func (r *Runtime) completeNormalToolCall(
 					Error:      map[ToolOutputKind]string{ToolOutputKindError: message}[kind],
 				},
 				Receipt: &ExternalReceipt{
-					System:      "session-v3-manual-tool-result",
+					System:      manualToolResultReceiptSystem,
 					Reference:   string(item.ID),
 					ConfirmedAt: now,
 					EffectState: effect,
@@ -953,7 +1074,7 @@ func (r *Runtime) requestAgentContinuationLocked(
 	execution *Execution,
 ) error {
 	if session == nil || execution == nil {
-		return errors.New("conversation execution is unavailable")
+		return errors.New(errConversationExecutionMissing)
 	}
 
 	frame := activeConversationAgentFrame(execution)
@@ -971,29 +1092,181 @@ func (r *Runtime) requestAgentContinuationLocked(
 	)
 }
 
-func (r *Runtime) activeConversationExecutionIDLocked(
+func (r *Runtime) findConversationOwnerExecutionLocked(
 	session *Session,
-	fallback ExecutionID,
-) ExecutionID {
+) *Execution {
 	if session == nil {
-		return fallback
+		return nil
 	}
-	if execution, err := r.conversationMessageExecutionLocked(session); err == nil &&
-		execution != nil && !execution.State.Terminal() {
-		return execution.ID
+	for _, ownership := range session.ConversationOwnership {
+		if ownership.ConversationID != string(session.ID) ||
+			ownership.ActiveHandoffID == "" ||
+			ownership.Owner.ExecutionID == "" ||
+			ownership.Owner.FrameID == "" {
+			continue
+		}
+		execution := mutableSessionExecution(
+			session,
+			ownership.Owner.ExecutionID,
+		)
+		if execution == nil || execution.State.Terminal() {
+			continue
+		}
+		frame := mutableFrame(execution, ownership.Owner.FrameID)
+		if frame == nil ||
+			frame.Status.Terminal() ||
+			frame.Program.InterpreterID != BuiltinAgentLoopInterpreterID {
+			continue
+		}
+		return execution
 	}
-	return fallback
+	for index := range session.Executions {
+		execution := &session.Executions[index]
+		if !execution.State.Terminal() && isNormalConversationExecution(*execution) {
+			return execution
+		}
+	}
+	return nil
 }
 
-func normalToolResultConsumed(
-	execution Execution,
-	workItemID WorkItemID,
-) bool {
-	item := executionWorkItem(execution, workItemID)
-	if item == nil {
-		return false
+func (r *Runtime) resolveConversationControlExecutionIDLocked(
+	session *Session,
+	requested ExecutionID,
+) ExecutionID {
+	if session == nil {
+		return requested
 	}
-	return item.ConsumedByWorkItemID != ""
+	owner := r.findConversationOwnerExecutionLocked(session)
+	if owner == nil {
+		return requested
+	}
+	if requested == "" {
+		return owner.ID
+	}
+	target := mutableSessionExecution(session, requested)
+	if target != nil && isNormalConversationExecution(*target) {
+		return owner.ID
+	}
+	return requested
+}
+
+func hasPendingRecoveryReviewWait(execution Execution) bool {
+	for _, wait := range execution.Waits {
+		if wait.Request.Kind != WaitKindRecovery {
+			continue
+		}
+		if wait.Status == WaitStatusPending ||
+			wait.Status == WaitStatusResolving {
+			return true
+		}
+	}
+	return false
+}
+
+func frameHasActiveLLMWork(
+	execution Execution,
+	frameID ProgramFrameID,
+) bool {
+	for _, item := range execution.WorkItems {
+		if item.FrameID != frameID || item.Type != WorkItemTypeLLM {
+			continue
+		}
+		if item.State == WorkItemStateBinding ||
+			item.State == WorkItemStateDispatched {
+			return true
+		}
+	}
+	return false
+}
+
+func validateManualToolControlExecution(execution Execution) string {
+	if execution.State.Terminal() ||
+		execution.Controls.CancellationRequested {
+		return errTerminalToolControl
+	}
+	if hasPendingRecoveryReviewWait(execution) {
+		return errRecoveryPendingToolControl
+	}
+	return ""
+}
+
+func validateManualToolBatchItem(
+	execution Execution,
+	item WorkItem,
+) string {
+	if item.Type != WorkItemTypeTool || item.Input.Tool == nil {
+		return errToolWorkItemUnavailable
+	}
+	if item.Input.Tool.Call.Binding.Kind == ToolBindingKindProvider {
+		return errProviderToolManualMutation
+	}
+	if item.ConsumedByWorkItemID != "" {
+		return errToolResultAlreadyConsumed
+	}
+	frame := mutableFrame(&execution, item.FrameID)
+	if frame == nil ||
+		frame.Status.Terminal() ||
+		frame.CancellationRequested ||
+		frame.Program.InterpreterID != BuiltinAgentLoopInterpreterID {
+		return errToolOutsideCurrentBatch
+	}
+	if frameHasActiveLLMWork(execution, frame.ID) {
+		return errActiveLLMToolControl
+	}
+	var state agentLoopProgramState
+	if err := json.Unmarshal(frame.State.Data, &state); err != nil {
+		return errToolOutsideCurrentBatch
+	}
+	if len(state.PendingToolIDs) == 0 ||
+		!containsWorkItemID(state.PendingToolIDs, item.ID) {
+		return errToolOutsideCurrentBatch
+	}
+	if state.LastLLMWorkItemID != "" &&
+		item.OriginWorkItemID != state.LastLLMWorkItemID {
+		return errToolOutsideCurrentBatch
+	}
+	return ""
+}
+
+func readyCurrentBatchToolIDs(
+	execution Execution,
+	ownerFrame *ProgramFrame,
+) []WorkItemID {
+	output := make([]WorkItemID, 0)
+	collectFromFrame := func(frame ProgramFrame) {
+		if frame.Status.Terminal() ||
+			frame.CancellationRequested ||
+			frame.Program.InterpreterID != BuiltinAgentLoopInterpreterID ||
+			frameHasActiveLLMWork(execution, frame.ID) {
+			return
+		}
+		var state agentLoopProgramState
+		if err := json.Unmarshal(frame.State.Data, &state); err != nil {
+			return
+		}
+		for _, id := range state.PendingToolIDs {
+			item := executionWorkItem(execution, id)
+			if item == nil ||
+				item.Type != WorkItemTypeTool ||
+				item.State != WorkItemStateReady ||
+				item.ConsumedByWorkItemID != "" {
+				continue
+			}
+			if state.LastLLMWorkItemID != "" &&
+				item.OriginWorkItemID != state.LastLLMWorkItemID {
+				continue
+			}
+			output = append(output, item.ID)
+		}
+	}
+	if ownerFrame != nil {
+		collectFromFrame(*ownerFrame)
+		return uniqueNormalWorkItemIDs(output)
+	}
+	for _, frame := range execution.ProgramFrames {
+		collectFromFrame(frame)
+	}
+	return uniqueNormalWorkItemIDs(output)
 }
 
 func isNormalConversationExecution(execution Execution) bool {
@@ -1156,6 +1429,20 @@ func latestNormalLLMWorkItemID(execution Execution) WorkItemID {
 	return ""
 }
 
+func latestScopedLLMWorkItemID(
+	execution Execution,
+	ownerFrame *ProgramFrame,
+) WorkItemID {
+	if ownerFrame != nil {
+		for _, item := range slices.Backward(execution.WorkItems) {
+			if item.FrameID == ownerFrame.ID && item.Type == WorkItemTypeLLM {
+				return item.ID
+			}
+		}
+	}
+	return latestNormalLLMWorkItemID(execution)
+}
+
 func automationHoldApplies(
 	hold AutomationHold,
 	origin WorkItemID,
@@ -1222,7 +1509,7 @@ func carriedNormalToolResults(
 	seen := make(map[WorkItemID]struct{}, len(ids))
 	for _, id := range ids {
 		if id == "" {
-			return nil, errors.New("carried Tool WorkItem identity is required")
+			return nil, errors.New(errCarriedToolIDRequired)
 		}
 		if _, duplicate := seen[id]; duplicate {
 			continue
@@ -1249,7 +1536,7 @@ func carriedNormalToolResults(
 			item.Output.Tool == nil ||
 			item.Input.Tool == nil {
 			return nil, fmt.Errorf(
-				"carried Tool WorkItem %q has no confirmed Tool result",
+				errCarriedToolUnconfirmedFmt,
 				id,
 			)
 		}

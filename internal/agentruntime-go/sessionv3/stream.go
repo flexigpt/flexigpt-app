@@ -99,7 +99,7 @@ func (r *Runtime) appendLLMStream(
 	item.UpdatedAt = r.now()
 	r.touchExecutionLocked(session, execution)
 
-	if err := r.persistLocked(ctx, "llmStream", session); err != nil {
+	if err := r.persistLocked(ctx, checkpointReasonLLMStream, session); err != nil {
 		return err
 	}
 

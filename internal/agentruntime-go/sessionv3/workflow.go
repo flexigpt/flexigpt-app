@@ -8,61 +8,78 @@ import "errors"
 func ValidatePreparedWorkflowStart(
 	program ProgramSnapshot,
 ) error {
-	if err := validatePreparedWorkflowProgram(program); err != nil {
-		return err
-	}
-	value, err := workflowProgramFromSnapshot(program)
+	_, err := validatePreparedWorkflowStartProgram(program)
+	return err
+}
+
+func validatePreparedWorkflowStartProgram(
+	program ProgramSnapshot,
+) (WorkflowProgram, error) {
+	value, err := validatePreparedWorkflowProgram(program)
 	if err != nil {
-		return err
+		return WorkflowProgram{}, err
 	}
 	if !value.InputBound {
-		return errors.New("workflow trigger registration returned no triggers")
+		return WorkflowProgram{}, errors.New(
+			"prepared workflow start program has no bound input",
+		)
 	}
-	return nil
+	return value, nil
 }
 
 func ValidatePreparedWorkflowTriggers(
 	program ProgramSnapshot,
 ) error {
-	if err := validatePreparedWorkflowProgram(program); err != nil {
-		return err
-	}
-	value, err := workflowProgramFromSnapshot(program)
+	_, err := validatePreparedWorkflowTriggersProgram(program)
+	return err
+}
+
+func validatePreparedWorkflowTriggersProgram(
+	program ProgramSnapshot,
+) (WorkflowProgram, error) {
+	value, err := validatePreparedWorkflowProgram(program)
 	if err != nil {
-		return err
+		return WorkflowProgram{}, err
 	}
 	if len(value.Triggers) == 0 {
-		return errors.New("workflow trigger registration returned no triggers")
+		return WorkflowProgram{}, errors.New(
+			"workflow trigger registration returned no triggers",
+		)
 	}
 	if value.InputBound {
-		return errors.New(
+		return WorkflowProgram{}, errors.New(
 			"workflow trigger registration returned an input-bound program",
 		)
 	}
-	return nil
+	return value, nil
 }
 
 func validatePreparedWorkflowProgram(
 	program ProgramSnapshot,
-) error {
+) (WorkflowProgram, error) {
 	if program.InterpreterID == "" || program.InterpreterVersion == 0 {
-		return errors.New("prepared workflow has no ProgramFrame interpreter")
+		return WorkflowProgram{}, errors.New(
+			"prepared workflow has no program frame interpreter",
+		)
 	}
 	if program.Artifact == nil {
-		return errors.New("prepared workflow has no Workflow Artifact pin")
+		return WorkflowProgram{}, errors.New(
+			"prepared workflow has no workflow artifact pin",
+		)
 	}
 	if err := validatePin(*program.Artifact); err != nil {
-		return err
+		return WorkflowProgram{}, err
 	}
 	if program.DefinitionDigest == "" ||
 		program.DefinitionDigest != program.Artifact.Digest {
-		return errors.New("prepared workflow definition digest is invalid")
+		return WorkflowProgram{}, errors.New(
+			"prepared workflow definition digest is invalid",
+		)
 	}
 	if !program.Payload.Valid() {
-		return errors.New("prepared workflow payload is not canonical JSON")
+		return WorkflowProgram{}, errors.New(
+			"prepared workflow payload is not canonical json",
+		)
 	}
-	if _, err := workflowProgramFromSnapshot(program); err != nil {
-		return err
-	}
-	return nil
+	return workflowProgramFromSnapshot(program)
 }

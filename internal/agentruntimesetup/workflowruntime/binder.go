@@ -127,13 +127,13 @@ func (b *Binder) PrepareUserMessageSkillTemplate(
 ) (sessionv3Runtime.UserMessageSkillTemplateResult, error) {
 	if b == nil || b.Base == nil {
 		return sessionv3Runtime.UserMessageSkillTemplateResult{}, errors.New(
-			"session v3 Skill template runtime is unavailable",
+			"session v3 skill template runtime is unavailable",
 		)
 	}
 	preparer, found := b.Base.(sessionv3Runtime.UserMessageSkillTemplatePreparer)
 	if !found || preparer == nil {
 		return sessionv3Runtime.UserMessageSkillTemplateResult{}, errors.New(
-			"session v3 Skill template runtime is unavailable",
+			"session v3 skill template runtime is unavailable",
 		)
 	}
 	return preparer.PrepareUserMessageSkillTemplate(ctx, request)
@@ -147,13 +147,13 @@ func (b *Binder) PreviewInstructionSkill(
 ) (sessionv3Runtime.InstructionSkillPreviewResult, error) {
 	if b == nil || b.Base == nil {
 		return sessionv3Runtime.InstructionSkillPreviewResult{}, errors.New(
-			"session v3 instruction Skill preview is unavailable",
+			"session v3 instruction skill preview is unavailable",
 		)
 	}
 	previewer, found := b.Base.(sessionv3Runtime.InstructionSkillPreviewer)
 	if !found || previewer == nil {
 		return sessionv3Runtime.InstructionSkillPreviewResult{}, errors.New(
-			"session v3 instruction Skill preview is unavailable",
+			"session v3 instruction skill preview is unavailable",
 		)
 	}
 	return previewer.PreviewInstructionSkill(ctx, request)
@@ -166,7 +166,7 @@ func (b *Binder) PrepareAppTool(
 	executor, found := b.Base.(sessionv3Runtime.AppExecutor)
 	if !found || executor == nil {
 		return sessionv3Runtime.ToolCall{}, errors.New(
-			"session v3 App runtime is unavailable",
+			"session v3 app runtime is unavailable",
 		)
 	}
 	return executor.PrepareAppTool(ctx, request)
@@ -179,7 +179,7 @@ func (b *Binder) ReadAppResource(
 	executor, found := b.Base.(sessionv3Runtime.AppExecutor)
 	if !found || executor == nil {
 		return sessionv3Runtime.AppResourceReadResult{}, errors.New(
-			"session v3 App runtime is unavailable",
+			"session v3 app runtime is unavailable",
 		)
 	}
 	return executor.ReadAppResource(ctx, request)
@@ -192,7 +192,7 @@ func (b *Binder) ValidateAppContext(
 	executor, found := b.Base.(sessionv3Runtime.AppExecutor)
 	if !found || executor == nil {
 		return sessionv3Runtime.AppContextUpdate{}, errors.New(
-			"session v3 App runtime is unavailable",
+			"session v3 app runtime is unavailable",
 		)
 	}
 	return executor.ValidateAppContext(ctx, request)
@@ -226,7 +226,7 @@ func (b *Binder) bindService(
 ) (sessionv3Runtime.BindResult, error) {
 	payload := request.WorkItem.Input.Service
 	if payload == nil {
-		return sessionv3Runtime.BindResult{}, errors.New("Service WorkItem payload is missing")
+		return sessionv3Runtime.BindResult{}, errors.New("service work item payload is missing")
 	}
 	binding, found := b.Bindings.Service(payload.ServiceID)
 	if !found || binding.Version() != payload.BindingVersion {
@@ -246,7 +246,7 @@ func (b *Binder) bindActivity(
 ) (sessionv3Runtime.BindResult, error) {
 	payload := request.WorkItem.Input.Activity
 	if payload == nil {
-		return sessionv3Runtime.BindResult{}, errors.New("activity WorkItem payload is missing")
+		return sessionv3Runtime.BindResult{}, errors.New("activity work item payload is missing")
 	}
 	binding, found := b.Bindings.Activity(payload.ActivityID)
 	if !found || binding.Version() != payload.BindingVersion {
@@ -423,19 +423,19 @@ func externalWorkContext(
 	switch item.Type {
 	case sessionv3Runtime.WorkItemTypeService:
 		if item.Input.Service == nil {
-			return nil, errors.New("service workItem payload is missing")
+			return nil, errors.New("service work item payload is missing")
 		}
 		return item.Input.Service.Context.Clone(), nil
 
 	case sessionv3Runtime.WorkItemTypeActivity:
 		if item.Input.Activity == nil {
-			return nil, errors.New("activity workItem payload is missing")
+			return nil, errors.New("activity work item payload is missing")
 		}
 		return item.Input.Activity.Context.Clone(), nil
 
 	default:
 		return nil, fmt.Errorf(
-			"unsupported external workItem type %q",
+			"unsupported external work item type %q",
 			item.Type,
 		)
 	}
@@ -447,19 +447,19 @@ func externalWorkInput(
 	switch item.Type {
 	case sessionv3Runtime.WorkItemTypeService:
 		if item.Input.Service == nil {
-			return nil, errors.New("Service WorkItem payload is missing")
+			return nil, errors.New("service work item payload is missing")
 		}
 		return item.Input.Service.Input.Clone(), nil
 
 	case sessionv3Runtime.WorkItemTypeActivity:
 		if item.Input.Activity == nil {
-			return nil, errors.New("activity WorkItem payload is missing")
+			return nil, errors.New("activity work item payload is missing")
 		}
 		return item.Input.Activity.Input.Clone(), nil
 
 	default:
 		return nil, fmt.Errorf(
-			"unsupported external WorkItem type %q",
+			"unsupported external work item type %q",
 			item.Type,
 		)
 	}
@@ -617,7 +617,7 @@ func (b *Binder) validateExternalPortPlans(
 	switch request.WorkItem.Type {
 	case sessionv3Runtime.WorkItemTypeService:
 		if request.WorkItem.Input.Service == nil {
-			return errors.New("service WorkItem payload is missing")
+			return errors.New("service work item payload is missing")
 		}
 		binding, found := b.Bindings.Service(
 			request.WorkItem.Input.Service.ServiceID,
@@ -639,7 +639,7 @@ func (b *Binder) validateExternalPortPlans(
 
 	case sessionv3Runtime.WorkItemTypeActivity:
 		if request.WorkItem.Input.Activity == nil {
-			return errors.New("activity WorkItem payload is missing")
+			return errors.New("activity work item payload is missing")
 		}
 		binding, found := b.Bindings.Activity(
 			request.WorkItem.Input.Activity.ActivityID,

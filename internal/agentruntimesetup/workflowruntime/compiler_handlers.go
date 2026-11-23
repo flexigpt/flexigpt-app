@@ -7,6 +7,12 @@ import (
 	workflowv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workflow/contract/v1"
 )
 
+const (
+	sourceEffectStateNotApplied = "not-applied"
+	sourceEffectStateApplied    = "applied"
+	sourceEffectStateUnknown    = "unknown"
+)
+
 func compileWorkflowCatchHandlers(
 	document workflowv1.WorkflowDocument,
 	values []workflowv1.Handler,
@@ -80,9 +86,6 @@ func compileWorkflowErrorMatch(
 		}
 		output.Schema = schema
 	}
-	if err := output.Validate(); err != nil {
-		return sessionv3Runtime.WorkflowErrorMatch{}, err
-	}
 	return output, nil
 }
 
@@ -90,11 +93,11 @@ func compileWorkflowEffectState(
 	value string,
 ) (sessionv3Runtime.EffectState, error) {
 	switch value {
-	case "not-applied":
+	case sourceEffectStateNotApplied:
 		return sessionv3Runtime.EffectStateConfirmedNotApplied, nil
-	case "applied":
+	case sourceEffectStateApplied:
 		return sessionv3Runtime.EffectStateConfirmedApplied, nil
-	case "unknown":
+	case sourceEffectStateUnknown:
 		return sessionv3Runtime.EffectStateUncertain, nil
 	default:
 		return "", fmt.Errorf(

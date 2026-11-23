@@ -25,12 +25,24 @@ import (
 )
 
 const (
-	defaultMCPServerLabel        = "MCP server"
-	defaultMCPToolDisplayName    = "MCP Tool"
-	mcpServerInstructionsHeading = "### MCP server instructions"
-	mcpResourceHeading           = "### MCP resource"
-	mcpResourceTemplateHeading   = "### MCP resource template"
-	mcpPromptHeading             = "### MCP prompt"
+	defaultMCPServerLabel         = "MCP server"
+	defaultMCPToolDisplayName     = "MCP Tool"
+	mcpServerInstructionsHeading  = "### MCP server instructions"
+	mcpResourceHeading            = "### MCP resource"
+	mcpResourceTemplateHeading    = "### MCP resource template"
+	mcpPromptHeading              = "### MCP prompt"
+	mcpPreparedChoiceIDPrefix     = "prepared-choice:"
+	mcpSemanticBindingVersion     = "session-v3-mcp/v1"
+	mcpResumeBindingVersion       = "session-v3-mcp-resume/v1"
+	mcpReceiptSystem              = "mcp"
+	mcpInvalidBindingCode         = "invalid_mcp_binding"
+	mcpFailedCode                 = "mcp_failed"
+	mcpEmptyCode                  = "mcp_empty"
+	mcpToolErrorCode              = "mcp_tool_error"
+	defaultMCPToolErrorMessage    = "mcp tool returned an error result"
+	defaultMCPPolicyDeniedMessage = "mcp policy denied the tool call."
+	mcpApprovalExpiredMessage     = "mcp approval expired or is no longer valid"
+	errMCPRuntimeUnavailable      = "session v3 mcp runtime is unavailable"
 )
 
 // V3Executor owns MCP Tool discovery adaptation, policy evaluation, approval
@@ -72,7 +84,7 @@ func NewV3Executor(
 	pins ArtifactPinVerifier,
 ) (*V3Executor, error) {
 	if runtime == nil || bridge == nil || pins == nil {
-		return nil, errors.New("session v3 MCP runtime dependencies are incomplete")
+		return nil, errors.New("session v3 mcp runtime dependencies are incomplete")
 	}
 	return &V3Executor{
 		runtime: runtime,
@@ -92,7 +104,7 @@ func (e *V3Executor) Context(
 		return nil, nil
 	}
 	if e == nil || e.runtime == nil {
-		return nil, errors.New("session v3 mcp runtime is unavailable")
+		return nil, errors.New(errMCPRuntimeUnavailable)
 	}
 
 	output := make([]string, 0)
@@ -137,7 +149,7 @@ func (e *V3Executor) Choices(
 		return nil, nil
 	}
 	if e == nil || e.runtime == nil {
-		return nil, errors.New("session v3 MCP runtime is unavailable")
+		return nil, errors.New(errMCPRuntimeUnavailable)
 	}
 
 	output := make([]toolruntime.V3PreparedChoice, 0)
@@ -149,7 +161,7 @@ func (e *V3Executor) Choices(
 		selection := selections[index]
 		serverID, pin, err := v3MCPServerSelection(selection)
 		if err != nil {
-			return nil, fmt.Errorf("selected MCP server %d: %w", index, err)
+			return nil, fmt.Errorf("selected mcp server %d: %w", index, err)
 		}
 
 		status, err := e.runtime.Status(ctx, serverID)
@@ -157,7 +169,7 @@ func (e *V3Executor) Choices(
 			return nil, err
 		}
 		if status == nil || status.Status != mcpServer.MCPServerStatusReady {
-			return nil, fmt.Errorf("MCP server %q is not connected", serverID)
+			return nil, fmt.Errorf("mcp server %q is not connected", serverID)
 		}
 
 		serverChoices, err := collectMCPServerChoices(
@@ -184,9 +196,7 @@ func (e *V3Executor) PrepareWorkflowMCPContribution(
 	owner sessionv3Runtime.ConfigurationOwner,
 ) (sessionv3Runtime.WorkflowPreparedMCP, error) {
 	if e == nil || e.runtime == nil {
-		return sessionv3Runtime.WorkflowPreparedMCP{}, errors.New(
-			"session v3 mcp runtime is unavailable",
-		)
+		return sessionv3Runtime.WorkflowPreparedMCP{}, errors.New(errMCPRuntimeUnavailable)
 	}
 	return prepareMCPContribution(ctx, e.runtime, server, selection, owner)
 }
@@ -289,7 +299,7 @@ func collectMCPServerChoices(
 			serverPin = &copyPin
 		}
 		call := sessionv3Runtime.ToolCall{
-			ID:       "prepared-choice:" + choice.ID,
+			ID:       mcpPreparedChoiceIDPrefix + choice.ID,
 			Name:     choice.Name,
 			ChoiceID: choice.ID,
 			Type:     inferenceSpec.ToolTypeFunction,
@@ -320,58 +330,6 @@ func collectMCPServerChoices(
 			Choice: choice,
 			Call:   call,
 		})
-
-		sort.Slice(selected, func(left, right int) bool {
-			return selected[left].ProviderToolName <
-				selected[right].ProviderToolName
-		})
-
-		for _, tool := range selected {
-			schema := jsonutil.CloneJSONInValue(tool.InputSchema)
-			if len(schema) == 0 {
-				schema = map[string]any{"type": "object"}
-			}
-
-			choice := inferenceSpec.ToolChoice{
-				Type:        inferenceSpec.ToolTypeFunction,
-				ID:          tool.ChoiceID,
-				Name:        tool.ProviderToolName,
-				Description: v3MCPToolDescription(tool),
-				Arguments:   schema,
-			}
-			call := sessionv3Runtime.ToolCall{
-				ID:       "prepared-choice:" + choice.ID,
-				Name:     choice.Name,
-				ChoiceID: choice.ID,
-				Type:     inferenceSpec.ToolTypeFunction,
-				Source:   sessionv3Runtime.ToolCallSourceModel,
-				DisplayName: firstNonBlank(
-					tool.DisplayName,
-					tool.ToolName,
-					"MCP Tool",
-				),
-				Description: strings.TrimSpace(tool.Description),
-				Automatic: tool.ExecutionMode ==
-					mcppolicy.MCPExecutionModeAuto,
-				Binding: sessionv3Runtime.ToolBinding{
-					Kind: sessionv3Runtime.ToolBindingKindMCP,
-					MCP: &sessionv3Runtime.MCPToolBinding{
-						ServerArtifact:   pin,
-						ServerID:         string(serverID),
-						ProviderToolName: tool.ProviderToolName,
-						ChoiceID:         tool.ChoiceID,
-						ToolName:         tool.ToolName,
-						ToolDigest:       tool.Digest,
-						ApprovalRule:     string(tool.ApprovalRule),
-						ExecutionMode:    string(tool.ExecutionMode),
-					},
-				},
-			}
-			output = append(output, toolruntime.V3PreparedChoice{
-				Choice: choice,
-				Call:   call,
-			})
-		}
 	}
 	return output, nil
 }
@@ -385,13 +343,11 @@ func (e *V3Executor) BindWorkflowTool(
 	payload *sessionv3Runtime.ToolWork,
 ) (sessionv3Runtime.ToolCall, error) {
 	if e == nil || e.runtime == nil {
-		return sessionv3Runtime.ToolCall{}, errors.New(
-			"session v3 MCP runtime is unavailable",
-		)
+		return sessionv3Runtime.ToolCall{}, errors.New(errMCPRuntimeUnavailable)
 	}
 	if payload == nil || payload.MCP == nil {
 		return sessionv3Runtime.ToolCall{}, errors.New(
-			"workflow MCP tool target is missing",
+			"workflow mcp tool target is missing",
 		)
 	}
 	if payload.MCP.Server.RootID == "" ||
@@ -399,12 +355,12 @@ func (e *V3Executor) BindWorkflowTool(
 		payload.MCP.Server.Revision == 0 ||
 		strings.TrimSpace(payload.MCP.Server.Digest) == "" {
 		return sessionv3Runtime.ToolCall{}, errors.New(
-			"workflow MCP server artifact pin is incomplete",
+			"workflow mcp server artifact pin is incomplete",
 		)
 	}
 	if err := e.pins.VerifyArtifactPin(ctx, payload.MCP.Server); err != nil {
 		return sessionv3Runtime.ToolCall{}, fmt.Errorf(
-			"workflow MCP server freshness: %w",
+			"workflow mcp server freshness: %w",
 			err,
 		)
 	}
@@ -419,14 +375,14 @@ func (e *V3Executor) BindWorkflowTool(
 	}
 	if current != *payload.MCP {
 		return sessionv3Runtime.ToolCall{}, errors.New(
-			"workflow MCP tool changed since preparation",
+			"workflow mcp tool changed since preparation",
 		)
 	}
 
 	call := payload.Call
 	if call.Name != "" && call.Name != payload.MCP.ToolName {
 		return sessionv3Runtime.ToolCall{}, errors.New(
-			"workflow MCP tool name changed since Workflow admission",
+			"workflow mcp tool name changed since workflow admission",
 		)
 	}
 	serverID, serverIDErr := workflowMCPServerID(
@@ -442,7 +398,7 @@ func (e *V3Executor) BindWorkflowTool(
 	call.ChoiceID = payload.MCP.ChoiceID
 	call.DisplayName = firstNonBlank(
 		payload.MCP.ToolName,
-		"MCP Tool",
+		defaultMCPToolDisplayName,
 	)
 	call.Automatic = mcppolicy.MCPExecutionMode(
 		payload.MCP.ExecutionMode,
@@ -469,9 +425,7 @@ func (e *V3Executor) PrepareAppTool(
 	request sessionv3Runtime.AppToolPreparationRequest,
 ) (sessionv3Runtime.ToolCall, error) {
 	if e == nil || e.runtime == nil {
-		return sessionv3Runtime.ToolCall{}, errors.New(
-			"session v3 MCP runtime is unavailable",
-		)
+		return sessionv3Runtime.ToolCall{}, errors.New(errMCPRuntimeUnavailable)
 	}
 	mapping, err := v3AppMapping(request.App)
 	if err != nil {
@@ -479,14 +433,14 @@ func (e *V3Executor) PrepareAppTool(
 	}
 	if request.App.ServerID != string(mapping.Server) {
 		return sessionv3Runtime.ToolCall{}, errors.New(
-			"app route belongs to another MCP server",
+			"app route belongs to another mcp server",
 		)
 	}
 	if _, err := jsonutil.DecodeCanonicalValue[map[string]any](
 		nonEmptyV3Arguments(request.Arguments),
 	); err != nil {
 		return sessionv3Runtime.ToolCall{}, errors.New(
-			"app Tool arguments must be a JSON object",
+			"app tool arguments must be a json object",
 		)
 	}
 
@@ -505,7 +459,7 @@ func (e *V3Executor) PrepareAppTool(
 		!selected.Enabled ||
 		!mcpApps.ToolVisibleToApp(selected.App) {
 		return sessionv3Runtime.ToolCall{}, errors.New(
-			"app requested an unavailable MCP Tool",
+			"app requested an unavailable mcp tool",
 		)
 	}
 	policy, err := e.runtime.AppPolicy(ctx, mapping.Server)
@@ -525,7 +479,7 @@ func (e *V3Executor) PrepareAppTool(
 		Name:          selected.ProviderToolName,
 		ChoiceID:      selected.ChoiceID,
 		Type:          inferenceSpec.ToolTypeFunction,
-		DisplayName:   firstNonBlank(selected.DisplayName, selected.ToolName, "MCP Tool"),
+		DisplayName:   firstNonBlank(selected.DisplayName, selected.ToolName, defaultMCPToolDisplayName),
 		Description:   strings.TrimSpace(selected.Description),
 		Source:        sessionv3Runtime.ToolCallSourceApp,
 		AppInstanceID: request.App.ID,
@@ -552,9 +506,7 @@ func (e *V3Executor) ReadAppResource(
 	request sessionv3Runtime.AppResourceReadRequest,
 ) (sessionv3Runtime.AppResourceReadResult, error) {
 	if e == nil || e.runtime == nil {
-		return sessionv3Runtime.AppResourceReadResult{}, errors.New(
-			"session v3 MCP runtime is unavailable",
-		)
+		return sessionv3Runtime.AppResourceReadResult{}, errors.New(errMCPRuntimeUnavailable)
 	}
 	mapping, err := v3AppMapping(request.App)
 	if err != nil {
@@ -562,7 +514,7 @@ func (e *V3Executor) ReadAppResource(
 	}
 	if request.App.ServerID != string(mapping.Server) {
 		return sessionv3Runtime.AppResourceReadResult{}, errors.New(
-			"app route belongs to another MCP server",
+			"app route belongs to another mcp server",
 		)
 	}
 	uri := strings.TrimSpace(request.ResourceURI)
@@ -571,7 +523,7 @@ func (e *V3Executor) ReadAppResource(
 	}
 	if uri == "" {
 		return sessionv3Runtime.AppResourceReadResult{}, errors.New(
-			"app resource URI is required",
+			"app resource uri is required",
 		)
 	}
 	resources, err := e.runtime.ListResources(ctx, mapping.Server)
@@ -587,7 +539,7 @@ func (e *V3Executor) ReadAppResource(
 	}
 	if !found {
 		return sessionv3Runtime.AppResourceReadResult{}, errors.New(
-			"app resource is unavailable on the originating MCP server",
+			"app resource is unavailable on the originating mcp server",
 		)
 	}
 	response, err := e.runtime.ReadResource(ctx, mapping.Server, uri)
@@ -615,7 +567,7 @@ func (e *V3Executor) ValidateAppContext(
 	}
 	if !policy.Enabled {
 		return sessionv3Runtime.AppContextUpdate{}, errors.New(
-			"MCP Apps are not enabled for this server",
+			"mcp apps are not enabled for this server",
 		)
 	}
 	update := request.Update
@@ -675,7 +627,7 @@ func (e *V3Executor) Bind(
 	}
 	if evaluation == nil {
 		return sessionv3Runtime.BindResult{}, true, errors.New(
-			"MCP approval evaluation returned no result",
+			"mcp approval evaluation returned no result",
 		)
 	}
 
@@ -686,7 +638,7 @@ func (e *V3Executor) Bind(
 			call.ID,
 	)))
 	semantic := sessionv3Runtime.SemanticBinding{
-		Version:           "session-v3-mcp/v1",
+		Version:           mcpSemanticBindingVersion,
 		TargetFingerprint: fingerprint,
 		BoundAt:           time.Now().UTC(),
 	}
@@ -719,7 +671,7 @@ func (e *V3Executor) Bind(
 		if evaluation.Summary == nil ||
 			strings.TrimSpace(evaluation.ApprovalID) == "" {
 			return sessionv3Runtime.BindResult{}, true, errors.New(
-				"MCP approval evaluation has no approval identity or summary",
+				"mcp approval evaluation has no approval identity or summary",
 			)
 		}
 
@@ -758,7 +710,7 @@ func (e *V3Executor) Bind(
 
 	default:
 		return sessionv3Runtime.BindResult{}, true, fmt.Errorf(
-			"unsupported MCP approval decision %q",
+			"unsupported mcp approval decision %q",
 			evaluation.Decision,
 		)
 	}
@@ -779,8 +731,8 @@ func (e *V3Executor) Execute(
 	if payload == nil {
 		return sessionv3Runtime.WorkExecutionResult{
 			Error: &sessionv3Runtime.SanitizedError{
-				Code:    "invalid_mcp_binding",
-				Message: "MCP Tool payload is missing",
+				Code:    mcpInvalidBindingCode,
+				Message: "mcp tool payload is missing",
 			},
 		}, true, nil
 	}
@@ -791,8 +743,8 @@ func (e *V3Executor) Execute(
 	if err != nil {
 		return sessionv3Runtime.WorkExecutionResult{
 			Error: &sessionv3Runtime.SanitizedError{
-				Code:    "invalid_mcp_binding",
-				Message: err.Error(),
+				Code:    mcpInvalidBindingCode,
+				Message: strings.ToLower(err.Error()),
 			},
 		}, true, nil
 	}
@@ -801,18 +753,33 @@ func (e *V3Executor) Execute(
 
 	response, err := e.bridge.InvokeMapped(ctx, mapping, invokeRequest)
 	if err != nil {
+		if request.WorkItem.Effect.Kind == sessionv3Runtime.EffectKindRead {
+			return sessionv3Runtime.WorkExecutionResult{
+				Error: &sessionv3Runtime.SanitizedError{
+					Code:     mcpFailedCode,
+					Category: sessionv3Runtime.ErrorCategoryExecution,
+					Message:  strings.ToLower(err.Error()),
+				},
+				Confirmed: ctx.Err() == nil,
+			}, true, nil
+		}
+		effect := sessionv3Runtime.EffectStateUncertain
 		return sessionv3Runtime.WorkExecutionResult{
 			Error: &sessionv3Runtime.SanitizedError{
-				Code:    "mcp_failed",
-				Message: err.Error(),
+				Code:     mcpFailedCode,
+				Category: sessionv3Runtime.ErrorCategoryUncertainty,
+				Effect:   effect,
+				Message:  strings.ToLower(err.Error()),
 			},
+			Confirmed:   false,
+			EffectState: &effect,
 		}, true, nil
 	}
 	if response == nil {
 		return sessionv3Runtime.WorkExecutionResult{
 			Error: &sessionv3Runtime.SanitizedError{
-				Code:    "mcp_empty",
-				Message: "MCP Tool returned no response",
+				Code:    mcpEmptyCode,
+				Message: "mcp tool returned no response",
 			},
 		}, true, nil
 	}
@@ -836,8 +803,11 @@ func (e *V3Executor) Execute(
 		kind = sessionv3Runtime.ToolOutputKindError
 		errorText = firstNonBlank(
 			adapted.Text,
-			"MCP Tool returned an error result",
+			defaultMCPToolErrorMessage,
 		)
+		if strings.TrimSpace(adapted.Text) == "" {
+			adapted.Text = errorText
+		}
 	}
 	var app *sessionv3Runtime.AppOutput
 	if response.App != nil {
@@ -861,11 +831,7 @@ func (e *V3Executor) Execute(
 				Structured: structured,
 				Error:      errorText,
 			},
-			Receipt: &sessionv3Runtime.ExternalReceipt{
-				System:      "mcp",
-				Reference:   private.TargetFingerprint,
-				ConfirmedAt: time.Now().UTC(),
-			},
+
 			App: app,
 		},
 		Confirmed: true,
@@ -922,10 +888,9 @@ func (e *V3Executor) ResolveWait(
 	if err != nil {
 		if errors.Is(err, mcpServer.ErrMCPInvalidRuntimeRequest) ||
 			errors.Is(err, mcpServer.ErrMCPApprovalNeeded) {
-			message := "MCP approval expired or is no longer valid"
 			effect := sessionv3Runtime.EffectStateConfirmedNotApplied
 			return sessionv3Runtime.WaitResolutionResult{
-				Output:      v3MCPToolErrorOutput(message),
+				Output:      v3MCPToolErrorOutput(mcpApprovalExpiredMessage),
 				Confirmed:   true,
 				EffectState: &effect,
 			}, true, nil
@@ -944,7 +909,7 @@ func (e *V3Executor) ResolveWait(
 
 	case mcpServer.MCPApprovalDecisionAllowed:
 		semantic := sessionv3Runtime.SemanticBinding{
-			Version:           "session-v3-mcp-resume/v1",
+			Version:           mcpResumeBindingVersion,
 			TargetFingerprint: private.TargetFingerprint,
 			BoundAt:           time.Now().UTC(),
 		}
@@ -958,7 +923,7 @@ func (e *V3Executor) ResolveWait(
 			sessionv3Runtime.WaitResolutionApproveOnce &&
 			strings.TrimSpace(result.Token) == "" {
 			return sessionv3Runtime.WaitResolutionResult{}, true, errors.New(
-				"MCP one-time approval returned no approval token",
+				"mcp one-time approval returned no approval token",
 			)
 		}
 
@@ -977,7 +942,7 @@ func (e *V3Executor) ResolveWait(
 
 	default:
 		return sessionv3Runtime.WaitResolutionResult{}, true, fmt.Errorf(
-			"unsupported MCP approval resolution decision %q",
+			"unsupported mcp approval resolution decision %q",
 			result.Decision,
 		)
 	}
@@ -1302,14 +1267,14 @@ func v3MCPSelectedTools(
 			tool, found := byName[requested.ToolName]
 			if !found || !v3MCPToolAvailable(tool) {
 				return nil, fmt.Errorf(
-					"selected MCP Tool %q is unavailable",
+					"selected mcp tool %q is unavailable",
 					requested.ToolName,
 				)
 			}
 			if requested.ExpectedDigest != "" &&
 				requested.ExpectedDigest != tool.Digest {
 				return nil, fmt.Errorf(
-					"selected MCP Tool %q changed since selection",
+					"selected mcp tool %q changed since selection",
 					requested.ToolName,
 				)
 			}
@@ -1324,7 +1289,7 @@ func v3MCPSelectedTools(
 
 	default:
 		return nil, fmt.Errorf(
-			"unsupported MCP Tool exposure %q",
+			"unsupported mcp tool exposure %q",
 			selection.ToolExposure,
 		)
 	}
@@ -1354,7 +1319,7 @@ func v3ConstrainMCPTool(
 				mcppolicy.NormalizedApprovalRule(tool.ApprovalRule),
 			) {
 			return mcpServer.MCPToolCapability{}, errors.New(
-				"MCP approval override weakens the effective server policy",
+				"mcp approval override weakens the effective server policy",
 			)
 		}
 		output.ApprovalRule = value
@@ -1370,7 +1335,7 @@ func v3ConstrainMCPTool(
 				mcppolicy.NormalizedExecutionMode(tool.ExecutionMode),
 			) {
 			return mcpServer.MCPToolCapability{}, errors.New(
-				"MCP execution override weakens the effective server policy",
+				"mcp execution override weakens the effective server policy",
 			)
 		}
 		output.ExecutionMode = value
@@ -1382,7 +1347,7 @@ func v3MCPApprovalRule(
 	value string,
 ) (mcppolicy.MCPApprovalRule, error) {
 	if strings.TrimSpace(value) != value {
-		return "", errors.New("MCP approval override is not normalized")
+		return "", errors.New("mcp approval override is not normalized")
 	}
 
 	rule := mcppolicy.MCPApprovalRule(value)
@@ -1392,7 +1357,7 @@ func v3MCPApprovalRule(
 		mcppolicy.MCPApprovalRuleDeny:
 		return rule, nil
 	default:
-		return "", errors.New("unsupported MCP approval override")
+		return "", errors.New("unsupported mcp approval override")
 	}
 }
 
@@ -1400,7 +1365,7 @@ func v3MCPExecutionMode(
 	value string,
 ) (mcppolicy.MCPExecutionMode, error) {
 	if strings.TrimSpace(value) != value {
-		return "", errors.New("MCP execution override is not normalized")
+		return "", errors.New("mcp execution override is not normalized")
 	}
 
 	mode := mcppolicy.MCPExecutionMode(value)
@@ -1409,7 +1374,7 @@ func v3MCPExecutionMode(
 		mcppolicy.MCPExecutionModeManual:
 		return mode, nil
 	default:
-		return "", errors.New("unsupported MCP execution override")
+		return "", errors.New("unsupported mcp execution override")
 	}
 }
 
@@ -1445,7 +1410,7 @@ func v3AppMapping(
 		app.Binding.MCP == nil ||
 		app.Binding.MCP.ServerArtifact == nil {
 		return invocation.MappedToolBinding{}, errors.New(
-			"app has no MCP Tool binding",
+			"app has no mcp tool binding",
 		)
 	}
 	return v3MCPMapping(&sessionv3Runtime.ToolWork{
@@ -1542,7 +1507,7 @@ func parseV3MCPDeadline(value string) (*time.Time, error) {
 
 	parsed, err := time.Parse(time.RFC3339Nano, value)
 	if err != nil {
-		return nil, fmt.Errorf("decode MCP approval expiration: %w", err)
+		return nil, fmt.Errorf("decode mcp approval expiration: %w", err)
 	}
 	parsed = parsed.UTC()
 	return &parsed, nil
@@ -1561,7 +1526,7 @@ func v3MCPWaitResolution(
 	case sessionv3Runtime.WaitResolutionDenyAlways:
 		return mcpServer.MCPApprovalResolutionDenyAlways, nil
 	default:
-		return "", fmt.Errorf("unsupported MCP wait resolution %q", value)
+		return "", fmt.Errorf("unsupported mcp wait resolution %q", value)
 	}
 }
 
@@ -1576,7 +1541,7 @@ func v3MCPToolDescription(
 }
 
 func v3MCPFailureText(reason string) string {
-	return firstNonBlank(reason, "MCP policy denied the Tool call.")
+	return firstNonBlank(reason, defaultMCPPolicyDeniedMessage)
 }
 
 func v3MCPContentsText(

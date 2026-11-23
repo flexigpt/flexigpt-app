@@ -92,6 +92,11 @@ func (r *TriggerRegistration) Validate() error {
 	if r.Program.Artifact == nil || *r.Program.Artifact != r.Workflow {
 		return errors.New("trigger registration program pin differs from workflow pin")
 	}
+	if r.Program.InterpreterID != WorkflowInterpreterID ||
+		r.Program.InterpreterVersion != WorkflowInterpreterVersion ||
+		len(r.Program.Payload) == 0 || !r.Program.Payload.Valid() {
+		return errors.New("trigger registration program snapshot is invalid")
+	}
 	if err := validateID("trigger registration name", r.TriggerName); err != nil {
 		return err
 	}
@@ -129,15 +134,6 @@ func (r *TriggerRegistration) Validate() error {
 		seenSlots[slot] = struct{}{}
 	}
 
-	program, err := workflowProgramFromSnapshot(r.Program)
-	if err != nil {
-		return err
-	}
-	trigger, found := workflowTriggerForName(program, r.TriggerName)
-	if !found || trigger.Kind() != r.Kind {
-		return errors.New("trigger registration declaration is unavailable")
-	}
-
 	occurrences := make(map[TriggerOccurrenceID]struct{}, len(r.Occurrences))
 	for _, occurrence := range r.Occurrences {
 		if err := occurrence.Validate(); err != nil {
@@ -158,6 +154,18 @@ func (r *TriggerRegistration) Validate() error {
 		if !found || occurrence.State != triggerOccurrenceStateQueued {
 			return errors.New("trigger queue contains a non-queued occurrence")
 		}
+	}
+	return nil
+}
+
+func validateTriggerRegistrationProgram(r TriggerRegistration) error {
+	program, err := workflowProgramFromSnapshot(r.Program)
+	if err != nil {
+		return err
+	}
+	trigger, found := workflowTriggerForName(program, r.TriggerName)
+	if !found || trigger.Kind() != r.Kind {
+		return errors.New("trigger registration declaration is unavailable")
 	}
 	return nil
 }
@@ -327,13 +335,10 @@ func workflowTriggerRegistrationID(
 func (r *Runtime) registerWorkflowTriggersLocked(
 	session *Session,
 	program ProgramSnapshot,
+	workflow WorkflowProgram,
 ) error {
 	if session == nil {
 		return errors.New("trigger registration session is unavailable")
-	}
-	workflow, err := workflowProgramFromSnapshot(program)
-	if err != nil {
-		return err
 	}
 	if len(workflow.Triggers) == 0 {
 		return nil
@@ -488,7 +493,7 @@ func (r *Runtime) waitForTrigger(
 	}
 	if changed {
 		r.touchSessionLocked(session)
-		if err := r.persistLocked(persistContext, "triggerFired", session); err != nil {
+		if err := r.persistLocked(persistContext, checkpointReasonTriggerFired, session); err != nil {
 			r.mu.Unlock()
 			return
 		}
@@ -1110,7 +1115,7 @@ func (r *Runtime) startTriggerExecutionLocked(
 		ExecutionID: executionID,
 		FrameID:     frameID,
 		Workflow: &WorkflowActivity{
-			Phase:   "triggered",
+			Phase:   WorkflowActivityPhaseTriggered,
 			Summary: "workflow trigger occurrence accepted",
 			Output: jsonutil.MustCanonicalValue(struct {
 				TriggerID    TriggerID           `json:"triggerID"`
@@ -1183,7 +1188,7 @@ func (r *Runtime) signalTriggerExecutionLocked(
 			ExecutionID: execution.ID,
 			FrameID:     frame.ID,
 			Workflow: &WorkflowActivity{
-				Phase:   "trigger-signal",
+				Phase:   WorkflowActivityPhaseTriggerSignal,
 				Summary: event.Type,
 				Output: jsonutil.MustCanonicalValue(struct {
 					Source      string                  `json:"source"`

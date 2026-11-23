@@ -34,7 +34,7 @@ func normalizeMCPSelections(
 			sessionv3Runtime.MCPToolExposureNone:
 			if len(value.SelectedTools) != 0 {
 				return nil, fmt.Errorf(
-					"mcp selection %d has selected Tools with exposure %q",
+					"mcp selection %d has selected tools with exposure %q",
 					index,
 					value.ToolExposure,
 				)
@@ -43,7 +43,7 @@ func normalizeMCPSelections(
 		case sessionv3Runtime.MCPToolExposureSelected:
 			if len(value.SelectedTools) == 0 {
 				return nil, fmt.Errorf(
-					"mcp selection %d selects no Tools",
+					"mcp selection %d selects no tools",
 					index,
 				)
 			}
@@ -54,12 +54,12 @@ func normalizeMCPSelections(
 				)
 				if name == "" || name != value.SelectedTools[toolIndex].ToolName {
 					return nil, errors.New(
-						"selected MCP Tool name is invalid",
+						"selected mcp tool name is invalid",
 					)
 				}
 				if _, duplicate := seen[name]; duplicate {
 					return nil, fmt.Errorf(
-						"selected MCP Tool %q is duplicated",
+						"selected mcp tool %q is duplicated",
 						name,
 					)
 				}
@@ -68,7 +68,7 @@ func normalizeMCPSelections(
 
 		default:
 			return nil, fmt.Errorf(
-				"unsupported MCP Tool exposure %q",
+				"unsupported mcp tool exposure %q",
 				value.ToolExposure,
 			)
 		}

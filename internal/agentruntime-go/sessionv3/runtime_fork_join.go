@@ -21,7 +21,7 @@ func (r *Runtime) deferFrameForkLocked(
 		return errors.New("fork boundary owner is unavailable")
 	}
 	if frame.Fork != nil {
-		return errors.New("ProgramFrame already has a pending fork boundary")
+		return errors.New("program frame already has a pending fork boundary")
 	}
 	if len(intents) == 0 {
 		return errors.New("fork boundary has no child intents")
@@ -43,15 +43,15 @@ func (r *Runtime) deferFrameForkLocked(
 			intent.ID = ProgramFrameID(r.newID())
 		}
 		if _, duplicate := seen[intent.ID]; duplicate {
-			return errors.New("fork boundary child ProgramFrame identity is duplicated")
+			return errors.New("fork boundary child program frame identity is duplicated")
 		}
 		if mutableFrame(execution, intent.ID) != nil {
-			return fmt.Errorf("fork boundary child ProgramFrame %q already exists", intent.ID)
+			return fmt.Errorf("fork boundary child program frame %q already exists", intent.ID)
 		}
 		if len(intent.Claims) != 0 {
 			if len(intents) != 1 {
 				return errors.New(
-					"child-frame resource claims require one child ProgramFrame",
+					"child-frame resource claims require one child program frame",
 				)
 			}
 			if intent.Lifetime == ChildFrameLifetimeIndependent {
@@ -243,7 +243,7 @@ func (r *Runtime) materializeForkFramesLocked(
 	}
 	parent := mutableFrame(execution, parentID)
 	if parent == nil || parent.Status.Terminal() {
-		return errors.New("fork parent ProgramFrame is unavailable")
+		return errors.New("fork parent program frame is unavailable")
 	}
 
 	attached := make([]ProgramFrameID, 0, len(boundary.Frames))
@@ -251,7 +251,7 @@ func (r *Runtime) materializeForkFramesLocked(
 	for _, intent := range boundary.Frames {
 		parent = mutableFrame(execution, parentID)
 		if parent == nil || parent.Status.Terminal() {
-			return errors.New("fork parent ProgramFrame disappeared")
+			return errors.New("fork parent program frame disappeared")
 		}
 
 		childInterpreter := r.interpreterLocked(intent.Program)
@@ -311,7 +311,7 @@ func (r *Runtime) materializeForkFramesLocked(
 			}
 			continue
 		default:
-			return errors.New("fork child ProgramFrame lifetime is invalid")
+			return errors.New("fork child program frame lifetime is invalid")
 		}
 		childBudget, budgetErr := narrowProgramFrameBudget(
 			effectiveProgramFrameBudget(*execution, *parent),
@@ -345,7 +345,7 @@ func (r *Runtime) materializeForkFramesLocked(
 		}
 		if mutableFrame(execution, intent.ID) != nil {
 			return fmt.Errorf(
-				"fork child ProgramFrame %q already exists",
+				"fork child program frame %q already exists",
 				intent.ID,
 			)
 		}
@@ -389,13 +389,13 @@ func (r *Runtime) materializeForkFramesLocked(
 		execution.ProgramFrames = append(execution.ProgramFrames, child)
 		parent = mutableFrame(execution, parentID)
 		if parent == nil {
-			return errors.New("fork parent ProgramFrame disappeared after child creation")
+			return errors.New("fork parent program frame disappeared after child creation")
 		}
 		parent.ChildFrameIDs = append(parent.ChildFrameIDs, child.ID)
 		attached = append(attached, child.ID)
 		childFrame := mutableFrame(execution, child.ID)
 		if childFrame == nil {
-			return errors.New("fork child ProgramFrame is unavailable")
+			return errors.New("fork child program frame is unavailable")
 		}
 		if intent.PortBoundary == ProgramFramePortBoundaryPublishedWorkflow {
 			if err := r.preparePublishedWorkflowPortBoundaryLocked(
@@ -432,7 +432,7 @@ func (r *Runtime) materializeForkFramesLocked(
 		parent = mutableFrame(execution, parentID)
 		childFrame = mutableFrame(execution, child.ID)
 		if parent == nil || childFrame == nil {
-			return errors.New("fork ProgramFrame disappeared during port preparation")
+			return errors.New("fork program frame disappeared during port preparation")
 		}
 
 		if intent.Handoff != nil {
@@ -484,7 +484,7 @@ func (r *Runtime) materializeForkFramesLocked(
 
 	parent = mutableFrame(execution, parentID)
 	if parent == nil {
-		return errors.New("fork parent ProgramFrame disappeared after child startup")
+		return errors.New("fork parent program frame disappeared after child startup")
 	}
 	if boundary.ContinueParent && !parent.Status.Terminal() {
 		return r.advanceFrameLocked(
@@ -509,7 +509,7 @@ func (r *Runtime) queueChildJoinLocked(
 	parent := mutableFrame(execution, parentID)
 	child := mutableFrame(execution, childID)
 	if parent == nil || child == nil {
-		return errors.New("join boundary ProgramFrame is unavailable")
+		return errors.New("join boundary program frame is unavailable")
 	}
 	if parent.Status.Terminal() {
 		return nil
@@ -535,7 +535,7 @@ func (r *Runtime) queueChildJoinLocked(
 		Input: WorkItemPayload{
 			Join: &JoinWork{
 				ChildFrames: []ProgramFrameID{childID},
-				Policy:      "child-settled",
+				Policy:      JoinWorkPolicyChildSettled,
 			},
 		},
 		CreatedAt: now,
@@ -607,7 +607,7 @@ func (r *Runtime) settleJoinBoundaryLocked(
 
 	child := mutableFrame(execution, boundary.ChildFrameID)
 	if child == nil || !child.Status.Terminal() {
-		return true, errors.New("join boundary child ProgramFrame is unavailable")
+		return true, errors.New("join boundary child program frame is unavailable")
 	}
 	return true, r.advanceFrameLocked(
 		session,

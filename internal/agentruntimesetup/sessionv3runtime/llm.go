@@ -12,12 +12,22 @@ import (
 
 	inferenceRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inference"
 	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
+	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/contributionruntime"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/modelruntime"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/skillruntime"
-	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
+)
+
+const (
+	v3LLMSemanticBindingVersion = "v3-llm/v1"
+	inferenceReceiptSystem      = "inference"
+	emptyCompletionCode         = "empty_completion"
+	completionFailedCode        = "completion_failed"
+	providerOutputInvalidCode   = "provider_output_invalid"
+	providerDebugInvalidCode    = "provider_debug_output_invalid"
+	providerCallIDFormat        = "provider-call-%d"
+	promptJoinSeparator         = "\n\n"
 )
 
 type privateLLM struct {
@@ -28,20 +38,13 @@ type privateLLM struct {
 	Fingerprint   string
 }
 
-func artifactRefForSelection(s sessionv3Runtime.ArtifactSelection) artifactModel.ArtifactRef {
-	return artifactModel.ArtifactRef{
-		RootID:     rootModel.RootID(s.RootID),
-		ArtifactID: artifactModel.ArtifactID(s.ArtifactID),
-	}
-}
-
 func (b *Binder) bindLLM(
 	ctx context.Context,
 	req sessionv3Runtime.WorkDispatchRequest,
 ) (sessionv3Runtime.BindResult, error) {
 	payload := req.WorkItem.Input.LLM
 	if payload == nil {
-		return sessionv3Runtime.BindResult{}, errors.New("LLM payload is missing")
+		return sessionv3Runtime.BindResult{}, errors.New("llm payload is missing")
 	}
 	if req.WorkItem.Binding != nil &&
 		req.WorkItem.Binding.Plan != nil {
@@ -58,7 +61,7 @@ func (b *Binder) bindLLM(
 	}
 	modelSel := plan.model
 
-	ref := artifactRefForSelection(*modelSel)
+	ref := contributionruntime.ArtifactRefForSelection(*modelSel)
 	if err := ref.Validate(); err != nil {
 		return sessionv3Runtime.BindResult{}, err
 	}
@@ -92,23 +95,23 @@ func (b *Binder) bindLLM(
 		return sessionv3Runtime.BindResult{}, err
 	}
 	if modelUse == nil {
-		return sessionv3Runtime.BindResult{}, errors.New("runtime model resolution returned no Artifact use")
+		return sessionv3Runtime.BindResult{}, errors.New("runtime model resolution returned no artifact use")
 	}
 	if modelUse.RootID == "" ||
 		modelUse.ArtifactID == "" ||
 		modelUse.Revision == 0 ||
 		strings.TrimSpace(modelUse.Digest) == "" {
 		return sessionv3Runtime.BindResult{}, errors.New(
-			"runtime model resolution returned an incomplete Artifact pin",
+			"runtime model resolution returned an incomplete artifact pin",
 		)
 	}
 	if modelSel.ExpectedRevision != 0 &&
 		modelSel.ExpectedRevision != modelUse.Revision {
-		return sessionv3Runtime.BindResult{}, errors.New("selected Model revision changed")
+		return sessionv3Runtime.BindResult{}, errors.New("selected model revision changed")
 	}
 	if modelSel.ExpectedDigest != "" &&
 		modelSel.ExpectedDigest != modelUse.Digest {
-		return sessionv3Runtime.BindResult{}, errors.New("selected Model definition changed")
+		return sessionv3Runtime.BindResult{}, errors.New("selected model definition changed")
 	}
 	if modelUse.PreparedRuntimeConfiguration == nil {
 		return sessionv3Runtime.BindResult{}, errors.New(
@@ -134,7 +137,7 @@ func (b *Binder) bindLLM(
 	if len(plan.defaults.Skills) != 0 {
 		if b.skillTools == nil {
 			return sessionv3Runtime.BindResult{}, errors.New(
-				"session v3 Skill runtime is unavailable",
+				"session v3 skill runtime is unavailable",
 			)
 		}
 		key := skillruntime.V3SkillSessionKey{
@@ -196,10 +199,10 @@ func (b *Binder) bindLLM(
 	}
 	seen := make(map[string]sessionv3Runtime.ArtifactPin, len(artifacts)+1)
 	for _, artifact := range artifacts {
-		key := artifact.RootID + "\x00" + artifact.ArtifactID
+		key := selectionKey(artifact.Selection())
 		seen[key] = artifact
 	}
-	if existing, found := seen[modelPin.RootID+"\x00"+modelPin.ArtifactID]; found {
+	if existing, found := seen[selectionKey(modelPin.Selection())]; found {
 		if existing != modelPin {
 			return sessionv3Runtime.BindResult{}, errors.New(
 				"model execution plan contains a conflicting model pin",
@@ -217,7 +220,7 @@ func (b *Binder) bindLLM(
 		configuration.ProviderParam.DefaultHeaders,
 	)
 	semantic := sessionv3Runtime.SemanticBinding{
-		Version:           "v3-llm/v1",
+		Version:           v3LLMSemanticBindingVersion,
 		Artifacts:         artifacts,
 		TargetFingerprint: resolved.Fingerprint,
 		BoundAt:           time.Now().UTC(),
@@ -273,7 +276,7 @@ func (b *Binder) executeLLM(
 		resp.Body.InferenceResponse == nil {
 		message := "empty provider response"
 		if err != nil {
-			message = err.Error()
+			message = strings.ToLower(err.Error())
 		}
 		var typed *sessionv3Runtime.SanitizedError
 		if errors.As(err, &typed) && typed != nil {
@@ -289,7 +292,7 @@ func (b *Binder) executeLLM(
 		}
 		return sessionv3Runtime.WorkExecutionResult{
 			Error: &sessionv3Runtime.SanitizedError{
-				Code:    "empty_completion",
+				Code:    emptyCompletionCode,
 				Message: message,
 			},
 		}, nil
@@ -299,8 +302,8 @@ func (b *Binder) executeLLM(
 	if protocolErr != nil {
 		return sessionv3Runtime.WorkExecutionResult{
 			Error: &sessionv3Runtime.SanitizedError{
-				Code:    "provider_output_invalid",
-				Message: protocolErr.Error(),
+				Code:    providerOutputInvalidCode,
+				Message: strings.ToLower(protocolErr.Error()),
 			},
 		}, nil
 	}
@@ -308,8 +311,8 @@ func (b *Binder) executeLLM(
 	if debugErr != nil {
 		return sessionv3Runtime.WorkExecutionResult{
 			Error: &sessionv3Runtime.SanitizedError{
-				Code:    "provider_debug_output_invalid",
-				Message: debugErr.Error(),
+				Code:    providerDebugInvalidCode,
+				Message: strings.ToLower(debugErr.Error()),
 			},
 		}, nil
 	}
@@ -332,7 +335,7 @@ func (b *Binder) executeLLM(
 		Value: value,
 		LLM:   llmOutput,
 		Receipt: &sessionv3Runtime.ExternalReceipt{
-			System:      "inference",
+			System:      inferenceReceiptSystem,
 			Reference:   private.Fingerprint,
 			ConfirmedAt: time.Now().UTC(),
 		},
@@ -342,7 +345,7 @@ func (b *Binder) executeLLM(
 			Output: output,
 			Error: &sessionv3Runtime.SanitizedError{
 				Code:    out.Error.Code,
-				Message: out.Error.Message,
+				Message: strings.ToLower(out.Error.Message),
 			},
 			Confirmed: true,
 		}, nil
@@ -354,8 +357,8 @@ func (b *Binder) executeLLM(
 		return sessionv3Runtime.WorkExecutionResult{
 			Output: output,
 			Error: &sessionv3Runtime.SanitizedError{
-				Code:    "completion_failed",
-				Message: err.Error(),
+				Code:    completionFailedCode,
+				Message: strings.ToLower(err.Error()),
 			},
 			Confirmed: confirmed,
 		}, nil
@@ -364,8 +367,8 @@ func (b *Binder) executeLLM(
 		return sessionv3Runtime.WorkExecutionResult{
 			Output: output,
 			Error: &sessionv3Runtime.SanitizedError{
-				Code:    "empty_completion",
-				Message: "provider returned no text or executable Tool call",
+				Code:    emptyCompletionCode,
+				Message: "provider returned no text or executable tool call",
 			},
 		}, nil
 	}
@@ -441,7 +444,7 @@ func (b *Binder) decodeProviderOutputs(
 
 		callID := firstText(call.ID, call.CallID)
 		if callID == "" {
-			callID = fmt.Sprintf("provider-call-%d", len(calls)+1)
+			callID = fmt.Sprintf(providerCallIDFormat, len(calls)+1)
 		}
 
 		arguments := jsonutil.MustCanonicalValue(map[string]any{})
@@ -452,7 +455,7 @@ func (b *Binder) decodeProviderOutputs(
 					call,
 					callID,
 					arguments,
-					"provider Tool call arguments are invalid JSON",
+					"provider tool call arguments are invalid json",
 				))
 				continue
 			}
@@ -468,7 +471,7 @@ func (b *Binder) decodeProviderOutputs(
 				call,
 				callID,
 				arguments,
-				"provider Tool call does not match a prepared binding",
+				"provider tool call does not match a prepared binding",
 			))
 			continue
 		}
@@ -521,7 +524,7 @@ func appendPrompt(base, extra string) string {
 	if strings.TrimSpace(extra) == "" {
 		return base
 	}
-	return base + "\n\n" + extra
+	return base + promptJoinSeparator + extra
 }
 
 func splitV3ModelSystemPromptOverride(

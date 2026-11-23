@@ -66,7 +66,7 @@ func validatePreparedTargetTransport(
 			if workflowTargetRequiresTypedLLMInvocation(target) &&
 				lowered.LLMInvocation == nil {
 				return fmt.Errorf(
-					"%w: call %q target %q requires the explicit typed Model or Agent invocation form",
+					"%w: call %q target %q requires the explicit typed model or agent invocation form",
 					ErrBindingUnavailable,
 					call.Path,
 					use.Name,
@@ -155,6 +155,6 @@ func workflowTransportAcceptsContext(
 	transport sessionv3Runtime.WorkflowTargetTransport,
 	name string,
 ) bool {
-	return slices.Contains(transport.ContextForms, "*") ||
+	return slices.Contains(transport.ContextForms, wildcardContextForm) ||
 		slices.Contains(transport.ContextForms, name)
 }

@@ -604,7 +604,7 @@ func (r *Runtime) waitForResource(
 	item.ResourceWait = nil
 	item.UpdatedAt = r.now()
 	r.touchExecutionLocked(session, execution)
-	if err := r.persistLocked(persistContext, "resourceReady", session); err != nil {
+	if err := r.persistLocked(persistContext, checkpointReasonResourceReady, session); err != nil {
 		return
 	}
 	r.publishLocked(

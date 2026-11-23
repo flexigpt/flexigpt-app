@@ -2,16 +2,16 @@ package workflowruntime
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/workbinding"
-	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/contributionruntime"
 	workflowAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workflow"
 	workflowv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workflow/contract/v1"
 )
+
+const wildcardContextForm = "*"
 
 // ProviderManagedWorkflowToolPlanner is implemented by the Tool domain. It
 // returns only a provider Tool choice; Model invocation remains the typed
@@ -32,25 +32,17 @@ func (a *Admission) workflowOwnerModel(
 	}
 
 	if defaults.Model != nil {
-		ref := artifactModel.ArtifactRef{
-			RootID:     rootModel.RootID(defaults.Model.RootID),
-			ArtifactID: artifactModel.ArtifactID(defaults.Model.ArtifactID),
-		}
-		pin, err := a.pinArtifact(ctx, ref)
+		pin, err := contributionruntime.PinArtifactSelection(
+			ctx,
+			a.artifacts,
+			*defaults.Model,
+		)
 		if err != nil {
 			return nil, err
 		}
-		if defaults.Model.ExpectedRevision != 0 &&
-			defaults.Model.ExpectedRevision != pin.Revision {
-			return nil, errors.New("selected workflow owner Model revision changed")
-		}
-		if defaults.Model.ExpectedDigest != "" &&
-			defaults.Model.ExpectedDigest != pin.Digest {
-			return nil, errors.New("selected workflow owner Model definition changed")
-		}
 		if a.invocations == nil {
 			return nil, fmt.Errorf(
-				"%w: provider-managed Tool lowering requires a Model adapter",
+				"%w: provider-managed tool lowering requires a model adapter",
 				ErrBindingUnavailable,
 			)
 		}
@@ -63,21 +55,13 @@ func (a *Admission) workflowOwnerModel(
 	if defaults.Agent == nil || a.invocations == nil {
 		return nil, nil
 	}
-	ref := artifactModel.ArtifactRef{
-		RootID:     rootModel.RootID(defaults.Agent.RootID),
-		ArtifactID: artifactModel.ArtifactID(defaults.Agent.ArtifactID),
-	}
-	agent, err := a.pinArtifact(ctx, ref)
+	agent, err := contributionruntime.PinArtifactSelection(
+		ctx,
+		a.artifacts,
+		*defaults.Agent,
+	)
 	if err != nil {
 		return nil, err
-	}
-	if defaults.Agent.ExpectedRevision != 0 &&
-		defaults.Agent.ExpectedRevision != agent.Revision {
-		return nil, errors.New("selected workflow owner Agent revision changed")
-	}
-	if defaults.Agent.ExpectedDigest != "" &&
-		defaults.Agent.ExpectedDigest != agent.Digest {
-		return nil, errors.New("selected workflow owner Agent definition changed")
 	}
 	model, err := a.invocations.ResolveWorkflowAgentOwnerModel(ctx, agent)
 	if err != nil {
@@ -157,7 +141,7 @@ func (a *Admission) prepareRequirement(
 	case workflowv1.TargetTool:
 		ref, err := requireWorkflowTargetArtifactRef(
 			requirement,
-			"Tool requirement",
+			"tool requirement",
 		)
 		if err != nil {
 			return sessionv3Runtime.WorkflowRequirementFact{}, err
@@ -189,14 +173,14 @@ func (a *Admission) prepareRequirement(
 	case workflowv1.TargetWorkflow:
 		ref, err := requireWorkflowTargetArtifactRef(
 			requirement,
-			"nested Workflow requirement",
+			"nested workflow requirement",
 		)
 		if err != nil {
 			return sessionv3Runtime.WorkflowRequirementFact{}, err
 		}
 		if _, found := closure.workflow(ref); !found {
 			return sessionv3Runtime.WorkflowRequirementFact{}, fmt.Errorf(
-				"%w: nested Workflow requirement %q is absent from the static Artifact closure",
+				"%w: nested workflow requirement %q is absent from the static artifact closure",
 				ErrBindingUnavailable,
 				requirement.Name,
 			)
@@ -210,7 +194,7 @@ func (a *Admission) prepareRequirement(
 
 	default:
 		return sessionv3Runtime.WorkflowRequirementFact{}, fmt.Errorf(
-			"%w: unsupported Workflow requirement kind %q",
+			"%w: unsupported workflow requirement kind %q",
 			ErrBindingUnavailable,
 			target.Kind,
 		)
@@ -276,14 +260,22 @@ func (a *Admission) prepareBoundTarget(
 	case sessionv3Runtime.WorkflowTargetProviderTool:
 		if target.ProviderTool == nil || a.invocations == nil {
 			return sessionv3Runtime.WorkflowTarget{}, fmt.Errorf(
-				"%w: provider-managed Tool target %q has no Model owner",
+				"%w: provider-managed tool target %q has no model owner",
 				ErrBindingUnavailable,
 				targetPlan.Name,
 			)
 		}
+		invocation, err := a.invocations.PrepareWorkflowModelInvocation(
+			ctx,
+			target.ProviderTool.OwnerModel,
+		)
+		if err != nil {
+			return sessionv3Runtime.WorkflowTarget{}, err
+		}
 		target.Transport = invocationTransport(
 			a.invocations.ModelInvocationCapabilities(),
 		)
+		target.Invocation = &invocation
 
 	case sessionv3Runtime.WorkflowTargetService:
 		binding, found := a.bindings.Service(target.ServiceID)
@@ -317,7 +309,7 @@ func (a *Admission) prepareBoundTarget(
 				sessionv3Runtime.WorkflowCallModeInvoke,
 				sessionv3Runtime.WorkflowCallModeStart,
 			},
-			ContextForms:      []string{"*"},
+			ContextForms:      []string{wildcardContextForm},
 			InputPorts:        true,
 			FinalOutputPorts:  true,
 			StreamOutputPorts: true,
@@ -396,7 +388,7 @@ func externalBindingTransport(
 	output.FinalOutputPorts = facts.FinalOutputPorts
 	output.StreamOutputPorts = facts.OutputStream
 	if facts.Context {
-		output.ContextForms = []string{"*"}
+		output.ContextForms = []string{wildcardContextForm}
 	}
 
 	return output

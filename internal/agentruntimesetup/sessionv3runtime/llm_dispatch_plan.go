@@ -9,6 +9,8 @@ import (
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
 
+const dispatchContextNameFormat = "context-%d"
+
 func (b *Binder) durableLLMDispatchPlan(
 	request sessionv3Runtime.WorkDispatchRequest,
 	plan llmExecutionPlan,
@@ -139,7 +141,7 @@ func (b *Binder) durableLLMDispatchPlan(
 		output.Context = append(
 			output.Context,
 			sessionv3Runtime.ContextDispatchPlan{
-				Name:  fmt.Sprintf("context-%d", index),
+				Name:  fmt.Sprintf(dispatchContextNameFormat, index),
 				Value: jsonutil.MustCanonicalValue(value),
 			},
 		)

@@ -85,13 +85,15 @@ type WorkflowPreparedText struct {
 }
 
 type WorkflowPreparedTool struct {
-	Artifact    ArtifactPin        `json:"artifact"`
-	AutoExecute *bool              `json:"autoExecute,omitempty"`
-	Owner       ConfigurationOwner `json:"owner"`
+	Artifact      ArtifactPin             `json:"artifact"`
+	UserArguments jsonutil.CanonicalValue `json:"userArguments,omitempty"`
+	AutoExecute   *bool                   `json:"autoExecute,omitempty"`
+	Owner         ConfigurationOwner      `json:"owner"`
 }
 
 type WorkflowPreparedSkill struct {
 	Artifact           ArtifactPin        `json:"artifact"`
+	Enabled            bool               `json:"enabled,omitempty"`
 	Active             bool               `json:"active,omitempty"`
 	Instructions       bool               `json:"instructions,omitempty"`
 	InstructionContent string             `json:"instructionContent,omitempty"`
@@ -401,6 +403,9 @@ func (v WorkflowPreparedText) Validate() error {
 func (v WorkflowPreparedTool) Validate() error {
 	if err := validatePin(v.Artifact); err != nil {
 		return err
+	}
+	if len(v.UserArguments) != 0 && !v.UserArguments.Valid() {
+		return errors.New("prepared tool contribution user arguments are invalid")
 	}
 	return PreparedContributionOrder{
 		Kind:  PreparedContributionKindTool,

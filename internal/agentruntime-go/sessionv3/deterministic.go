@@ -9,7 +9,15 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
-const deterministicCompensationIntentSystem = "session-v3-compensation-intent"
+const (
+	deterministicBindingVersion           = "session-v3-deterministic/v1"
+	deterministicReceiptSystem            = "session-v3-deterministic"
+	deterministicForkReceiptSystem        = "session-v3-fork"
+	deterministicJoinReceiptSystem        = "session-v3-join"
+	deterministicReconcileReceiptSystem   = "session-v3-reconciliation"
+	deterministicResolverReceiptSystem    = "session-v3-target-resolver"
+	deterministicCompensationIntentSystem = "session-v3-compensation-intent"
+)
 
 type deterministicCompensationIntentOutput struct {
 	EffectID           EffectRecordID `json:"effectID"`
@@ -33,7 +41,7 @@ func (DeterministicExecutor) Bind(
 ) (BindResult, bool, error) {
 	item := request.WorkItem
 	binding := SemanticBinding{
-		Version:           "session-v3-deterministic/v1",
+		Version:           deterministicBindingVersion,
 		TargetFingerprint: string(item.Type) + ":" + item.ProgramPath,
 		BoundAt:           time.Now().UTC(),
 	}
@@ -55,7 +63,7 @@ func (DeterministicExecutor) Bind(
 	case WorkItemTypeChildCall:
 		if item.Input.ChildCall == nil {
 			return BindResult{}, true, errors.New(
-				"child call WorkItem has no payload",
+				"child call work item has no payload",
 			)
 		}
 		completion := item.Input.ChildCall.Completion
@@ -74,7 +82,7 @@ func (DeterministicExecutor) Bind(
 	case WorkItemTypeWait:
 		if item.Input.Wait == nil {
 			return BindResult{}, true, errors.New(
-				"deterministic wait WorkItem has no wait payload",
+				"deterministic wait work item has no wait payload",
 			)
 		}
 
@@ -112,7 +120,7 @@ func (DeterministicExecutor) Execute(
 
 	case WorkItemTypeChildCall:
 		return WorkExecutionResult{}, true, errors.New(
-			"child call WorkItem must settle from child completion",
+			"child call work item must settle from child completion",
 		)
 
 	case WorkItemTypeReconciliation:
@@ -121,7 +129,7 @@ func (DeterministicExecutor) Execute(
 	case WorkItemTypeCompensation:
 		if item.Input.Compensation == nil {
 			return WorkExecutionResult{}, true, errors.New(
-				"deterministic compensation WorkItem has no payload",
+				"deterministic compensation work item has no payload",
 			)
 		}
 		value := jsonutil.MustCanonicalValue(deterministicCompensationIntentOutput{
@@ -146,7 +154,7 @@ func (DeterministicExecutor) Execute(
 	case WorkItemTypeTransform:
 		if item.Input.Transform == nil {
 			return WorkExecutionResult{}, true, errors.New(
-				"deterministic transform WorkItem has no transform payload",
+				"deterministic transform work item has no transform payload",
 			)
 		}
 		value = item.Input.Transform.Input.Clone()
@@ -163,7 +171,7 @@ func (DeterministicExecutor) Execute(
 	case WorkItemTypeCondition:
 		if item.Input.Condition == nil {
 			return WorkExecutionResult{}, true, errors.New(
-				"deterministic condition WorkItem has no condition payload",
+				"deterministic condition work item has no condition payload",
 			)
 		}
 
@@ -178,7 +186,7 @@ func (DeterministicExecutor) Execute(
 	case WorkItemTypeStateUpdate:
 		if item.Input.StateUpdate == nil {
 			return WorkExecutionResult{}, true, errors.New(
-				"deterministic StateUpdate WorkItem has no payload",
+				"deterministic state update work item has no payload",
 			)
 		}
 		next, err := applyWorkflowStateUpdate(
@@ -201,7 +209,7 @@ func (DeterministicExecutor) Execute(
 	case WorkItemTypeTargetResolver:
 		if item.Input.TargetResolver == nil {
 			return WorkExecutionResult{}, true, errors.New(
-				"deterministic target resolver WorkItem has no payload",
+				"deterministic target resolver work item has no payload",
 			)
 		}
 		output := TargetResolverOutput{
@@ -220,7 +228,7 @@ func (DeterministicExecutor) Execute(
 				Value:          value,
 				TargetResolver: &output,
 				Receipt: &ExternalReceipt{
-					System:      "session-v3-target-resolver",
+					System:      deterministicResolverReceiptSystem,
 					Reference:   string(item.ID),
 					ConfirmedAt: time.Now().UTC(),
 				},
@@ -236,7 +244,7 @@ func (DeterministicExecutor) Execute(
 		Output: &WorkItemOutput{
 			Value: value,
 			Receipt: &ExternalReceipt{
-				System:      "session-v3-deterministic",
+				System:      deterministicReceiptSystem,
 				Reference:   string(item.ID),
 				ConfirmedAt: time.Now().UTC(),
 			},
@@ -257,7 +265,7 @@ type joinWorkFrame struct {
 }
 
 type joinWorkOutput struct {
-	Policy string          `json:"policy"`
+	Policy JoinWorkPolicy  `json:"policy"`
 	Frames []joinWorkFrame `json:"frames"`
 }
 
@@ -266,12 +274,12 @@ func deterministicForkResult(
 ) (WorkExecutionResult, bool, error) {
 	if item.Input.Fork == nil {
 		return WorkExecutionResult{}, true, errors.New(
-			"deterministic fork WorkItem has no payload",
+			"deterministic fork work item has no payload",
 		)
 	}
 	if len(item.Input.Fork.ChildFrames) == 0 {
 		return WorkExecutionResult{}, true, errors.New(
-			"deterministic fork WorkItem has no child frames",
+			"deterministic fork work item has no child frames",
 		)
 	}
 	value := jsonutil.MustCanonicalValue(forkWorkOutput{
@@ -284,7 +292,7 @@ func deterministicForkResult(
 		Output: &WorkItemOutput{
 			Value: value,
 			Receipt: &ExternalReceipt{
-				System:      "session-v3-fork",
+				System:      deterministicForkReceiptSystem,
 				Reference:   string(item.ID),
 				ConfirmedAt: time.Now().UTC(),
 			},
@@ -298,7 +306,7 @@ func deterministicReconciliationResult(
 ) (WorkExecutionResult, bool, error) {
 	if item.Input.Reconciliation == nil {
 		return WorkExecutionResult{}, true, errors.New(
-			"deterministic reconciliation WorkItem has no payload",
+			"deterministic reconciliation work item has no payload",
 		)
 	}
 	if err := item.Input.Reconciliation.Validate(); err != nil {
@@ -314,7 +322,7 @@ func deterministicReconciliationResult(
 		Output: &WorkItemOutput{
 			Value: value,
 			Receipt: &ExternalReceipt{
-				System:      "session-v3-reconciliation",
+				System:      deterministicReconcileReceiptSystem,
 				Reference:   string(item.ID),
 				ConfirmedAt: time.Now().UTC(),
 			},
@@ -329,12 +337,12 @@ func deterministicJoinResult(
 ) (WorkExecutionResult, bool, error) {
 	if item.Input.Join == nil {
 		return WorkExecutionResult{}, true, errors.New(
-			"deterministic join WorkItem has no payload",
+			"deterministic join work item has no payload",
 		)
 	}
 	if len(item.Input.Join.ChildFrames) == 0 {
 		return WorkExecutionResult{}, true, errors.New(
-			"deterministic join WorkItem has no child frames",
+			"deterministic join work item has no child frames",
 		)
 	}
 
@@ -343,13 +351,13 @@ func deterministicJoinResult(
 		frame := mutableFrame(&execution, id)
 		if frame == nil {
 			return WorkExecutionResult{}, true, fmt.Errorf(
-				"join WorkItem child ProgramFrame %q is unavailable",
+				"join work item child program frame %q is unavailable",
 				id,
 			)
 		}
 		if !frame.Status.Terminal() {
 			return WorkExecutionResult{}, true, fmt.Errorf(
-				"join WorkItem child ProgramFrame %q is not terminal",
+				"join work item child program frame %q is not terminal",
 				id,
 			)
 		}
@@ -378,7 +386,7 @@ func deterministicJoinResult(
 		Output: &WorkItemOutput{
 			Value: value,
 			Receipt: &ExternalReceipt{
-				System:      "session-v3-join",
+				System:      deterministicJoinReceiptSystem,
 				Reference:   string(item.ID),
 				ConfirmedAt: time.Now().UTC(),
 			},
@@ -429,7 +437,7 @@ func (DeterministicExecutor) ResolveWait(
 		Output: &WorkItemOutput{
 			Value: value,
 			Receipt: &ExternalReceipt{
-				System:      "session-v3-deterministic",
+				System:      deterministicReceiptSystem,
 				Reference:   string(request.Wait.ID),
 				ConfirmedAt: time.Now().UTC(),
 			},
@@ -456,6 +464,6 @@ func normalizeDeterministicCondition(
 	}
 
 	return nil, errors.New(
-		"deterministic condition WorkItem must contain a boolean value",
+		"deterministic condition work item must contain a boolean value",
 	)
 }

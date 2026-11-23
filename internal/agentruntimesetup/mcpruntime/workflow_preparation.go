@@ -22,7 +22,7 @@ func NewWorkflowTargetPreparer(
 	runtime *mcpConnection.MCPRuntimeManager,
 ) (*WorkflowTargetPreparer, error) {
 	if runtime == nil {
-		return nil, errors.New("workflow MCP target preparer requires an MCP runtime")
+		return nil, errors.New("workflow mcp target preparer requires an mcp runtime")
 	}
 	return &WorkflowTargetPreparer{runtime: runtime}, nil
 }
@@ -34,7 +34,7 @@ func (p *WorkflowTargetPreparer) PrepareWorkflowMCPTool(
 ) (sessionv3Runtime.WorkflowMCP, error) {
 	if p == nil || p.runtime == nil {
 		return sessionv3Runtime.WorkflowMCP{}, errors.New(
-			"workflow MCP target preparer is unavailable",
+			"workflow mcp target preparer is unavailable",
 		)
 	}
 	return prepareWorkflowMCPTool(ctx, p.runtime, server, toolName)
@@ -64,7 +64,7 @@ func prepareWorkflowMCPTool(
 ) (sessionv3Runtime.WorkflowMCP, error) {
 	if runtime == nil {
 		return sessionv3Runtime.WorkflowMCP{}, errors.New(
-			"workflow MCP runtime is unavailable",
+			"workflow mcp runtime is unavailable",
 		)
 	}
 	if server.RootID == "" ||
@@ -72,7 +72,7 @@ func prepareWorkflowMCPTool(
 		server.Revision == 0 ||
 		server.Digest == "" {
 		return sessionv3Runtime.WorkflowMCP{}, errors.New(
-			"workflow MCP server Artifact pin is incomplete",
+			"workflow mcp server artifact pin is incomplete",
 		)
 	}
 
@@ -94,13 +94,13 @@ func prepareWorkflowMCPTool(
 	}
 	if status == nil || status.Status != mcpServer.MCPServerStatusReady {
 		return sessionv3Runtime.WorkflowMCP{}, fmt.Errorf(
-			"workflow MCP server %q is not connected",
+			"workflow mcp server %q is not connected",
 			serverID,
 		)
 	}
 	if status.SnapshotDigest == "" {
 		return sessionv3Runtime.WorkflowMCP{}, errors.New(
-			"workflow MCP server has no discovery snapshot digest",
+			"workflow mcp server has no discovery snapshot digest",
 		)
 	}
 
@@ -114,7 +114,7 @@ func prepareWorkflowMCPTool(
 		}
 		if !v3MCPToolAvailable(tool) {
 			return sessionv3Runtime.WorkflowMCP{}, fmt.Errorf(
-				"workflow MCP tool %q is unavailable",
+				"workflow mcp tool %q is unavailable",
 				toolName,
 			)
 		}
@@ -130,7 +130,7 @@ func prepareWorkflowMCPTool(
 		}, nil
 	}
 	return sessionv3Runtime.WorkflowMCP{}, fmt.Errorf(
-		"workflow MCP tool %q is unavailable",
+		"workflow mcp tool %q is unavailable",
 		toolName,
 	)
 }

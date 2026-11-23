@@ -37,7 +37,7 @@ func (b *Binder) bindTool(
 		case payload.MCP != nil:
 			if b.mcpTools == nil {
 				return sessionv3Runtime.BindResult{}, errors.New(
-					"session v3 MCP Tool runtime is unavailable",
+					"session v3 mcp tool runtime is unavailable",
 				)
 			}
 			value, err := b.mcpTools.BindWorkflowTool(ctx, payload)
@@ -49,7 +49,7 @@ func (b *Binder) bindTool(
 		case payload.Target != nil:
 			if b.goTools == nil {
 				return sessionv3Runtime.BindResult{}, errors.New(
-					"session v3 Tool runtime is unavailable",
+					"session v3 tool runtime is unavailable",
 				)
 			}
 			value, err := b.goTools.BindWorkflowTool(ctx, payload)
@@ -60,7 +60,7 @@ func (b *Binder) bindTool(
 
 		default:
 			return sessionv3Runtime.BindResult{}, fmt.Errorf(
-				"unresolved Tool WorkItem %q has no typed target",
+				"unresolved tool work item %q has no typed target",
 				req.WorkItem.ID,
 			)
 		}
@@ -78,7 +78,7 @@ func (b *Binder) bindTool(
 	case sessionv3Runtime.ToolBindingKindGo:
 		if b.goTools == nil {
 			return sessionv3Runtime.BindResult{}, errors.New(
-				"session v3 Tool runtime is unavailable",
+				"session v3 tool runtime is unavailable",
 			)
 		}
 		semantic, err := b.goTools.BindGo(ctx, effectiveRequest.WorkItem.Input.Tool)
@@ -94,7 +94,7 @@ func (b *Binder) bindTool(
 	case sessionv3Runtime.ToolBindingKindMCP:
 		if b.mcpTools == nil {
 			return sessionv3Runtime.BindResult{}, errors.New(
-				"session v3 MCP Tool runtime is unavailable",
+				"session v3 mcp tool runtime is unavailable",
 			)
 		}
 		result, handled, err := b.mcpTools.Bind(ctx, effectiveRequest)
@@ -103,7 +103,7 @@ func (b *Binder) bindTool(
 		}
 		if !handled {
 			return sessionv3Runtime.BindResult{}, errors.New(
-				"MCP Tool runtime declined an MCP Tool binding",
+				"mcp tool runtime declined an mcp tool binding",
 			)
 		}
 		return wrapMCPBindResult(result, call)
@@ -111,7 +111,7 @@ func (b *Binder) bindTool(
 	case sessionv3Runtime.ToolBindingKindSkill:
 		if b.skillTools == nil {
 			return sessionv3Runtime.BindResult{}, errors.New(
-				"session v3 Skill runtime is unavailable",
+				"session v3 skill runtime is unavailable",
 			)
 		}
 		semantic, err := b.skillTools.Bind(
@@ -130,13 +130,13 @@ func (b *Binder) bindTool(
 
 	case sessionv3Runtime.ToolBindingKindProvider:
 		return sessionv3Runtime.BindResult{}, fmt.Errorf(
-			"provider-managed Tool %q requires a typed Model execution plan",
+			"provider-managed tool %q requires a typed model execution plan",
 			call.Name,
 		)
 
 	default:
 		return sessionv3Runtime.BindResult{}, fmt.Errorf(
-			"unsupported Tool binding kind %q",
+			"unsupported tool binding kind %q",
 			call.Binding.Kind,
 		)
 	}
@@ -150,7 +150,7 @@ func (b *Binder) executeTool(
 	private, found := bound.Private.(boundTool)
 	if !found {
 		return sessionv3Runtime.WorkExecutionResult{}, errors.New(
-			"tool workItem has no typed domain binding",
+			"tool work item has no typed domain binding",
 		)
 	}
 
@@ -164,10 +164,14 @@ func (b *Binder) executeTool(
 	case sessionv3Runtime.ToolBindingKindGo:
 		if b.goTools == nil {
 			return sessionv3Runtime.WorkExecutionResult{}, errors.New(
-				"session v3 Tool runtime is unavailable",
+				"session v3 tool runtime is unavailable",
 			)
 		}
-		result, executeErr := b.goTools.ExecuteGo(ctx, payload)
+		result, executeErr := b.goTools.ExecuteGo(
+			ctx,
+			payload,
+			effectiveRequest.WorkItem.Effect,
+		)
 		if executeErr != nil {
 			return sessionv3Runtime.WorkExecutionResult{}, executeErr
 		}
@@ -176,7 +180,7 @@ func (b *Binder) executeTool(
 	case sessionv3Runtime.ToolBindingKindMCP:
 		if b.mcpTools == nil {
 			return sessionv3Runtime.WorkExecutionResult{}, errors.New(
-				"session v3 MCP Tool runtime is unavailable",
+				"session v3 mcp tool runtime is unavailable",
 			)
 		}
 		result, handled, err := b.mcpTools.Execute(
@@ -192,7 +196,7 @@ func (b *Binder) executeTool(
 		}
 		if !handled {
 			return sessionv3Runtime.WorkExecutionResult{}, errors.New(
-				"MCP Tool runtime declined an MCP Tool execution",
+				"mcp tool runtime declined an mcp tool execution",
 			)
 		}
 		return result, nil
@@ -200,7 +204,7 @@ func (b *Binder) executeTool(
 	case sessionv3Runtime.ToolBindingKindSkill:
 		if b.skillTools == nil {
 			return sessionv3Runtime.WorkExecutionResult{}, errors.New(
-				"session v3 Skill runtime is unavailable",
+				"session v3 skill runtime is unavailable",
 			)
 		}
 		result, handled, err := b.skillTools.Execute(
@@ -213,19 +217,19 @@ func (b *Binder) executeTool(
 		}
 		if !handled {
 			return sessionv3Runtime.WorkExecutionResult{}, errors.New(
-				"skill runtime declined a Skill Tool execution",
+				"skill runtime declined a skill tool execution",
 			)
 		}
 		return result, nil
 
 	case sessionv3Runtime.ToolBindingKindProvider:
 		return sessionv3Runtime.WorkExecutionResult{}, errors.New(
-			"provider-managed Tool cannot execute as a local WorkItem",
+			"provider-managed tool cannot execute as a local work item",
 		)
 
 	default:
 		return sessionv3Runtime.WorkExecutionResult{}, fmt.Errorf(
-			"unsupported Tool binding kind %q",
+			"unsupported tool binding kind %q",
 			private.Call.Binding.Kind,
 		)
 	}
@@ -243,7 +247,7 @@ func (b *Binder) resolveToolWait(
 	}
 	if b.mcpTools == nil {
 		return sessionv3Runtime.WaitResolutionResult{}, errors.New(
-			"session v3 MCP Tool runtime is unavailable",
+			"session v3 mcp tool runtime is unavailable",
 		)
 	}
 
@@ -268,13 +272,13 @@ func (b *Binder) resolveToolWait(
 	}
 	if !handled {
 		return sessionv3Runtime.WaitResolutionResult{}, errors.New(
-			"MCP Tool runtime declined an MCP approval resolution",
+			"mcp tool runtime declined an mcp approval resolution",
 		)
 	}
 	if result.Resume {
 		if result.Bound == nil || result.Bound.Private == nil {
 			return sessionv3Runtime.WaitResolutionResult{}, errors.New(
-				"MCP approval resolution returned no execution binding",
+				"mcp approval resolution returned no execution binding",
 			)
 		}
 		result.Bound.Private = boundTool{
@@ -291,7 +295,7 @@ func requestWithBoundTool(
 ) (sessionv3Runtime.WorkDispatchRequest, error) {
 	if request.WorkItem.Input.Tool == nil {
 		return sessionv3Runtime.WorkDispatchRequest{}, errors.New(
-			"tool workItem payload is missing",
+			"tool work item payload is missing",
 		)
 	}
 
@@ -311,7 +315,7 @@ func wrapMCPBindResult(
 	case result.Wait != nil:
 		if result.Private == nil {
 			return sessionv3Runtime.BindResult{}, errors.New(
-				"MCP Tool wait has no private resolver state",
+				"mcp tool wait has no private resolver state",
 			)
 		}
 		result.Private = boundToolWait{
@@ -325,7 +329,7 @@ func wrapMCPBindResult(
 	default:
 		if result.Private == nil {
 			return sessionv3Runtime.BindResult{}, errors.New(
-				"MCP Tool binding has no private execution state",
+				"mcp tool binding has no private execution state",
 			)
 		}
 		result.Private = boundTool{

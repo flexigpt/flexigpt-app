@@ -52,9 +52,6 @@ func compileWorkflowTriggers(
 			}
 			value.Schedule = &schedule
 		}
-		if err := value.Validate(); err != nil {
-			return nil, fmt.Errorf("workflow trigger %q: %w", name, err)
-		}
 		output = append(output, value)
 	}
 	return output, nil
@@ -85,9 +82,6 @@ func compileWorkflowEventTrigger(
 			return sessionv3Runtime.WorkflowEventTrigger{}, keyErr
 		}
 		output.InstanceKey = &key
-	}
-	if err := output.Validate(); err != nil {
-		return sessionv3Runtime.WorkflowEventTrigger{}, err
 	}
 	return output, nil
 }
@@ -123,9 +117,6 @@ func compileWorkflowScheduleTrigger(
 		if input.Missed.MaxOccurrences != nil {
 			output.Missed.MaxOccurrences = *input.Missed.MaxOccurrences
 		}
-	}
-	if err := output.Validate(); err != nil {
-		return sessionv3Runtime.WorkflowScheduleTrigger{}, err
 	}
 	return output, nil
 }

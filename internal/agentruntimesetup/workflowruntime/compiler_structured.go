@@ -117,11 +117,11 @@ func compileWorkflowCompletion(
 	input *workflowv1.Completion,
 ) sessionv3Runtime.WorkflowCompletion {
 	if input == nil {
-		return sessionv3Runtime.WorkflowCompletion{Mode: "all"}
+		return sessionv3Runtime.WorkflowCompletion{Mode: sessionv3Runtime.WorkflowCompletionModeAll}
 	}
 
 	output := sessionv3Runtime.WorkflowCompletion{
-		Mode: input.Mode,
+		Mode: sessionv3Runtime.WorkflowCompletionMode(input.Mode),
 	}
 	if input.Quorum != nil {
 		output.Quorum = *input.Quorum
@@ -144,8 +144,8 @@ func compileWorkflowParallel(
 	}
 	output := sessionv3Runtime.WorkflowParallel{
 		Completion: compileWorkflowCompletion(input.Completion),
-		Errors:     input.Errors,
-		Remaining:  input.Remaining,
+		Errors:     sessionv3Runtime.WorkflowCollectionErrorPolicy(input.Errors),
+		Remaining:  sessionv3Runtime.WorkflowRemainingPolicy(input.Remaining),
 		Merge:      merge,
 		Branches:   make([]sessionv3Runtime.WorkflowBranch, 0, len(names)),
 	}
@@ -196,8 +196,8 @@ func compileWorkflowForeach(
 		Items:      items,
 		ItemSchema: itemSchema,
 		Completion: compileWorkflowCompletion(input.Completion),
-		Errors:     input.Errors,
-		Remaining:  input.Remaining,
+		Errors:     sessionv3Runtime.WorkflowCollectionErrorPolicy(input.Errors),
+		Remaining:  sessionv3Runtime.WorkflowRemainingPolicy(input.Remaining),
 		Merge:      merge,
 		Do:         block,
 	}
@@ -247,9 +247,9 @@ func compileWorkflowRepeat(
 	}
 
 	output := sessionv3Runtime.WorkflowRepeat{
-		Lifetime:    input.Lifetime,
+		Lifetime:    sessionv3Runtime.WorkflowRepeatLifetime(input.Lifetime),
 		State:       state,
-		OnExhausted: input.OnExhausted,
+		OnExhausted: sessionv3Runtime.WorkflowRepeatExhaustedPolicy(input.OnExhausted),
 		Do:          block,
 	}
 	if input.MaxIterations != nil {

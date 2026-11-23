@@ -172,11 +172,20 @@ func (r *Runtime) preparePublishedWorkflowPortBoundaryLocked(
 			localInputs = append(localInputs, local)
 
 		case WorkflowPortDirectionOutput:
+			targetExecution, receivingFrame, targetErr := resolvePortChannelTarget(
+				session,
+				childExecution,
+				plan,
+			)
+			if targetErr != nil {
+				return targetErr
+			}
 			receivingWorkItemID,
 				receivingFrameID,
 				receivingBudgetScope,
 				ownerErr := channelForwardReceivingOwner(
-				parentExecution,
+				targetExecution,
+				receivingFrame,
 				*childExecution,
 				*childFrame,
 				plan,
@@ -188,7 +197,7 @@ func (r *Runtime) preparePublishedWorkflowPortBoundaryLocked(
 				childExecution,
 				ChannelForward{
 					SourceChannel:        localChannel,
-					TargetExecutionID:    parentExecutionID,
+					TargetExecutionID:    targetExecution.ID,
 					TargetChannel:        plan.Channel,
 					PortName:             plan.Name,
 					Stream:               plan.Stream,
@@ -342,6 +351,7 @@ func publishedWorkflowChannelRetention(
 
 func channelForwardReceivingOwner(
 	parent *Execution,
+	resolvedFrame *ProgramFrame,
 	child Execution,
 	childFrame ProgramFrame,
 	plan PortPlan,
@@ -352,16 +362,19 @@ func channelForwardReceivingOwner(
 		)
 	}
 
-	frameID := plan.ParentFrameID
-	if frameID == "" {
-		frameID = child.ParentFrameID
+	frame := resolvedFrame
+	if frame == nil {
+		frameID := plan.ParentFrameID
+		if frameID == "" {
+			frameID = child.ParentFrameID
+		}
+		if frameID == "" {
+			return "", "", "", errors.New(
+				portForwardReceivingFrameUnavailableMessage,
+			)
+		}
+		frame = mutableFrame(parent, frameID)
 	}
-	if frameID == "" {
-		return "", "", "", errors.New(
-			portForwardReceivingFrameUnavailableMessage,
-		)
-	}
-	frame := mutableFrame(parent, frameID)
 	if frame == nil {
 		return "", "", "", errors.New(
 			portForwardReceivingFrameUnavailableMessage,
@@ -866,7 +879,20 @@ func portChannelExecution(
 	execution *Execution,
 	plan PortPlan,
 ) (*Execution, error) {
-	return resolvePortChannelExecution(
+	ownerExecution, _, err := resolvePortChannelTarget(
+		session,
+		execution,
+		plan,
+	)
+	return ownerExecution, err
+}
+
+func resolvePortChannelTarget(
+	session *Session,
+	execution *Execution,
+	plan PortPlan,
+) (*Execution, *ProgramFrame, error) {
+	return resolvePortChannelTargetWithVisited(
 		session,
 		execution,
 		plan,
@@ -883,14 +909,14 @@ type portForwardingIdentity struct {
 	Stream      bool
 }
 
-func resolvePortChannelExecution(
+func resolvePortChannelTargetWithVisited(
 	session *Session,
 	execution *Execution,
 	plan PortPlan,
 	visited map[portForwardingIdentity]struct{},
-) (*Execution, error) {
+) (*Execution, *ProgramFrame, error) {
 	if session == nil || execution == nil {
-		return nil, errors.New(portInputOwnerUnavailableMessage)
+		return nil, nil, errors.New(portInputOwnerUnavailableMessage)
 	}
 
 	frameID := plan.ParentFrameID
@@ -898,7 +924,7 @@ func resolvePortChannelExecution(
 		frameID = plan.OwnerFrameID
 	}
 	if frameID == "" {
-		return execution, nil
+		return execution, nil, nil
 	}
 
 	ownerExecution, ownerFrame, err := portFrameOwner(
@@ -907,7 +933,7 @@ func resolvePortChannelExecution(
 		frameID,
 	)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	identity := portForwardingIdentity{
@@ -919,20 +945,20 @@ func resolvePortChannelExecution(
 		Stream:      plan.Stream,
 	}
 	if _, found := visited[identity]; found {
-		return nil, errors.New(portChannelForwardingCycleMessage)
+		return nil, nil, errors.New(portChannelForwardingCycleMessage)
 	}
 	visited[identity] = struct{}{}
 
 	if forwarding := forwardingPortPlan(*ownerFrame, plan); forwarding != nil &&
 		forwarding.ParentFrameID != "" {
-		return resolvePortChannelExecution(
+		return resolvePortChannelTargetWithVisited(
 			session,
 			ownerExecution,
 			*forwarding,
 			visited,
 		)
 	}
-	return ownerExecution, nil
+	return ownerExecution, ownerFrame, nil
 }
 
 func portFrameOwner(
@@ -1128,7 +1154,7 @@ func (r *Runtime) appendWorkPortStream(
 	item.UpdatedAt = r.now()
 	r.touchExecutionLocked(session, execution)
 
-	if err := r.persistLocked(ctx, "portStream", session); err != nil {
+	if err := r.persistLocked(ctx, checkpointReasonPortStream, session); err != nil {
 		return err
 	}
 	r.publishLocked(ctx, session, execution.ID, RuntimeEventWorkChanged)

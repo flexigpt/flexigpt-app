@@ -18,7 +18,7 @@ func ConfigureSessionV3Runtime(
 ) (sessionv3Runtime.RuntimeDependencies, error) {
 	if binder == nil {
 		return sessionv3Runtime.RuntimeDependencies{}, errors.New(
-			"workflow Runtime v3 binder is required",
+			"workflow runtime v3 binder is required",
 		)
 	}
 

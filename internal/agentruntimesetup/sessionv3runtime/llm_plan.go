@@ -9,8 +9,6 @@ import (
 
 	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/contributionruntime"
-	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
@@ -35,32 +33,7 @@ func (p *llmExecutionPlan) setPreparedMCP(
 	if p.preparedMCP == nil {
 		p.preparedMCP = make(map[string]sessionv3Runtime.WorkflowPreparedMCP)
 	}
-	p.preparedMCP[value.Server.RootID+"\x00"+value.Server.ArtifactID] = jsonutil.CloneJSONInValue(value)
-}
-
-func (p *llmExecutionPlan) reconcilePreparedMCP(
-	specific []sessionv3Runtime.MCPServerSelection,
-) {
-	if p == nil || len(p.preparedMCP) == 0 {
-		return
-	}
-	effective := make(map[string]struct{}, len(p.defaults.MCP))
-	for _, selection := range p.defaults.MCP {
-		effective[selectionKey(selection.Server)] = struct{}{}
-	}
-	overridden := make(map[string]struct{}, len(specific))
-	for _, selection := range specific {
-		overridden[selectionKey(selection.Server)] = struct{}{}
-	}
-	for key := range p.preparedMCP {
-		if _, kept := effective[key]; !kept {
-			delete(p.preparedMCP, key)
-			continue
-		}
-		if _, replaced := overridden[key]; replaced {
-			delete(p.preparedMCP, key)
-		}
-	}
+	p.preparedMCP[selectionKey(value.Server.Selection())] = jsonutil.CloneJSONInValue(value)
 }
 
 func (p *llmExecutionPlan) applySpecificInstructionPolicy(
@@ -138,7 +111,14 @@ func (b *Binder) prepareLLMPlan(
 		); err != nil {
 			return llmExecutionPlan{}, err
 		}
-	} else if defaults.Agent != nil || defaults.Workspace != nil {
+		if len(specificCollections.ToolSelections) != 0 {
+			plan.defaults.ToolSelections = overlayToolSelections(
+				plan.defaults.ToolSelections,
+				specificCollections.ToolSelections,
+				specificCollections.CollectionPolicies.ToolSelections,
+			)
+		}
+	} else {
 		if b.contributions == nil {
 			return llmExecutionPlan{}, errors.New(
 				"session v3 contribution runtime is unavailable",
@@ -150,6 +130,8 @@ func (b *Binder) prepareLLMPlan(
 				Agent:              cloneLLMArtifactSelection(defaults.Agent),
 				Workspace:          cloneLLMArtifactSelection(defaults.Workspace),
 				WorkspaceOverrides: defaults.WorkspaceOverrides,
+				Defaults:           &specificCollections,
+				SpecificOwner:      sessionv3Runtime.ConfigurationOwnerSession,
 			},
 		)
 		if prepareErr != nil {
@@ -159,12 +141,16 @@ func (b *Binder) prepareLLMPlan(
 			return llmExecutionPlan{}, err
 		}
 	}
-	applySpecificCollections(&plan.defaults, specificCollections)
-	plan.reconcilePreparedMCP(specificCollections.MCP)
+	plan.defaults.CollectionPolicies = specificCollections.CollectionPolicies
 	plan.applySpecificInstructionPolicy(
 		specificCollections.CollectionPolicies.SystemInstructions,
 	)
-	for _, instruction := range plan.defaults.SystemInstructions {
+	inlineInstructions := overlayInstructions(
+		nil,
+		specificCollections.SystemInstructions,
+		specificCollections.CollectionPolicies.SystemInstructions,
+	)
+	for _, instruction := range inlineInstructions {
 		instruction.Owner = sessionv3Runtime.ConfigurationOwnerSession
 		instruction.SourceKey = instructionKey(instruction)
 		plan.addInstruction(instruction)
@@ -239,7 +225,7 @@ func (b *Binder) prepareLLMPlan(
 	if len(plan.defaults.Skills) != 0 {
 		if b.skillTools == nil {
 			return llmExecutionPlan{}, errors.New(
-				"session v3 Skill runtime is unavailable",
+				"session v3 skill runtime is unavailable",
 			)
 		}
 		active, activeErr := b.skillTools.EffectiveActiveSelectionsForFrame(
@@ -340,7 +326,7 @@ func (b *Binder) prepareLLMTextContribution(
 		)
 	}
 
-	ref := artifactRefForSelection(selection)
+	ref := contributionruntime.ArtifactRefForSelection(selection)
 	if err := ref.Validate(); err != nil {
 		return preparedLLMTextContribution{}, err
 	}
@@ -415,7 +401,7 @@ func (b *Binder) applyInstructionArtifacts(
 			Label:     contribution.Label,
 			Content:   contribution.Dispatch.Content,
 			Owner:     sessionv3Runtime.ConfigurationOwnerSession,
-			SourceKey: selection.RootID + "\x00" + selection.ArtifactID,
+			SourceKey: selectionKey(selection),
 		})
 	}
 	return nil
@@ -446,12 +432,7 @@ func (b *Binder) pinSelections(
 		}
 		output = appendUniqueLLMSelection(
 			output,
-			sessionv3Runtime.ArtifactSelection{
-				RootID:           pin.RootID,
-				ArtifactID:       pin.ArtifactID,
-				ExpectedRevision: pin.Revision,
-				ExpectedDigest:   pin.Digest,
-			},
+			pin.Selection(),
 		)
 		pins = append(pins, pin)
 	}
@@ -485,18 +466,13 @@ func (b *Binder) pinToolSelections(
 		if err != nil {
 			return nil, nil, err
 		}
-		key := pin.RootID + "\x00" + pin.ArtifactID
+		key := selectionKey(pin.Selection())
 		if _, duplicate := seen[key]; duplicate {
 			return nil, nil, errors.New("tool selection is duplicated")
 		}
 		seen[key] = struct{}{}
 		output = append(output, sessionv3Runtime.ToolSelection{
-			Artifact: sessionv3Runtime.ArtifactSelection{
-				RootID:           pin.RootID,
-				ArtifactID:       pin.ArtifactID,
-				ExpectedRevision: pin.Revision,
-				ExpectedDigest:   pin.Digest,
-			},
+			Artifact:      pin.Selection(),
 			UserArguments: selection.UserArguments.Clone(),
 			AutoExecute:   cloneBool(selection.AutoExecute),
 		})
@@ -528,12 +504,7 @@ func (b *Binder) pinMCPSelections(
 		if prepared, found := preparedMCP[selectionKey(selection.Server)]; found &&
 			prepared.Prepared {
 			value := jsonutil.CloneJSONInValue(selection)
-			value.Server = sessionv3Runtime.ArtifactSelection{
-				RootID:           prepared.Server.RootID,
-				ArtifactID:       prepared.Server.ArtifactID,
-				ExpectedRevision: prepared.Server.Revision,
-				ExpectedDigest:   prepared.Server.Digest,
-			}
+			value.Server = prepared.Server.Selection()
 			output = appendUniqueMCPSelection(output, value)
 			pins = append(pins, prepared.Server)
 			continue
@@ -543,12 +514,7 @@ func (b *Binder) pinMCPSelections(
 			return nil, nil, err
 		}
 		value := jsonutil.CloneJSONInValue(selection)
-		value.Server = sessionv3Runtime.ArtifactSelection{
-			RootID:           pin.RootID,
-			ArtifactID:       pin.ArtifactID,
-			ExpectedRevision: pin.Revision,
-			ExpectedDigest:   pin.Digest,
-		}
+		value.Server = pin.Selection()
 		output = appendUniqueMCPSelection(output, value)
 		pins = append(pins, pin)
 	}
@@ -559,92 +525,7 @@ func (b *Binder) pinSelection(
 	ctx context.Context,
 	selection sessionv3Runtime.ArtifactSelection,
 ) (sessionv3Runtime.ArtifactPin, error) {
-	ref := artifactRefForSelection(selection)
-	if err := ref.Validate(); err != nil {
-		return sessionv3Runtime.ArtifactPin{}, err
-	}
-	pin, err := b.pinArtifactRef(ctx, ref)
-	if err != nil {
-		return sessionv3Runtime.ArtifactPin{}, err
-	}
-	if selection.ExpectedRevision != 0 &&
-		selection.ExpectedRevision != pin.Revision {
-		return sessionv3Runtime.ArtifactPin{}, errors.New(
-			"selected artifact revision changed",
-		)
-	}
-	if selection.ExpectedDigest != "" &&
-		selection.ExpectedDigest != pin.Digest {
-		return sessionv3Runtime.ArtifactPin{}, errors.New(
-			"selected artifact definition changed",
-		)
-	}
-	return pin, nil
-}
-
-func (b *Binder) pinArtifactRef(
-	ctx context.Context,
-	ref artifactModel.ArtifactRef,
-) (sessionv3Runtime.ArtifactPin, error) {
-	if b == nil || b.deps.Artifacts == nil {
-		return sessionv3Runtime.ArtifactPin{}, errors.New(
-			"session v3 artifact runtime is unavailable",
-		)
-	}
-	if err := ref.Validate(); err != nil {
-		return sessionv3Runtime.ArtifactPin{}, err
-	}
-
-	values, err := b.deps.Artifacts.GetMany(
-		ctx,
-		[]artifactModel.ArtifactRef{ref},
-	)
-	if err != nil {
-		return sessionv3Runtime.ArtifactPin{}, err
-	}
-	if len(values) != 1 || values[0].Ref() != ref {
-		return sessionv3Runtime.ArtifactPin{}, errors.New(
-			"artifact runtime returned an unexpected artifact",
-		)
-	}
-
-	value := values[0]
-	if value.State != artifactModel.StateAvailable || !value.Enabled {
-		return sessionv3Runtime.ArtifactPin{}, errors.New(
-			"selected artifact is unavailable",
-		)
-	}
-	if value.ResolvedDefinition == nil ||
-		strings.TrimSpace(string(*value.ResolvedDefinition)) == "" {
-		return sessionv3Runtime.ArtifactPin{}, errors.New(
-			"selected artifact has no resolved definition",
-		)
-	}
-
-	return sessionv3Runtime.ArtifactPin{
-		RootID:     string(value.RootID),
-		ArtifactID: string(value.ID),
-		Revision:   value.Revision,
-		Digest:     string(*value.ResolvedDefinition),
-	}, nil
-}
-
-func (b *Binder) verifyArtifactPin(
-	ctx context.Context,
-	pin sessionv3Runtime.ArtifactPin,
-) error {
-	ref := artifactModel.ArtifactRef{
-		RootID:     rootModel.RootID(pin.RootID),
-		ArtifactID: artifactModel.ArtifactID(pin.ArtifactID),
-	}
-	current, err := b.pinArtifactRef(ctx, ref)
-	if err != nil {
-		return err
-	}
-	if current != pin {
-		return errors.New("artifact pin changed since work item binding")
-	}
-	return nil
+	return contributionruntime.PinArtifactSelection(ctx, b.deps.Artifacts, selection)
 }
 
 func (p *llmExecutionPlan) addArtifact(

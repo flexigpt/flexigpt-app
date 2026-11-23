@@ -9,6 +9,22 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
+const (
+	appWorkPathSeparator             = "/app/"
+	errCommandIDRequired             = "command id is required"
+	errAppInstanceUnavailable        = "app instance is unavailable"
+	errAppViewIDRequired             = "app view id is required"
+	errAppToolArgumentsNotCanonical  = "app tool arguments are not canonical json"
+	errAppToolExecutionNotAllowed    = "terminal or cancelling executions cannot execute app tools"
+	errAppViewNotAttached            = "app instance is not attached to this view"
+	errExecutionChangedPreparingTool = "execution changed while app tool execution was prepared; retry"
+	errAppChangedPreparingTool       = "app instance changed while app tool execution was prepared"
+	errAppOriginFrameUnavailable     = "app origin program frame is unavailable"
+	errExecutionChangedPreparingCtx  = "execution changed while app context was prepared; retry"
+	errAppChangedPreparingCtx        = "app instance changed while app context was prepared"
+	errAppExecutorUnavailable        = "app executor is unavailable"
+)
+
 type AppToolPreparationRequest struct {
 	SessionID   SessionID
 	ExecutionID ExecutionID
@@ -34,7 +50,7 @@ func (r *Runtime) OpenAppView(
 					CommandID:   command.Meta.ID,
 					SessionID:   session.ID,
 					ExecutionID: execution.ID,
-					Message:     "App instance is unavailable",
+					Message:     errAppInstanceUnavailable,
 				}, nil
 			}
 			if strings.TrimSpace(string(command.ViewID)) == "" {
@@ -42,7 +58,7 @@ func (r *Runtime) OpenAppView(
 					CommandID:   command.Meta.ID,
 					SessionID:   session.ID,
 					ExecutionID: execution.ID,
-					Message:     "App view ID is required",
+					Message:     errAppViewIDRequired,
 				}, nil
 			}
 			if slices.Contains(app.Views, command.ViewID) {
@@ -76,14 +92,14 @@ func (r *Runtime) ExecuteAppTool(
 	command ExecuteAppToolCommand,
 ) (*CommandReceipt, error) {
 	if command.Meta.ID == "" {
-		return nil, errors.New("command ID is required")
+		return nil, errors.New(errCommandIDRequired)
 	}
 	if !command.Arguments.Valid() {
 		return &CommandReceipt{
 			CommandID:   command.Meta.ID,
 			SessionID:   command.SessionID,
 			ExecutionID: command.ExecutionID,
-			Message:     "App Tool arguments are not canonical JSON",
+			Message:     errAppToolArgumentsNotCanonical,
 		}, nil
 	}
 
@@ -124,7 +140,7 @@ func (r *Runtime) ExecuteAppTool(
 			session,
 			command.Meta,
 			command,
-			"terminal or cancelling executions cannot execute App Tools",
+			errAppToolExecutionNotAllowed,
 		)
 		r.mu.Unlock()
 		return receipt, nil
@@ -135,7 +151,7 @@ func (r *Runtime) ExecuteAppTool(
 			session,
 			command.Meta,
 			command,
-			"App instance is not attached to this view",
+			errAppViewNotAttached,
 		)
 		r.mu.Unlock()
 		return receipt, nil
@@ -181,7 +197,7 @@ func (r *Runtime) ExecuteAppTool(
 			session,
 			command.Meta,
 			command,
-			"execution changed while App Tool execution was prepared; retry",
+			errExecutionChangedPreparingTool,
 		), nil
 	}
 	if prepareErr != nil {
@@ -198,7 +214,7 @@ func (r *Runtime) ExecuteAppTool(
 			session,
 			command.Meta,
 			command,
-			"terminal or cancelling executions cannot execute App Tools",
+			errAppToolExecutionNotAllowed,
 		), nil
 	}
 	app = mutableAppInstance(execution, command.AppInstanceID)
@@ -207,7 +223,7 @@ func (r *Runtime) ExecuteAppTool(
 			session,
 			command.Meta,
 			command,
-			"App instance changed while App Tool execution was prepared",
+			errAppChangedPreparingTool,
 		), nil
 	}
 
@@ -217,7 +233,7 @@ func (r *Runtime) ExecuteAppTool(
 			session,
 			command.Meta,
 			command,
-			"App origin ProgramFrame is unavailable",
+			errAppOriginFrameUnavailable,
 		), nil
 	}
 
@@ -241,7 +257,7 @@ func (r *Runtime) ExecuteAppTool(
 		FrameID:     frame.ID,
 		Type:        WorkItemTypeTool,
 		State:       WorkItemStateReady,
-		ProgramPath: frame.Path + "/app/" + call.ID,
+		ProgramPath: frame.Path + appWorkPathSeparator + call.ID,
 		Effect: EffectContract{
 			Kind: EffectKindNonIdempotent,
 		},
@@ -276,7 +292,7 @@ func (r *Runtime) ExecuteAppTool(
 		WorkItemIDs:       []WorkItemID{item.ID},
 	}
 	r.rememberCommandLocked(session, command.Meta, command, receipt)
-	if err := r.persistLocked(ctx, "appToolQueued", session); err != nil {
+	if err := r.persistLocked(ctx, checkpointReasonAppToolQueued, session); err != nil {
 		return nil, err
 	}
 	r.publishLocked(ctx, session, execution.ID, RuntimeEventWorkChanged)
@@ -288,7 +304,7 @@ func (r *Runtime) StageAppContext(
 	command StageAppContextCommand,
 ) (*CommandReceipt, error) {
 	if command.Meta.ID == "" {
-		return nil, errors.New("command ID is required")
+		return nil, errors.New(errCommandIDRequired)
 	}
 	executor, err := r.appExecutor()
 	if err != nil {
@@ -327,7 +343,7 @@ func (r *Runtime) StageAppContext(
 			session,
 			command.Meta,
 			command,
-			"App instance is not attached to this view",
+			errAppViewNotAttached,
 		)
 		r.mu.Unlock()
 		return receipt, nil
@@ -373,7 +389,7 @@ func (r *Runtime) StageAppContext(
 			session,
 			command.Meta,
 			command,
-			"execution changed while App context was prepared; retry",
+			errExecutionChangedPreparingCtx,
 		), nil
 	}
 	if validateErr != nil {
@@ -390,7 +406,7 @@ func (r *Runtime) StageAppContext(
 			session,
 			command.Meta,
 			command,
-			"App instance changed while App context was prepared",
+			errAppChangedPreparingCtx,
 		), nil
 	}
 
@@ -419,7 +435,7 @@ func (r *Runtime) StageAppContext(
 		AppInstanceIDs:    []AppInstanceID{app.ID},
 	}
 	r.rememberCommandLocked(session, command.Meta, command, receipt)
-	if err := r.persistLocked(ctx, "appContextStaged", session); err != nil {
+	if err := r.persistLocked(ctx, checkpointReasonAppContextStaged, session); err != nil {
 		return nil, err
 	}
 	r.publishLocked(ctx, session, execution.ID, RuntimeEventExecutionChanged)
@@ -452,7 +468,7 @@ func (r *Runtime) ReadAppResource(
 	if app == nil || !containsAppView(*app, request.ViewID) {
 		r.mu.RUnlock()
 		return AppResourceReadResult{}, errors.New(
-			"app instance is not attached to this view",
+			errAppViewNotAttached,
 		)
 	}
 	snapshot := cloneAppInstance(*app)
@@ -473,11 +489,11 @@ func (r *Runtime) ReadAppResource(
 
 func (r *Runtime) appExecutor() (AppExecutor, error) {
 	if r == nil || r.deps.Binder == nil {
-		return nil, errors.New("app executor is unavailable")
+		return nil, errors.New(errAppExecutorUnavailable)
 	}
 	executor, found := r.deps.Binder.(AppExecutor)
 	if !found || executor == nil {
-		return nil, errors.New("app executor is unavailable")
+		return nil, errors.New(errAppExecutorUnavailable)
 	}
 	return executor, nil
 }

@@ -58,9 +58,6 @@ func compileWorkflowMachine(
 		}
 		output.States = append(output.States, value)
 	}
-	if err := output.Validate(); err != nil {
-		return sessionv3Runtime.WorkflowMachine{}, err
-	}
 	return output, nil
 }
 
@@ -119,7 +116,7 @@ func compileWorkflowMachineState(
 		}
 		output.Transitions = append(output.Transitions, transition)
 	}
-	return output, output.Validate()
+	return output, nil
 }
 
 func compileWorkflowMachineTransition(
@@ -153,5 +150,5 @@ func compileWorkflowMachineTransition(
 		}
 		output.Do = &value
 	}
-	return output, output.Validate()
+	return output, nil
 }

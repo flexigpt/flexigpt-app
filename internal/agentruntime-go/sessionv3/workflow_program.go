@@ -63,6 +63,13 @@ const (
 	WorkflowCallModeHandoff WorkflowCallMode = "handoff"
 )
 
+type WorkflowHandoffCompletionPolicy string
+
+const (
+	WorkflowHandoffCompletionRestore WorkflowHandoffCompletionPolicy = "restore"
+	WorkflowHandoffCompletionRetain  WorkflowHandoffCompletionPolicy = "retain"
+)
+
 type WorkflowChildOwnership struct {
 	Owner            WorkflowValue   `json:"owner"`
 	CancelWithParent bool            `json:"cancelWithParent"`
@@ -154,23 +161,23 @@ type WorkflowStep struct {
 }
 
 type WorkflowCall struct {
-	Target                 WorkflowValue              `json:"target"`
-	AllowedTargets         []string                   `json:"allowedTargets,omitempty"`
-	AllowedTargetSet       string                     `json:"allowedTargetSet,omitempty"`
-	Input                  WorkflowValue              `json:"input"`
-	Context                WorkflowValue              `json:"context"`
-	DeclarationPath        string                     `json:"declarationPath"`
-	Ports                  []WorkflowPortBinding      `json:"ports,omitempty"`
-	Contract               *WorkflowCallableInterface `json:"contract,omitempty"`
-	SetContract            *WorkflowCallableInterface `json:"setContract,omitempty"`
-	Mode                   WorkflowCallMode           `json:"mode,omitempty"`
-	Lifetime               WorkflowChildLifetime      `json:"lifetime,omitempty"`
-	Conversation           *WorkflowValue             `json:"conversation,omitempty"`
-	Ownership              *WorkflowChildOwnership    `json:"ownership,omitempty"`
-	OnCompletion           string                     `json:"onCompletion,omitempty"`
-	InternalLifecycleChild bool                       `json:"internalLifecycleChild,omitempty"`
-	LLMInvocation          *WorkflowLLMInvocation     `json:"llmInvocation,omitempty"`
-	PortInputs             []PortInput                `json:"portInputs,omitempty"`
+	Target                 WorkflowValue                   `json:"target"`
+	AllowedTargets         []string                        `json:"allowedTargets,omitempty"`
+	AllowedTargetSet       string                          `json:"allowedTargetSet,omitempty"`
+	Input                  WorkflowValue                   `json:"input"`
+	Context                WorkflowValue                   `json:"context"`
+	DeclarationPath        string                          `json:"declarationPath"`
+	Ports                  []WorkflowPortBinding           `json:"ports,omitempty"`
+	Contract               *WorkflowCallableInterface      `json:"contract,omitempty"`
+	SetContract            *WorkflowCallableInterface      `json:"setContract,omitempty"`
+	Mode                   WorkflowCallMode                `json:"mode,omitempty"`
+	Lifetime               WorkflowChildLifetime           `json:"lifetime,omitempty"`
+	Conversation           *WorkflowValue                  `json:"conversation,omitempty"`
+	Ownership              *WorkflowChildOwnership         `json:"ownership,omitempty"`
+	OnCompletion           WorkflowHandoffCompletionPolicy `json:"onCompletion,omitempty"`
+	InternalLifecycleChild bool                            `json:"internalLifecycleChild,omitempty"`
+	LLMInvocation          *WorkflowLLMInvocation          `json:"llmInvocation,omitempty"`
+	PortInputs             []PortInput                     `json:"portInputs,omitempty"`
 }
 
 // WorkflowLLMInvocation is the setup-lowered typed Model or Agent invocation
@@ -385,7 +392,7 @@ func (s *WorkflowState) Validate() error {
 		!s.State.Valid() ||
 		!s.Messages.Valid() ||
 		s.Outcomes == nil {
-		return errors.New("Workflow Program state is invalid")
+		return errors.New("workflow program state is invalid")
 	}
 	seen := make(map[string]struct{}, len(s.Outcomes))
 	for _, outcome := range s.Outcomes {
@@ -393,7 +400,7 @@ func (s *WorkflowState) Validate() error {
 			return fmt.Errorf("workflow step outcome: %w", err)
 		}
 		if _, duplicate := seen[outcome.ID]; duplicate {
-			return errors.New("Workflow Program step outcome is duplicated")
+			return errors.New("workflow program step outcome is duplicated")
 		}
 		seen[outcome.ID] = struct{}{}
 	}
@@ -607,7 +614,7 @@ func NewWorkflowInterpreter() (*WorkflowInterpreter, error) {
 	)
 	if err != nil {
 		return nil, fmt.Errorf(
-			"construct Workflow expression environment: %w",
+			"construct workflow expression environment: %w",
 			err,
 		)
 	}
@@ -627,16 +634,16 @@ func (i *WorkflowInterpreter) ValidateSnapshot(
 ) error {
 	if snapshot.InterpreterID != WorkflowInterpreterID ||
 		snapshot.InterpreterVersion != WorkflowInterpreterVersion {
-		return errors.New("unsupported Workflow interpreter version")
+		return errors.New("unsupported workflow interpreter version")
 	}
 	if snapshot.Artifact == nil {
-		return errors.New("Workflow Program snapshot has no Artifact pin")
+		return errors.New("workflow program snapshot has no artifact pin")
 	}
 	if err := validatePin(*snapshot.Artifact); err != nil {
 		return err
 	}
 	if snapshot.DefinitionDigest != snapshot.Artifact.Digest {
-		return errors.New("Workflow Program definition digest is invalid")
+		return errors.New("workflow program definition digest is invalid")
 	}
 
 	program, err := jsonutil.DecodeCanonicalValue[WorkflowProgram](snapshot.Payload)
@@ -651,7 +658,7 @@ func (*WorkflowInterpreter) ValidateState(
 ) error {
 	if state.Type != WorkflowInterpreterID ||
 		state.Version != WorkflowInterpreterVersion {
-		return errors.New("unsupported Workflow state version")
+		return errors.New("unsupported workflow state version")
 	}
 
 	value, err := jsonutil.DecodeCanonicalValue[WorkflowState](state.Data)
@@ -1945,6 +1952,10 @@ func (i *WorkflowInterpreter) call(
 			invocation.Defaults,
 			choice.Artifact,
 		)
+		invocation.PreparedInvocation = withoutProviderManagedPreparedTool(
+			invocation.PreparedInvocation,
+			choice.Artifact,
+		)
 		child, childErr := NewSingleModelWorkflowInvocationProgram(
 			invocation.Defaults,
 			invocation.InputActivityID,
@@ -2784,7 +2795,7 @@ func (i *WorkflowInterpreter) stringValue(
 
 func (p WorkflowProgram) Validate() error {
 	if p.Version != WorkflowInterpreterVersion {
-		return errors.New("unsupported Workflow Program version")
+		return errors.New("unsupported workflow program version")
 	}
 	if err := p.Scope.Validate(); err != nil {
 		return err
@@ -2797,10 +2808,13 @@ func (p WorkflowProgram) Validate() error {
 		return errors.New("workflow Program schemas or input are invalid")
 	}
 	if p.InputBound && len(p.Input) == 0 {
-		return errors.New("bound Workflow Program input is missing")
+		return errors.New("bound workflow program input is missing")
 	}
 	if strings.TrimSpace(p.Root.DeclarationPath) == "" {
 		return errors.New("workflow root has no declaration path")
+	}
+	if err := p.Root.Validate(); err != nil {
+		return err
 	}
 	for _, requirement := range p.Requirements {
 		if err := requirement.Validate(); err != nil {
@@ -2815,7 +2829,40 @@ func (p WorkflowProgram) Validate() error {
 	for name, target := range p.Targets {
 		if strings.TrimSpace(name) == "" ||
 			strings.TrimSpace(target.DeclarationPath) == "" {
-			return errors.New("Workflow Program target name is empty")
+			return errors.New("workflow program target name is empty")
+		}
+	}
+	for name, set := range p.TargetSets {
+		if err := validateID("workflow target set name", name); err != nil {
+			return err
+		}
+		if err := set.Validate(); err != nil {
+			return err
+		}
+	}
+	for _, event := range p.Events {
+		if err := event.Validate(); err != nil {
+			return err
+		}
+	}
+	for _, resource := range p.Resources {
+		if err := resource.Validate(); err != nil {
+			return err
+		}
+	}
+	for _, channel := range p.Channels {
+		if err := channel.Validate(); err != nil {
+			return err
+		}
+	}
+	for _, port := range p.Ports {
+		if err := port.Validate(); err != nil {
+			return err
+		}
+	}
+	for _, trigger := range p.Triggers {
+		if err := trigger.Validate(); err != nil {
+			return err
 		}
 	}
 	return p.Limits.Validate()
@@ -2823,7 +2870,7 @@ func (p WorkflowProgram) Validate() error {
 
 func (p WorkflowProgram) ValidateInput() error {
 	if !p.InputBound {
-		return errors.New("Workflow Program input has not been bound")
+		return errors.New("workflow program input has not been bound")
 	}
 	return validateWorkflowSchema(p.InputSchema, p.Input)
 }
@@ -3047,7 +3094,9 @@ func (c WorkflowCall) Validate() error {
 			return err
 		}
 	}
-	if c.OnCompletion != "" && c.OnCompletion != "restore" && c.OnCompletion != "retain" {
+	switch c.OnCompletion {
+	case "", WorkflowHandoffCompletionRestore, WorkflowHandoffCompletionRetain:
+	default:
 		return errors.New("workflow handoff completion behavior is invalid")
 	}
 	if c.AllowedTargetSet != "" &&
@@ -3059,10 +3108,10 @@ func (c WorkflowCall) Validate() error {
 	seen := make(map[string]struct{}, len(c.AllowedTargets))
 	for _, target := range c.AllowedTargets {
 		if strings.TrimSpace(target) == "" {
-			return errors.New("Workflow allowed target is empty")
+			return errors.New("workflow allowed target is empty")
 		}
 		if _, duplicate := seen[target]; duplicate {
-			return errors.New("Workflow allowed target is duplicated")
+			return errors.New("workflow allowed target is duplicated")
 		}
 		seen[target] = struct{}{}
 	}
@@ -3092,7 +3141,7 @@ func (s *WorkflowState) validateStructuredState() error {
 		return err
 	}
 	if !s.ExitValue.Valid() {
-		return errors.New("Workflow Program exit value is invalid")
+		return errors.New("workflow program exit value is invalid")
 	}
 	return nil
 }
@@ -3112,7 +3161,7 @@ func (t WorkflowTransform) Validate() error {
 		return err
 	}
 	if len(t.OutputSchema) != 0 && !t.OutputSchema.Valid() {
-		return errors.New("Workflow transform output schema is invalid")
+		return errors.New("workflow transform output schema is invalid")
 	}
 	return nil
 }
@@ -3121,10 +3170,10 @@ func (s WorkflowSet) Validate() error {
 	seen := make(map[string]struct{}, len(s.Values))
 	for _, value := range s.Values {
 		if strings.TrimSpace(value.Key) == "" {
-			return errors.New("Workflow state assignment key is empty")
+			return errors.New("workflow state assignment key is empty")
 		}
 		if _, duplicate := seen[value.Key]; duplicate {
-			return errors.New("Workflow state assignment key is duplicated")
+			return errors.New("workflow state assignment key is duplicated")
 		}
 		if err := value.Value.Validate(); err != nil {
 			return err
@@ -3133,10 +3182,10 @@ func (s WorkflowSet) Validate() error {
 	}
 	for _, path := range s.Remove {
 		if strings.TrimSpace(path) == "" {
-			return errors.New("Workflow state removal path is empty")
+			return errors.New("workflow state removal path is empty")
 		}
 		if _, duplicate := seen[path]; duplicate {
-			return errors.New("Workflow state assignment and removal overlap")
+			return errors.New("workflow state assignment and removal overlap")
 		}
 		seen[path] = struct{}{}
 	}
@@ -3147,14 +3196,14 @@ func (v WorkflowValue) Validate() error {
 	switch v.Kind {
 	case WorkflowValueLiteral:
 		if len(v.Literal) == 0 || !v.Literal.Valid() {
-			return errors.New("Workflow literal is invalid")
+			return errors.New("workflow literal is invalid")
 		}
 		return nil
 
 	case WorkflowValueExpression:
 		if strings.TrimSpace(v.Expression) == "" ||
 			len(v.Expression) > 65536 {
-			return errors.New("Workflow expression is invalid")
+			return errors.New("workflow expression is invalid")
 		}
 		return nil
 
@@ -3162,7 +3211,7 @@ func (v WorkflowValue) Validate() error {
 		seen := make(map[string]struct{}, len(v.Object))
 		for _, value := range v.Object {
 			if _, duplicate := seen[value.Key]; duplicate {
-				return errors.New("Workflow object key is duplicated")
+				return errors.New("workflow object key is duplicated")
 			}
 			if err := value.Value.Validate(); err != nil {
 				return err
@@ -3180,7 +3229,7 @@ func (v WorkflowValue) Validate() error {
 		return nil
 
 	default:
-		return errors.New("Workflow value kind is unsupported")
+		return errors.New("workflow value kind is unsupported")
 	}
 }
 
@@ -3198,7 +3247,7 @@ func (c WorkflowCallableInterface) Validate() error {
 		!c.OutputSchema.Valid() ||
 		!c.ErrorSchema.Valid() ||
 		!c.ReceiptSchema.Valid() {
-		return errors.New("Workflow callable interface is invalid")
+		return errors.New("workflow callable interface is invalid")
 	}
 	for _, requirement := range c.Context {
 		if err := requirement.Validate(); err != nil {
@@ -3225,19 +3274,19 @@ func (t WorkflowTarget) Validate() error {
 		if strings.TrimSpace(t.ToolName) == "" ||
 			t.MCP != nil ||
 			t.Artifact == nil {
-			return errors.New("Workflow Tool target is invalid")
+			return errors.New("workflow tool target is invalid")
 		}
 		err = validatePin(*t.Artifact)
 
 	case WorkflowTargetMCPTool:
 		if t.MCP == nil || t.Artifact != nil {
-			return errors.New("Workflow MCP Tool target is invalid")
+			return errors.New("workflow mcp tool target is invalid")
 		}
 		err = t.MCP.Validate()
 
 	case WorkflowTargetProviderTool:
 		if t.ProviderTool == nil || t.Artifact != nil || t.MCP != nil {
-			return errors.New("Workflow provider-managed Tool target is invalid")
+			return errors.New("workflow provider-managed tool target is invalid")
 		}
 		err = t.ProviderTool.Validate()
 
@@ -3247,7 +3296,7 @@ func (t WorkflowTarget) Validate() error {
 			t.Artifact != nil ||
 			t.MCP != nil ||
 			t.ProviderTool != nil {
-			return errors.New("Workflow Service target is invalid")
+			return errors.New("workflow service target is invalid")
 		}
 
 	case WorkflowTargetActivity:
@@ -3256,24 +3305,24 @@ func (t WorkflowTarget) Validate() error {
 			t.Artifact != nil ||
 			t.MCP != nil ||
 			t.ProviderTool != nil {
-			return errors.New("Workflow Activity target is invalid")
+			return errors.New("workflow activity target is invalid")
 		}
 
 	case WorkflowTargetWorkflow:
 		if t.NestedProgram == nil {
-			return errors.New("Workflow nested target is invalid")
+			return errors.New("workflow nested target is invalid")
 		}
 		_, err = workflowProgramFromSnapshot(*t.NestedProgram)
 
 	case WorkflowTargetAgent,
 		WorkflowTargetModel:
 		if t.Artifact == nil {
-			return errors.New("Workflow Model or Agent target has no Artifact pin")
+			return errors.New("workflow model or agent target has no artifact pin")
 		}
 		err = validatePin(*t.Artifact)
 
 	default:
-		return errors.New("Workflow target kind is unsupported")
+		return errors.New("workflow target kind is unsupported")
 	}
 	if err != nil {
 		return err
@@ -3303,7 +3352,7 @@ func (t WorkflowTarget) Validate() error {
 
 func (m WorkflowMCP) Validate() error {
 	if strings.TrimSpace(m.ToolName) == "" {
-		return errors.New("Workflow MCP Tool name is required")
+		return errors.New("workflow mcp tool name is required")
 	}
 	if err := validatePin(m.Server); err != nil {
 		return err
@@ -3329,7 +3378,7 @@ func workflowProgramFromSnapshot(
 	if snapshot.InterpreterID != WorkflowInterpreterID ||
 		snapshot.InterpreterVersion != WorkflowInterpreterVersion {
 		return WorkflowProgram{}, errors.New(
-			"Workflow Program snapshot has another interpreter",
+			"workflow program snapshot has another interpreter",
 		)
 	}
 	program, err := jsonutil.DecodeCanonicalValue[WorkflowProgram](
@@ -3347,7 +3396,15 @@ func workflowProgramFromSnapshot(
 func decodeWorkflowProgram(
 	frame ProgramFrame,
 ) (WorkflowProgram, WorkflowState, error) {
-	program, err := workflowProgramFromSnapshot(frame.Program)
+	if frame.Program.InterpreterID != WorkflowInterpreterID ||
+		frame.Program.InterpreterVersion != WorkflowInterpreterVersion {
+		return WorkflowProgram{}, WorkflowState{}, errors.New(
+			"workflow program snapshot has another interpreter",
+		)
+	}
+	program, err := jsonutil.DecodeCanonicalValue[WorkflowProgram](
+		frame.Program.Payload,
+	)
 	if err != nil {
 		return WorkflowProgram{}, WorkflowState{}, err
 	}
@@ -3741,7 +3798,7 @@ func workflowWorkValue(
 	item WorkItem,
 ) (jsonutil.CanonicalValue, error) {
 	if item.Output == nil {
-		return nil, errors.New("Workflow WorkItem has no output")
+		return nil, errors.New("workflow work item has no output")
 	}
 	if len(item.Output.Value) != 0 {
 		return item.Output.Value.Clone(), nil
@@ -3751,7 +3808,7 @@ func workflowWorkValue(
 		return item.Output.Tool.Structured.Clone(), nil
 	}
 	return nil, errors.New(
-		"Workflow WorkItem output has no durable semantic value",
+		"workflow work item output has no durable semantic value",
 	)
 }
 
@@ -3836,7 +3893,7 @@ func validateWorkflowSchema(
 		return nil
 	}
 	if !schema.Valid() || !value.Valid() {
-		return errors.New("Workflow schema or value is invalid")
+		return errors.New("workflow schema or value is invalid")
 	}
 
 	compiled, err := jsonutil.CompileJSONSchema([]byte(schema))

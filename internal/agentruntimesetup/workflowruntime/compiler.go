@@ -17,6 +17,15 @@ var ErrUnsupportedOperation = errors.New(
 	"workflow operation is unsupported by the typed runtime",
 )
 
+const (
+	sourceEffectKindRead          = "read"
+	sourceEffectKindIdempotent    = "idempotent"
+	sourceEffectKindKeyed         = "keyed"
+	sourceEffectKindNonIdempotent = "non-idempotent"
+	directiveExprKey              = "$expr"
+	directiveLiteralKey           = "$literal"
+)
+
 // UnsupportedOperationError is returned only during Workflow admission. It
 // prevents a syntactically valid declaration from being accepted and later
 // ignored or changed by Session Runtime.
@@ -213,7 +222,7 @@ func compileWorkflowBlockCore(
 		step, err := compileWorkflowStep(document, block.Steps[index])
 		if err != nil {
 			return sessionv3Runtime.WorkflowBlock{}, fmt.Errorf(
-				"compile Workflow step %q: %w",
+				"compile workflow step %q: %w",
 				block.Steps[index].ID,
 				err,
 			)
@@ -492,7 +501,7 @@ func compileWorkflowCall(
 		Contract:     contract,
 		Mode:         mode,
 		Lifetime:     lifetime,
-		OnCompletion: input.OnCompletion,
+		OnCompletion: sessionv3Runtime.WorkflowHandoffCompletionPolicy(input.OnCompletion),
 	}
 	if len(input.Conversation) != 0 {
 		conversation, err := compileWorkflowValue(input.Conversation)
@@ -509,9 +518,6 @@ func compileWorkflowCall(
 		output.Ownership = &ownership
 	}
 	if input.Allowed == "" {
-		if err := output.Validate(); err != nil {
-			return sessionv3Runtime.WorkflowCall{}, err
-		}
 		return output, nil
 	}
 
@@ -536,9 +542,6 @@ func compileWorkflowCall(
 	}
 	output.SetContract, err = compileWorkflowCallableInterface(document, interfaceValue)
 	if err != nil {
-		return sessionv3Runtime.WorkflowCall{}, err
-	}
-	if err := output.Validate(); err != nil {
 		return sessionv3Runtime.WorkflowCall{}, err
 	}
 	return output, nil
@@ -624,9 +627,6 @@ func compileWorkflowEffect(
 	} else {
 		output.Kind = sourceKind
 	}
-	if err := output.Validate(); err != nil {
-		return sessionv3Runtime.EffectContract{}, err
-	}
 	return output, nil
 }
 
@@ -637,13 +637,13 @@ func compileWorkflowSourceEffectKind(
 	value string,
 ) (sessionv3Runtime.EffectKind, error) {
 	switch value {
-	case "read":
+	case sourceEffectKindRead:
 		return sessionv3Runtime.EffectKindRead, nil
-	case "idempotent":
+	case sourceEffectKindIdempotent:
 		return sessionv3Runtime.EffectKindIdempotent, nil
-	case "keyed":
+	case sourceEffectKindKeyed:
 		return sessionv3Runtime.EffectKindKeyed, nil
-	case "non-idempotent":
+	case sourceEffectKindNonIdempotent:
 		return sessionv3Runtime.EffectKindNonIdempotent, nil
 	default:
 		return "", unsupportedWorkflowOperation(
@@ -696,9 +696,6 @@ func compileWorkflowStepEffect(
 		}
 		output.Compensate = &block
 	}
-	if err := output.Validate(); err != nil {
-		return sessionv3Runtime.WorkflowStepEffect{}, err
-	}
 	return output, nil
 }
 
@@ -742,7 +739,7 @@ func compileWorkflowValueNode(
 ) (sessionv3Runtime.WorkflowValue, error) {
 	switch typed := value.(type) {
 	case map[string]any:
-		if expression, found := typed["$expr"]; found {
+		if expression, found := typed[directiveExprKey]; found {
 			if len(typed) != 1 {
 				return sessionv3Runtime.WorkflowValue{}, errors.New(
 					"workflow expression has fields other than $expr",
@@ -760,7 +757,7 @@ func compileWorkflowValueNode(
 			}, nil
 		}
 
-		if literal, found := typed["$literal"]; found {
+		if literal, found := typed[directiveLiteralKey]; found {
 			if len(typed) != 1 {
 				return sessionv3Runtime.WorkflowValue{}, errors.New(
 					"workflow literal has fields other than $literal",

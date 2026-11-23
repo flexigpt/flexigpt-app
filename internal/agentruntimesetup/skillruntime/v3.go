@@ -22,10 +22,23 @@ import (
 )
 
 const (
-	v3SkillToolLoadName         = "skills-load"
-	v3SkillToolUnloadName       = "skills-unload"
-	v3SkillToolReadResourceName = "skills-readresource"
-	v3SkillToolRunScriptName    = "skills-runscript"
+	v3SkillToolLoadName          = "skills-load"
+	v3SkillToolUnloadName        = "skills-unload"
+	v3SkillToolReadResourceName  = "skills-readresource"
+	v3SkillToolRunScriptName     = "skills-runscript"
+	v3SkillBindingVersion        = "session-v3-skill/v1"
+	v3SkillPreparedChoicePrefix  = "prepared-choice:"
+	v3SkillFingerprintPrefix     = "skill:"
+	v3SkillReceiptSystem         = "skill"
+	v3SkillInvalidBindingCode    = "invalid_skill_binding"
+	v3SkillSessionFailedCode     = "skill_session_failed"
+	v3SkillInvalidArgsCode       = "invalid_skill_arguments"
+	v3SkillFailedCode            = "skill_failed"
+	v3SkillEmptyCode             = "skill_empty"
+	v3SkillStateUnavailableCode  = "skill_state_unavailable"
+	v3SkillToolErrorCode         = "skill_tool_error"
+	defaultSkillToolErrorMessage = "skill tool returned an error result"
+	errV3SkillRuntimeUnavailable = "session v3 skill runtime is unavailable"
 )
 
 // V3Executor owns source-backed Skill selection and per-Execution Skill
@@ -56,7 +69,7 @@ func NewV3Executor(
 	runtime *skillRuntime.Service,
 ) (*V3Executor, error) {
 	if resolver == nil || runtime == nil {
-		return nil, errors.New("session v3 Skill runtime dependencies are incomplete")
+		return nil, errors.New("session v3 skill runtime dependencies are incomplete")
 	}
 
 	return &V3Executor{
@@ -165,16 +178,14 @@ func (e *V3Executor) Bind(
 	payload *sessionv3Runtime.ToolWork,
 ) (sessionv3Runtime.SemanticBinding, error) {
 	if e == nil || e.resolver == nil || e.runtime == nil {
-		return sessionv3Runtime.SemanticBinding{}, errors.New(
-			"session v3 Skill runtime is unavailable",
-		)
+		return sessionv3Runtime.SemanticBinding{}, errors.New(errV3SkillRuntimeUnavailable)
 	}
 	if payload == nil ||
 		payload.Call.Binding.Kind != sessionv3Runtime.ToolBindingKindSkill ||
 		payload.Call.Binding.Skill == nil ||
 		payload.Call.Binding.Skill.Name != payload.Call.Name {
 		return sessionv3Runtime.SemanticBinding{}, errors.New(
-			"skill tool binding does not match the requested Tool",
+			"skill tool binding does not match the requested tool",
 		)
 	}
 	if err := payload.Call.Validate(); err != nil {
@@ -189,7 +200,7 @@ func (e *V3Executor) Bind(
 	}
 	if len(skills) == 0 {
 		return sessionv3Runtime.SemanticBinding{}, errors.New(
-			"skill tool was requested without enabled Skills",
+			"skill tool was requested without enabled skills",
 		)
 	}
 	owner := v3SkillOwnerKey(request, payload)
@@ -212,9 +223,9 @@ func (e *V3Executor) Bind(
 	}
 
 	return sessionv3Runtime.SemanticBinding{
-		Version:           "session-v3-skill/v1",
+		Version:           v3SkillBindingVersion,
 		Artifacts:         append([]sessionv3Runtime.ArtifactPin(nil), resolved.state.Enabled...),
-		TargetFingerprint: "skill:" + payload.Call.Name,
+		TargetFingerprint: v3SkillFingerprintPrefix + payload.Call.Name,
 		BoundAt:           time.Now().UTC(),
 	}, nil
 }
@@ -233,8 +244,8 @@ func (e *V3Executor) Execute(
 		payload.Call.Binding.Skill.Name != payload.Call.Name {
 		return sessionv3Runtime.WorkExecutionResult{
 			Error: &sessionv3Runtime.SanitizedError{
-				Code:    "invalid_skill_binding",
-				Message: "Skill Tool binding does not match the requested Tool",
+				Code:    v3SkillInvalidBindingCode,
+				Message: "skill tool binding does not match the requested tool",
 			},
 		}, true, nil
 	}
@@ -260,8 +271,8 @@ func (e *V3Executor) Execute(
 	if err != nil {
 		return sessionv3Runtime.WorkExecutionResult{
 			Error: &sessionv3Runtime.SanitizedError{
-				Code:    "skill_session_failed",
-				Message: err.Error(),
+				Code:    v3SkillSessionFailedCode,
+				Message: strings.ToLower(err.Error()),
 			},
 		}, true, nil
 	}
@@ -273,8 +284,8 @@ func (e *V3Executor) Execute(
 	if err != nil {
 		return sessionv3Runtime.WorkExecutionResult{
 			Error: &sessionv3Runtime.SanitizedError{
-				Code:    "skill_session_failed",
-				Message: err.Error(),
+				Code:    v3SkillSessionFailedCode,
+				Message: strings.ToLower(err.Error()),
 			},
 		}, true, nil
 	}
@@ -286,8 +297,8 @@ func (e *V3Executor) Execute(
 	if !arguments.Valid() {
 		return sessionv3Runtime.WorkExecutionResult{
 			Error: &sessionv3Runtime.SanitizedError{
-				Code:    "invalid_skill_arguments",
-				Message: "Skill Tool arguments are not canonical JSON",
+				Code:    v3SkillInvalidArgsCode,
+				Message: "skill tool arguments are not canonical json",
 			},
 		}, true, nil
 	}
@@ -303,18 +314,35 @@ func (e *V3Executor) Execute(
 		},
 	)
 	if err != nil {
+		if v3SkillConversationSource(payload.Call.Source) && ctx.Err() == nil {
+			activeState, stateErr := e.activeSkillSelectionState(ctx, owner, runtimeSession)
+			if stateErr != nil {
+				activeState = cloneV3SkillState(runtimeSession.state)
+			}
+			effect := sessionv3Runtime.EffectStateConfirmedNotApplied
+			return sessionv3Runtime.WorkExecutionResult{
+				Output:      v3SkillToolErrorOutput(err.Error(), &activeState),
+				Confirmed:   true,
+				EffectState: &effect,
+			}, true, nil
+		}
+		effect := sessionv3Runtime.EffectStateUncertain
 		return sessionv3Runtime.WorkExecutionResult{
 			Error: &sessionv3Runtime.SanitizedError{
-				Code:    "skill_failed",
-				Message: err.Error(),
+				Code:     v3SkillFailedCode,
+				Category: sessionv3Runtime.ErrorCategoryUncertainty,
+				Effect:   effect,
+				Message:  strings.ToLower(err.Error()),
 			},
+			Confirmed:   false,
+			EffectState: &effect,
 		}, true, nil
 	}
 	if response == nil || response.Body == nil {
 		return sessionv3Runtime.WorkExecutionResult{
 			Error: &sessionv3Runtime.SanitizedError{
-				Code:    "skill_empty",
-				Message: "Skill Tool returned no response",
+				Code:    v3SkillEmptyCode,
+				Message: "skill tool returned no response",
 			},
 		}, true, nil
 	}
@@ -337,32 +365,28 @@ func (e *V3Executor) Execute(
 	if stateErr != nil {
 		return sessionv3Runtime.WorkExecutionResult{
 			Error: &sessionv3Runtime.SanitizedError{
-				Code:     "skill_state_unavailable",
+				Code:     v3SkillStateUnavailableCode,
 				Category: sessionv3Runtime.ErrorCategoryUncertainty,
-				Message:  stateErr.Error(),
+				Message:  strings.ToLower(stateErr.Error()),
 			},
 			Confirmed: false,
 		}, true, nil
 	}
 
 	kind := sessionv3Runtime.ToolOutputKindSuccess
-	var executionError *sessionv3Runtime.SanitizedError
+	errorText := ""
 	if response.Body.IsError {
 		kind = sessionv3Runtime.ToolOutputKindError
-		message := firstV3SkillText(
+		errorText = firstV3SkillText(
 			response.Body.ErrorMessage,
-			"Skill Tool returned an error result",
+			defaultSkillToolErrorMessage,
 		)
-		executionError = &sessionv3Runtime.SanitizedError{
-			Code:    "skill_tool_error",
-			Message: message,
-		}
 		if strings.TrimSpace(adapted.Text) == "" {
-			adapted.Text = message
+			adapted.Text = errorText
 		}
 	}
 
-	return sessionv3Runtime.WorkExecutionResult{
+	result := sessionv3Runtime.WorkExecutionResult{
 		Output: &sessionv3Runtime.WorkItemOutput{
 			Value: structured,
 			Tool: &sessionv3Runtime.ToolOutput{
@@ -370,18 +394,82 @@ func (e *V3Executor) Execute(
 				Text:       adapted.Text,
 				Contents:   adapted.Contents,
 				Structured: structured,
-				Error:      firstV3SkillText(response.Body.ErrorMessage),
+				Error:      errorText,
 				SkillState: &activeState,
 			},
-			Receipt: &sessionv3Runtime.ExternalReceipt{
-				System:      "skill",
-				Reference:   "skill:" + payload.Call.Name + ":" + payload.Call.ID,
-				ConfirmedAt: time.Now().UTC(),
-			},
 		},
-		Error:     executionError,
 		Confirmed: true,
-	}, true, nil
+	}
+	if !response.Body.IsError {
+		result.Output.Receipt = &sessionv3Runtime.ExternalReceipt{
+			System:      v3SkillReceiptSystem,
+			Reference:   v3SkillFingerprintPrefix + payload.Call.Name + ":" + payload.Call.ID,
+			ConfirmedAt: time.Now().UTC(),
+		}
+		return result, true, nil
+	}
+	if v3SkillConversationSource(payload.Call.Source) && ctx.Err() == nil {
+		effect := sessionv3Runtime.EffectStateConfirmedNotApplied
+		result.Confirmed = true
+		result.EffectState = &effect
+		return result, true, nil
+	}
+	if ctx.Err() != nil {
+		effect := sessionv3Runtime.EffectStateUncertain
+		result.Confirmed = false
+		result.EffectState = &effect
+		result.Error = &sessionv3Runtime.SanitizedError{
+			Code:     v3SkillToolErrorCode,
+			Category: sessionv3Runtime.ErrorCategoryUncertainty,
+			Effect:   effect,
+			Message:  strings.ToLower(errorText),
+		}
+		return result, true, nil
+	}
+	effect := sessionv3Runtime.EffectStateConfirmedNotApplied
+	result.Confirmed = true
+	result.EffectState = &effect
+	result.Error = &sessionv3Runtime.SanitizedError{
+		Code:     v3SkillToolErrorCode,
+		Category: sessionv3Runtime.ErrorCategoryExecution,
+		Effect:   effect,
+		Message:  strings.ToLower(errorText),
+	}
+	return result, true, nil
+}
+
+func v3SkillConversationSource(source sessionv3Runtime.ToolCallSource) bool {
+	return source == sessionv3Runtime.ToolCallSourceModel ||
+		source == sessionv3Runtime.ToolCallSourceApp
+}
+
+func v3SkillToolErrorOutput(
+	message string,
+	state *sessionv3Runtime.SkillSelectionState,
+) *sessionv3Runtime.WorkItemOutput {
+	text := firstV3SkillText(message, defaultSkillToolErrorMessage)
+	value := jsonutil.MustCanonicalValue(struct {
+		Kind    sessionv3Runtime.ToolOutputKind `json:"kind"`
+		Message string                          `json:"message"`
+	}{
+		Kind:    sessionv3Runtime.ToolOutputKindError,
+		Message: text,
+	})
+	var copiedState *sessionv3Runtime.SkillSelectionState
+	if state != nil {
+		cloned := cloneV3SkillState(*state)
+		copiedState = &cloned
+	}
+	return &sessionv3Runtime.WorkItemOutput{
+		Value: value,
+		Tool: &sessionv3Runtime.ToolOutput{
+			Kind:       sessionv3Runtime.ToolOutputKindError,
+			Text:       text,
+			Structured: value.Clone(),
+			Error:      text,
+			SkillState: copiedState,
+		},
+	}
 }
 
 // CloseExecution closes the process-local Skill Runtime session associated
@@ -457,9 +545,7 @@ func (e *V3Executor) renderSelectedSkill(
 	expectedInsert document.SkillInsert,
 ) (sessionv3Runtime.ArtifactPin, string, error) {
 	if e == nil || e.resolver == nil || e.runtime == nil {
-		return sessionv3Runtime.ArtifactPin{}, "", errors.New(
-			"session v3 skill runtime is unavailable",
-		)
+		return sessionv3Runtime.ArtifactPin{}, "", errors.New(errV3SkillRuntimeUnavailable)
 	}
 
 	ref := artifactModel.ArtifactRef{
@@ -592,7 +678,7 @@ func v3SkillChoices(
 	output := make([]toolruntime.V3PreparedChoice, 0, len(choices))
 	for _, choice := range choices {
 		call := sessionv3Runtime.ToolCall{
-			ID:          "prepared-choice:" + choice.ID,
+			ID:          v3SkillPreparedChoicePrefix + choice.ID,
 			Name:        choice.Name,
 			ChoiceID:    choice.ID,
 			Type:        choice.Type,
@@ -680,7 +766,7 @@ func v3SkillSelectionsForTool(
 	if payload.Origin == nil {
 		if payload.Call.Source == sessionv3Runtime.ToolCallSourceModel {
 			return nil, nil, errors.New(
-				"generated Skill Tool has no immutable LLM invocation origin",
+				"generated skill tool has no immutable llm invocation origin",
 			)
 		}
 		return request.Session.Defaults.Skills,
@@ -706,12 +792,7 @@ func v3SkillSelectionsForTool(
 		len(originPlan.Skills),
 	)
 	for _, value := range originPlan.Skills {
-		selection := sessionv3Runtime.ArtifactSelection{
-			RootID:           value.Artifact.RootID,
-			ArtifactID:       value.Artifact.ArtifactID,
-			ExpectedRevision: value.Artifact.Revision,
-			ExpectedDigest:   value.Artifact.Digest,
-		}
+		selection := value.Artifact.Selection()
 		skills = append(skills, selection)
 		if value.Active {
 			active = append(active, selection)

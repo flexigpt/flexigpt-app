@@ -38,8 +38,5 @@ func compileWorkflowParentStateMerge(
 			Value: value,
 		})
 	}
-	if err := output.Validate(); err != nil {
-		return nil, err
-	}
 	return output, nil
 }

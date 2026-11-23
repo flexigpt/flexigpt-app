@@ -2,6 +2,7 @@ package workflowruntime
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -200,9 +201,6 @@ func compileWorkflowLLMMessage(
 		}
 		output.Attachments = attachments
 	}
-	if err := output.Validate(); err != nil {
-		return sessionv3Runtime.WorkflowLLMMessage{}, err
-	}
 	return output, nil
 }
 
@@ -225,7 +223,7 @@ func compileWorkflowLLMInstructionSegment(
 	var values []json.RawMessage
 	if err := json.Unmarshal(value, &values); err != nil {
 		return sessionv3Runtime.WorkflowLLMInstructionSegment{}, errors.New(
-			"workflow Model or Agent instructions must be an array",
+			"workflow model or agent instructions must be an array",
 		)
 	}
 
@@ -238,7 +236,7 @@ func compileWorkflowLLMInstructionSegment(
 		var object map[string]json.RawMessage
 		if err := json.Unmarshal(values[index], &object); err != nil || object == nil {
 			return sessionv3Runtime.WorkflowLLMInstructionSegment{}, fmt.Errorf(
-				"workflow Model or Agent instruction %d must be an object",
+				"workflow model or agent instruction %d must be an object",
 				index,
 			)
 		}
@@ -276,7 +274,7 @@ func compileWorkflowLLMInstructionSegment(
 		if idRaw, found := object[workflowLLMFieldID]; found {
 			if err := json.Unmarshal(idRaw, &instruction.ID); err != nil {
 				return sessionv3Runtime.WorkflowLLMInstructionSegment{}, errors.New(
-					"workflow model or agent instruction ID must be a string",
+					"workflow model or agent instruction id must be a string",
 				)
 			}
 		}
@@ -286,9 +284,6 @@ func compileWorkflowLLMInstructionSegment(
 					"workflow model or agent instruction label must be a string",
 				)
 			}
-		}
-		if err := instruction.Validate(); err != nil {
-			return sessionv3Runtime.WorkflowLLMInstructionSegment{}, err
 		}
 		output = append(output, instruction)
 	}
@@ -361,6 +356,8 @@ func workflowCallAtDeclarationPath(
 }
 
 func prepareWorkflowLLMInvocations(
+	ctx context.Context,
+	invocations WorkflowInvocationTargetAdapter,
 	inventory workflowAPI.Inventory,
 	program *sessionv3Runtime.WorkflowProgram,
 ) error {
@@ -399,7 +396,7 @@ func prepareWorkflowLLMInvocations(
 		invocation, err := compileWorkflowLLMInvocation(callSite.Call)
 		if err != nil {
 			return fmt.Errorf(
-				"workflow call %q typed Model or Agent invocation: %w",
+				"workflow call %q typed model or agent invocation: %w",
 				callSite.Path,
 				err,
 			)
@@ -407,9 +404,62 @@ func prepareWorkflowLLMInvocations(
 		invocation.PreparedTargets = make(
 			map[string]sessionv3Runtime.WorkflowPreparedInvocation,
 		)
+		callPreparer, hasCallPreparer := invocations.(WorkflowCallInvocationTargetAdapter)
 		for _, use := range callSite.TargetUses {
 			target, found := program.Targets[use.Name]
-			if !found || target.Invocation == nil {
+			if !found {
+				continue
+			}
+			if invocation.Defaults != nil && hasCallPreparer {
+				var (
+					prepared   sessionv3Runtime.WorkflowPreparedInvocation
+					prepareErr error
+					handled    bool
+				)
+				switch target.Kind {
+				case sessionv3Runtime.WorkflowTargetModel:
+					if target.Artifact != nil {
+						prepared, prepareErr = callPreparer.PrepareWorkflowModelCallInvocation(
+							ctx,
+							*target.Artifact,
+							invocation.Defaults,
+						)
+						handled = true
+					}
+				case sessionv3Runtime.WorkflowTargetAgent:
+					if target.Artifact != nil {
+						prepared, prepareErr = callPreparer.PrepareWorkflowAgentCallInvocation(
+							ctx,
+							*target.Artifact,
+							invocation.Defaults,
+						)
+						handled = true
+					}
+				case sessionv3Runtime.WorkflowTargetProviderTool:
+					if target.ProviderTool != nil {
+						prepared, prepareErr = callPreparer.PrepareWorkflowModelCallInvocation(
+							ctx,
+							target.ProviderTool.OwnerModel,
+							invocation.Defaults,
+						)
+						handled = true
+					}
+				default:
+				}
+				if prepareErr != nil {
+					return fmt.Errorf(
+						"workflow call %q target %q defaults preparation: %w",
+						callSite.Path,
+						use.Name,
+						prepareErr,
+					)
+				}
+				if handled {
+					invocation.PreparedTargets[use.Name] = jsonutil.CloneJSONInValue(prepared)
+					continue
+				}
+			}
+			if target.Invocation == nil {
 				continue
 			}
 			invocation.PreparedTargets[use.Name] = jsonutil.CloneJSONInValue(*target.Invocation)

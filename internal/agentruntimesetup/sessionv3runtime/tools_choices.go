@@ -29,13 +29,13 @@ func (b *Binder) toolChoices(
 
 	register := func(value preparedChoice) error {
 		if value.Choice.ID == "" || value.Choice.Name == "" {
-			return errors.New("prepared Tool choice has no ID or name")
+			return errors.New("prepared tool choice has no id or name")
 		}
 		if _, duplicate := bindings[value.Choice.ID]; duplicate {
-			return fmt.Errorf("duplicate provider Tool choice ID %q", value.Choice.ID)
+			return fmt.Errorf("duplicate provider tool choice id %q", value.Choice.ID)
 		}
 		if _, duplicate := bindings[value.Choice.Name]; duplicate {
-			return fmt.Errorf("duplicate provider Tool name %q", value.Choice.Name)
+			return fmt.Errorf("duplicate provider tool name %q", value.Choice.Name)
 		}
 
 		choices = append(choices, value.Choice)
@@ -48,7 +48,7 @@ func (b *Binder) toolChoices(
 	if len(defaults.Skills) != 0 {
 		if len(skillChoices) == 0 {
 			return nil, nil, nil, errors.New(
-				"enabled Skills produced no lifecycle Tool choices",
+				"enabled skills produced no lifecycle tool choices",
 			)
 		}
 		for _, c := range preparedChoicesFromDomain(skillChoices) {
@@ -76,7 +76,7 @@ func (b *Binder) toolChoices(
 	}
 	if b.goTools == nil {
 		return nil, nil, nil, errors.New(
-			"session v3 Tool runtime is unavailable",
+			"session v3 tool runtime is unavailable",
 		)
 	}
 	goChoices, err := b.goTools.Choices(

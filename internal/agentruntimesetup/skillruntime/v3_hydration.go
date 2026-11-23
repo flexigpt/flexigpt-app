@@ -137,9 +137,7 @@ func (e *V3Executor) HydrateLLM(
 		return V3LLMSkillHydration{}, nil
 	}
 	if e == nil || e.runtime == nil {
-		return V3LLMSkillHydration{}, errors.New(
-			"session v3 Skill runtime is unavailable",
-		)
+		return V3LLMSkillHydration{}, errors.New(errV3SkillRuntimeUnavailable)
 	}
 
 	resolved, err := e.resolveV3Selections(ctx, enabled, active)
@@ -177,7 +175,7 @@ func (e *V3Executor) HydrateLLM(
 	}
 	if !sameV3SkillState(actual, resolved.state) {
 		return V3LLMSkillHydration{}, errors.New(
-			"private Skill Runtime active selection differs from durable Skill state",
+			"private skill runtime active selection differs from durable skill state",
 		)
 	}
 	e.storeV3SkillSession(key, runtimeSession, actual)
@@ -217,12 +215,12 @@ func (e *V3Executor) resolveV3Selections(
 ) (v3ResolvedSkillSelections, error) {
 	if e == nil || e.resolver == nil {
 		return v3ResolvedSkillSelections{}, errors.New(
-			"session v3 Skill resolver is unavailable",
+			"session v3 skill resolver is unavailable",
 		)
 	}
 	if len(selections) == 0 {
 		return v3ResolvedSkillSelections{}, errors.New(
-			"enabled Skill selection is required",
+			"enabled skill selection is required",
 		)
 	}
 
@@ -242,7 +240,7 @@ func (e *V3Executor) resolveV3Selections(
 		key := v3SkillArtifactKey(selection.RootID, selection.ArtifactID)
 		if _, duplicate := byKey[key]; duplicate {
 			return v3ResolvedSkillSelections{}, fmt.Errorf(
-				"duplicate selected Skill %s/%s",
+				"duplicate selected skill %s/%s",
 				selection.RootID,
 				selection.ArtifactID,
 			)
@@ -259,14 +257,14 @@ func (e *V3Executor) resolveV3Selections(
 		key := v3SkillArtifactKey(selection.RootID, selection.ArtifactID)
 		if _, duplicate := activeByKey[key]; duplicate {
 			return v3ResolvedSkillSelections{}, fmt.Errorf(
-				"duplicate active Skill %s/%s",
+				"duplicate active skill %s/%s",
 				selection.RootID,
 				selection.ArtifactID,
 			)
 		}
 		if _, enabled := byKey[key]; !enabled {
 			return v3ResolvedSkillSelections{}, errors.New(
-				"active Skill is not part of the enabled Skill selection",
+				"active skill is not part of the enabled skill selection",
 			)
 		}
 		activeByKey[key] = selection
@@ -278,7 +276,7 @@ func (e *V3Executor) resolveV3Selections(
 	}
 	if len(values.Values) != len(refs) {
 		return v3ResolvedSkillSelections{}, errors.New(
-			"skill resolver returned an unexpected selected Skill count",
+			"skill resolver returned an unexpected selected skill count",
 		)
 	}
 
@@ -309,24 +307,24 @@ func (e *V3Executor) resolveV3Selections(
 		selection, found := byKey[key]
 		if !found {
 			return v3ResolvedSkillSelections{}, errors.New(
-				"skill resolver returned an Artifact that was not requested",
+				"skill resolver returned an artifact that was not requested",
 			)
 		}
 		if selection.ExpectedRevision != 0 &&
 			selection.ExpectedRevision != value.Revision {
 			return v3ResolvedSkillSelections{}, errors.New(
-				"selected Skill revision changed",
+				"selected skill revision changed",
 			)
 		}
 		if selection.ExpectedDigest != "" &&
 			selection.ExpectedDigest != value.DefinitionDigest {
 			return v3ResolvedSkillSelections{}, errors.New(
-				"selected Skill Definition changed",
+				"selected skill definition changed",
 			)
 		}
 		if !value.Enabled {
 			return v3ResolvedSkillSelections{}, fmt.Errorf(
-				"selected Skill %q is disabled",
+				"selected skill %q is disabled",
 				value.Artifact.ArtifactID,
 			)
 		}
@@ -350,19 +348,19 @@ func (e *V3Executor) resolveV3Selections(
 		pin, found := pinsByKey[key]
 		if !found {
 			return v3ResolvedSkillSelections{}, errors.New(
-				"active Skill is not part of the enabled Skill selection",
+				"active skill is not part of the enabled skill selection",
 			)
 		}
 		if selection.ExpectedRevision != 0 &&
 			selection.ExpectedRevision != pin.Revision {
 			return v3ResolvedSkillSelections{}, errors.New(
-				"selected active Skill revision changed",
+				"selected active skill revision changed",
 			)
 		}
 		if selection.ExpectedDigest != "" &&
 			selection.ExpectedDigest != pin.Digest {
 			return v3ResolvedSkillSelections{}, errors.New(
-				"selected active Skill Definition changed",
+				"selected active skill definition changed",
 			)
 		}
 		output.active = append(output.active, definitionsByKey[key])
@@ -405,7 +403,7 @@ func (e *V3Executor) ensureResolvedSkillSession(
 		created.Body == nil ||
 		created.Body.SessionID == "" {
 		return v3SkillSession{}, errors.New(
-			"skill runtime returned no Session identity",
+			"skill runtime returned no session identity",
 		)
 	}
 	if !sameV3SkillDefinitions(
@@ -417,7 +415,7 @@ func (e *V3Executor) ensureResolvedSkillSession(
 			created.Body.SessionID,
 		)
 		return v3SkillSession{}, errors.New(
-			"skill runtime returned an unexpected active Skill selection",
+			"skill runtime returned an unexpected active skill selection",
 		)
 	}
 
@@ -505,7 +503,7 @@ func v3SkillStateFromDefinitions(
 		pin, found := session.byDefinition[definition]
 		if !found {
 			return sessionv3Runtime.SkillSelectionState{}, errors.New(
-				"skill runtime returned an active Skill outside its durable allow-list",
+				"skill runtime returned an active skill outside its durable allow-list",
 			)
 		}
 		activeByKey[pin.RootID+"\x00"+pin.ArtifactID] = struct{}{}
@@ -569,13 +567,13 @@ func v3SkillActiveSelections(
 		selection, found := byKey[key]
 		if !found {
 			return nil, errors.New(
-				"durable active Skill state contains an unavailable Skill",
+				"durable active skill state contains an unavailable skill",
 			)
 		}
 		expected, found := v3SkillSelectionPin(selection)
 		if !found || expected != pin {
 			return nil, errors.New(
-				"durable active Skill state differs from the current enabled Skill pin",
+				"durable active skill state differs from the current enabled skill pin",
 			)
 		}
 		output = append(output, selection)

@@ -67,8 +67,5 @@ func compileWorkflowSaga(
 			)
 		}
 	}
-	if err := output.Validate(); err != nil {
-		return sessionv3Runtime.WorkflowSaga{}, err
-	}
 	return output, nil
 }

@@ -315,7 +315,7 @@ func (r *Runtime) waitForRetry(
 	item.RetryState = nil
 	item.UpdatedAt = now
 	r.touchExecutionLocked(session, execution)
-	if err := r.persistLocked(persistContext, "retryReady", session); err != nil {
+	if err := r.persistLocked(persistContext, checkpointReasonRetryReady, session); err != nil {
 		return
 	}
 	r.publishLocked(

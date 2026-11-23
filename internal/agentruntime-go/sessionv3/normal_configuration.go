@@ -2,6 +2,13 @@ package sessionv3
 
 import "errors"
 
+func ResolveSessionInvocationDefaults(
+	base SessionDefaults,
+	override *SessionDefaultsOverride,
+) (SessionDefaults, error) {
+	return resolveSessionInvocationDefaults(base, override)
+}
+
 func resolveSessionInvocationDefaults(
 	base SessionDefaults,
 	override *SessionDefaultsOverride,

@@ -107,13 +107,6 @@ func compileWorkflowTargetSets(
 			value.Resolved = resolved
 		}
 
-		if err := value.Validate(); err != nil {
-			return nil, fmt.Errorf(
-				"workflow target set %q: %w",
-				name,
-				err,
-			)
-		}
 		output[name] = value
 	}
 	return output, nil

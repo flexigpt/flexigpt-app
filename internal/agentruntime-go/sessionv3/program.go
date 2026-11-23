@@ -18,6 +18,30 @@ const (
 	BuiltinSingleModelInterpreterID   = "builtin.single-model"
 	BuiltinRetryBoundaryInterpreterID = "builtin.retry-boundary"
 	BuiltinInterpreterVersion         = uint32(1)
+
+	conversationFramePathPrefix = "conversation/"
+	agentLoopToolPathPrefix     = "tools/"
+	agentLoopSkillWorkPrefix    = "skill-lifecycle:"
+	agentLoopLLMPathFormat      = "llm/%d"
+	singleModelWorkPath         = "model"
+	actionKindTool              = "tool"
+	providerManagedToolSummary  = "Provider managed tool observed."
+	errAgentLoopInputRequired   = "agent-loop input activity is required"
+	errSingleModelInputRequired = "single-model input activity is required"
+	errUnsupportedConvProgram   = "unsupported conversation program version"
+	errUnsupportedConvState     = "unsupported conversation state version"
+	errUnsupportedAgentProgram  = "unsupported agent-loop program version"
+	errUnsupportedAgentState    = "unsupported agent-loop state version"
+	errUnsupportedModelProgram  = "unsupported single-model program version"
+	errUnsupportedModelState    = "unsupported single-model state version"
+	llmOutputMissingCode        = "llm_output_missing"
+	llmOutputMissingMessage     = "llm work item completed without llm output"
+	llmToolOriginMissingCode    = "llm_tool_origin_missing"
+	llmWorkFailedCode           = "llm_work_failed"
+	llmWorkCancelledMessage     = "llm work item was cancelled"
+	llmWorkFailedMessage        = "llm work item did not complete successfully"
+	modelOutputMissingCode      = "model_output_missing"
+	modelOutputMissingMessage   = "single-model program frame has no output"
 )
 
 type (
@@ -48,16 +72,17 @@ type agentLoopProgramPayload struct {
 }
 
 type agentLoopProgramState struct {
-	InputActivityID    ActivityID                   `json:"inputActivityID"`
-	LastLLMWorkItemID  WorkItemID                   `json:"lastLLMWorkItemID,omitempty"`
-	PendingToolIDs     []WorkItemID                 `json:"pendingToolIDs,omitempty"`
-	QueuedActivityIDs  []ActivityID                 `json:"queuedActivityIDs,omitempty"`
-	QueuedActivities   []conversationQueuedActivity `json:"queuedActivities,omitempty"`
-	InvocationDefaults *SessionDefaults             `json:"invocationDefaults,omitempty"`
-	InvocationBudget   *ExecutionBudget             `json:"invocationBudget,omitempty"`
-	Round              int                          `json:"round"`
-	AwaitingContinue   bool                         `json:"awaitingContinue"`
-	ContinueRequested  bool                         `json:"continueRequested,omitempty"`
+	InputActivityID           ActivityID                   `json:"inputActivityID"`
+	CompletedInputActivityIDs []ActivityID                 `json:"completedInputActivityIDs,omitempty"`
+	LastLLMWorkItemID         WorkItemID                   `json:"lastLLMWorkItemID,omitempty"`
+	PendingToolIDs            []WorkItemID                 `json:"pendingToolIDs,omitempty"`
+	QueuedActivityIDs         []ActivityID                 `json:"queuedActivityIDs,omitempty"`
+	QueuedActivities          []conversationQueuedActivity `json:"queuedActivities,omitempty"`
+	InvocationDefaults        *SessionDefaults             `json:"invocationDefaults,omitempty"`
+	InvocationBudget          *ExecutionBudget             `json:"invocationBudget,omitempty"`
+	Round                     int                          `json:"round"`
+	AwaitingContinue          bool                         `json:"awaitingContinue"`
+	ContinueRequested         bool                         `json:"continueRequested,omitempty"`
 }
 
 type singleModelProgramPayload struct {
@@ -133,7 +158,7 @@ func newAgentLoopProgram(
 	history []ActivityID,
 ) (ProgramSnapshot, error) {
 	if input == "" {
-		return ProgramSnapshot{}, errors.New("agent-loop input Activity is required")
+		return ProgramSnapshot{}, errors.New(errAgentLoopInputRequired)
 	}
 	return programSnapshot(
 		BuiltinAgentLoopInterpreterID,
@@ -154,7 +179,7 @@ func newAgentLoopWorkflowInvocationProgram(
 	prepared ...*WorkflowPreparedInvocation,
 ) (ProgramSnapshot, error) {
 	if input == "" {
-		return ProgramSnapshot{}, errors.New("agent-loop input Activity is required")
+		return ProgramSnapshot{}, errors.New(errAgentLoopInputRequired)
 	}
 	return programSnapshot(BuiltinAgentLoopInterpreterID, agentLoopProgramPayload{
 		Defaults:           defaults,
@@ -212,7 +237,7 @@ func newSingleModelProgram(
 	history []ActivityID,
 ) (ProgramSnapshot, error) {
 	if input == "" {
-		return ProgramSnapshot{}, errors.New("single-model input Activity is required")
+		return ProgramSnapshot{}, errors.New(errSingleModelInputRequired)
 	}
 	return programSnapshot(
 		BuiltinSingleModelInterpreterID,
@@ -233,7 +258,7 @@ func newSingleModelWorkflowInvocationProgram(
 	prepared ...*WorkflowPreparedInvocation,
 ) (ProgramSnapshot, error) {
 	if input == "" {
-		return ProgramSnapshot{}, errors.New("single-model input Activity is required")
+		return ProgramSnapshot{}, errors.New(errSingleModelInputRequired)
 	}
 	return programSnapshot(BuiltinSingleModelInterpreterID, singleModelProgramPayload{
 		Defaults:           defaults,
@@ -275,7 +300,7 @@ func (conversationInterpreter) Version() uint32 { return BuiltinInterpreterVersi
 func (conversationInterpreter) ValidateSnapshot(snapshot ProgramSnapshot) error {
 	if snapshot.InterpreterID != BuiltinConversationInterpreterID ||
 		snapshot.InterpreterVersion != BuiltinInterpreterVersion {
-		return errors.New("unsupported conversation program version")
+		return errors.New(errUnsupportedConvProgram)
 	}
 	var value conversationProgramPayload
 	return json.Unmarshal(snapshot.Payload, &value)
@@ -283,7 +308,7 @@ func (conversationInterpreter) ValidateSnapshot(snapshot ProgramSnapshot) error 
 
 func (conversationInterpreter) ValidateState(state ProgramState) error {
 	if state.Type != BuiltinConversationInterpreterID || state.Version != BuiltinInterpreterVersion {
-		return errors.New("unsupported conversation state version")
+		return errors.New(errUnsupportedConvState)
 	}
 	var value conversationProgramState
 	return json.Unmarshal(state.Data, &value)
@@ -360,7 +385,7 @@ func (conversationInterpreter) Advance(frame ProgramFrame, _ Execution, event Pr
 	return ProgramTransition{
 		State: encodeConversationState(state),
 		Frames: []ProgramFrameIntent{{
-			Path:    "conversation/" + string(queued.ID),
+			Path:    conversationFramePathPrefix + string(queued.ID),
 			Program: program,
 			Budget:  cloneBudget(queued.InvocationBudget),
 		}},
@@ -382,21 +407,21 @@ func (agentLoopInterpreter) Version() uint32 { return BuiltinInterpreterVersion 
 func (agentLoopInterpreter) ValidateSnapshot(snapshot ProgramSnapshot) error {
 	if snapshot.InterpreterID != BuiltinAgentLoopInterpreterID ||
 		snapshot.InterpreterVersion != BuiltinInterpreterVersion {
-		return errors.New("unsupported Agent-loop program version")
+		return errors.New(errUnsupportedAgentProgram)
 	}
 	var value agentLoopProgramPayload
 	if err := json.Unmarshal(snapshot.Payload, &value); err != nil {
 		return err
 	}
 	if value.InputActivityID == "" {
-		return errors.New("agent-loop input activity is required")
+		return errors.New(errAgentLoopInputRequired)
 	}
 	return nil
 }
 
 func (agentLoopInterpreter) ValidateState(state ProgramState) error {
 	if state.Type != BuiltinAgentLoopInterpreterID || state.Version != BuiltinInterpreterVersion {
-		return errors.New("unsupported Agent-loop state version")
+		return errors.New(errUnsupportedAgentState)
 	}
 	var value agentLoopProgramState
 	if err := json.Unmarshal(state.Data, &value); err != nil {
@@ -492,7 +517,7 @@ func (agentLoopInterpreter) Advance(
 				return transition, transitionErr
 			}
 			if item.Output == nil || item.Output.LLM == nil {
-				return failedAgentTransition(state, "llm_output_missing", "LLM WorkItem completed without LLM output")
+				return failedAgentTransition(state, llmOutputMissingCode, llmOutputMissingMessage)
 			}
 			assistant := Activity{
 				Kind:       ActivityKindMessage,
@@ -537,14 +562,14 @@ func (agentLoopInterpreter) Advance(
 			if originErr != nil {
 				return failedAgentTransition(
 					state,
-					"llm_tool_origin_missing",
+					llmToolOriginMissingCode,
 					originErr.Error(),
 				)
 			}
 			var previousSkillWork WorkItemID
 			for callIndex, call := range executable {
 				intent := WorkItemIntent{
-					ProgramPath:      "tools/" + call.ID,
+					ProgramPath:      agentLoopToolPathPrefix + call.ID,
 					Type:             WorkItemTypeTool,
 					OriginWorkItemID: item.ID,
 					Automatic:        call.Automatic,
@@ -560,7 +585,7 @@ func (agentLoopInterpreter) Advance(
 						callIdentity = strconv.Itoa(callIndex)
 					}
 					intent.ID = WorkItemID(
-						"skill-lifecycle:" +
+						agentLoopSkillWorkPrefix +
 							string(item.ID) +
 							":" +
 							callIdentity,
@@ -686,6 +711,13 @@ func startQueuedAgentLLM(
 			State: encodeAgentLoopState(state),
 		}, nil
 	}
+	if state.InputActivityID != "" &&
+		!slices.Contains(state.CompletedInputActivityIDs, state.InputActivityID) {
+		state.CompletedInputActivityIDs = append(
+			state.CompletedInputActivityIDs,
+			state.InputActivityID,
+		)
+	}
 	queued := state.QueuedActivities[0]
 	state.QueuedActivities = state.QueuedActivities[1:]
 	state.InputActivityID = queued.ID
@@ -694,7 +726,6 @@ func startQueuedAgentLLM(
 	)
 	state.InvocationBudget = cloneBudget(queued.InvocationBudget)
 	state.LastLLMWorkItemID = ""
-	state.PendingToolIDs = nil
 	state.Round = 0
 	state.AwaitingContinue = false
 	state.ContinueRequested = false
@@ -720,7 +751,7 @@ func startAgentLLM(
 		Status: &status,
 		WorkItems: []WorkItemIntent{
 			{
-				ProgramPath: fmt.Sprintf("llm/%d", state.Round),
+				ProgramPath: fmt.Sprintf(agentLoopLLMPathFormat, state.Round),
 				Type:        WorkItemTypeLLM,
 				Automatic:   true,
 				Budget:      cloneBudget(state.InvocationBudget),
@@ -768,14 +799,32 @@ func agentLLMWork(
 	if state.InvocationDefaults != nil {
 		work.InvocationDefaults = cloneInvocationDefaults(state.InvocationDefaults)
 	}
+	history := append([]ActivityID(nil), payload.HistoryActivityIDs...)
+	for _, activityID := range state.CompletedInputActivityIDs {
+		if activityID != "" && !slices.Contains(history, activityID) {
+			history = append(history, activityID)
+		}
+	}
 	applyIsolatedLLMInput(
 		&work,
 		payload.IsolatedInput,
-		payload.HistoryActivityIDs,
+		history,
 	)
 	work.PreparedInvocation = jsonutil.CloneJSONInValue(payload.PreparedInvocation)
 	work.ProviderTools = jsonutil.CloneJSONInValue(payload.ProviderTools)
 	return work
+}
+
+func AgentLoopCompletedInputActivityIDs(frame ProgramFrame) []ActivityID {
+	if frame.Program.InterpreterID != BuiltinAgentLoopInterpreterID ||
+		len(frame.State.Data) == 0 {
+		return nil
+	}
+	var state agentLoopProgramState
+	if err := json.Unmarshal(frame.State.Data, &state); err != nil {
+		return nil
+	}
+	return append([]ActivityID(nil), state.CompletedInputActivityIDs...)
 }
 
 func applyLLMInvocationDefaults(
@@ -826,7 +875,7 @@ func failedAgentWorkTransition(
 	failure := cloneWorkflowSanitizedError(item.Error)
 	if failure == nil {
 		failure = &SanitizedError{
-			Code:     "llm_work_failed",
+			Code:     llmWorkFailedCode,
 			Category: ErrorCategoryExecution,
 			Message:  workItemFailureMessage(item),
 		}
@@ -843,9 +892,9 @@ func workItemFailureMessage(item WorkItem) string {
 		return item.Error.Message
 	}
 	if item.State == WorkItemStateCancelled {
-		return "LLM WorkItem was cancelled"
+		return llmWorkCancelledMessage
 	}
-	return "LLM WorkItem did not complete successfully"
+	return llmWorkFailedMessage
 }
 
 // interruptedAssistantActivities retains observed assistant text after a
@@ -863,12 +912,12 @@ func interruptedAssistantActivities(item WorkItem) []Activity {
 		return nil
 	}
 
-	status := "failed"
+	status := MessageStatusFailed
 	if item.State == WorkItemStateCancelled {
-		status = "cancelled"
+		status = MessageStatusCancelled
 	}
 	if item.State == WorkItemStateUncertain {
-		status = "uncertain"
+		status = MessageStatusUncertain
 	}
 	return []Activity{{
 		Kind:       ActivityKindMessage,
@@ -946,8 +995,8 @@ func splitExecutableCalls(calls []ToolCall) ([]ToolCall, []Activity) {
 				WorkItemID: WorkItemID(call.ID),
 				Action: &ActionActivity{
 					Title:      firstNonEmpty(call.DisplayName, call.Name),
-					Summary:    "Provider managed tool observed.",
-					ActionKind: "tool",
+					Summary:    providerManagedToolSummary,
+					ActionKind: actionKindTool,
 					Outcome:    string(ToolOutputKindSuccess),
 				},
 			})
@@ -965,21 +1014,21 @@ func (singleModelInterpreter) Version() uint32 { return BuiltinInterpreterVersio
 func (singleModelInterpreter) ValidateSnapshot(snapshot ProgramSnapshot) error {
 	if snapshot.InterpreterID != BuiltinSingleModelInterpreterID ||
 		snapshot.InterpreterVersion != BuiltinInterpreterVersion {
-		return errors.New("unsupported single-model program version")
+		return errors.New(errUnsupportedModelProgram)
 	}
 	var value singleModelProgramPayload
 	if err := json.Unmarshal(snapshot.Payload, &value); err != nil {
 		return err
 	}
 	if value.InputActivityID == "" {
-		return errors.New("single-model input activity is required")
+		return errors.New(errSingleModelInputRequired)
 	}
 	return nil
 }
 
 func (singleModelInterpreter) ValidateState(state ProgramState) error {
 	if state.Type != BuiltinSingleModelInterpreterID || state.Version != BuiltinInterpreterVersion {
-		return errors.New("unsupported single-model state version")
+		return errors.New(errUnsupportedModelState)
 	}
 	var value singleModelProgramState
 	return json.Unmarshal(state.Data, &value)
@@ -1032,7 +1081,7 @@ func (singleModelInterpreter) Advance(
 				Status: &status,
 				WorkItems: []WorkItemIntent{
 					{
-						ProgramPath: "model",
+						ProgramPath: singleModelWorkPath,
 						Type:        WorkItemTypeLLM,
 						Automatic:   true,
 						Effect:      EffectContract{Kind: EffectKindRead},
@@ -1068,8 +1117,8 @@ func (singleModelInterpreter) Advance(
 				State:  encodeSingleModelState(state),
 				Status: &status,
 				Error: &SanitizedError{
-					Code:    "model_output_missing",
-					Message: "single-model ProgramFrame has no output",
+					Code:    modelOutputMissingCode,
+					Message: modelOutputMissingMessage,
 				},
 			}, nil
 		}

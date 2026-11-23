@@ -131,14 +131,10 @@ func recoveredProviderInputs(
 func recoveredSessionDefaults(
 	plan sessionv3Runtime.ModelDispatchPlan,
 ) (sessionv3Runtime.SessionDefaults, error) {
+	modelSelection := plan.Model.Artifact.Selection()
 	defaults := sessionv3Runtime.SessionDefaults{
 		History: plan.History,
-		Model: &sessionv3Runtime.ArtifactSelection{
-			RootID:           plan.Model.Artifact.RootID,
-			ArtifactID:       plan.Model.Artifact.ArtifactID,
-			ExpectedRevision: plan.Model.Artifact.Revision,
-			ExpectedDigest:   plan.Model.Artifact.Digest,
-		},
+		Model:   &modelSelection,
 	}
 	if plan.ModelOverrides != nil {
 		defaults.ModelOverrides = jsonutil.CloneJSONInValue(
@@ -146,28 +142,15 @@ func recoveredSessionDefaults(
 		)
 	}
 	if plan.Agent != nil {
-		defaults.Agent = &sessionv3Runtime.ArtifactSelection{
-			RootID:           plan.Agent.Artifact.RootID,
-			ArtifactID:       plan.Agent.Artifact.ArtifactID,
-			ExpectedRevision: plan.Agent.Artifact.Revision,
-			ExpectedDigest:   plan.Agent.Artifact.Digest,
-		}
+		agentSelection := plan.Agent.Artifact.Selection()
+		defaults.Agent = &agentSelection
 	}
 	if plan.Workspace != nil {
-		defaults.Workspace = &sessionv3Runtime.ArtifactSelection{
-			RootID:           plan.Workspace.Artifact.RootID,
-			ArtifactID:       plan.Workspace.Artifact.ArtifactID,
-			ExpectedRevision: plan.Workspace.Artifact.Revision,
-			ExpectedDigest:   plan.Workspace.Artifact.Digest,
-		}
+		workspaceSelection := plan.Workspace.Artifact.Selection()
+		defaults.Workspace = &workspaceSelection
 	}
 	for _, skill := range plan.Skills {
-		selection := sessionv3Runtime.ArtifactSelection{
-			RootID:           skill.Artifact.RootID,
-			ArtifactID:       skill.Artifact.ArtifactID,
-			ExpectedRevision: skill.Artifact.Revision,
-			ExpectedDigest:   skill.Artifact.Digest,
-		}
+		selection := skill.Artifact.Selection()
 		defaults.Skills = append(defaults.Skills, selection)
 		if skill.Active {
 			defaults.ActiveSkills = append(
@@ -178,12 +161,7 @@ func recoveredSessionDefaults(
 	}
 	for _, value := range plan.MCP {
 		selection := sessionv3Runtime.MCPServerSelection{
-			Server: sessionv3Runtime.ArtifactSelection{
-				RootID:           value.Server.RootID,
-				ArtifactID:       value.Server.ArtifactID,
-				ExpectedRevision: value.Server.Revision,
-				ExpectedDigest:   value.Server.Digest,
-			},
+			Server:                    value.Server.Selection(),
 			IncludeServerInstructions: value.IncludeServerInstructions,
 			ToolExposure:              value.ToolExposure,
 		}

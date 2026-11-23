@@ -55,7 +55,10 @@ type binderArtifactPinVerifier struct {
 }
 
 func (v binderArtifactPinVerifier) VerifyArtifactPin(ctx context.Context, pin sessionv3Runtime.ArtifactPin) error {
-	return v.binder.verifyArtifactPin(ctx, pin)
+	if v.binder == nil {
+		return errors.New("session v3 binder is unavailable")
+	}
+	return contributionruntime.VerifyArtifactPin(ctx, v.binder.deps.Artifacts, pin)
 }
 
 func New(deps Dependencies) (*Binder, error) {
@@ -69,7 +72,7 @@ func New(deps Dependencies) (*Binder, error) {
 		return nil, errors.New("sessionv3 binder requires skill resolver and runtime")
 	}
 	if deps.MCPRuntime == nil || deps.MCPBridge == nil {
-		return nil, errors.New("sessionv3 binder requires MCP runtime and bridge")
+		return nil, errors.New("sessionv3 binder requires mcp runtime and bridge")
 	}
 
 	if deps.Artifacts == nil {
@@ -138,7 +141,7 @@ func (b *Binder) BindWork(
 		return b.bindTool(ctx, req)
 	default:
 		return sessionv3Runtime.BindResult{}, fmt.Errorf(
-			"unsupported sessionv3 WorkItem type %q",
+			"unsupported sessionv3 work item type %q",
 			req.WorkItem.Type,
 		)
 	}
@@ -245,7 +248,7 @@ func (b *Binder) PrepareAppTool(
 ) (sessionv3Runtime.ToolCall, error) {
 	if b == nil || b.mcpTools == nil {
 		return sessionv3Runtime.ToolCall{}, errors.New(
-			"session v3 MCP App runtime is unavailable",
+			"session v3 mcp app runtime is unavailable",
 		)
 	}
 	return b.mcpTools.PrepareAppTool(ctx, request)
@@ -257,7 +260,7 @@ func (b *Binder) ReadAppResource(
 ) (sessionv3Runtime.AppResourceReadResult, error) {
 	if b == nil || b.mcpTools == nil {
 		return sessionv3Runtime.AppResourceReadResult{}, errors.New(
-			"session v3 MCP App runtime is unavailable",
+			"session v3 mcp app runtime is unavailable",
 		)
 	}
 	return b.mcpTools.ReadAppResource(ctx, request)
@@ -269,7 +272,7 @@ func (b *Binder) ValidateAppContext(
 ) (sessionv3Runtime.AppContextUpdate, error) {
 	if b == nil || b.mcpTools == nil {
 		return sessionv3Runtime.AppContextUpdate{}, errors.New(
-			"session v3 MCP App runtime is unavailable",
+			"session v3 mcp app runtime is unavailable",
 		)
 	}
 	return b.mcpTools.ValidateAppContext(ctx, request)

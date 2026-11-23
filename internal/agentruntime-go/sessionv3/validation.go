@@ -13,11 +13,19 @@ var (
 	ErrRuntimeClosed     = errors.New("session runtime is closed")
 	ErrSessionNotFound   = errors.New("session not found")
 	ErrExecutionNotFound = errors.New("execution not found")
-	ErrCommandConflict   = errors.New("command ID was reused with another payload")
-	ErrCommandInProgress = errors.New("command ID is already being processed")
+	ErrCommandConflict   = errors.New("command id was reused with another payload")
+	ErrCommandInProgress = errors.New("command id is already being processed")
 )
 
-const maximumMessageAttachmentSources = 4096
+const (
+	maximumMessageAttachmentSources = 4096
+	mcpApprovalRuleAllow            = "allow"
+	mcpApprovalRuleAsk              = "ask"
+	mcpApprovalRuleDeny             = "deny"
+	mcpExecutionModeAuto            = "auto"
+	mcpExecutionModeManual          = "manual"
+	artifactPinKeySeparator         = "\x00"
+)
 
 func validateID(subject, value string) error {
 	if strings.TrimSpace(value) == "" || strings.TrimSpace(value) != value ||
@@ -28,14 +36,14 @@ func validateID(subject, value string) error {
 }
 
 func (s Session) Validate() error {
-	if err := validateID("session ID", string(s.ID)); err != nil {
+	if err := validateID("session id", string(s.ID)); err != nil {
 		return err
 	}
 	if s.Revision == 0 || s.CreatedAt.IsZero() || s.UpdatedAt.IsZero() {
 		return errors.New("session revision and timestamps are required")
 	}
 	if !s.Metadata.Valid() || !s.Defaults.Metadata.Valid() {
-		return errors.New("session metadata is not canonical JSON")
+		return errors.New("session metadata is not canonical json")
 	}
 	if err := validateDefaults(s.Defaults); err != nil {
 		return err
@@ -97,7 +105,7 @@ func (s Session) Validate() error {
 	}
 
 	for _, ownership := range s.ConversationOwnership {
-		if err := validateID("conversation ID", ownership.ConversationID); err != nil {
+		if err := validateID("conversation id", ownership.ConversationID); err != nil {
 			return err
 		}
 		if ownership.Owner.ExecutionID != "" {
@@ -117,7 +125,7 @@ func (s Session) Validate() error {
 
 	commands := make(map[CommandID]struct{}, len(s.Commands))
 	for _, command := range s.Commands {
-		if err := validateID("command ID", string(command.ID)); err != nil {
+		if err := validateID("command id", string(command.ID)); err != nil {
 			return err
 		}
 		if command.Fingerprint == "" || command.RecordedAt.IsZero() {
@@ -132,10 +140,10 @@ func (s Session) Validate() error {
 }
 
 func validateArtifactSelection(value ArtifactSelection) error {
-	if err := validateID("Artifact Root ID", value.RootID); err != nil {
+	if err := validateID("artifact root id", value.RootID); err != nil {
 		return err
 	}
-	if err := validateID("Artifact ID", value.ArtifactID); err != nil {
+	if err := validateID("artifact id", value.ArtifactID); err != nil {
 		return err
 	}
 	if value.ExpectedDigest != "" &&
@@ -190,7 +198,7 @@ func validateDefaults(value SessionDefaults) error {
 		if instruction.ID == "" {
 			continue
 		}
-		if err := validateID("instruction ID", instruction.ID); err != nil {
+		if err := validateID("instruction id", instruction.ID); err != nil {
 			return err
 		}
 		if _, duplicate := instructions[instruction.ID]; duplicate {
@@ -209,7 +217,7 @@ func validateDefaults(value SessionDefaults) error {
 			if err := validateSelection(selection); err != nil {
 				return fmt.Errorf("%s %d: %w", label, index, err)
 			}
-			key := selection.RootID + "\x00" + selection.ArtifactID
+			key := selection.RootID + artifactPinKeySeparator + selection.ArtifactID
 			if _, duplicate := seen[key]; duplicate {
 				return fmt.Errorf("duplicate %s selection %q", label, key)
 			}
@@ -223,17 +231,17 @@ func validateDefaults(value SessionDefaults) error {
 		if err := selection.Validate(); err != nil {
 			return fmt.Errorf("tool selection %d: %w", index, err)
 		}
-		key := selection.Artifact.RootID + "\x00" +
+		key := selection.Artifact.RootID + artifactPinKeySeparator +
 			selection.Artifact.ArtifactID
 		if _, duplicate := toolSelections[key]; duplicate {
-			return fmt.Errorf("duplicate Tool selection %q", key)
+			return fmt.Errorf("duplicate tool selection %q", key)
 		}
 		toolSelections[key] = struct{}{}
 	}
-	if err := validateSelections("Skill", value.Skills); err != nil {
+	if err := validateSelections("skill", value.Skills); err != nil {
 		return err
 	}
-	if err := validateSelections("active Skill", value.ActiveSkills); err != nil {
+	if err := validateSelections("active skill", value.ActiveSkills); err != nil {
 		return err
 	}
 
@@ -242,13 +250,13 @@ func validateDefaults(value SessionDefaults) error {
 		len(value.Skills),
 	)
 	for _, selection := range value.Skills {
-		enabledSkills[selection.RootID+"\x00"+selection.ArtifactID] = struct{}{}
+		enabledSkills[selection.RootID+artifactPinKeySeparator+selection.ArtifactID] = struct{}{}
 	}
 	for _, selection := range value.ActiveSkills {
-		key := selection.RootID + "\x00" + selection.ArtifactID
+		key := selection.RootID + artifactPinKeySeparator + selection.ArtifactID
 		if _, found := enabledSkills[key]; !found {
 			return fmt.Errorf(
-				"active Skill %q is not part of enabled Skills",
+				"active skill %q is not part of enabled skills",
 				key,
 			)
 		}
@@ -257,13 +265,13 @@ func validateDefaults(value SessionDefaults) error {
 	servers := make(map[string]struct{}, len(value.MCP))
 	for index, selection := range value.MCP {
 		if err := validateSelection(selection.Server); err != nil {
-			return fmt.Errorf("MCP selection %d: %w", index, err)
+			return fmt.Errorf("mcp selection %d: %w", index, err)
 		}
-		serverKey := selection.Server.RootID + "\x00" +
+		serverKey := selection.Server.RootID + artifactPinKeySeparator +
 			selection.Server.ArtifactID
 		if _, duplicate := servers[serverKey]; duplicate {
 			return fmt.Errorf(
-				"duplicate MCP server selection %q",
+				"duplicate mcp server selection %q",
 				serverKey,
 			)
 		}
@@ -273,7 +281,7 @@ func validateDefaults(value SessionDefaults) error {
 		case MCPToolExposureNone:
 			if len(selection.SelectedTools) != 0 {
 				return fmt.Errorf(
-					"MCP selection %d disables tools but contains selected tools",
+					"mcp selection %d disables tools but contains selected tools",
 					index,
 				)
 			}
@@ -281,7 +289,7 @@ func validateDefaults(value SessionDefaults) error {
 		case "", MCPToolExposureAll:
 			if len(selection.SelectedTools) != 0 {
 				return fmt.Errorf(
-					"MCP selection %d exposes all tools but contains selected tools",
+					"mcp selection %d exposes all tools but contains selected tools",
 					index,
 				)
 			}
@@ -289,7 +297,7 @@ func validateDefaults(value SessionDefaults) error {
 		case MCPToolExposureSelected:
 			if len(selection.SelectedTools) == 0 {
 				return fmt.Errorf(
-					"MCP selection %d selects tools but contains none",
+					"mcp selection %d selects tools but contains none",
 					index,
 				)
 			}
@@ -300,7 +308,7 @@ func validateDefaults(value SessionDefaults) error {
 			for toolIndex, tool := range selection.SelectedTools {
 				if err := validateMCPToolSelection(tool); err != nil {
 					return fmt.Errorf(
-						"MCP selection %d tool %d: %w",
+						"mcp selection %d tool %d: %w",
 						index,
 						toolIndex,
 						err,
@@ -308,7 +316,7 @@ func validateDefaults(value SessionDefaults) error {
 				}
 				if _, duplicate := tools[tool.ToolName]; duplicate {
 					return fmt.Errorf(
-						"duplicate selected MCP Tool %q",
+						"duplicate selected mcp tool %q",
 						tool.ToolName,
 					)
 				}
@@ -317,7 +325,7 @@ func validateDefaults(value SessionDefaults) error {
 
 		default:
 			return fmt.Errorf(
-				"unsupported MCP tool exposure %q",
+				"unsupported mcp tool exposure %q",
 				selection.ToolExposure,
 			)
 		}
@@ -365,46 +373,34 @@ func ValidateSessionDefaults(value SessionDefaults) error {
 }
 
 func validateMCPToolSelection(value MCPToolSelection) error {
-	if err := validateID("MCP Tool name", value.ToolName); err != nil {
+	if err := validateID("mcp tool name", value.ToolName); err != nil {
 		return err
 	}
 	if value.ExpectedDigest != "" {
-		if err := validateID("MCP Tool expected digest", value.ExpectedDigest); err != nil {
+		if err := validateID("mcp tool expected digest", value.ExpectedDigest); err != nil {
 			return err
 		}
 	}
 
 	if value.ApprovalRule != nil {
 		switch *value.ApprovalRule {
-		case "allow", "ask", "deny":
+		case mcpApprovalRuleAllow, mcpApprovalRuleAsk, mcpApprovalRuleDeny:
 		default:
-			return errors.New("invalid MCP Tool approval override")
+			return errors.New("invalid mcp tool approval override")
 		}
 	}
 	if value.ExecutionMode != nil {
 		switch *value.ExecutionMode {
-		case "auto", "manual":
+		case mcpExecutionModeAuto, mcpExecutionModeManual:
 		default:
-			return errors.New("invalid MCP Tool execution override")
+			return errors.New("invalid mcp tool execution override")
 		}
 	}
 	return nil
 }
 
 func validateSelection(value ArtifactSelection) error {
-	if err := validateID("Artifact Root ID", value.RootID); err != nil {
-		return err
-	}
-	if err := validateID("Artifact ID", value.ArtifactID); err != nil {
-		return err
-	}
-	if value.ExpectedDigest != "" &&
-		(strings.TrimSpace(value.ExpectedDigest) != value.ExpectedDigest ||
-			!utf8.ValidString(value.ExpectedDigest) ||
-			strings.ContainsRune(value.ExpectedDigest, 0)) {
-		return errors.New("artifact expected digest is invalid")
-	}
-	return nil
+	return validateArtifactSelection(value)
 }
 
 func (s ToolSelection) Validate() error {
@@ -418,10 +414,10 @@ func (s ToolSelection) Validate() error {
 }
 
 func validatePin(value ArtifactPin) error {
-	if err := validateID("Artifact Root ID", value.RootID); err != nil {
+	if err := validateID("artifact root id", value.RootID); err != nil {
 		return err
 	}
-	if err := validateID("Artifact ID", value.ArtifactID); err != nil {
+	if err := validateID("artifact id", value.ArtifactID); err != nil {
 		return err
 	}
 	if value.Revision == 0 || strings.TrimSpace(value.Digest) == "" {
@@ -432,7 +428,7 @@ func validatePin(value ArtifactPin) error {
 
 func (s SkillSelectionState) Validate() error {
 	if len(s.Enabled) == 0 {
-		return errors.New("skill selection state has no enabled Skills")
+		return errors.New("skill selection state has no enabled skills")
 	}
 
 	enabled := make(map[string]ArtifactPin, len(s.Enabled))
@@ -440,12 +436,12 @@ func (s SkillSelectionState) Validate() error {
 		if err := validatePin(pin); err != nil {
 			return err
 		}
-		key := pin.RootID + "\x00" + pin.ArtifactID
+		key := pin.RootID + artifactPinKeySeparator + pin.ArtifactID
 		if current, duplicate := enabled[key]; duplicate {
 			if current != pin {
-				return errors.New("skill selection state has conflicting enabled Skill pins")
+				return errors.New("skill selection state has conflicting enabled skill pins")
 			}
-			return errors.New("skill selection state has duplicate enabled Skills")
+			return errors.New("skill selection state has duplicate enabled skills")
 		}
 		enabled[key] = pin
 	}
@@ -455,20 +451,20 @@ func (s SkillSelectionState) Validate() error {
 		if err := validatePin(pin); err != nil {
 			return err
 		}
-		key := pin.RootID + "\x00" + pin.ArtifactID
+		key := pin.RootID + artifactPinKeySeparator + pin.ArtifactID
 		if _, duplicate := seenActive[key]; duplicate {
-			return errors.New("skill selection state has duplicate active Skills")
+			return errors.New("skill selection state has duplicate active skills")
 		}
 		seenActive[key] = struct{}{}
 		if enabledPin, found := enabled[key]; !found || enabledPin != pin {
-			return errors.New("active Skill is not part of the enabled Skill selection")
+			return errors.New("active skill is not part of the enabled skill selection")
 		}
 	}
 	return nil
 }
 
 func (a Activity) Validate() error {
-	if err := validateID("activity ID", string(a.ID)); err != nil {
+	if err := validateID("activity id", string(a.ID)); err != nil {
 		return err
 	}
 	if a.CreatedAt.IsZero() {
@@ -502,6 +498,18 @@ func (a Activity) Validate() error {
 		if a.Message == nil || !a.Message.Metadata.Valid() {
 			return errors.New("invalid message activity")
 		}
+		switch a.Message.Status {
+		case "",
+			MessageStatusAccepted,
+			MessageStatusContinuation,
+			MessageStatusCompleted,
+			MessageStatusFailed,
+			MessageStatusCancelled,
+			MessageStatusUncertain,
+			MessageStatusInterrupted:
+		default:
+			return fmt.Errorf("unsupported message activity status %q", a.Message.Status)
+		}
 		if a.Message.InvocationDefaults != nil {
 			if err := validateDefaults(*a.Message.InvocationDefaults); err != nil {
 				return err
@@ -525,6 +533,14 @@ func (a Activity) Validate() error {
 		if a.Workflow == nil || !a.Workflow.Output.Valid() {
 			return errors.New("invalid workflow activity")
 		}
+		switch a.Workflow.Phase {
+		case WorkflowActivityPhaseStarted,
+			WorkflowActivityPhaseSignal,
+			WorkflowActivityPhaseTriggered,
+			WorkflowActivityPhaseTriggerSignal:
+		default:
+			return fmt.Errorf("unsupported workflow activity phase %q", a.Workflow.Phase)
+		}
 	case ActivityKindWait:
 		if a.Wait == nil || a.Wait.WaitID == "" {
 			return errors.New("invalid wait activity")
@@ -547,7 +563,7 @@ func (a Attachment) Validate() error {
 		}
 	case AttachmentKindURL:
 		if a.URL == "" {
-			return errors.New("URL attachment has no URL")
+			return errors.New("url attachment has no url")
 		}
 	default:
 		return fmt.Errorf("unsupported attachment kind %q", a.Kind)
@@ -555,7 +571,7 @@ func (a Attachment) Validate() error {
 	if strings.ContainsRune(a.Label, 0) ||
 		strings.ContainsRune(a.URL, 0) ||
 		strings.ContainsRune(a.SourceURL, 0) {
-		return errors.New("attachment contains NUL")
+		return errors.New("attachment contains nul")
 	}
 	return nil
 }
@@ -596,7 +612,7 @@ func (s AttachmentSource) Validate() error {
 	if strings.ContainsRune(s.Label, 0) ||
 		strings.ContainsRune(s.Path, 0) ||
 		strings.ContainsRune(s.URL, 0) {
-		return errors.New("attachment source contains NUL")
+		return errors.New("attachment source contains nul")
 	}
 	return nil
 }
@@ -627,7 +643,7 @@ func (m MessageInput) Validate() error {
 }
 
 func (e Execution) Validate(sessionID SessionID) error {
-	if err := validateID("execution ID", string(e.ID)); err != nil {
+	if err := validateID("execution id", string(e.ID)); err != nil {
 		return err
 	}
 	if e.SessionID != sessionID || e.Revision == 0 || e.CreatedAt.IsZero() || e.UpdatedAt.IsZero() {
@@ -646,17 +662,17 @@ func (e Execution) Validate(sessionID SessionID) error {
 		return fmt.Errorf("unsupported execution lifetime %q", e.Lifetime)
 	}
 	if e.RootExecutionID != "" {
-		if err := validateID("execution root ID", string(e.RootExecutionID)); err != nil {
+		if err := validateID("execution root id", string(e.RootExecutionID)); err != nil {
 			return err
 		}
 	}
 	if e.ParentExecutionID != "" {
-		if err := validateID("execution parent ID", string(e.ParentExecutionID)); err != nil {
+		if err := validateID("execution parent id", string(e.ParentExecutionID)); err != nil {
 			return err
 		}
 	}
 	if e.ParentFrameID != "" {
-		if err := validateID("execution parent frame ID", string(e.ParentFrameID)); err != nil {
+		if err := validateID("execution parent frame id", string(e.ParentFrameID)); err != nil {
 			return err
 		}
 	}
@@ -751,7 +767,7 @@ func (e Execution) Validate(sessionID SessionID) error {
 		if err := signal.Validate(); err != nil {
 			return err
 		}
-		identity := signal.Source + "\x00" + signal.ID
+		identity := signal.Source + artifactPinKeySeparator + signal.ID
 		if _, duplicate := signals[identity]; duplicate {
 			return fmt.Errorf(
 				"duplicate execution signal source and identity %q",
@@ -766,9 +782,9 @@ func (e Execution) Validate(sessionID SessionID) error {
 		if err := forward.Validate(); err != nil {
 			return err
 		}
-		key := string(forward.TargetExecutionID) + "\x00" +
-			forward.SourceChannel + "\x00" +
-			forward.TargetChannel + "\x00" +
+		key := string(forward.TargetExecutionID) + artifactPinKeySeparator +
+			forward.SourceChannel + artifactPinKeySeparator +
+			forward.TargetChannel + artifactPinKeySeparator +
 			forward.PortName
 		if _, duplicate := forwards[key]; duplicate {
 			return errors.New("channel forward is duplicated")
@@ -795,14 +811,14 @@ func (e Execution) Validate(sessionID SessionID) error {
 }
 
 func (p ProgramFrame) Validate() error {
-	if err := validateID("ProgramFrame ID", string(p.ID)); err != nil {
+	if err := validateID("program frame id", string(p.ID)); err != nil {
 		return err
 	}
 	if p.Program.InterpreterID == "" || p.Program.InterpreterVersion == 0 {
-		return errors.New("ProgramFrame interpreter is required")
+		return errors.New("program frame interpreter is required")
 	}
 	if !p.Program.Payload.Valid() || !p.State.Data.Valid() || p.State.Type == "" || p.State.Version == 0 {
-		return errors.New("ProgramFrame payload or state is invalid")
+		return errors.New("program frame payload or state is invalid")
 	}
 	if p.Program.Artifact != nil {
 		if err := validatePin(*p.Program.Artifact); err != nil {
@@ -810,7 +826,7 @@ func (p ProgramFrame) Validate() error {
 		}
 	}
 	if p.CreatedAt.IsZero() || p.UpdatedAt.IsZero() {
-		return errors.New("ProgramFrame timestamps are required")
+		return errors.New("program frame timestamps are required")
 	}
 	if p.Depth < 0 {
 		return errors.New("program frame depth is invalid")
@@ -843,7 +859,7 @@ func (p ProgramFrame) Validate() error {
 		}
 	}
 	for _, executionID := range p.ChildExecutionIDs {
-		if err := validateID("ProgramFrame child Execution ID", string(executionID)); err != nil {
+		if err := validateID("program frame child execution id", string(executionID)); err != nil {
 			return err
 		}
 	}
@@ -858,7 +874,7 @@ func (p ProgramFrame) Validate() error {
 			return err
 		}
 		if _, duplicate := seenJoins[join.WorkItemID]; duplicate {
-			return errors.New("ProgramFrame join WorkItem is duplicated")
+			return errors.New("program frame join work item is duplicated")
 		}
 		seenJoins[join.WorkItemID] = struct{}{}
 	}
@@ -866,7 +882,7 @@ func (p ProgramFrame) Validate() error {
 }
 
 func (b ForkBoundary) Validate() error {
-	if err := validateID("fork WorkItem ID", string(b.WorkItemID)); err != nil {
+	if err := validateID("fork work item id", string(b.WorkItemID)); err != nil {
 		return err
 	}
 	if len(b.Frames) == 0 {
@@ -886,25 +902,25 @@ func (b ForkBoundary) Validate() error {
 }
 
 func (b JoinBoundary) Validate() error {
-	if err := validateID("join WorkItem ID", string(b.WorkItemID)); err != nil {
+	if err := validateID("join work item id", string(b.WorkItemID)); err != nil {
 		return err
 	}
-	return validateID("join child ProgramFrame ID", string(b.ChildFrameID))
+	return validateID("join child program frame id", string(b.ChildFrameID))
 }
 
 func validateDeferredFrameIntent(value ProgramFrameIntent) error {
-	if err := validateID("deferred ProgramFrame ID", string(value.ID)); err != nil {
+	if err := validateID("deferred program frame id", string(value.ID)); err != nil {
 		return err
 	}
 	if value.ExecutionID != "" {
-		if err := validateID("deferred Execution ID", string(value.ExecutionID)); err != nil {
+		if err := validateID("deferred execution id", string(value.ExecutionID)); err != nil {
 			return err
 		}
 	}
 	if value.Program.InterpreterID == "" ||
 		value.Program.InterpreterVersion == 0 ||
 		!value.Program.Payload.Valid() {
-		return errors.New("deferred ProgramFrame program is invalid")
+		return errors.New("deferred program frame program is invalid")
 	}
 	if value.Budget != nil {
 		if err := value.Budget.Validate(); err != nil {
@@ -935,17 +951,17 @@ func validateDeferredFrameIntent(value ProgramFrameIntent) error {
 }
 
 func (w WorkItem) Validate() error {
-	if err := validateID("WorkItem ID", string(w.ID)); err != nil {
+	if err := validateID("work item id", string(w.ID)); err != nil {
 		return err
 	}
-	if err := validateID("WorkItem frame ID", string(w.FrameID)); err != nil {
+	if err := validateID("work item frame id", string(w.FrameID)); err != nil {
 		return err
 	}
 	if w.CreatedAt.IsZero() || w.UpdatedAt.IsZero() {
-		return errors.New("WorkItem timestamps are required")
+		return errors.New("work item timestamps are required")
 	}
 	if w.Deadline != nil && w.Deadline.IsZero() {
-		return errors.New("invalid WorkItem deadline")
+		return errors.New("invalid work item deadline")
 	}
 	if err := w.Effect.Validate(); err != nil {
 		return err
@@ -969,7 +985,7 @@ func (w WorkItem) Validate() error {
 		}
 	}
 	if w.SagaID != "" {
-		if err := validateID("work item saga ID", w.SagaID); err != nil {
+		if err := validateID("work item saga id", w.SagaID); err != nil {
 			return err
 		}
 		if err := w.CompensationPolicy.Validate(); err != nil {
@@ -983,7 +999,7 @@ func (w WorkItem) Validate() error {
 			)
 		}
 		if err := validateID(
-			"work item retained claim owner frame ID",
+			"work item retained claim owner frame id",
 			string(w.RetainClaimsForFrameID),
 		); err != nil {
 			return err
@@ -1023,7 +1039,7 @@ func (w WorkItem) Validate() error {
 		WorkItemStateCancelled,
 		WorkItemStateBlocked:
 	default:
-		return fmt.Errorf("unsupported WorkItem state %q", w.State)
+		return fmt.Errorf("unsupported work item state %q", w.State)
 	}
 	if w.Retry != nil {
 		if err := w.Retry.Validate(); err != nil {
@@ -1031,7 +1047,7 @@ func (w WorkItem) Validate() error {
 		}
 	}
 	if w.RetryState != nil && w.State != WorkItemStateRetryWaiting {
-		return errors.New("non-retrying WorkItem has retry state")
+		return errors.New("non-retrying work item has retry state")
 	}
 	if err := validateUniquePortPlans(w.Ports); err != nil {
 		return err
@@ -1311,17 +1327,17 @@ func (p WorkItemPayload) Validate(kind WorkItemType) error {
 		if value.present {
 			count++
 			if value.kind != kind {
-				return fmt.Errorf("WorkItem type %q has payload %q", kind, value.kind)
+				return fmt.Errorf("work item type %q has payload %q", kind, value.kind)
 			}
 		}
 	}
 	if count != 1 {
-		return errors.New("WorkItem must have exactly one typed payload")
+		return errors.New("work item must have exactly one typed payload")
 	}
 	switch kind {
 	case WorkItemTypeLLM:
 		if p.LLM.InputActivityID == "" {
-			return errors.New("llm WorkItem requires an input activity")
+			return errors.New("llm work item requires an input activity")
 		}
 		for _, choice := range p.LLM.ProviderTools {
 			if err := choice.Validate(); err != nil {
@@ -1340,7 +1356,7 @@ func (p WorkItemPayload) Validate(kind WorkItemType) error {
 		}
 		if p.Tool.Target != nil && p.Tool.MCP != nil {
 			return errors.New(
-				"tool workItem cannot contain both Artifact and MCP targets",
+				"tool work item cannot contain both artifact and mcp targets",
 			)
 		}
 		if p.Tool.Target != nil {
@@ -1358,14 +1374,14 @@ func (p WorkItemPayload) Validate(kind WorkItemType) error {
 			p.Service.BindingVersion == "" ||
 			!p.Service.Input.Valid() ||
 			!p.Service.Context.Valid() {
-			return errors.New("invalid service WorkItem")
+			return errors.New("invalid service work item")
 		}
 	case WorkItemTypeActivity:
 		if p.Activity.ActivityID == "" ||
 			p.Activity.BindingVersion == "" ||
 			!p.Activity.Input.Valid() ||
 			!p.Activity.Context.Valid() {
-			return errors.New("invalid activity WorkItem")
+			return errors.New("invalid activity work item")
 		}
 	case WorkItemTypeChildCall:
 		if err := p.ChildCall.Validate(); err != nil {
@@ -1374,25 +1390,30 @@ func (p WorkItemPayload) Validate(kind WorkItemType) error {
 	case WorkItemTypeTransform:
 		if !p.Transform.Input.Valid() ||
 			!p.Transform.OutputSchema.Valid() {
-			return errors.New("invalid transform WorkItem")
+			return errors.New("invalid transform work item")
 		}
 	case WorkItemTypeCondition:
 		if !p.Condition.Input.Valid() {
-			return errors.New("invalid condition WorkItem")
+			return errors.New("invalid condition work item")
 		}
 	case WorkItemTypeStateUpdate:
 		return p.StateUpdate.Validate()
 	case WorkItemTypeFork:
 		if len(p.Fork.ChildFrames) == 0 {
-			return errors.New("fork WorkItem has no child frames")
+			return errors.New("fork work item has no child frames")
 		}
 	case WorkItemTypeJoin:
 		if len(p.Join.ChildFrames) == 0 || p.Join.Policy == "" {
-			return errors.New("invalid join WorkItem")
+			return errors.New("invalid join work item")
+		}
+		switch p.Join.Policy {
+		case JoinWorkPolicyChildSettled:
+		default:
+			return errors.New("invalid join work item policy")
 		}
 		for _, childID := range p.Join.ChildFrames {
 			if err := validateID(
-				"join WorkItem child ProgramFrame ID",
+				"join work item child program frame id",
 				string(childID),
 			); err != nil {
 				return err
@@ -1409,18 +1430,18 @@ func (p WorkItemPayload) Validate(kind WorkItemType) error {
 			!p.Emit.Correlation.Valid() ||
 			!p.Emit.DataSchema.Valid() ||
 			!p.Emit.CorrelationSchema.Valid() {
-			return errors.New("invalid emit WorkItem")
+			return errors.New("invalid emit work item")
 		}
 		if p.Emit.MaxMessages < 0 || p.Emit.MaxBytes < 0 {
-			return errors.New("emit WorkItem limits cannot be negative")
+			return errors.New("emit work item limits cannot be negative")
 		}
 		switch {
 		case p.Emit.Destination.Channel == "" &&
 			p.Emit.Destination.Event == "":
-			return errors.New("emit WorkItem has no destination")
+			return errors.New("emit work item has no destination")
 		case p.Emit.Destination.Channel != "" &&
 			p.Emit.Destination.Event != "":
-			return errors.New("emit WorkItem has more than one destination")
+			return errors.New("emit work item has more than one destination")
 		}
 	case WorkItemTypeCompensation:
 		if p.Compensation.OriginalWorkItemID == "" ||
@@ -1428,14 +1449,14 @@ func (p WorkItemPayload) Validate(kind WorkItemType) error {
 			p.Compensation.CompensationFrameID == "" ||
 			!p.Compensation.Input.Valid() ||
 			!p.Compensation.Completed.Valid() {
-			return errors.New("invalid compensation WorkItem")
+			return errors.New("invalid compensation work item")
 		}
 	case WorkItemTypeReconciliation:
 		if err := p.Reconciliation.Validate(); err != nil {
 			return err
 		}
 	default:
-		return errors.New("unsupported WorkItem payload type")
+		return errors.New("unsupported work item payload type")
 	}
 	return nil
 }
@@ -1484,7 +1505,7 @@ func (w ChildCallWork) Validate() error {
 
 func (c ToolCall) Validate() error {
 	if c.ID == "" || c.Name == "" || !c.Arguments.Valid() {
-		return errors.New("invalid Tool call")
+		return errors.New("invalid tool call")
 	}
 	return c.Binding.Validate()
 }
@@ -1514,7 +1535,7 @@ func (b ToolBinding) Validate() error {
 		if b.Go == nil ||
 			strings.TrimSpace(b.Go.Function) == "" ||
 			b.Go.TimeoutMS < 0 {
-			return errors.New("go Tool binding is missing")
+			return errors.New("go tool binding is missing")
 		}
 		return validatePin(b.Go.Target)
 
@@ -1525,7 +1546,7 @@ func (b ToolBinding) Validate() error {
 			strings.TrimSpace(b.MCP.ChoiceID) == "" ||
 			strings.TrimSpace(b.MCP.ToolName) == "" ||
 			strings.TrimSpace(b.MCP.ToolDigest) == "" {
-			return errors.New("invalid MCP Tool binding")
+			return errors.New("invalid mcp tool binding")
 		}
 		if b.MCP.ServerArtifact != nil {
 			if err := validatePin(*b.MCP.ServerArtifact); err != nil {
@@ -1533,23 +1554,23 @@ func (b ToolBinding) Validate() error {
 			}
 		}
 		switch b.MCP.ApprovalRule {
-		case "allow", "ask", "deny":
+		case mcpApprovalRuleAllow, mcpApprovalRuleAsk, mcpApprovalRuleDeny:
 		default:
-			return errors.New("invalid MCP Tool approval rule")
+			return errors.New("invalid mcp tool approval rule")
 		}
 		switch b.MCP.ExecutionMode {
-		case "auto", "manual":
+		case mcpExecutionModeAuto, mcpExecutionModeManual:
 		default:
-			return errors.New("invalid MCP Tool execution mode")
+			return errors.New("invalid mcp tool execution mode")
 		}
 
 	case ToolBindingKindSkill:
 		if b.Skill == nil || b.Skill.Name == "" {
-			return errors.New("invalid Skill Tool binding")
+			return errors.New("invalid skill tool binding")
 		}
 	case ToolBindingKindProvider:
 		if b.Provider == nil || b.Provider.Name == "" {
-			return errors.New("invalid provider Tool binding")
+			return errors.New("invalid provider tool binding")
 		}
 		if b.Provider.Artifact != nil {
 			if err := validatePin(*b.Provider.Artifact); err != nil {
@@ -1558,10 +1579,10 @@ func (b ToolBinding) Validate() error {
 		}
 	case ToolBindingKindUnresolved:
 		if b.Unresolved == nil || b.Unresolved.Reason == "" {
-			return errors.New("invalid unresolved Tool binding")
+			return errors.New("invalid unresolved tool binding")
 		}
 	default:
-		return fmt.Errorf("unsupported Tool binding kind %q", b.Kind)
+		return fmt.Errorf("unsupported tool binding kind %q", b.Kind)
 	}
 	return nil
 }
@@ -1602,13 +1623,13 @@ func (b SemanticBinding) Validate() error {
 
 func (o WorkItemOutput) Validate(kind WorkItemType) error {
 	if !o.Value.Valid() {
-		return errors.New("WorkItem output value is not canonical")
+		return errors.New("work item output value is not canonical")
 	}
 	if kind == WorkItemTypeLLM && o.LLM == nil {
-		return errors.New("LLM WorkItem output is missing")
+		return errors.New("llm work item output is missing")
 	}
 	if kind == WorkItemTypeTool && o.Tool == nil {
-		return errors.New("tool WorkItem output is missing")
+		return errors.New("tool work item output is missing")
 	}
 	if o.Tool != nil {
 		if err := o.Tool.Validate(); err != nil {
@@ -1616,10 +1637,10 @@ func (o WorkItemOutput) Validate(kind WorkItemType) error {
 		}
 	}
 	if kind == WorkItemTypeEmit && o.Emit == nil {
-		return errors.New("emit WorkItem output is missing")
+		return errors.New("emit work item output is missing")
 	}
 	if kind == WorkItemTypeTargetResolver && o.TargetResolver == nil {
-		return errors.New("target resolver WorkItem output is missing")
+		return errors.New("target resolver work item output is missing")
 	}
 	if o.TargetResolver != nil {
 		if err := o.TargetResolver.Validate(); err != nil {

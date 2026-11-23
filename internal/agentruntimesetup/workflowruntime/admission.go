@@ -25,6 +25,10 @@ import (
 const (
 	InterpreterID      = sessionv3Runtime.WorkflowInterpreterID
 	InterpreterVersion = sessionv3Runtime.WorkflowInterpreterVersion
+
+	bindingKindService  = "service"
+	bindingKindActivity = "activity"
+	bindingKeySeparator = ":"
 )
 
 var ErrBindingUnavailable = errors.New("workflow target binding is unavailable")
@@ -89,6 +93,19 @@ type WorkflowInvocationTargetAdapter interface {
 	) (sessionv3Runtime.WorkflowPreparedInvocation, error)
 }
 
+type WorkflowCallInvocationTargetAdapter interface {
+	PrepareWorkflowModelCallInvocation(
+		ctx context.Context,
+		model sessionv3Runtime.ArtifactPin,
+		defaults *sessionv3Runtime.SessionDefaultsOverride,
+	) (sessionv3Runtime.WorkflowPreparedInvocation, error)
+	PrepareWorkflowAgentCallInvocation(
+		ctx context.Context,
+		agent sessionv3Runtime.ArtifactPin,
+		defaults *sessionv3Runtime.SessionDefaultsOverride,
+	) (sessionv3Runtime.WorkflowPreparedInvocation, error)
+}
+
 // Registered binding contracts are runtime-neutral. They are aliases here so
 // existing setup composition can register domains without making domains
 // import this Artifact-planning package.
@@ -115,25 +132,25 @@ func NewBindingRegistry() *BindingRegistry {
 func (r *BindingRegistry) RegisterService(
 	value WorkBinding,
 ) error {
-	return r.register("service", value)
+	return r.register(bindingKindService, value)
 }
 
 func (r *BindingRegistry) RegisterActivity(
 	value WorkBinding,
 ) error {
-	return r.register("activity", value)
+	return r.register(bindingKindActivity, value)
 }
 
 func (r *BindingRegistry) Service(
 	id string,
 ) (WorkBinding, bool) {
-	return r.get("service", id)
+	return r.get(bindingKindService, id)
 }
 
 func (r *BindingRegistry) Activity(
 	id string,
 ) (WorkBinding, bool) {
-	return r.get("activity", id)
+	return r.get(bindingKindActivity, id)
 }
 
 func (r *BindingRegistry) register(
@@ -144,7 +161,7 @@ func (r *BindingRegistry) register(
 		value == nil ||
 		value.ID() == "" ||
 		value.Version() == "" {
-		return errors.New("invalid Workflow runtime binding")
+		return errors.New("invalid workflow runtime binding")
 	}
 	effect := value.Effect()
 	if err := effect.Validate(); err != nil {
@@ -159,10 +176,10 @@ func (r *BindingRegistry) register(
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	key := kind + ":" + value.ID()
+	key := kind + bindingKeySeparator + value.ID()
 	if _, found := r.bindings[key]; found {
 		return fmt.Errorf(
-			"duplicate Workflow %s binding %q",
+			"duplicate workflow %s binding %q",
 			kind,
 			value.ID(),
 		)
@@ -180,7 +197,7 @@ func (r *BindingRegistry) get(
 	}
 
 	r.mu.RLock()
-	value, found := r.bindings[kind+":"+id]
+	value, found := r.bindings[kind+bindingKeySeparator+id]
 	r.mu.RUnlock()
 	return value, found
 }
@@ -261,7 +278,7 @@ func (a *Admission) PrepareWorkflow(
 		request.Workflow.ArtifactID == "" ||
 		!request.Input.Valid() {
 		return sessionv3Runtime.ProgramSnapshot{}, errors.New(
-			"invalid Workflow preparation request",
+			"invalid workflow preparation request",
 		)
 	}
 
@@ -304,7 +321,7 @@ func (a *Admission) AdmitWorkflow(
 		request.Workflow.ArtifactID == "" ||
 		!request.Input.Valid() {
 		return sessionv3Runtime.WorkflowAdmissionResult{}, errors.New(
-			"invalid Workflow admission request",
+			"invalid workflow admission request",
 		)
 	}
 	program, err := a.PrepareWorkflow(
@@ -324,18 +341,7 @@ func (a *Admission) VerifyArtifactPin(
 	ctx context.Context,
 	pin sessionv3Runtime.ArtifactPin,
 ) error {
-	ref := artifactModel.ArtifactRef{
-		RootID:     rootModel.RootID(pin.RootID),
-		ArtifactID: artifactModel.ArtifactID(pin.ArtifactID),
-	}
-	current, err := a.pinArtifact(ctx, ref)
-	if err != nil {
-		return err
-	}
-	if current != pin {
-		return errors.New("workflow Artifact pin changed since admission")
-	}
-	return nil
+	return contributionruntime.VerifyArtifactPin(ctx, a.artifacts, pin)
 }
 
 // prepareWorkflowTriggers compiles an input-unbound Workflow program for
@@ -430,7 +436,7 @@ func workflowAdmissionClosureFromPlan(
 		node := plan.Closure.Nodes[index]
 		if _, duplicate := closure.artifacts[node.Artifact]; duplicate {
 			return nil, workflowAdmissionPlan{}, fmt.Errorf(
-				"workflow Artifact closure repeats Artifact %q",
+				"workflow artifact closure repeats artifact %q",
 				node.Artifact.ArtifactID,
 			)
 		}
@@ -458,7 +464,7 @@ func workflowAdmissionClosureFromPlan(
 
 	if !rootFound {
 		return nil, workflowAdmissionPlan{}, errors.New(
-			"workflow artifact closure root has no typed Workflow facts",
+			"workflow artifact closure root has no typed workflow facts",
 		)
 	}
 	if plan.Workflow != root.artifact ||
@@ -509,7 +515,7 @@ func (a *Admission) admitRoot(
 	}
 	if !plan.CompositionComplete {
 		return sessionv3Runtime.WorkflowAdmissionResult{}, fmt.Errorf(
-			"%w: unresolved required Workflow capability",
+			"%w: unresolved required workflow capability",
 			ErrBindingUnavailable,
 		)
 	}
@@ -543,19 +549,19 @@ func (a *Admission) admitPlanned(
 	if selection.RootID != string(plan.artifact.RootID) ||
 		selection.ArtifactID != string(plan.artifact.ArtifactID) {
 		return sessionv3Runtime.WorkflowAdmissionResult{}, errors.New(
-			"selected Workflow differs from the static Artifact closure",
+			"selected workflow differs from the static artifact closure",
 		)
 	}
 	if selection.ExpectedRevision != 0 &&
 		selection.ExpectedRevision != plan.revision {
 		return sessionv3Runtime.WorkflowAdmissionResult{}, errors.New(
-			"selected Workflow revision changed",
+			"selected workflow revision changed",
 		)
 	}
 	if selection.ExpectedDigest != "" &&
 		selection.ExpectedDigest != string(plan.definitionDigest) {
 		return sessionv3Runtime.WorkflowAdmissionResult{}, errors.New(
-			"selected Workflow definition changed",
+			"selected workflow definition changed",
 		)
 	}
 
@@ -608,6 +614,8 @@ func (a *Admission) admitPlanned(
 	}
 
 	if err := prepareWorkflowLLMInvocations(
+		ctx,
+		a.invocations,
 		plan.facts.Inventory,
 		&program,
 	); err != nil {
@@ -756,7 +764,7 @@ func (a *Admission) bindTarget(
 	case workflowv1.TargetTool:
 		ref, err := requireWorkflowTargetArtifactRef(
 			targetPlan,
-			"Tool target",
+			"tool target",
 		)
 		if err != nil {
 			return sessionv3Runtime.WorkflowTarget{}, err
@@ -801,14 +809,14 @@ func (a *Admission) bindTarget(
 			planner, found := a.tools.(ProviderManagedWorkflowToolPlanner)
 			if !found {
 				return sessionv3Runtime.WorkflowTarget{}, fmt.Errorf(
-					"%w: provider-managed tool target %q has no typed Model planner",
+					"%w: provider-managed tool target %q has no typed model planner",
 					ErrBindingUnavailable,
 					target.Ref,
 				)
 			}
 			if ownerModel == nil {
 				return sessionv3Runtime.WorkflowTarget{}, fmt.Errorf(
-					"%w: provider-managed tool target %q requires a prepared Model selection",
+					"%w: provider-managed tool target %q requires a prepared model selection",
 					ErrBindingUnavailable,
 					target.Ref,
 				)
@@ -825,7 +833,7 @@ func (a *Admission) bindTarget(
 			}
 			if *ownerModel == nil {
 				return sessionv3Runtime.WorkflowTarget{}, fmt.Errorf(
-					"%w: provider-managed tool target %q requires a prepared Model selection",
+					"%w: provider-managed tool target %q requires a prepared model selection",
 					ErrBindingUnavailable,
 					target.Ref,
 				)
@@ -862,7 +870,7 @@ func (a *Admission) bindTarget(
 	case workflowv1.TargetWorkflow:
 		ref, err := requireWorkflowTargetArtifactRef(
 			targetPlan,
-			"nested Workflow target",
+			"nested workflow target",
 		)
 		if err != nil {
 			return sessionv3Runtime.WorkflowTarget{}, err
@@ -870,7 +878,7 @@ func (a *Admission) bindTarget(
 		nestedPlan, found := closure.workflow(ref)
 		if !found {
 			return sessionv3Runtime.WorkflowTarget{}, fmt.Errorf(
-				"%w: nested Workflow %q is absent from the static Artifact closure",
+				"%w: nested workflow %q is absent from the static artifact closure",
 				ErrBindingUnavailable,
 				target.Ref,
 			)
@@ -964,7 +972,7 @@ func (a *Admission) bindTarget(
 
 	default:
 		return sessionv3Runtime.WorkflowTarget{}, fmt.Errorf(
-			"unsupported Workflow target kind %q",
+			"unsupported workflow target kind %q",
 			target.Kind,
 		)
 	}
@@ -977,7 +985,7 @@ func (a *Admission) pinInvocationTarget(
 ) (sessionv3Runtime.ArtifactPin, error) {
 	ref, err := requireWorkflowTargetArtifactRef(
 		target,
-		"Workflow invocation target",
+		"workflow invocation target",
 	)
 	if err != nil {
 		return sessionv3Runtime.ArtifactPin{}, err
@@ -1007,7 +1015,7 @@ func requireWorkflowTargetArtifactRef(
 	if value.Resolution != nil &&
 		value.Resolution.Status == composition.ResolutionAvailable {
 		return artifactModel.ArtifactRef{}, fmt.Errorf(
-			"%w: %s %q has a non-Artifact composition result; Workflow direct capabilities are unsupported",
+			"%w: %s %q has a non-artifact composition result; workflow direct capabilities are unsupported",
 			ErrBindingUnavailable,
 			targetLabel,
 			value.Name,
@@ -1015,7 +1023,7 @@ func requireWorkflowTargetArtifactRef(
 	}
 
 	return artifactModel.ArtifactRef{}, fmt.Errorf(
-		"%w: %s %q has no resolved source-backed Artifact",
+		"%w: %s %q has no resolved source-backed artifact",
 		ErrBindingUnavailable,
 		targetLabel,
 		value.Name,
@@ -1089,9 +1097,6 @@ func finalizeWorkflowTarget(
 			return sessionv3Runtime.WorkflowTarget{}, err
 		}
 	}
-	if err := target.Effect.Validate(); err != nil {
-		return sessionv3Runtime.WorkflowTarget{}, err
-	}
 	return target, nil
 }
 
@@ -1103,7 +1108,7 @@ func (a *Admission) pinClosureArtifact(
 	expected, found := closure.artifact(ref)
 	if !found {
 		return sessionv3Runtime.ArtifactPin{}, fmt.Errorf(
-			"%w: Artifact %q is absent from the static Workflow closure",
+			"%w: artifact %q is absent from the static workflow closure",
 			ErrBindingUnavailable,
 			ref.ArtifactID,
 		)
@@ -1126,42 +1131,5 @@ func (a *Admission) pinArtifact(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (sessionv3Runtime.ArtifactPin, error) {
-	if err := ref.Validate(); err != nil {
-		return sessionv3Runtime.ArtifactPin{}, err
-	}
-
-	values, err := a.artifacts.GetMany(
-		ctx,
-		[]artifactModel.ArtifactRef{ref},
-	)
-	if err != nil {
-		return sessionv3Runtime.ArtifactPin{}, err
-	}
-	if len(values) != 1 || values[0].Ref() != ref {
-		return sessionv3Runtime.ArtifactPin{}, errors.New(
-			"workflow Artifact pinning returned an unexpected Artifact",
-		)
-	}
-
-	value := values[0]
-	if value.State != artifactModel.StateAvailable ||
-		!value.Enabled {
-		return sessionv3Runtime.ArtifactPin{}, fmt.Errorf(
-			"workflow Artifact %q is not available and enabled",
-			ref.ArtifactID,
-		)
-	}
-	if value.ResolvedDefinition == nil {
-		return sessionv3Runtime.ArtifactPin{}, fmt.Errorf(
-			"workflow Artifact %q has no resolved Definition",
-			ref.ArtifactID,
-		)
-	}
-
-	return sessionv3Runtime.ArtifactPin{
-		RootID:     string(value.RootID),
-		ArtifactID: string(value.ID),
-		Revision:   value.Revision,
-		Digest:     string(*value.ResolvedDefinition),
-	}, nil
+	return contributionruntime.PinArtifactRef(ctx, a.artifacts, ref)
 }

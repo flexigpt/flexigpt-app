@@ -243,9 +243,9 @@ func BuildWorkflowProjection(
 	return output
 }
 
-func BuildSessionSnapshotProjection(
+func BuildConversationProjection(
 	session Session,
-) SessionSnapshotProjection {
+) ConversationProjection {
 	value := cloneSession(session)
 	messages := make([]Activity, 0)
 	for _, activity := range value.Timeline {
@@ -254,26 +254,36 @@ func BuildSessionSnapshotProjection(
 			messages = append(messages, activity)
 		}
 	}
-
-	conversation := ConversationProjection{
+	return ConversationProjection{
 		SchemaVersion:   SchemaVersion,
 		SessionID:       value.ID,
 		SessionRevision: value.Revision,
 		Title:           value.Title,
 		Messages:        messages,
 	}
-	activities := ActivityProjection{
+}
+
+func BuildActivityProjection(
+	session Session,
+) ActivityProjection {
+	value := cloneSession(session)
+	return ActivityProjection{
 		SchemaVersion:   SchemaVersion,
 		SessionID:       value.ID,
 		SessionRevision: value.Revision,
 		Activities:      append([]Activity(nil), value.Timeline...),
 	}
+}
 
+func BuildSessionSnapshotProjection(
+	session Session,
+) SessionSnapshotProjection {
+	value := cloneSession(session)
 	return SessionSnapshotProjection{
 		SchemaVersion: SchemaVersion,
 		Session:       value,
-		Conversation:  conversation,
-		Activities:    activities,
+		Conversation:  BuildConversationProjection(value),
+		Activities:    BuildActivityProjection(value),
 		Runtime:       BuildSessionRuntimeProjection(value),
 		Workflow:      BuildWorkflowProjection(value),
 	}

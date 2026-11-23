@@ -8,11 +8,15 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/contributionruntime"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/modelruntime"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
-	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	agentAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent"
 	textAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/text"
 	workspaceAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace"
+)
+
+const (
+	invocationContextInstructions = "instructions"
+	invocationContextMessages     = "messages"
+	invocationContextDefaults     = "defaults"
 )
 
 // ModelAgentInvocationAdapter is Workflow setup composition over existing
@@ -83,9 +87,9 @@ func (*ModelAgentInvocationAdapter) ModelInvocationCapabilities() WorkflowInvoca
 			sessionv3Runtime.WorkflowCallModeStart,
 		},
 		ContextForms: []string{
-			"instructions",
-			"messages",
-			"defaults",
+			invocationContextInstructions,
+			invocationContextMessages,
+			invocationContextDefaults,
 		},
 		OutputPorts:       true,
 		StreamOutputPorts: true,
@@ -100,9 +104,9 @@ func (*ModelAgentInvocationAdapter) AgentInvocationCapabilities() WorkflowInvoca
 			sessionv3Runtime.WorkflowCallModeHandoff,
 		},
 		ContextForms: []string{
-			"instructions",
-			"messages",
-			"defaults",
+			invocationContextInstructions,
+			invocationContextMessages,
+			invocationContextDefaults,
 		},
 		OutputPorts:       true,
 		StreamOutputPorts: true,
@@ -116,7 +120,7 @@ func (a *ModelAgentInvocationAdapter) AdmitWorkflowModelTarget(
 	ctx context.Context,
 	pin sessionv3Runtime.ArtifactPin,
 ) error {
-	ref := workflowInvocationArtifactRef(pin)
+	ref := contributionruntime.ArtifactRefForPin(pin)
 	_, use, err := a.models.ResolveRuntimeModelWithRequestPatch(
 		ctx,
 		ref,
@@ -175,9 +179,18 @@ func (a *ModelAgentInvocationAdapter) PrepareWorkflowModelInvocation(
 	ctx context.Context,
 	model sessionv3Runtime.ArtifactPin,
 ) (sessionv3Runtime.WorkflowPreparedInvocation, error) {
+	return a.PrepareWorkflowModelCallInvocation(ctx, model, nil)
+}
+
+func (a *ModelAgentInvocationAdapter) PrepareWorkflowModelCallInvocation(
+	ctx context.Context,
+	model sessionv3Runtime.ArtifactPin,
+	defaults *sessionv3Runtime.SessionDefaultsOverride,
+) (sessionv3Runtime.WorkflowPreparedInvocation, error) {
 	if err := a.AdmitWorkflowModelTarget(ctx, model); err != nil {
 		return sessionv3Runtime.WorkflowPreparedInvocation{}, err
 	}
+
 	value := sessionv3Runtime.WorkflowPreparedInvocation{
 		Model:           &model,
 		OwnerProvenance: sessionv3Runtime.ConfigurationOwnerModel,
@@ -194,15 +207,27 @@ func (a *ModelAgentInvocationAdapter) PrepareWorkflowAgentInvocation(
 	ctx context.Context,
 	agent sessionv3Runtime.ArtifactPin,
 ) (sessionv3Runtime.WorkflowPreparedInvocation, error) {
+	return a.PrepareWorkflowAgentCallInvocation(ctx, agent, nil)
+}
+
+func (a *ModelAgentInvocationAdapter) PrepareWorkflowAgentCallInvocation(
+	ctx context.Context,
+	agent sessionv3Runtime.ArtifactPin,
+	defaults *sessionv3Runtime.SessionDefaultsOverride,
+) (sessionv3Runtime.WorkflowPreparedInvocation, error) {
 	if a == nil || a.contributions == nil {
 		return sessionv3Runtime.WorkflowPreparedInvocation{}, errors.New(
 			"workflow contribution runtime is unavailable",
 		)
 	}
-	selection := selectionForPreparedPin(agent)
+	selection := agent.Selection()
 	value, err := a.contributions.Prepare(
 		ctx,
-		contributionruntime.Request{Agent: &selection},
+		contributionruntime.Request{
+			Agent:            &selection,
+			DefaultsOverride: defaults,
+			SpecificOwner:    sessionv3Runtime.ConfigurationOwnerInvocation,
+		},
 	)
 	if err != nil {
 		return sessionv3Runtime.WorkflowPreparedInvocation{}, err
@@ -228,25 +253,5 @@ func (a *ModelAgentInvocationAdapter) setDefaultMCPPreparer(
 ) {
 	if a != nil && a.contributions != nil {
 		a.contributions.SetDefaultMCPPreparer(preparer)
-	}
-}
-
-func workflowInvocationArtifactRef(
-	pin sessionv3Runtime.ArtifactPin,
-) artifactModel.ArtifactRef {
-	return artifactModel.ArtifactRef{
-		RootID:     rootModel.RootID(pin.RootID),
-		ArtifactID: artifactModel.ArtifactID(pin.ArtifactID),
-	}
-}
-
-func selectionForPreparedPin(
-	value sessionv3Runtime.ArtifactPin,
-) sessionv3Runtime.ArtifactSelection {
-	return sessionv3Runtime.ArtifactSelection{
-		RootID:           value.RootID,
-		ArtifactID:       value.ArtifactID,
-		ExpectedRevision: value.Revision,
-		ExpectedDigest:   value.Digest,
 	}
 }

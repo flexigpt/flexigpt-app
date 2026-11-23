@@ -9,6 +9,13 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
+const (
+	workflowLLMActivityPrefix   = "workflow-llm:"
+	workflowLLMInputMidfix      = ":input:"
+	workflowHandoffIntentPrefix = "workflow-handoff:"
+	workflowPathColonSeparator  = ":"
+)
+
 type workflowLLMInvocation struct {
 	Activities         []Activity
 	Defaults           SessionDefaults
@@ -300,21 +307,44 @@ func (i *WorkflowInterpreter) prepareWorkflowLLMInvocation(
 			return workflowLLMInvocation{}, err
 		}
 		if prepared.Model != nil {
-			defaults.Model = selectionForPreparedPin(*prepared.Model)
+			selection := prepared.Model.Selection()
+			defaults.Model = &selection
+		}
+		if prepared.Agent != nil {
+			selection := prepared.Agent.Selection()
+			defaults.Agent = &selection
+		}
+		if prepared.Workspace != nil {
+			selection := prepared.Workspace.Selection()
+			defaults.Workspace = &selection
+		} else {
+			defaults.Workspace = nil
+		}
+		defaults.InstructionArtifacts = nil
+		defaults.Skills = nil
+		defaults.ActiveSkills = nil
+		defaults.MCP = nil
+		if len(prepared.Tools) != 0 {
+			defaults.ToolSelections = make([]ToolSelection, 0, len(prepared.Tools))
+			for _, tool := range prepared.Tools {
+				defaults.ToolSelections = append(defaults.ToolSelections, ToolSelection{
+					Artifact:      tool.Artifact.Selection(),
+					UserArguments: tool.UserArguments.Clone(),
+					AutoExecute:   jsonutil.CloneJSONInValue(tool.AutoExecute),
+				})
+			}
+		} else {
+			defaults.ToolSelections = nil
 		}
 	} else if target.Artifact == nil {
 		return workflowLLMInvocation{}, errors.New(
-			"workflow model or agent target has no source-backed Artifact pin",
+			"workflow model or agent target has no source-backed artifact pin",
 		)
 	}
 
 	if prepared == nil && target.Artifact != nil {
-		selection := &ArtifactSelection{
-			RootID:           target.Artifact.RootID,
-			ArtifactID:       target.Artifact.ArtifactID,
-			ExpectedRevision: target.Artifact.Revision,
-			ExpectedDigest:   target.Artifact.Digest,
-		}
+		selected := target.Artifact.Selection()
+		selection := &selected
 		switch target.Kind {
 		case WorkflowTargetModel:
 			defaults.Model = selection
@@ -344,11 +374,11 @@ func (i *WorkflowInterpreter) prepareWorkflowLLMInvocation(
 			text = value
 		}
 		activityID := ActivityID(
-			"workflow-llm:" +
+			workflowLLMActivityPrefix +
 				string(frame.ID) +
-				":" +
+				workflowPathColonSeparator +
 				path +
-				":input:" +
+				workflowLLMInputMidfix +
 				strconv.Itoa(index),
 		)
 		activities = append(activities, Activity{
@@ -373,15 +403,6 @@ func (i *WorkflowInterpreter) prepareWorkflowLLMInvocation(
 		HistoryActivityIDs: append([]ActivityID(nil), activityIDs[:len(activityIDs)-1]...),
 		PreparedInvocation: prepared,
 	}, nil
-}
-
-func selectionForPreparedPin(value ArtifactPin) *ArtifactSelection {
-	return &ArtifactSelection{
-		RootID:           value.RootID,
-		ArtifactID:       value.ArtifactID,
-		ExpectedRevision: value.Revision,
-		ExpectedDigest:   value.Digest,
-	}
 }
 
 func workflowInvocationOverridesTarget(
@@ -436,6 +457,36 @@ func withoutProviderManagedToolSelection(
 		output.ToolSelections = nil
 	}
 	return output
+}
+
+func withoutProviderManagedPreparedTool(
+	input *WorkflowPreparedInvocation,
+	target ArtifactPin,
+) *WorkflowPreparedInvocation {
+	if input == nil {
+		return nil
+	}
+	output := jsonutil.CloneJSONInValue(*input)
+	key := PreparedContributionKey(PreparedContributionKindTool, target)
+	tools := make([]WorkflowPreparedTool, 0, len(output.Tools))
+	for _, tool := range output.Tools {
+		if tool.Artifact.RootID == target.RootID &&
+			tool.Artifact.ArtifactID == target.ArtifactID {
+			continue
+		}
+		tools = append(tools, tool)
+	}
+	output.Tools = tools
+
+	order := make([]PreparedContributionOrder, 0, len(output.ContributionOrder))
+	for _, item := range output.ContributionOrder {
+		if item.Kind == PreparedContributionKindTool && item.Key == key {
+			continue
+		}
+		order = append(order, item)
+	}
+	output.ContributionOrder = order
+	return &output
 }
 
 func (i *WorkflowInterpreter) invokeWorkflowLLMTarget(
@@ -607,11 +658,11 @@ func (i *WorkflowInterpreter) handoffWorkflowAgentTarget(
 		contextValue,
 		effect,
 		&ConversationHandoffIntent{
-			ID:                  "workflow-handoff:" + string(frame.ID) + ":" + path,
+			ID:                  workflowHandoffIntentPrefix + string(frame.ID) + workflowPathColonSeparator + path,
 			ConversationID:      conversationID,
 			Owner:               owner,
 			TargetAgent:         targetAgent,
-			RestoreOnCompletion: call.OnCompletion != "retain",
+			RestoreOnCompletion: call.OnCompletion != WorkflowHandoffCompletionRetain,
 		},
 		ports,
 		budget,

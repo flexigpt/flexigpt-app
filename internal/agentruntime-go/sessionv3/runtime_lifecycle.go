@@ -9,30 +9,59 @@ import (
 const (
 	maxExecutionSettlementPasses = 64
 	executionCancelledMessage    = "execution was cancelled"
+	frameBindingCleanupOp        = "session-v3 committed program frame binding cleanup"
+	executionBindingCleanupOp    = "session-v3 committed execution binding cleanup"
+	lifecycleKeySeparator        = "\x00"
 
-	checkpointReasonWorkFinished             = "workFinished"
-	checkpointReasonWorkBindingInvalid       = "workBindingInvalid"
-	checkpointReasonWorkNotInvoked           = "workNotInvoked"
-	checkpointReasonWorkPanicked             = "workPanicked"
-	checkpointReasonWorkBudgetBlocked        = "workBudgetBlocked"
-	checkpointReasonWorkStepBudgetBlocked    = "workStepBudgetBlocked"
-	checkpointReasonChildCallBudgetBlocked   = "childCallBudgetBlocked"
-	checkpointReasonPortInputBlocked         = "portInputBlocked"
-	checkpointReasonResourceClaimInvalid     = "resourceClaimInvalid"
-	checkpointReasonPortBindingUnavailable   = "portBindingUnavailable"
-	checkpointReasonWorkBlocked              = "workBlocked"
-	checkpointReasonWorkDeadlineElapsed      = "workDeadlineElapsed"
-	checkpointReasonWaitResolved             = "waitResolved"
-	checkpointReasonWaitExpired              = "waitExpired"
-	checkpointReasonTimerFired               = "timerFired"
-	checkpointReasonEmitBlocked              = "emitBlocked"
-	checkpointReasonEmitFinished             = "emitFinished"
-	checkpointReasonRetryCancelled           = "retryCancelled"
-	checkpointReasonRetryDeadlineElapsed     = "retryDeadlineElapsed"
-	checkpointReasonResourceWaitCancelled    = "resourceWaitCancelled"
-	checkpointReasonResourceDeadlineElapsed  = "resourceDeadlineElapsed"
-	checkpointReasonExecutionDeadlineElapsed = "executionDeadlineElapsed"
-	checkpointReasonExecutionChanged         = "executionChanged"
+	checkpointReasonSessionCreated           CheckpointReason = "sessionCreated"
+	checkpointReasonSessionChanged           CheckpointReason = "sessionChanged"
+	checkpointReasonMessageSubmitted         CheckpointReason = "messageSubmitted"
+	checkpointReasonMessageEditedAndResent   CheckpointReason = "messageEditedAndResent"
+	checkpointReasonWorkflowStarted          CheckpointReason = "workflowStarted"
+	checkpointReasonWorkBinding              CheckpointReason = "workBinding"
+	checkpointReasonWorkBindingReverted      CheckpointReason = "workBindingReverted"
+	checkpointReasonWorkDispatched           CheckpointReason = "workDispatched"
+	checkpointReasonWorkFinished             CheckpointReason = "workFinished"
+	checkpointReasonWorkBindingInvalid       CheckpointReason = "workBindingInvalid"
+	checkpointReasonWorkNotInvoked           CheckpointReason = "workNotInvoked"
+	checkpointReasonWorkPanicked             CheckpointReason = "workPanicked"
+	checkpointReasonWorkBudgetBlocked        CheckpointReason = "workBudgetBlocked"
+	checkpointReasonWorkStepBudgetBlocked    CheckpointReason = "workStepBudgetBlocked"
+	checkpointReasonWorkConcurrencyWaiting   CheckpointReason = "workConcurrencyWaiting"
+	checkpointReasonChildCallBudgetBlocked   CheckpointReason = "childCallBudgetBlocked"
+	checkpointReasonPortInputBlocked         CheckpointReason = "portInputBlocked"
+	checkpointReasonPortStream               CheckpointReason = "portStream"
+	checkpointReasonResourceClaimInvalid     CheckpointReason = "resourceClaimInvalid"
+	checkpointReasonResourceWait             CheckpointReason = "resourceWait"
+	checkpointReasonResourceReady            CheckpointReason = "resourceReady"
+	checkpointReasonPortBindingUnavailable   CheckpointReason = "portBindingUnavailable"
+	checkpointReasonWorkBlocked              CheckpointReason = "workBlocked"
+	checkpointReasonWorkDeadlineElapsed      CheckpointReason = "workDeadlineElapsed"
+	checkpointReasonWaitRequested            CheckpointReason = "waitRequested"
+	checkpointReasonWaitResolutionRequested  CheckpointReason = "waitResolutionRequested"
+	checkpointReasonWaitResolutionFailed     CheckpointReason = "waitResolutionFailed"
+	checkpointReasonWaitResolved             CheckpointReason = "waitResolved"
+	checkpointReasonWaitExpired              CheckpointReason = "waitExpired"
+	checkpointReasonRecoveryWaitResolved     CheckpointReason = "recoveryWaitResolved"
+	checkpointReasonTimerFired               CheckpointReason = "timerFired"
+	checkpointReasonEmitBlocked              CheckpointReason = "emitBlocked"
+	checkpointReasonEmitFinished             CheckpointReason = "emitFinished"
+	checkpointReasonRetryCancelled           CheckpointReason = "retryCancelled"
+	checkpointReasonRetryDeadlineElapsed     CheckpointReason = "retryDeadlineElapsed"
+	checkpointReasonRetryReady               CheckpointReason = "retryReady"
+	checkpointReasonResourceWaitCancelled    CheckpointReason = "resourceWaitCancelled"
+	checkpointReasonResourceDeadlineElapsed  CheckpointReason = "resourceDeadlineElapsed"
+	checkpointReasonExecutionDeadlineElapsed CheckpointReason = "executionDeadlineElapsed"
+	checkpointReasonCleanupDeadlineElapsed   CheckpointReason = "cleanupDeadlineElapsed"
+	checkpointReasonExecutionChanged         CheckpointReason = "executionChanged"
+	checkpointReasonLLMStream                CheckpointReason = "llmStream"
+	checkpointReasonAppToolQueued            CheckpointReason = "appToolQueued"
+	checkpointReasonAppContextStaged         CheckpointReason = "appContextStaged"
+	checkpointReasonRecoveryApplied          CheckpointReason = "recoveryApplied"
+	checkpointReasonTriggerRecovery          CheckpointReason = "triggerRecovery"
+	checkpointReasonTriggerFired             CheckpointReason = "triggerFired"
+	checkpointReasonReconciliationRecovery   CheckpointReason = "reconciliationRecovery"
+	checkpointReasonDurableWaitRecovery      CheckpointReason = "durableWaitRecovery"
 )
 
 type executionSettlementSignature struct {
@@ -240,7 +269,7 @@ func (r *Runtime) scheduleCommittedFrameClosuresLocked(session *Session) {
 					r.frameHasLiveOwnedWorkLocked(session, *execution, frame.ID) {
 					continue
 				}
-				key := string(execution.ID) + "\x00" + string(frame.ID)
+				key := string(execution.ID) + lifecycleKeySeparator + string(frame.ID)
 				if _, alreadyClosed := r.closedFrameBindings[key]; alreadyClosed {
 					continue
 				}
@@ -248,7 +277,7 @@ func (r *Runtime) scheduleCommittedFrameClosuresLocked(session *Session) {
 				executionID := execution.ID
 				frameID := frame.ID
 				r.launchAsync(
-					"session-v3 committed program frame binding cleanup",
+					frameBindingCleanupOp,
 					func() {
 						_ = frameCloser.CloseProgramFrameBinding(
 							context.WithoutCancel(r.lifecycleCtx),
@@ -267,7 +296,7 @@ func (r *Runtime) scheduleCommittedFrameClosuresLocked(session *Session) {
 			r.closedExecutionBindings[execution.ID] = struct{}{}
 			executionID := execution.ID
 			r.launchAsync(
-				"session-v3 committed execution binding cleanup",
+				executionBindingCleanupOp,
 				func() {
 					_ = executionCloser.CloseExecutionBinding(
 						context.WithoutCancel(r.lifecycleCtx),
@@ -390,7 +419,7 @@ func (r *Runtime) commitTerminalMutationLocked(
 	ctx context.Context,
 	session *Session,
 	executionID ExecutionID,
-	reason string,
+	reason CheckpointReason,
 	event RuntimeEventKind,
 ) bool {
 	execution, err := r.finalizeExecutionSettlementLocked(

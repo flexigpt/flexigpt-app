@@ -8,6 +8,8 @@ import (
 	workflowv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workflow/contract/v1"
 )
 
+const defaultRetryBackoffInitial = sessionv3Runtime.WorkflowDuration("PT1S")
+
 func compileWorkflowEvents(
 	document workflowv1.WorkflowDocument,
 ) ([]sessionv3Runtime.WorkflowEventContract, error) {
@@ -128,13 +130,6 @@ func compileWorkflowSubscriptions(
 		if value.MaxBytes != nil {
 			subscription.MaxBytes = *value.MaxBytes
 		}
-		if err := subscription.Validate(); err != nil {
-			return nil, fmt.Errorf(
-				"workflow subscription %q: %w",
-				name,
-				err,
-			)
-		}
 		output = append(output, subscription)
 	}
 	return output, nil
@@ -232,7 +227,7 @@ func compileWorkflowRetry(
 			output.Backoff.Jitter = *input.Backoff.Jitter
 		}
 	} else if input.MaxAttempts > 1 {
-		output.Backoff.Initial = sessionv3Runtime.WorkflowDuration("PT1S")
+		output.Backoff.Initial = defaultRetryBackoffInitial
 	}
 	if input.PerAttemptTimeout != "" {
 		value, err := sessionv3Runtime.ParseWorkflowDuration(
@@ -242,9 +237,6 @@ func compileWorkflowRetry(
 			return sessionv3Runtime.RetryPolicy{}, err
 		}
 		output.PerAttemptTimeout = value
-	}
-	if err := output.Validate(); err != nil {
-		return sessionv3Runtime.RetryPolicy{}, err
 	}
 	return output, nil
 }

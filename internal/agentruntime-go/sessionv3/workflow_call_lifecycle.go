@@ -334,7 +334,7 @@ func (i *WorkflowInterpreter) cancelCall(
 		return workflowFailure(
 			state,
 			"workflow_cancel_invalid",
-			"workflow cancel requires a WorkItem, child frame, or Execution handle",
+			"workflow cancel requires a work item, child frame, or execution handle",
 		)
 	}
 

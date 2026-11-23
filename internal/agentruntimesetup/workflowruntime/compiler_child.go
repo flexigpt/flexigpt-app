@@ -18,15 +18,11 @@ func compileWorkflowChildOwnership(
 	if err != nil {
 		return sessionv3Runtime.WorkflowChildOwnership{}, err
 	}
-	output := sessionv3Runtime.WorkflowChildOwnership{
+	return sessionv3Runtime.WorkflowChildOwnership{
 		Owner:            owner,
 		CancelWithParent: input.CancelWithParent,
 		Budget:           budget,
-	}
-	if err := output.Validate(); err != nil {
-		return sessionv3Runtime.WorkflowChildOwnership{}, err
-	}
-	return output, nil
+	}, nil
 }
 
 func compileWorkflowExecutionBudget(
@@ -69,9 +65,6 @@ func compileWorkflowExecutionBudget(
 			Amount:   input.Cost.Amount,
 			Currency: input.Cost.Currency,
 		}
-	}
-	if err := output.Validate(); err != nil {
-		return sessionv3Runtime.ExecutionBudget{}, err
 	}
 	return output, nil
 }

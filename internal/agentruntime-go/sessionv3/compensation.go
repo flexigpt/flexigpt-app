@@ -485,7 +485,7 @@ func (r *Runtime) markCompensationIntentLocked(
 		return nil
 	}
 	if item.Input.Compensation == nil {
-		return errors.New("compensation WorkItem has no compensation payload")
+		return errors.New("compensation work item has no compensation payload")
 	}
 
 	intent := item.Input.Compensation
@@ -498,7 +498,7 @@ func (r *Runtime) markCompensationIntentLocked(
 	}
 	original := mutableWorkItem(execution, record.OriginalWorkItemID)
 	if original == nil {
-		return errors.New("compensation original WorkItem is unavailable")
+		return errors.New("compensation original work item is unavailable")
 	}
 
 	record.State = CompensationStateDispatching

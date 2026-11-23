@@ -198,6 +198,15 @@ type ArtifactPin struct {
 	Digest     string `json:"digest"`
 }
 
+func (p ArtifactPin) Selection() ArtifactSelection {
+	return ArtifactSelection{
+		RootID:           p.RootID,
+		ArtifactID:       p.ArtifactID,
+		ExpectedRevision: p.Revision,
+		ExpectedDigest:   p.Digest,
+	}
+}
+
 type CollectionOverrideMode string
 
 const (
@@ -289,9 +298,21 @@ type Activity struct {
 	Wait        *WaitActivity      `json:"wait,omitempty"`
 }
 
+type MessageStatus string
+
+const (
+	MessageStatusAccepted     MessageStatus = "accepted"
+	MessageStatusContinuation MessageStatus = "continuation"
+	MessageStatusCompleted    MessageStatus = "completed"
+	MessageStatusFailed       MessageStatus = "failed"
+	MessageStatusCancelled    MessageStatus = "cancelled"
+	MessageStatusUncertain    MessageStatus = "uncertain"
+	MessageStatusInterrupted  MessageStatus = "interrupted"
+)
+
 type MessageActivity struct {
 	Role               MessageRole             `json:"role"`
-	Status             string                  `json:"status,omitempty"`
+	Status             MessageStatus           `json:"status,omitempty"`
 	Text               string                  `json:"text,omitempty"`
 	Attachments        []Attachment            `json:"attachments,omitempty"`
 	ToolResults        []ToolResultActivity    `json:"toolResults,omitempty"`
@@ -429,8 +450,17 @@ type ActionActivity struct {
 	Receipt    *ExternalReceipt        `json:"receipt,omitempty"`
 }
 
+type WorkflowActivityPhase string
+
+const (
+	WorkflowActivityPhaseStarted       WorkflowActivityPhase = "started"
+	WorkflowActivityPhaseSignal        WorkflowActivityPhase = "signal"
+	WorkflowActivityPhaseTriggered     WorkflowActivityPhase = "triggered"
+	WorkflowActivityPhaseTriggerSignal WorkflowActivityPhase = "trigger-signal"
+)
+
 type WorkflowActivity struct {
-	Phase   string                  `json:"phase"`
+	Phase   WorkflowActivityPhase   `json:"phase"`
 	Summary string                  `json:"summary,omitempty"`
 	Path    string                  `json:"path,omitempty"`
 	Output  jsonutil.CanonicalValue `json:"output,omitempty"`
@@ -1253,9 +1283,15 @@ type ForkWork struct {
 	ChildFrames []ProgramFrameID `json:"childFrames"`
 }
 
+type JoinWorkPolicy string
+
+const (
+	JoinWorkPolicyChildSettled JoinWorkPolicy = "child-settled"
+)
+
 type JoinWork struct {
 	ChildFrames []ProgramFrameID `json:"childFrames"`
-	Policy      string           `json:"policy"`
+	Policy      JoinWorkPolicy   `json:"policy"`
 	Quorum      int              `json:"quorum,omitempty"`
 }
 
@@ -1827,10 +1863,12 @@ type WorkflowAdmissionResult struct {
 	Program ProgramSnapshot `json:"program"`
 }
 
+type CheckpointReason string
+
 type CheckpointView struct {
-	Reason    string    `json:"reason"`
-	Session   Session   `json:"session"`
-	CreatedAt time.Time `json:"createdAt"`
+	Reason    CheckpointReason `json:"reason"`
+	Session   Session          `json:"session"`
+	CreatedAt time.Time        `json:"createdAt"`
 }
 
 type CheckpointSink interface {

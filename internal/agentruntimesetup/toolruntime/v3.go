@@ -19,6 +19,23 @@ import (
 	toolv1 "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/tool/contract/v1"
 )
 
+const (
+	v3GoChoicePrefix               = "v3-go"
+	v3SDKChoicePrefix              = "v3-sdk"
+	v3PreparedChoicePrefix         = "prepared-choice:"
+	v3WorkflowProviderChoicePrefix = "workflow-provider-choice:"
+	v3GoBindingVersion             = "session-v3-go-tool/v1"
+	v3GoFingerprintKind            = "go"
+	v3GoReceiptSystem              = "go-tool"
+	goRuntimeUnavailableCode       = "go_runtime_unavailable"
+	goInvalidBindingCode           = "invalid_go_binding"
+	goBindingStaleCode             = "go_binding_stale"
+	goInvalidArgumentsCode         = "invalid_arguments"
+	goToolOutputInvalidCode        = "go_tool_output_invalid"
+	goToolFailedCode               = "go_tool_failed"
+	errV3ToolRuntimeUnavailable    = "session v3 tool runtime is unavailable"
+)
+
 // V3PreparedChoice is a provider Tool choice paired with its immutable v3
 // semantic call binding.
 type V3PreparedChoice struct {
@@ -38,7 +55,7 @@ type V3Executor struct {
 // being treated as a locally executable Tool. Such a Tool must be executed by
 // its typed Model plan, not by a synthetic local success result.
 var ErrProviderManagedWorkflowTool = errors.New(
-	"provider-managed SDK Tool requires a typed Model execution plan",
+	"provider-managed sdk tool requires a typed model execution plan",
 )
 
 func NewV3Executor(
@@ -46,7 +63,7 @@ func NewV3Executor(
 	caller GoToolCaller,
 ) (*V3Executor, error) {
 	if tools == nil || caller == nil {
-		return nil, errors.New("session v3 Tool runtime dependencies are incomplete")
+		return nil, errors.New("session v3 tool runtime dependencies are incomplete")
 	}
 
 	return &V3Executor{
@@ -101,7 +118,7 @@ func (e *V3Executor) PrepareProviderManagedWorkflowTool(
 	if call.Binding.Kind != sessionv3Runtime.ToolBindingKindProvider {
 		return sessionv3Runtime.ProviderManagedToolChoice{}, ErrProviderManagedWorkflowTool
 	}
-	call.ID = "workflow-provider-choice:" + call.ChoiceID
+	call.ID = v3WorkflowProviderChoicePrefix + call.ChoiceID
 	call.Arguments = jsonutil.MustCanonicalValue(map[string]any{})
 
 	raw, err := json.Marshal(choice.Arguments)
@@ -135,7 +152,7 @@ func (e *V3Executor) Choices(
 		return nil, nil
 	}
 	if e == nil || e.tools == nil {
-		return nil, errors.New("session v3 Tool runtime is unavailable")
+		return nil, errors.New(errV3ToolRuntimeUnavailable)
 	}
 
 	output := make([]V3PreparedChoice, 0, len(selections))
@@ -150,13 +167,13 @@ func (e *V3Executor) Choices(
 			ArtifactID: artifactModel.ArtifactID(selection.Artifact.ArtifactID),
 		}
 		if err := ref.Validate(); err != nil {
-			return nil, fmt.Errorf("selected Tool %d: %w", index, err)
+			return nil, fmt.Errorf("selected tool %d: %w", index, err)
 		}
 
 		target, err := e.tools.MapToolTarget(ctx, ref)
 		if err != nil {
 			return nil, fmt.Errorf(
-				"map selected Tool %s/%s: %w",
+				"map selected tool %s/%s: %w",
 				ref.RootID,
 				ref.ArtifactID,
 				err,
@@ -165,7 +182,7 @@ func (e *V3Executor) Choices(
 		resolved, err := e.tools.ResolveToolTarget(ctx, target)
 		if err != nil {
 			return nil, fmt.Errorf(
-				"resolve selected Tool %s/%s: %w",
+				"resolve selected tool %s/%s: %w",
 				ref.RootID,
 				ref.ArtifactID,
 				err,
@@ -203,13 +220,11 @@ func (e *V3Executor) BindWorkflowTool(
 	payload *sessionv3Runtime.ToolWork,
 ) (sessionv3Runtime.ToolCall, error) {
 	if e == nil || e.tools == nil {
-		return sessionv3Runtime.ToolCall{}, errors.New(
-			"session v3 Tool runtime is unavailable",
-		)
+		return sessionv3Runtime.ToolCall{}, errors.New(errV3ToolRuntimeUnavailable)
 	}
 	if payload == nil || payload.Target == nil {
 		return sessionv3Runtime.ToolCall{}, errors.New(
-			"workflow tool Artifact target is missing",
+			"workflow tool artifact target is missing",
 		)
 	}
 
@@ -224,18 +239,19 @@ func (e *V3Executor) BindWorkflowTool(
 	}
 	if call.Binding.Kind == sessionv3Runtime.ToolBindingKindProvider {
 		return sessionv3Runtime.ToolCall{}, fmt.Errorf(
-			"%w: Tool %q",
+			"%w: tool %q",
 			ErrProviderManagedWorkflowTool,
 			resolved.Tool.Name,
 		)
 	}
 	if payload.Call.Name != "" && payload.Call.Name != call.Name {
 		return sessionv3Runtime.ToolCall{}, errors.New(
-			"workflow tool name changed since Workflow admission",
+			"workflow tool name changed since workflow admission",
 		)
 	}
 
 	call.ID = payload.Call.ID
+	call.Source = payload.Call.Source
 	call.ProviderCallID = payload.Call.ProviderCallID
 	call.Arguments = payload.Call.Arguments.Clone()
 	call.Automatic = payload.Call.Automatic
@@ -249,9 +265,7 @@ func (e *V3Executor) BindGo(
 	payload *sessionv3Runtime.ToolWork,
 ) (sessionv3Runtime.SemanticBinding, error) {
 	if e == nil || e.tools == nil {
-		return sessionv3Runtime.SemanticBinding{}, errors.New(
-			"session v3 Tool runtime is unavailable",
-		)
+		return sessionv3Runtime.SemanticBinding{}, errors.New(errV3ToolRuntimeUnavailable)
 	}
 	if payload == nil ||
 		payload.Call.Binding.Kind != sessionv3Runtime.ToolBindingKindGo ||
@@ -270,12 +284,12 @@ func (e *V3Executor) BindGo(
 	}
 
 	return sessionv3Runtime.SemanticBinding{
-		Version: "session-v3-go-tool/v1",
+		Version: v3GoBindingVersion,
 		Artifacts: []sessionv3Runtime.ArtifactPin{
 			binding.Target,
 		},
 		TargetFingerprint: strings.Join([]string{
-			"go",
+			v3GoFingerprintKind,
 			binding.Target.RootID,
 			binding.Target.ArtifactID,
 			binding.Target.Digest,
@@ -290,22 +304,27 @@ func (e *V3Executor) BindGo(
 func (e *V3Executor) ExecuteGo(
 	ctx context.Context,
 	payload *sessionv3Runtime.ToolWork,
+	effects ...sessionv3Runtime.EffectContract,
 ) (sessionv3Runtime.WorkExecutionResult, error) {
 	if e == nil || e.tools == nil || e.caller == nil {
 		return sessionv3Runtime.WorkExecutionResult{
 			Error: &sessionv3Runtime.SanitizedError{
-				Code:    "go_runtime_unavailable",
-				Message: "Go Tool runtime is unavailable",
+				Code:    goRuntimeUnavailableCode,
+				Message: "go tool runtime is unavailable",
 			},
 		}, nil
 	}
 	if payload == nil || payload.Call.Binding.Kind != sessionv3Runtime.ToolBindingKindGo {
 		return sessionv3Runtime.WorkExecutionResult{
 			Error: &sessionv3Runtime.SanitizedError{
-				Code:    "invalid_go_binding",
-				Message: "Go Tool binding is missing",
+				Code:    goInvalidBindingCode,
+				Message: "go tool binding is missing",
 			},
 		}, nil
+	}
+	effectKind := sessionv3Runtime.EffectKindNonIdempotent
+	if len(effects) != 0 && effects[0].Kind != "" {
+		effectKind = effects[0].Kind
 	}
 
 	binding := payload.Call.Binding.Go
@@ -313,8 +332,8 @@ func (e *V3Executor) ExecuteGo(
 	if err != nil {
 		return sessionv3Runtime.WorkExecutionResult{
 			Error: &sessionv3Runtime.SanitizedError{
-				Code:    "go_binding_stale",
-				Message: err.Error(),
+				Code:    goBindingStaleCode,
+				Message: strings.ToLower(err.Error()),
 			},
 		}, nil
 	}
@@ -326,8 +345,8 @@ func (e *V3Executor) ExecuteGo(
 	if !arguments.Valid() {
 		return sessionv3Runtime.WorkExecutionResult{
 			Error: &sessionv3Runtime.SanitizedError{
-				Code:    "invalid_arguments",
-				Message: "Go Tool arguments are not canonical JSON",
+				Code:    goInvalidArgumentsCode,
+				Message: "go tool arguments are not canonical json",
 			},
 		}, nil
 	}
@@ -342,8 +361,8 @@ func (e *V3Executor) ExecuteGo(
 	if conversionErr != nil {
 		return sessionv3Runtime.WorkExecutionResult{
 			Error: &sessionv3Runtime.SanitizedError{
-				Code:    "go_tool_output_invalid",
-				Message: conversionErr.Error(),
+				Code:    goToolOutputInvalidCode,
+				Message: strings.ToLower(conversionErr.Error()),
 			},
 		}, nil
 	}
@@ -353,8 +372,8 @@ func (e *V3Executor) ExecuteGo(
 	if conversionErr != nil {
 		return sessionv3Runtime.WorkExecutionResult{
 			Error: &sessionv3Runtime.SanitizedError{
-				Code:    "go_tool_output_invalid",
-				Message: conversionErr.Error(),
+				Code:    goToolOutputInvalidCode,
+				Message: strings.ToLower(conversionErr.Error()),
 			},
 		}, nil
 	}
@@ -362,22 +381,43 @@ func (e *V3Executor) ExecuteGo(
 		if strings.TrimSpace(adapted.Text) == "" {
 			adapted.Text = invokeErr.Error()
 		}
+		errorOutput := &sessionv3Runtime.WorkItemOutput{
+			Value: structured,
+			Tool: &sessionv3Runtime.ToolOutput{
+				Kind:       sessionv3Runtime.ToolOutputKindError,
+				Text:       adapted.Text,
+				Contents:   adapted.Contents,
+				Structured: structured,
+				Error:      invokeErr.Error(),
+			},
+		}
+		if v3GoConversationSource(payload.Call.Source) && ctx.Err() == nil {
+			effect := sessionv3Runtime.EffectStateConfirmedNotApplied
+			return sessionv3Runtime.WorkExecutionResult{
+				Output:      errorOutput,
+				Confirmed:   true,
+				EffectState: &effect,
+			}, nil
+		}
+		if effectKind == sessionv3Runtime.EffectKindRead && ctx.Err() == nil {
+			return sessionv3Runtime.WorkExecutionResult{
+				Output: errorOutput,
+				Error: &sessionv3Runtime.SanitizedError{
+					Code:     goToolFailedCode,
+					Category: sessionv3Runtime.ErrorCategoryExecution,
+					Message:  strings.ToLower(invokeErr.Error()),
+				},
+				Confirmed: true,
+			}, nil
+		}
 		effect := sessionv3Runtime.EffectStateUncertain
 		return sessionv3Runtime.WorkExecutionResult{
-			Output: &sessionv3Runtime.WorkItemOutput{
-				Value: structured,
-				Tool: &sessionv3Runtime.ToolOutput{
-					Kind:       sessionv3Runtime.ToolOutputKindError,
-					Text:       adapted.Text,
-					Contents:   adapted.Contents,
-					Structured: structured,
-					Error:      invokeErr.Error(),
-				},
-			},
+			Output: errorOutput,
 			Error: &sessionv3Runtime.SanitizedError{
-				Code:     "go_tool_failed",
+				Code:     goToolFailedCode,
 				Category: sessionv3Runtime.ErrorCategoryUncertainty,
-				Message:  invokeErr.Error(),
+				Effect:   effect,
+				Message:  strings.ToLower(invokeErr.Error()),
 			},
 			Confirmed:   false,
 			EffectState: &effect,
@@ -394,13 +434,18 @@ func (e *V3Executor) ExecuteGo(
 				Structured: structured,
 			},
 			Receipt: &sessionv3Runtime.ExternalReceipt{
-				System:      "go-tool",
+				System:      v3GoReceiptSystem,
 				Reference:   resolved.Tool.Implementation.Function,
 				ConfirmedAt: time.Now().UTC(),
 			},
 		},
 		Confirmed: true,
 	}, nil
+}
+
+func v3GoConversationSource(source sessionv3Runtime.ToolCallSource) bool {
+	return source == sessionv3Runtime.ToolCallSourceModel ||
+		source == sessionv3Runtime.ToolCallSourceApp
 }
 
 // V3ToolOutputs produces the v3 durable text projection and canonical
@@ -424,9 +469,7 @@ func (e *V3Executor) resolvePinnedTool(
 	pin sessionv3Runtime.ArtifactPin,
 ) (toolAPI.ResolvedToolView, error) {
 	if e == nil || e.tools == nil {
-		return toolAPI.ResolvedToolView{}, errors.New(
-			"session v3 Tool runtime is unavailable",
-		)
+		return toolAPI.ResolvedToolView{}, errors.New(errV3ToolRuntimeUnavailable)
 	}
 	if pin.RootID == "" ||
 		pin.ArtifactID == "" ||
@@ -458,7 +501,7 @@ func (e *V3Executor) resolvePinnedTool(
 		resolved.Tool.Artifact.ResolvedDefinition == nil ||
 		string(*resolved.Tool.Artifact.ResolvedDefinition) != pin.Digest {
 		return toolAPI.ResolvedToolView{}, errors.New(
-			"tool artifact changed since WorkItem binding",
+			"tool artifact changed since work item binding",
 		)
 	}
 	return resolved, nil
@@ -484,13 +527,13 @@ func (e *V3Executor) resolvePinnedGoTool(
 	if strings.TrimSpace(binding.LogicalName) != "" &&
 		binding.LogicalName != string(resolved.Tool.Name) {
 		return toolAPI.ResolvedToolView{}, errors.New(
-			"go tool logical name changed since WorkItem binding",
+			"go tool logical name changed since work item binding",
 		)
 	}
 	if resolved.Tool.Implementation.Kind != toolv1.ImplementationKindGo ||
 		resolved.Tool.Implementation.Function != binding.Function {
 		return toolAPI.ResolvedToolView{}, errors.New(
-			"go tool implementation changed since WorkItem binding",
+			"go tool implementation changed since work item binding",
 		)
 	}
 	return resolved, nil
@@ -503,12 +546,12 @@ func validateV3Selection(
 	artifact := resolved.Tool.Artifact
 	if selection.ExpectedRevision != 0 &&
 		selection.ExpectedRevision != artifact.Revision {
-		return errors.New("selected Tool revision changed")
+		return errors.New("selected tool revision changed")
 	}
 	if selection.ExpectedDigest != "" &&
 		(artifact.ResolvedDefinition == nil ||
 			selection.ExpectedDigest != string(*artifact.ResolvedDefinition)) {
-		return errors.New("selected Tool Definition changed")
+		return errors.New("selected tool definition changed")
 	}
 	return nil
 }
@@ -520,7 +563,7 @@ func v3ChoiceForResolvedTool(
 	if name == "" {
 		return inferenceSpec.ToolChoice{},
 			sessionv3Runtime.ToolCall{},
-			errors.New("resolved Tool has no logical name")
+			errors.New("resolved tool has no logical name")
 	}
 
 	arguments, err := InputSchema(resolved.Tool.InputSchema)
@@ -537,7 +580,7 @@ func v3ChoiceForResolvedTool(
 	if strings.TrimSpace(digest) == "" {
 		return inferenceSpec.ToolChoice{},
 			sessionv3Runtime.ToolCall{},
-			errors.New("resolved Tool has no Definition digest")
+			errors.New("resolved tool has no definition digest")
 	}
 
 	pin := sessionv3Runtime.ArtifactPin{
@@ -553,11 +596,11 @@ func v3ChoiceForResolvedTool(
 		if function == "" {
 			return inferenceSpec.ToolChoice{},
 				sessionv3Runtime.ToolCall{},
-				errors.New("resolved Go Tool has no function")
+				errors.New("resolved go tool has no function")
 		}
 
 		choiceID := StableChoiceID(
-			"v3-go",
+			v3GoChoicePrefix,
 			pin.RootID,
 			pin.ArtifactID,
 			name,
@@ -571,12 +614,13 @@ func v3ChoiceForResolvedTool(
 			Arguments:   arguments,
 		}
 		call := sessionv3Runtime.ToolCall{
-			ID:          "prepared-choice:" + choiceID,
+			ID:          v3PreparedChoicePrefix + choiceID,
 			Name:        name,
 			ChoiceID:    choiceID,
 			Type:        choice.Type,
 			DisplayName: resolved.Tool.DisplayName,
 			Description: resolved.Tool.Description,
+			Source:      sessionv3Runtime.ToolCallSourceModel,
 			Binding: sessionv3Runtime.ToolBinding{
 				Kind: sessionv3Runtime.ToolBindingKindGo,
 				Go: &sessionv3Runtime.GoToolBinding{
@@ -595,11 +639,11 @@ func v3ChoiceForResolvedTool(
 		if sdkType == "" {
 			return inferenceSpec.ToolChoice{},
 				sessionv3Runtime.ToolCall{},
-				errors.New("resolved SDK Tool has no type")
+				errors.New("resolved sdk tool has no type")
 		}
 
 		choiceID := StableChoiceID(
-			"v3-sdk",
+			v3SDKChoicePrefix,
 			pin.RootID,
 			pin.ArtifactID,
 			name,
@@ -613,12 +657,13 @@ func v3ChoiceForResolvedTool(
 			Arguments:   arguments,
 		}
 		call := sessionv3Runtime.ToolCall{
-			ID:          "prepared-choice:" + choiceID,
+			ID:          v3PreparedChoicePrefix + choiceID,
 			Name:        name,
 			ChoiceID:    choiceID,
 			Type:        choice.Type,
 			DisplayName: resolved.Tool.DisplayName,
 			Description: resolved.Tool.Description,
+			Source:      sessionv3Runtime.ToolCallSourceModel,
 			Binding: sessionv3Runtime.ToolBinding{
 				Kind: sessionv3Runtime.ToolBindingKindProvider,
 				Provider: &sessionv3Runtime.ProviderToolBinding{
@@ -634,7 +679,7 @@ func v3ChoiceForResolvedTool(
 		return inferenceSpec.ToolChoice{},
 			sessionv3Runtime.ToolCall{},
 			fmt.Errorf(
-				"unsupported Tool implementation %q",
+				"unsupported tool implementation %q",
 				resolved.Tool.Implementation.Kind,
 			)
 	}

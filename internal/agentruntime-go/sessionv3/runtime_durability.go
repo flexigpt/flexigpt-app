@@ -84,7 +84,7 @@ func (r *Runtime) resumeRestoredWork(ctx context.Context) {
 			queueChanged = r.drainTriggerQueuesLocked(ctx, session, "")
 		}
 		if triggerErr == nil && (triggerChanged || queueChanged) {
-			if err := r.persistLocked(ctx, "triggerRecovery", session); err != nil {
+			if err := r.persistLocked(ctx, checkpointReasonTriggerRecovery, session); err != nil {
 				continue
 			}
 		}
@@ -136,7 +136,7 @@ func (r *Runtime) resumeRestoredWork(ctx context.Context) {
 				r.touchExecutionLocked(session, current)
 				if err := r.persistLocked(
 					ctx,
-					"reconciliationRecovery",
+					checkpointReasonReconciliationRecovery,
 					session,
 				); err != nil {
 					continue
@@ -162,7 +162,7 @@ func (r *Runtime) resumeRestoredWork(ctx context.Context) {
 				r.touchExecutionLocked(session, execution)
 				if err := r.persistLocked(
 					ctx,
-					"reconciliationRecovery",
+					checkpointReasonReconciliationRecovery,
 					session,
 				); err != nil {
 					continue
@@ -188,7 +188,7 @@ func (r *Runtime) resumeRestoredWork(ctx context.Context) {
 				r.touchExecutionLocked(session, current)
 				if err := r.persistLocked(
 					ctx,
-					"durableWaitRecovery",
+					checkpointReasonDurableWaitRecovery,
 					session,
 				); err != nil {
 					continue
