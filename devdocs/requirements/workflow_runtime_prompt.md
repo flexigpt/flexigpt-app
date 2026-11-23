@@ -1,241 +1,174 @@
-Complete the Runtime and associated setup functionality specified by the
-`Functional tasks` section at the end of
-`devdocs/requirements/workflow_runtime.md`.
+Complete every `Partial` and `Not implemented` item in the `Current task
+record` in `devdocs/requirements/workflow_runtime.md`.
 
-That heading-based section is the sole current completion ledger. It replaces
-all former completion tables, pending ledgers, status registers, architecture
-status tables, and repeated component claims.
+This is one substantial, connected, end-to-end functional delivery. Do not
+split the work into phases, status-only edits, small helper changes, or later
+milestones. Implement the complete behavior and then update the HLD task
+statuses and completion evidence in the same delivery.
 
-Deliver one substantial end-to-end functional implementation. Do not split the
-work into phases, status-only edits, isolated helpers, or a partial milestone.
-Complete every dependency-ready parent and subtask in this delivery.
+This is WIP. Do not bump or change any version identifier. This includes
+Workflow apiVersion, ProgramSnapshot or ProgramFrame interpreter versions,
+Artifact and Store schema versions, package or module versions, public API
+versions, and release identifiers.
 
-Scope exclusions are mandatory:
+Explicit exclusions:
 
-- Do not add, run, or report tests.
-- Do not add validation-only hardening, validation reports, malformed-input
-  cleanup, or a separate validation project.
-- Do not implement frontend integration.
-- Do not remove SessionV2, migrate SessionV2, convert stored Sessions, or do
-  V2 retirement cleanup.
-- Do not change any version identifier.
-- Do not add release work, release notes, or cost metering.
-- Do not add direct Model, Agent, Tool, MCP, Skill, Service, Activity, or
+- Do not add or change tests.
+- Do not add validation work, validation-only hardening, malformed-input
+  handling work, or validation reports.
+- Do not do frontend integration.
+- Do not delete, retire, migrate, convert, or clean up SessionV2.
+- Do not implement stored-session conversion.
+- Do not do release work.
+- Do not implement cost metering, pricing, currency, or cost settlement.
+- Do not add direct Tool, Skill, Model, Agent, MCP, Service, Activity, or
   Workflow capability paths.
-- Do not reopen the prior V2 direct Tool analysis.
 
-No version identifier may change. This includes Workflow apiVersion, interpreter
-or payload versions, Artifact and Store schemas, package versions, module
-versions, public APIs, and release identifiers.
+Implement the following connected functional results.
 
-Use the current HLD as the source of truth. A parent task is complete only when
-every listed subtask is complete. Change a status to `Implemented` only when the
-complete behavior exists in source. Replace the current evidence with exact
-source evidence when completion is real.
+- Establish one Runtime-owned committed lifecycle for every terminal WorkItem
+  path. Settle Attempt and effect evidence, release or transfer claims, wake
+  completion and resource waiters, advance owners, settle Executions, commit
+  the Session, then launch all dependency-ready work. Handle ordinary commits,
+  committed derived-index errors, prior checkpoint-pending state, cancellation,
+  deadlines, panic, binding failure, port failure, retry, resource waits,
+  reconciliation, compensation, child completion, and recovery.
 
-Complete these parent tasks and every listed subtask:
+- Reacquire Session-owned objects by durable identity after any call that can
+  append, replace, forward, resolve, restore, create child frames, create child
+  Executions, or otherwise invalidate slice-backed pointers.
 
-- `RT-SETTLE-003`
-- `RT-CLEANUP-003`
-- `RT-BUDGET-003`
-- `RT-TRIGGER-003`
-- `RT-COMMAND-003`
-- `RT-PERSIST-003`
-- `WF-PREPARE-003`
-- `WF-RETRY-003`
-- `WF-CHANNEL-003`
-- `WF-EFFECT-003`
-- `WF-CONTROL-003`
-- `WF-OUTCOME-003`
-- `V3-REPLAY-003`
-- `V3-CONFIG-003`
-- `DOMAIN-SKILL-003`
-- `V3-CONTINUE-003`
-- `WF-HANDOFF-003`
-- `ARC-DOMAIN-003`
-- `V3-API-003`
-- `DOMAIN-ATTACH-003`
-- `ARC-DUP-003`
+- Remove pre-commit work launch from port and channel helpers. Remove repeated
+  direct ready-work launches where the common post-commit lifecycle can own the
+  behavior. Preserve harmless dispatch guards during transition, but do not
+  retain duplicated scheduling algorithms.
 
-Implement the following functional outcomes.
+- Complete cancellation and bounded cleanup. Preserve cleanup classification
+  and effective deadlines through Workflow, retry, Agent-loop, single-Model,
+  Machine, merge, Fork, Join, waits, resources, streams, emits, settlement,
+  and recovery. Support failure-driven cleanup as well as cancellation and
+  ordinary deadline cleanup. Do not terminalize a frame or Execution while
+  dispatched owned work, late effect evidence, reconciliation, compensation,
+  claim release, or completion delivery remains active.
 
-Runtime settlement and lifecycle:
+- Complete recovery as operation resumption. Reconstruct eligible
+  pre-invocation domain waits from captured semantic requests without
+  persisting tokens, clients, callbacks, or private bindings. Route recovery
+  decisions through the original WorkItem owner, catch, finally, cleanup,
+  reconciliation, compensation, and dependent completion lifecycle. Finish
+  restore with one committed Session-wide readiness pass.
 
-- Use durable identity reacquisition after any mutation-capable operation that
-  can invalidate Session-owned slice-backed objects.
-- Route binding error, port error, panic, invalid wait result, manual result,
-  cancellation, reconciliation, child completion, and ordinary completion
-  through one terminal Runtime lifecycle.
-- Settle Attempt and effect facts, release or transfer claims, wake completion
-  and resource waiters, advance owners, settle Executions, checkpoint, then
-  launch all newly ready Session work.
-- Do not leave catch, finally, parent completion waits, resource waiters,
-  forwarded channel work, or cross-Execution work idle after committed
-  settlement.
+- Preserve one immutable prepared Workflow invocation through invoke, start,
+  retry, handoff, nested Workflow preparation, Agent rounds, and recovery.
+  Preserve planned source pins, selected contribution facts, Workspace prompt
+  and context behavior, target-set facts, typed messages, instructions,
+  defaults, ports, effect policy, and actual owner provenance. Do not resolve a
+  different current Agent or Workspace graph after preparation.
 
-Cleanup, Saga, budget, and scheduling:
+- Add typed lowering and capture for expression-backed message and instruction
+  collections. Evaluate them at the logical call boundary. Do not turn
+  arbitrary Workflow JSON into fallback Model or Agent chat text.
 
-- Stop normal work after cancellation or normal deadline expiry.
-- Dispatch eligible cleanup through its effective cleanup deadline across
-  binding, execution, retry, resource acquisition, waits, emits, streams, and
-  settlement.
-- Preserve cleanup classification through synthetic frames, including retry
-  wrappers.
-- Keep cancellation as the primary outcome.
-- Retain a Saga while late external effect confirmation can still require
-  reconciliation or compensation. An empty initial compensation list is not
-  proof that no later compensation is required.
-- Wake concurrency waiters after every counted-slot release.
-- Apply `step.Limits` to all structured constructs.
-- Distinguish nested Workflow depth from internal Runtime frame depth.
-- Persist outer child-call Attempt, policy, accounting, and ownership before a
-  child can dispatch native work.
-- Drain eligible trigger queues on registration reactivation.
-- Use one event projection with `type`, source, identity, data, correlation,
-  and time for trigger, wait, and Machine expressions.
+- Capture complete logical call values before child materialization or dispatch,
+  including actual port input values and cursors. Retry, started work,
+  reconciliation, and recovery must use this captured operation and must not
+  observe later channel content or later state.
 
-Command and persistence semantics:
+- Make channel and subscription coordination authoritative. Preserve declared
+  aliases separately from private nested channel names. Use the actual
+  invocation Execution for every evaluation boundary. Re-read durable event
+  consumption after each wait settlement. Permit only one consumption for the
+  same originating subscription owner.
 
-- Return accepted command receipts before repeated attachment admission or
-  Workflow preparation is required.
-- Preserve caller payload identity across prepared snapshots.
-- Keep server-generated occurrence time outside caller command identity.
-- Do not move Workflow preparation into Runtime.
-- Treat a committed tombstone as committed if derived-index deletion fails.
-- Schedule derived-index repair without restoring a deleted Session.
-- Permit deletion of an idle long-lived normal conversation while protecting
-  actual active Workflow, child, wait, cleanup, and external work.
+- Complete scoped budget behavior. Preserve Execution aggregate accounting and
+  controlling structured-scope accounting. Mark real nested Workflow calls as
+  Workflow nesting. Account user Activities, trigger signals, channel records,
+  forwarded ports, staged inputs, output ports, and supplied provider usage
+  against their actual semantic owner. Keep cost metering excluded.
 
-Workflow preparation, calls, channels, and transport:
+- Preserve target-owned effect guarantees. Distinguish unconditional
+  idempotence from keyed-only deduplication. Treat keyed work as replay-safe
+  only when it has a stable captured key and the target supports a
+  target-native keying mechanism. Do not add generic Workflow metadata to Go
+  Tool, MCP Tool, Skill Tool, Model, Agent, Service, or Activity request
+  grammars.
 
-- Retain complete prepared target meaning through neutral immutable snapshots.
-- Preserve transitive prepared Agent, Model, Text, Tool, Skill, MCP, Workspace,
-  nested Workflow, and requirement facts without storing private clients,
-  credentials, or Artifact Store execution handles.
-- Resolve an owner Model only for provider-managed Tool lowering.
-- Capture a complete logical call before dispatch or child materialization.
-- Retain target, target-set membership, input, context, typed messages,
-  instructions, port inputs, effect key, policy, and logical time.
-- Reuse the capture for retry, started calls, recovery, and resumption.
-- Preserve retry schema matching, effect-safe replay decisions, and native
-  Model and Agent failure classification.
-- Keep private nested channel storage names separate from declaration-visible
-  aliases.
-- Capture an authorized channel view at every actual step and block-output
-  evaluation boundary.
-- Preserve inherited subscription ownership and consumption identity.
+- Preserve causal effect dependencies through ChildCall boundaries, structured
+  exits, reconciliation, and compensation. Persist complete compensation facts,
+  including identities, before compensation code consumes `completed`.
 
-Effects, recovery, control flow, and outcomes:
+- Complete structured control behavior. Preserve child state, causal facts,
+  claims, and outcomes through break, continue, block return, Workflow return,
+  Saga exit, and cancellation. Persist actual completion order for
+  first-completed behavior. Keep one selected winner while retaining all
+  branch or item outcomes.
 
-- Explicitly map source `non-idempotent` to Runtime `nonIdempotent`.
-- Settle MCP results from actual domain evidence. Do not make every confirmed
-  MCP success uncertain.
-- Use the same settled effect facts for Tool continuation, Workflow outcome,
-  history, reconciliation, retry, and Saga recording.
-- Preserve causal effect dependencies across ordered and structured work.
-- Provide complete original and compensation operation facts.
-- Apply Repeat index to `while` and `until`.
-- Settle empty Foreach and other empty collections truthfully.
-- Preserve omitted versus explicit zero maxima.
-- Limit consecutive immediate Machine transitions without limiting long-lived
-  event-driven Machines.
-- Record actual terminal step boundaries for inline failure, return, break,
-  continue, cancellation, reconciliation, and child settlement.
-- Preserve partial assistant output once without inventing success.
+- Preserve truthful terminal meaning. Keep typed errors, categories, causes,
+  receipt evidence, effect state, outputs, and declaration paths through
+  WorkItems, ProgramFrames, Executions, completion waits, projections, retry,
+  and catch. Separate interrupted and replayed LLM streams. Persist one
+  interrupted assistant Activity with its actual terminal state.
 
-Conversation, replay, configuration, Skill, continuation, and handoff:
+- Reconstruct exact retained LLM inputs and final non-secret configuration.
+  Use captured message ordering, assistant protocol facts, Tool results,
+  attachments, App context, injected context, and final effective Model
+  configuration. Reconstruct only private credentials, clients, and private
+  Skill resources. Never substitute current Session defaults, current history,
+  current Agent contributions, current Workspace contributions, or later
+  operation results.
 
-- Preserve semantic LLM dispatch plans before clearing private bindings during
-  recovery.
-- Rebuild recovered requests from captured message identities, causal order,
-  effective non-secret Model and Provider facts, instructions, capabilities,
-  and context.
-- Recreate credentials and clients privately. Do not substitute current
-  defaults, overlays, or contribution assembly.
-- Add durable collection policy for inherit, replace, explicit empty clearing,
-  supported removal, and override semantics.
-- Preserve explicit MCP selection and apply the effective Workspace.
-- Preserve truthful Agent, Workspace, Session, and invocation contribution
-  provenance.
-- Reconstruct Skill active state for the exact owning ProgramFrame and enabled
-  set, then release private Skill sessions at natural frame and Execution
-  completion.
-- Resume staged continuation into the active owning Agent operation instead of
-  queueing it behind that Agent.
-- Scope manual Tool controls and continuation to the current unconsumed
-  operation.
-- Preserve queued handoff message defaults, budget, completed assistant rounds,
-  and causal history.
-- Add typed successful handoff completion or relinquish behavior with restore or
-  retain. Do not use cancellation as success.
+- Complete continuation routing. Route public and staged continuation to one
+  active semantic conversation owner, including Workflow handoff ownership.
+  Consume or durably transfer every accepted queued Activity before an Agent
+  frame completes. Scope manual Tool controls and automation holds to the
+  active operation and current Tool batch.
 
-Domain ownership, binder composition, attachments, and duplication:
+- Move domain behavior to the owning domain:
+  - Agent setup owns Agent capability interpretation and Model selection.
+  - Workspace setup owns Workspace contribution, override, prompt, and context
+    interpretation.
+  - Attachment setup owns V3 attachment admission and immutable snapshot
+    creation.
+  - Model setup owns final provider input, output, and Model-default
+    adaptation.
+  - Tool, MCP, Skill, Service, and Activity setup own native request
+    construction, private resources, native invocation, and native result
+    conversion.
+  - Session and Workflow setup compose neutral domain facts and lower only
+    orchestration intent.
+  - Core Runtime owns durable orchestration only.
 
-- Move Agent Model selection and Agent contribution semantics into Agent setup.
-- Move Workspace contribution semantics into Workspace setup.
-- Move Text contribution preparation into Text setup.
-- Move attachment admission and materialization into Attachment setup.
-- Move native Model request, output, and Model-default adaptation into Model
-  setup.
-- Keep Session and Workflow setup as compositional consumers of neutral domain
-  facts.
-- Forward `PrepareUserMessageSkillTemplate` and `PreviewInstructionSkill`
-  through the final composed Workflow binder. Reuse the Base implementation.
-- Preserve attachment labels and root-relative directory identity in provider
-  content while replaying admitted snapshots only.
-- Retain one canonical immutable effective plan with truthful provenance.
-- Replace full per-Tool plan copies with immutable canonical origin-plan
-  references plus necessary Tool-specific facts.
-- Retain one authoritative attachment content snapshot.
-- Consolidate duplicate Runtime evaluation, failure matching, error cloning,
-  operation-input extraction, lowered-tree traversal, namespacing, retention,
-  terminal settlement, and ready-work launch behavior.
+- Remove duplicated execution algorithms and replicated effective state. Keep
+  one canonical immutable LLM dispatch plan and canonical origin-plan
+  references for generated Tool WorkItems. Do not reintroduce current-default
+  lookup or full per-Tool plan copies.
 
-Architecture constraints are mandatory:
+- Keep Artifact Store passive. Do not add Runtime preparation, execution,
+  binding, dispatch, scheduler, persistence, recovery, or consumer-private
+  APIs to Artifact Store. Do not move Runtime behavior into
+  `workflow_artifact.md`.
 
-- Core Runtime owns durable orchestration and must not import Artifact Store or
-  setup.
-- Artifact Store remains a passive source-fact provider.
-- Setup owns preparation and composition, not Runtime scheduling or recovery.
-- Domain setup owns native grammar, private resources, invocation, and result
-  conversion.
-- Workflow remains an orchestration language. It must not become a generic
-  native-domain envelope.
-- Provider SDK Tools remain typed Model-plan capabilities.
-- Native Tool arguments remain native domain arguments.
-- Keep one Runtime due-time owner. MCP connection and discovery timers remain
-  MCP-domain lifecycle behavior.
-- Do not add another durable execution root or another orchestration path.
-- Do not add repeated admission or a separate validation project.
+- Reduce redundant validation only by retaining a single existing owner for
+  admission or domain checks. Do not create a validation project and do not add
+  repeated source admission checks.
 
-Preserve already working behavior:
+- Preserve V2 coexistence. Do not remove or alter V2 behavior as part of this
+  implementation cycle.
 
-- Artifact-independent core Runtime.
-- Direct Workflow composition rejection.
-- Typed prepared Workflow commands.
-- Provider-managed SDK Tool lowering.
-- Registered Service and Activity binding behavior.
-- Published-port validation.
-- Forward-only started-call wrappers.
-- Repeated calendar local-slot identity.
-- Immutable attachment content snapshots.
-- Typed Model defaults and Store-owned semantic export.
-- Shared V3 MCP content conversion.
+- Preserve backend setup ownership. If Runtime restore succeeds but final
+  wrapper publication fails, close the restored Runtime and preserve the
+  existing Runtime-before-Store shutdown order.
 
-Update `devdocs/requirements/workflow_runtime.md` in the same delivery:
+Update `devdocs/requirements/workflow_runtime.md` as part of the delivery:
 
-- Keep `Functional tasks` as the only current status ledger.
-- Update only the completed parent and subtask headings.
-- Change status to `Implemented` only after complete source behavior exists.
-- Replace current evidence with exact source evidence.
-- Remove obsolete contradictory claims if implementation makes them inaccurate.
-- Retain the WIP statement, scope exclusions, no-version-change rule, ownership
-  constraints, and V2 coexistence rule.
+- Replace each pending completion-evidence field with exact source paths,
+  symbols, and connected behavior.
+- Change a task to `Implemented` only after every listed result is present.
+- Update parent status only after all subtasks are complete.
+- Remove obsolete earlier gap text and obsolete false completion claims for
+  corrected task IDs.
+- Do not modify `workflow_artifact.md` unless a separate demonstrated
+  Artifact-planning defect exists.
 
-Return:
-
-- Completed source changes.
-- Updated HLD task statuses and exact source evidence.
-- Any genuine remaining in-scope blocker, including the exact unavailable
-  input, authorization, or environment limitation.
-- Do not stop at a milestone while a dependency-ready task remains unfinished.
+The delivery is complete only when no in-scope task in the current task record
+remains `Partial` or `Not implemented`.
