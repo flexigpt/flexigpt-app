@@ -1209,14 +1209,9 @@ func (r *Runtime) appendPortMessageLocked(
 	}
 	r.touchExecutionLocked(session, channelExecution)
 
-	// The receiver can belong to another independent Execution. Launching
-	// ready work here keeps stream and final-port delivery reactive instead
-	// of waiting for the sending child to settle.
-	r.launchReadyWork(
-		context.Background(),
-		session.ID,
-		r.readyWorkForSessionLocked(session),
-	)
+	// The caller checkpoints the complete Session mutation after port
+	// delivery. Runtime persistLocked owns dependency-ready dispatch only
+	// after that checkpoint commits.
 	return nil
 }
 
@@ -1459,9 +1454,18 @@ func (r *Runtime) validatePortPlansForDispatch(
 	request WorkDispatchRequest,
 ) error {
 	if len(request.WorkItem.Ports) == 0 {
-		return nil
+		switch request.WorkItem.Type {
+		case WorkItemTypeService, WorkItemTypeActivity:
+			// Registered bindings can still receive explicit Workflow context.
+			// Ask the composed binding to enforce that transport capability.
+		default:
+			return nil
+		}
 	}
-	if err := validateUniquePortPlans(request.WorkItem.Ports); err != nil {
+
+	if err := validateUniquePortPlans(
+		request.WorkItem.Ports,
+	); err != nil {
 		return err
 	}
 	validator, found := r.deps.Binder.(PortPlanValidator)

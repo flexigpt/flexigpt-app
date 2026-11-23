@@ -2287,6 +2287,26 @@ status-only updates, small implementation phases, or isolated helper changes.
     behavior.
   - Retain domain-native request grammar in owning domains.
 
+### Runtime setup lifecycle
+
+#### `RT-SETUP-003` Release a restored Runtime when wrapper publication fails
+
+- Status: Implemented.
+- Source evidence:
+  - `cmd/agentgo/app.go` constructs Runtime dependencies before Store v3 and
+    Runtime v3 restore.
+  - `cmd/agentgo/wrapper_sessionv3_runtime.go:close` closes Runtime before
+    Store.
+  - `cmd/agentgo/wrapper_sessionv3_bootstrap.go:InitComposedSessionV3Runtime`
+    closes the restored Runtime if final `InitSessionV3Wrapper` publication
+    fails.
+- Completed behavior:
+  - Runtime ownership transfers to the wrapper only after wrapper publication
+    succeeds.
+  - A failed publication does not leave restored asynchronous Runtime work
+    alive against caller-owned Store resources.
+  - Existing Runtime-before-Store shutdown order remains unchanged.
+
 ### Current task record
 
 This subsection is the current functional status authority for every task ID

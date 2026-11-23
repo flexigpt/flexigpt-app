@@ -31,11 +31,15 @@ func (b *Binder) applyPreparedWorkflowInvocation(
 		}
 	}
 	if value.Agent != nil {
+		selection := selectionForPreparedPin(*value.Agent)
+		plan.defaults.Agent = &selection
 		if err := plan.addArtifact(*value.Agent); err != nil {
 			return err
 		}
 	}
 	if value.Workspace != nil {
+		selection := selectionForPreparedPin(*value.Workspace)
+		plan.defaults.Workspace = &selection
 		if err := plan.addArtifact(*value.Workspace); err != nil {
 			return err
 		}

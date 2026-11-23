@@ -52,6 +52,23 @@ func workflowEventWaitOutput(
 	}
 }
 
+func mutableExecutionSignal(
+	execution *Execution,
+	source string,
+	id string,
+) *ExecutionSignal {
+	if execution == nil {
+		return nil
+	}
+	for index := range execution.Signals {
+		if execution.Signals[index].Source == source &&
+			execution.Signals[index].ID == id {
+			return &execution.Signals[index]
+		}
+	}
+	return nil
+}
+
 type completionWaitOutput struct {
 	WorkItemID  WorkItemID              `json:"workItemID,omitempty"`
 	FrameID     ProgramFrameID          `json:"frameID,omitempty"`
@@ -588,10 +605,19 @@ func (r *Runtime) wakeEventWaitsLocked(
 		if execution == nil {
 			return errors.New("event wait execution disappeared")
 		}
+		currentSignal := mutableExecutionSignal(
+			execution,
+			signal.Source,
+			signal.ID,
+		)
+		if currentSignal == nil {
+			return errors.New("event signal is unavailable")
+		}
 		wait := mutableWait(execution, waitID)
-		if wait.Status != WaitStatusPending ||
+		if wait == nil ||
+			wait.Status != WaitStatusPending ||
 			wait.Request.Kind != WaitKindEvent ||
-			wait.Request.Signal != signal.Name {
+			wait.Request.Signal != currentSignal.Name {
 			continue
 		}
 		if wait.Request.Consume {
@@ -599,18 +625,18 @@ func (r *Runtime) wakeEventWaitsLocked(
 				execution,
 				*wait,
 			); found &&
-				signalConsumedBySubscription(signal, consumption) {
+				signalConsumedBySubscription(*currentSignal, consumption) {
 				continue
 			}
 			if wait.Request.Subscription == "" &&
-				containsWaitID(signal.ConsumedBy, wait.ID) {
+				containsWaitID(currentSignal.ConsumedBy, wait.ID) {
 				continue
 			}
 		}
 		accepted, err := r.subscriptionAcceptedForWaitLocked(
 			execution,
 			*wait,
-			signal,
+			*currentSignal,
 		)
 		if err != nil {
 			return err
@@ -619,13 +645,13 @@ func (r *Runtime) wakeEventWaitsLocked(
 			continue
 		}
 
-		response := jsonutil.MustCanonicalValue(workflowEventWaitOutput(signal))
+		response := jsonutil.MustCanonicalValue(workflowEventWaitOutput(*currentSignal))
 		if !waitMatchesEvent(
 			*wait,
 			response,
-			signal.Source,
-			signal.Data,
-			signal.Correlation,
+			currentSignal.Source,
+			currentSignal.Data,
+			currentSignal.Correlation,
 		) {
 			continue
 		}
@@ -653,29 +679,39 @@ func (r *Runtime) wakeEventWaitsLocked(
 			return errors.New("event wait execution disappeared")
 		}
 		wait = mutableWait(execution, waitID)
+		currentSignal = mutableExecutionSignal(
+			execution,
+			signal.Source,
+			signal.ID,
+		)
+		if wait == nil || currentSignal == nil {
+			return errors.New("event wait settlement lost its durable owner")
+		}
 		if wait.Request.Consume {
-			for signalIndex := range execution.Signals {
-				if execution.Signals[signalIndex].ID != signal.ID {
-					continue
-				}
-				execution.Signals[signalIndex].ConsumedBy = append(
-					execution.Signals[signalIndex].ConsumedBy,
+			if !containsWaitID(currentSignal.ConsumedBy, wait.ID) {
+				currentSignal.ConsumedBy = append(
+					currentSignal.ConsumedBy,
 					wait.ID,
 				)
-				if consumption, found := subscriptionConsumptionForWait(
-					execution,
-					*wait,
-				); found {
-					execution.Signals[signalIndex].ConsumedSubscriptions = append(
-						execution.Signals[signalIndex].ConsumedSubscriptions,
+			}
+			if consumption, found := subscriptionConsumptionForWait(
+				execution,
+				*wait,
+			); found &&
+				!signalConsumedBySubscription(*currentSignal, consumption) {
+				if !slices.Contains(
+					currentSignal.ConsumedSubscriptions,
+					consumption.Subscription,
+				) {
+					currentSignal.ConsumedSubscriptions = append(
+						currentSignal.ConsumedSubscriptions,
 						consumption.Subscription,
 					)
-					execution.Signals[signalIndex].SubscriptionConsumptions = append(
-						execution.Signals[signalIndex].SubscriptionConsumptions,
-						consumption,
-					)
 				}
-				break
+				currentSignal.SubscriptionConsumptions = append(
+					currentSignal.SubscriptionConsumptions,
+					consumption,
+				)
 			}
 		}
 	}

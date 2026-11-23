@@ -1260,6 +1260,7 @@ func (i *WorkflowInterpreter) drive(
 		case step.Parallel != nil:
 			return i.startParallel(
 				frame,
+				execution,
 				program,
 				state,
 				step,
@@ -1269,6 +1270,7 @@ func (i *WorkflowInterpreter) drive(
 		case step.Foreach != nil:
 			return i.startForeach(
 				frame,
+				execution,
 				program,
 				state,
 				step,
@@ -1278,6 +1280,7 @@ func (i *WorkflowInterpreter) drive(
 		case step.Repeat != nil:
 			return i.startRepeat(
 				frame,
+				execution,
 				program,
 				state,
 				step,

@@ -677,12 +677,15 @@ func (r *Runtime) acceptTriggerEvent(
 		!command.Correlation.Valid() {
 		return nil, errors.New("invalid trigger event command")
 	}
+
+	// Preserve caller identity before Runtime creates an occurrence timestamp.
+	// An accepted duplicate with omitted OccurredAt must fingerprint identically.
+	identity := command
 	if command.OccurredAt.IsZero() {
 		command.OccurredAt = r.now()
 	} else {
 		command.OccurredAt = command.OccurredAt.UTC()
 	}
-	identity := command
 
 	return r.changeSession(
 		ctx,

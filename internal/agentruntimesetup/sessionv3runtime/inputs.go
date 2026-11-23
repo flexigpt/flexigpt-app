@@ -684,6 +684,9 @@ func attachmentToContentItem(a sessionv3Runtime.Attachment) (inferenceSpec.Input
 		}, true
 	case sessionv3Runtime.AttachmentKindImage:
 		image := &inferenceSpec.ContentItemImage{ImageMIME: "image/png"}
+		if strings.TrimSpace(a.Label) != "" {
+			image.ImageName = a.Label
+		}
 		if a.MIMEType != "" {
 			image.ImageMIME = a.MIMEType
 		}

@@ -731,6 +731,7 @@ func startAgentLLM(
 							IsolatedInput:      payload.IsolatedInput,
 							HistoryActivityIDs: payload.HistoryActivityIDs,
 							ProviderTools:      payload.ProviderTools,
+							PreparedInvocation: jsonutil.CloneJSONInValue(payload.PreparedInvocation),
 						},
 						continuations,
 					)),

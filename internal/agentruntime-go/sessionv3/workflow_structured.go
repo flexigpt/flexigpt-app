@@ -832,6 +832,7 @@ func workflowRemainingMode(value string) string {
 
 func (i *WorkflowInterpreter) startParallel(
 	frame ProgramFrame,
+	execution Execution,
 	program WorkflowProgram,
 	state WorkflowState,
 	step WorkflowStep,
@@ -935,13 +936,14 @@ func (i *WorkflowInterpreter) startParallel(
 			}
 			return workflowFailure(state, "workflow_parallel_failed", err.Error())
 		}
-		return i.drive(frame, Execution{}, program, state)
+		return i.drive(frame, execution, program, state)
 	}
 	return workflowStructuredTransition(state, frames)
 }
 
 func (i *WorkflowInterpreter) startForeach(
 	frame ProgramFrame,
+	execution Execution,
 	program WorkflowProgram,
 	state WorkflowState,
 	step WorkflowStep,
@@ -1028,11 +1030,12 @@ func (i *WorkflowInterpreter) startForeach(
 		pending.StateOwner = owner
 	}
 	state.Pending = pending
-	return i.drivePending(frame, Execution{}, program, state)
+	return i.drivePending(frame, execution, program, state)
 }
 
 func (i *WorkflowInterpreter) startRepeat(
 	frame ProgramFrame,
+	execution Execution,
 	program WorkflowProgram,
 	state WorkflowState,
 	step WorkflowStep,
@@ -1106,7 +1109,7 @@ func (i *WorkflowInterpreter) startRepeat(
 		Claims: claims,
 		Repeat: progress,
 	}
-	return i.drivePending(frame, Execution{}, program, state)
+	return i.drivePending(frame, execution, program, state)
 }
 
 func (i *WorkflowInterpreter) drivePending(
@@ -1219,14 +1222,14 @@ func (i *WorkflowInterpreter) launchForeachChildren(
 		if state.Pending != nil {
 			return i.drivePending(frame, execution, program, state)
 		}
-		return i.drive(frame, Execution{}, program, state)
+		return i.drive(frame, execution, program, state)
 	}
 	return workflowTransition(state, nil, nil, nil)
 }
 
 func (i *WorkflowInterpreter) launchRepeatChild(
 	frame ProgramFrame,
-	_ Execution,
+	execution Execution,
 	program WorkflowProgram,
 	state WorkflowState,
 ) (ProgramTransition, error) {
@@ -1270,7 +1273,7 @@ func (i *WorkflowInterpreter) launchRepeatChild(
 		if err := i.finishRepeat(&state, program, step); err != nil {
 			return workflowFailure(state, "workflow_repeat_failed", err.Error())
 		}
-		return i.drive(frame, Execution{}, program, state)
+		return i.drive(frame, execution, program, state)
 	}
 
 	index := progress.Iterations

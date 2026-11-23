@@ -571,6 +571,7 @@ func (i *WorkflowInterpreter) settleSagaChild(
 		if failure == nil {
 			return i.settleSagaBodySuccess(
 				frame,
+				execution,
 				program,
 				state,
 				result,
@@ -665,6 +666,7 @@ func (i *WorkflowInterpreter) settleSagaChild(
 
 func (i *WorkflowInterpreter) settleSagaBodySuccess(
 	frame ProgramFrame,
+	execution Execution,
 	program WorkflowProgram,
 	state WorkflowState,
 	result WorkflowBlockResult,
@@ -717,14 +719,14 @@ func (i *WorkflowInterpreter) settleSagaBodySuccess(
 		state.Pending = nil
 		state.Index++
 		state.clearPendingStep()
-		transition, _ := i.drive(frame, Execution{}, program, state)
+		transition, _ := i.drive(frame, execution, program, state)
 		return transition
 
 	case WorkflowExitReturnWorkflow:
 		state.Exit = result.Exit
 		state.ExitValue = result.Value.Clone()
 		state.Pending = nil
-		transition, _ := i.drive(frame, Execution{}, program, state)
+		transition, _ := i.drive(frame, execution, program, state)
 		return transition
 
 	default:

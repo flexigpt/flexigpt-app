@@ -202,14 +202,14 @@ func (b *Binder) ValidatePortPlans(
 	ctx context.Context,
 	request sessionv3Runtime.WorkDispatchRequest,
 ) error {
-	if len(request.WorkItem.Ports) == 0 {
-		return nil
-	}
 	switch request.WorkItem.Type {
 	case sessionv3Runtime.WorkItemTypeService,
 		sessionv3Runtime.WorkItemTypeActivity:
 		return b.validateExternalPortPlans(request)
 	default:
+	}
+	if len(request.WorkItem.Ports) == 0 {
+		return nil
 	}
 	validator, found := b.Base.(sessionv3Runtime.PortPlanValidator)
 	if !found {
@@ -278,9 +278,6 @@ func bindExternal(
 		request,
 	)
 	if err != nil {
-		return sessionv3Runtime.BindResult{}, err
-	}
-	if err := requireExternalPortCapabilities(binding, request.WorkItem, domainRequest); err != nil {
 		return sessionv3Runtime.BindResult{}, err
 	}
 	rb, err := binding.Bind(ctx, domainRequest)
@@ -546,6 +543,7 @@ func requireExternalPortCapabilities(
 ) error {
 	needsContext := len(request.Context) != 0
 	needsInputPorts := len(request.Ports) != 0
+	needsFinalOutput := false
 	needsOutputStream := false
 	for _, plan := range item.Ports {
 		if plan.Direction != sessionv3Runtime.WorkflowPortDirectionOutput {
@@ -553,9 +551,14 @@ func requireExternalPortCapabilities(
 		}
 		if plan.Stream {
 			needsOutputStream = true
+		} else {
+			needsFinalOutput = true
 		}
 	}
-	if !needsContext && !needsInputPorts && !needsOutputStream {
+	if !needsContext &&
+		!needsInputPorts &&
+		!needsFinalOutput &&
+		!needsOutputStream {
 		return nil
 	}
 
@@ -574,6 +577,10 @@ func requireExternalPortCapabilities(
 	case needsInputPorts && !support.InputPorts:
 		return errors.New(
 			"external binding does not support workflow input ports",
+		)
+	case needsFinalOutput && !support.FinalOutputPorts:
+		return errors.New(
+			"external binding does not support workflow final output ports",
 		)
 	case needsOutputStream && !support.OutputStream:
 		return errors.New(

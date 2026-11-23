@@ -639,6 +639,15 @@ func retryCaptureLLMInvocation(
 			len(input.Instructions),
 		),
 	}
+	if len(input.PreparedTargets) != 0 {
+		output.PreparedTargets = make(
+			map[string]WorkflowPreparedInvocation,
+			len(input.PreparedTargets),
+		)
+		for name, target := range input.PreparedTargets {
+			output.PreparedTargets[name] = jsonutil.CloneJSONInValue(target)
+		}
+	}
 	if input.Defaults != nil {
 		defaults := jsonutil.CloneJSONInValue(*input.Defaults)
 		output.Defaults = &defaults

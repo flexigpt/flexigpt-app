@@ -167,6 +167,7 @@ func (i *WorkflowInterpreter) recordTerminalWorkflowStepOutcome(
 
 	case ProgramFrameStateCancelled:
 		outcome.Status = WorkflowStepOutcomeCancelled
+		outcome.Output = nil
 		outcome.Error = cloneWorkflowSanitizedError(transition.Error)
 		if outcome.Error == nil && settled != nil {
 			outcome.Error = cloneWorkflowSanitizedError(settled.Error)

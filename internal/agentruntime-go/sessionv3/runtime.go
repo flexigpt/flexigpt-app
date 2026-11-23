@@ -2704,10 +2704,10 @@ func (r *Runtime) dispatchOne(ctx context.Context, sessionID SessionID, executio
 				return
 			}
 		}
-		bound.Wait.Deadline = earlierDeadline(bound.Wait.Deadline, item.Deadline)
+		effectiveDeadline := r.effectiveWorkDeadlineLocked(*execution, *item)
 		bound.Wait.Deadline = earlierDeadline(
 			bound.Wait.Deadline,
-			r.effectiveWorkDeadlineLocked(*execution, *item),
+			effectiveDeadline,
 		)
 		now := r.now()
 		wait := Wait{
@@ -3062,26 +3062,18 @@ func (r *Runtime) executeOne(
 		return
 	}
 	attempt := activeAttempt(execution, itemID)
-	//nolint:gocritic // If else is ok.
-	if item.Cleanup &&
-		execution.Cleanup.Active &&
-		execution.Cleanup.Deadline != nil {
-		cancel()
-		executionCtx, cancel = context.WithDeadline(
-			r.lifecycleCtx,
-			execution.Cleanup.Deadline.UTC(),
+	dispatchDeadline := r.effectiveWorkDeadlineLocked(*execution, *item)
+	if attempt != nil {
+		dispatchDeadline = earlierDeadline(
+			dispatchDeadline,
+			attempt.Deadline,
 		)
-	} else if attempt != nil && attempt.Deadline != nil {
+	}
+	if dispatchDeadline != nil {
 		cancel()
 		executionCtx, cancel = context.WithDeadline(
 			r.lifecycleCtx,
-			attempt.Deadline.UTC(),
-		)
-	} else if item.Deadline != nil {
-		cancel()
-		executionCtx, cancel = context.WithDeadline(
-			r.lifecycleCtx,
-			item.Deadline.UTC(),
+			dispatchDeadline.UTC(),
 		)
 	}
 	r.cancels[itemID] = cancel
@@ -3900,6 +3892,23 @@ func (r *Runtime) frameOutcomeLocked(execution *Execution) *ExecutionOutcome {
 		// parent reaches a terminal frame state.
 		return nil
 	}
+	for _, item := range execution.WorkItems {
+		if !item.State.Terminal() {
+			return nil
+		}
+	}
+	for _, wait := range execution.Waits {
+		if wait.Status == WaitStatusPending ||
+			wait.Status == WaitStatusResolving {
+			return nil
+		}
+	}
+	if len(execution.ResourceLeases) != 0 {
+		return nil
+	}
+	if hasOutstandingCleanup(*execution) {
+		return nil
+	}
 
 	outcome := &ExecutionOutcome{
 		Kind:        ExecutionOutcomeCompleted,
@@ -4070,20 +4079,30 @@ func (r *Runtime) persistLocked(ctx context.Context, reason string, session *Ses
 			}
 		}
 	}
-	if err := r.deps.Checkpoints.HandleCheckpoint(
+	checkpointErr := r.deps.Checkpoints.HandleCheckpoint(
 		context.WithoutCancel(ctx),
 		CheckpointView{Reason: reason, Session: snapshot, CreatedAt: r.now()},
-	); err != nil {
+	)
+	if checkpointErr != nil {
 		var committed CheckpointCommitStatus
-		if errors.As(err, &committed) &&
+		if !errors.As(checkpointErr, &committed) ||
+			committed == nil ||
+			!committed.CheckpointCommitted() {
+			return checkpointErr
+		}
+		if errors.As(checkpointErr, &committed) &&
 			committed != nil &&
 			committed.CheckpointCommitted() {
 			session.EventSequence = snapshot.EventSequence
-			return nil
 		}
-		return err
+	} else {
+		session.EventSequence = snapshot.EventSequence
 	}
-	session.EventSequence = snapshot.EventSequence
+
+	// A prior failed checkpoint must not suppress ready-work selection after
+	// this checkpoint has committed. Clear the barrier before the common
+	// post-commit dispatcher computes readiness.
+	delete(r.checkpointPending, session.ID)
 
 	// All durable command, settlement, retry, wait, and resource paths pass
 	// through persistLocked. Launch only after the authoritative checkpoint

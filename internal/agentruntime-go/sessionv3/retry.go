@@ -43,7 +43,8 @@ func (r *Runtime) prepareRetryLocked(
 		}
 		return false
 	}
-	if item.Deadline != nil && !nextAttemptAt.Before(item.Deadline.UTC()) {
+	if deadline := r.effectiveWorkDeadlineLocked(*execution, *item); deadline != nil &&
+		!nextAttemptAt.Before(deadline.UTC()) {
 		item.Error = deadlineError()
 		return false
 	}
