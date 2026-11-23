@@ -26,6 +26,8 @@ const (
 	workflowChildCallIDSeparator = ":"
 
 	maxWorkflowProgramJSONBytes = 2 << 20
+
+	workflowCELMessagesVariable = "messages"
 )
 
 type WorkflowValueKind string
@@ -168,6 +170,7 @@ type WorkflowCall struct {
 	OnCompletion           string                     `json:"onCompletion,omitempty"`
 	InternalLifecycleChild bool                       `json:"internalLifecycleChild,omitempty"`
 	LLMInvocation          *WorkflowLLMInvocation     `json:"llmInvocation,omitempty"`
+	PortInputs             []PortInput                `json:"portInputs,omitempty"`
 }
 
 // WorkflowLLMInvocation is the setup-lowered typed Model or Agent invocation
@@ -175,10 +178,22 @@ type WorkflowCall struct {
 // receives a ProgramSnapshot. Runtime evaluates only typed templates and does
 // not decode a generic Workflow JSON request envelope.
 type WorkflowLLMInvocation struct {
-	Messages        []WorkflowLLMMessage                  `json:"messages"`
-	Instructions    []WorkflowLLMInstruction              `json:"instructions,omitempty"`
-	Defaults        *SessionDefaultsOverride              `json:"defaults,omitempty"`
-	PreparedTargets map[string]WorkflowPreparedInvocation `json:"preparedTargets,omitempty"`
+	Messages            []WorkflowLLMMessage                  `json:"messages,omitempty"`
+	MessageSegments     []WorkflowLLMMessageSegment           `json:"messageSegments,omitempty"`
+	Instructions        []WorkflowLLMInstruction              `json:"instructions,omitempty"`
+	InstructionSegments []WorkflowLLMInstructionSegment       `json:"instructionSegments,omitempty"`
+	Defaults            *SessionDefaultsOverride              `json:"defaults,omitempty"`
+	PreparedTargets     map[string]WorkflowPreparedInvocation `json:"preparedTargets,omitempty"`
+}
+
+type WorkflowLLMMessageSegment struct {
+	Messages   []WorkflowLLMMessage `json:"messages,omitempty"`
+	Collection *WorkflowValue       `json:"collection,omitempty"`
+}
+
+type WorkflowLLMInstructionSegment struct {
+	Instructions []WorkflowLLMInstruction `json:"instructions,omitempty"`
+	Collection   *WorkflowValue           `json:"collection,omitempty"`
 }
 
 type WorkflowLLMMessage struct {
@@ -458,6 +473,20 @@ func (s *WorkflowState) recordOutcome(
 	return nil
 }
 
+func appendWorkflowCausalDependencies(
+	state WorkflowState,
+	intent *WorkItemIntent,
+) {
+	if intent == nil || intent.Effect.Kind == EffectKindRead {
+		return
+	}
+	for _, dependency := range workflowCausalEffectWorkItemIDs(state) {
+		if !slices.Contains(intent.Dependencies, dependency) {
+			intent.Dependencies = append(intent.Dependencies, dependency)
+		}
+	}
+}
+
 // clearPendingStep clears the source-step boundary only after that step has
 // settled. Structured control flow retains the boundary while child work is
 // active, then calls this method before it asks drive to select the next step.
@@ -565,7 +594,7 @@ func NewWorkflowInterpreter() (*WorkflowInterpreter, error) {
 		cel.Variable("state", cel.DynType),
 		cel.Variable("steps", cel.MapType(cel.StringType, cel.DynType)),
 		cel.Variable("context", cel.DynType),
-		cel.Variable("messages", cel.DynType),
+		cel.Variable(workflowCELMessagesVariable, cel.DynType),
 		cel.Variable("item", cel.DynType),
 		cel.Variable("index", cel.DynType),
 		cel.Variable("result", cel.DynType),
@@ -1032,6 +1061,7 @@ func (i *WorkflowInterpreter) resumeResolvedTargetSetCall(
 	if step.Retry != nil && step.Retry.MaxAttempts > 1 {
 		return i.startWorkflowRetry(
 			frame,
+			execution,
 			program,
 			state,
 			step,
@@ -1040,6 +1070,7 @@ func (i *WorkflowInterpreter) resumeResolvedTargetSetCall(
 	}
 	return i.call(
 		frame,
+		execution,
 		program,
 		state,
 		state.PendingPath,
@@ -1197,6 +1228,7 @@ func (i *WorkflowInterpreter) drive(
 		if step.Retry != nil && step.Retry.MaxAttempts > 1 {
 			return i.startWorkflowRetry(
 				frame,
+				execution,
 				program,
 				state,
 				step,
@@ -1208,6 +1240,7 @@ func (i *WorkflowInterpreter) drive(
 		case step.Call != nil:
 			return i.call(
 				frame,
+				execution,
 				program,
 				state,
 				path,
@@ -1438,6 +1471,7 @@ func (i *WorkflowInterpreter) drive(
 
 func (i *WorkflowInterpreter) call(
 	frame ProgramFrame,
+	execution Execution,
 	program WorkflowProgram,
 	state WorkflowState,
 	path string,
@@ -1535,6 +1569,22 @@ func (i *WorkflowInterpreter) call(
 	)
 	if err != nil {
 		return workflowFailure(state, "workflow_port_invalid", err.Error())
+	}
+	call.PortInputs = capturedWorkflowCallPortInputs(
+		execution,
+		call,
+		ports,
+	)
+	if call.LLMInvocation != nil {
+		captured, captureErr := i.captureWorkflowLLMInvocation(
+			program,
+			state,
+			*call.LLMInvocation,
+		)
+		if captureErr != nil {
+			return workflowFailure(state, "workflow_invocation_input_invalid", captureErr.Error())
+		}
+		call.LLMInvocation = &captured
 	}
 	if err := validateWorkflowInterfaceInput(
 		target.Contract,
@@ -1645,6 +1695,7 @@ func (i *WorkflowInterpreter) call(
 				Effect:      effect,
 				Budget:      cloneBudget(callBudget),
 				Ports:       clonePortPlans(ports),
+				PortInputs:  clonePortInputs(call.PortInputs),
 				Input: WorkItemPayload{
 					Tool: &ToolWork{
 						Call: ToolCall{
@@ -1683,6 +1734,7 @@ func (i *WorkflowInterpreter) call(
 				Effect:      effect,
 				Budget:      cloneBudget(callBudget),
 				Ports:       clonePortPlans(ports),
+				PortInputs:  clonePortInputs(call.PortInputs),
 				Input: WorkItemPayload{
 					Tool: &ToolWork{
 						Call: ToolCall{
@@ -1723,6 +1775,7 @@ func (i *WorkflowInterpreter) call(
 				Effect:      effect,
 				Budget:      cloneBudget(callBudget),
 				Ports:       clonePortPlans(ports),
+				PortInputs:  clonePortInputs(call.PortInputs),
 				Input: WorkItemPayload{
 					Service: &ServiceWork{
 						ServiceID:      target.ServiceID,
@@ -1746,6 +1799,7 @@ func (i *WorkflowInterpreter) call(
 				Effect:      effect,
 				Budget:      cloneBudget(callBudget),
 				Ports:       clonePortPlans(ports),
+				PortInputs:  clonePortInputs(call.PortInputs),
 				Input: WorkItemPayload{
 					Activity: &ActivityWork{
 						ActivityID:     target.ActivityID,
@@ -1945,12 +1999,12 @@ func (i *WorkflowInterpreter) workflowCallEffect(
 ) (EffectContract, error) {
 	effect := target.Effect
 	if step.Effect == nil {
-		if effect.Kind == EffectKindKeyed &&
-			strings.TrimSpace(effect.IdempotencyKey) == "" ||
-			effect.IdempotencyKey == "workflow-key-pending" {
-			return EffectContract{}, errors.New(
-				"keyed target requires a workflow operation key",
-			)
+		if target.KeyedCapable {
+			// A keyed-only target is not unconditionally idempotent. Without
+			// a captured operation key it remains non-idempotent.
+			effect.Kind = EffectKindNonIdempotent
+			effect.IdempotencyKey = ""
+			effect.KeyedNative = false
 		}
 		return effect, nil
 	}
@@ -1973,11 +2027,9 @@ func (i *WorkflowInterpreter) workflowCallEffect(
 		}
 
 	case EffectKindKeyed:
-		switch target.Effect.Kind {
-		case EffectKindRead, EffectKindIdempotent, EffectKindKeyed:
-		default:
+		if !target.KeyedCapable {
 			return EffectContract{}, errors.New(
-				"workflow call requests keying from a target without a keying guarantee",
+				"workflow keyed call requires a target-native keying capability",
 			)
 		}
 		if step.Effect.Key == nil {
@@ -2001,10 +2053,14 @@ func (i *WorkflowInterpreter) workflowCallEffect(
 				"workflow operation key must be a non-empty normalized string",
 			)
 		}
+		effect.Kind = EffectKindKeyed
 		effect.IdempotencyKey = key
+		effect.KeyedNative = true
 
 	case EffectKindNonIdempotent:
+		effect.Kind = EffectKindNonIdempotent
 		effect.IdempotencyKey = ""
+		effect.KeyedNative = false
 
 	default:
 		return EffectContract{}, fmt.Errorf(
@@ -2021,7 +2077,6 @@ func (i *WorkflowInterpreter) workflowCallEffect(
 		effect.Reconcile = true
 	}
 
-	effect.Kind = requested
 	return effect, nil
 }
 
@@ -2520,12 +2575,38 @@ func (i *WorkflowInterpreter) startWorkflowChildCall(
 		Program:         child,
 		Deadline:        cloneTime(state.Deadline),
 		Budget:          cloneBudget(budget),
+		WorkflowNesting: child.InterpreterID == WorkflowInterpreterID,
 		Claims:          claims,
 		Ports:           clonePortPlans(ports),
+		PortInputs:      clonePortInputs(callPortInputsFromStep(step, ports)),
 		PortBoundary:    portBoundary,
 		Handoff:         handoff,
 	}}
 	return transition, nil
+}
+
+func callPortInputsFromStep(
+	step WorkflowStep,
+	ports []PortPlan,
+) []PortInput {
+	if step.Call == nil {
+		return nil
+	}
+	if len(step.Call.PortInputs) != 0 {
+		return clonePortInputs(step.Call.PortInputs)
+	}
+	output := make([]PortInput, 0)
+	for _, plan := range ports {
+		if plan.Direction == WorkflowPortDirectionInput {
+			output = append(output, PortInput{
+				Name:     plan.Name,
+				Channel:  plan.Channel,
+				Streamed: plan.Stream,
+				Captured: true,
+			})
+		}
+	}
+	return output
 }
 
 func (i *WorkflowInterpreter) workflowChildCallBoundary(
@@ -2564,6 +2645,7 @@ func (i *WorkflowInterpreter) workflowChildCallBoundary(
 			},
 		},
 	}
+	appendWorkflowCausalDependencies(state, &intent)
 	if err := i.applyWorkflowStepEffectPolicy(
 		program,
 		state,
@@ -3356,13 +3438,7 @@ func workflowWork(
 	path string,
 	intent WorkItemIntent,
 ) (ProgramTransition, error) {
-	if intent.Effect.Kind != EffectKindRead {
-		for _, dependency := range workflowCausalEffectWorkItemIDs(state) {
-			if !slices.Contains(intent.Dependencies, dependency) {
-				intent.Dependencies = append(intent.Dependencies, dependency)
-			}
-		}
-	}
+	appendWorkflowCausalDependencies(state, &intent)
 	state.PendingPath = path
 	intent.DeclarationPath = state.PendingDeclarationPath
 	if state.PendingDeclarationPath != "" {
@@ -3586,20 +3662,20 @@ func workflowActivationWithScope(
 		return nil, err
 	}
 	return map[string]any{
-		"input":     input,
-		"state":     currentState,
-		"steps":     steps,
-		"context":   contextValue,
-		"messages":  messagesValue,
-		"item":      item,
-		"index":     index,
-		"result":    result,
-		"event":     eventValue,
-		"error":     errorValue,
-		"outcome":   outcomeValue,
-		"completed": completedValue,
-		"operation": operationValue,
-		"ports":     portsValue,
+		"input":                     input,
+		"state":                     currentState,
+		"steps":                     steps,
+		"context":                   contextValue,
+		workflowCELMessagesVariable: messagesValue,
+		"item":                      item,
+		"index":                     index,
+		"result":                    result,
+		"event":                     eventValue,
+		"error":                     errorValue,
+		"outcome":                   outcomeValue,
+		"completed":                 completedValue,
+		"operation":                 operationValue,
+		"ports":                     portsValue,
 	}, nil
 }
 

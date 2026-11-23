@@ -7,6 +7,47 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
+// captureWorkflowCallPortInputs freezes all currently visible input-port
+// records at the logical call boundary. Runtime staging later reuses these
+// facts and never observes channel records appended after this boundary.
+func captureWorkflowCallPortInputs(
+	execution Execution,
+	plans []PortPlan,
+) []PortInput {
+	output := make([]PortInput, 0)
+	for _, plan := range plans {
+		if plan.Direction != WorkflowPortDirectionInput {
+			continue
+		}
+		input := PortInput{
+			Name:     plan.Name,
+			Channel:  plan.Channel,
+			Streamed: plan.Stream,
+			Captured: true,
+		}
+		channel := executionChannel(&execution, plan.Channel)
+		if channel != nil {
+			input.Cursor = channel.NextSequence
+			for _, message := range channel.Messages {
+				input.Values = append(input.Values, message.Data.Clone())
+			}
+		}
+		output = append(output, input)
+	}
+	return output
+}
+
+func capturedWorkflowCallPortInputs(
+	execution Execution,
+	call WorkflowCall,
+	plans []PortPlan,
+) []PortInput {
+	if len(call.PortInputs) != 0 {
+		return clonePortInputs(call.PortInputs)
+	}
+	return captureWorkflowCallPortInputs(execution, plans)
+}
+
 func validateWorkflowCallContext(
 	contracts ...*WorkflowCallableInterface,
 ) func(jsonutil.CanonicalValue) error {

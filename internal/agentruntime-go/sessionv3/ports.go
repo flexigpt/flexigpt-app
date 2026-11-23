@@ -55,11 +55,13 @@ type PortInput struct {
 	Cursor   uint64                    `json:"cursor,omitempty"`
 	Values   []jsonutil.CanonicalValue `json:"values,omitempty"`
 	Streamed bool                      `json:"streamed,omitempty"`
+	Captured bool                      `json:"captured,omitempty"`
 }
 
 type PortStream struct {
-	Name         string `json:"name"`
-	NextSequence uint64 `json:"nextSequence"`
+	Name         string    `json:"name"`
+	NextSequence uint64    `json:"nextSequence"`
+	AttemptID    AttemptID `json:"attemptID,omitempty"`
 }
 
 // ChannelForward is a durable published-port bridge. SourceChannel belongs to
@@ -202,6 +204,9 @@ func (p PortInput) Validate() error {
 			return errors.New("port input value is invalid")
 		}
 	}
+	if p.Captured && p.Cursor == 0 && len(p.Values) != 0 {
+		return errors.New("captured port input values have no cursor")
+	}
 	return nil
 }
 
@@ -211,6 +216,9 @@ func (p PortStream) Validate() error {
 	}
 	if p.NextSequence == 0 {
 		return errors.New("port stream sequence is invalid")
+	}
+	if p.AttemptID != "" {
+		return validateID("port stream attempt ID", string(p.AttemptID))
 	}
 	return nil
 }
@@ -289,10 +297,7 @@ func clonePortInputs(values []PortInput) []PortInput {
 	output := make([]PortInput, len(values))
 	for index := range values {
 		output[index] = values[index]
-		output[index].Values = make(
-			[]jsonutil.CanonicalValue,
-			len(values[index].Values),
-		)
+		output[index].Values = make([]jsonutil.CanonicalValue, len(values[index].Values))
 		for valueIndex := range values[index].Values {
 			output[index].Values[valueIndex] = values[index].Values[valueIndex].Clone()
 		}

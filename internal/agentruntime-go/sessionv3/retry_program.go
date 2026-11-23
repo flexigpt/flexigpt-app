@@ -585,6 +585,7 @@ func retryCaptureChildCall(
 		Kind:    WorkflowValueLiteral,
 		Literal: contextValue.Clone(),
 	}
+	call.PortInputs = clonePortInputs(item.PortInputs)
 	if call.LLMInvocation != nil {
 		invocation, invocationErr := retryCaptureLLMInvocation(
 			program,
@@ -630,71 +631,8 @@ func retryCaptureLLMInvocation(
 	if err != nil {
 		return nil, err
 	}
-
-	output := WorkflowLLMInvocation{
-		Messages: make([]WorkflowLLMMessage, 0, len(input.Messages)),
-		Instructions: make(
-			[]WorkflowLLMInstruction,
-			0,
-			len(input.Instructions),
-		),
-	}
-	if len(input.PreparedTargets) != 0 {
-		output.PreparedTargets = make(
-			map[string]WorkflowPreparedInvocation,
-			len(input.PreparedTargets),
-		)
-		for name, target := range input.PreparedTargets {
-			output.PreparedTargets[name] = jsonutil.CloneJSONInValue(target)
-		}
-	}
-	if input.Defaults != nil {
-		defaults := jsonutil.CloneJSONInValue(*input.Defaults)
-		output.Defaults = &defaults
-	}
-	for _, message := range input.Messages {
-		captured := WorkflowLLMMessage{
-			Role:        message.Role,
-			Attachments: jsonutil.CloneJSONInValue(message.Attachments),
-		}
-		if message.Text != nil {
-			value, evaluateErr := interpreter.evaluate(
-				*message.Text,
-				program,
-				state,
-			)
-			if evaluateErr != nil {
-				return nil, evaluateErr
-			}
-			captured.Text = &WorkflowValue{
-				Kind:    WorkflowValueLiteral,
-				Literal: value.Clone(),
-			}
-		}
-		output.Messages = append(output.Messages, captured)
-	}
-	for _, instruction := range input.Instructions {
-		value, evaluateErr := interpreter.evaluate(
-			instruction.Content,
-			program,
-			state,
-		)
-		if evaluateErr != nil {
-			return nil, evaluateErr
-		}
-		output.Instructions = append(
-			output.Instructions,
-			WorkflowLLMInstruction{
-				ID:    instruction.ID,
-				Label: instruction.Label,
-				Content: WorkflowValue{
-					Kind:    WorkflowValueLiteral,
-					Literal: value.Clone(),
-				},
-			},
-		)
-	}
-	if err := output.Validate(); err != nil {
+	output, err := interpreter.captureWorkflowLLMInvocation(program, state, input)
+	if err != nil {
 		return nil, err
 	}
 	return &output, nil

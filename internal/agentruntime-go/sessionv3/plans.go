@@ -21,24 +21,28 @@ type WorkflowCallablePort struct {
 }
 
 type ModelDispatchPlan struct {
-	Agent                *AgentDispatchPlan          `json:"agent,omitempty"`
-	Workspace            *WorkspaceDispatchPlan      `json:"workspace,omitempty"`
-	Model                ModelDispatchTarget         `json:"model"`
-	ProviderTools        []ProviderManagedToolChoice `json:"providerTools,omitempty"`
-	ModelOverrides       *ModelDefaultsOverride      `json:"modelOverrides,omitempty"`
-	Instructions         []InstructionDispatchPlan   `json:"instructions,omitempty"`
-	Texts                []TextDispatchPlan          `json:"texts,omitempty"`
-	Tools                []ToolDispatchPlan          `json:"tools,omitempty"`
-	Skills               []SkillDispatchPlan         `json:"skills,omitempty"`
-	MCP                  []MCPDispatchPlan           `json:"mcp,omitempty"`
-	Attachments          []AttachmentDispatchPlan    `json:"attachments,omitempty"`
-	Messages             []MessageDispatchPlan       `json:"messages,omitempty"`
-	Context              []ContextDispatchPlan       `json:"context,omitempty"`
-	Channels             []ChannelDispatchPlan       `json:"channels,omitempty"`
-	Ports                []PortPlan                  `json:"ports,omitempty"`
-	PortInputs           []PortInput                 `json:"portInputs,omitempty"`
-	History              HistorySelection            `json:"history"`
-	RuntimeConfiguration jsonutil.CanonicalValue     `json:"runtimeConfiguration,omitempty"`
+	Agent          *AgentDispatchPlan          `json:"agent,omitempty"`
+	Workspace      *WorkspaceDispatchPlan      `json:"workspace,omitempty"`
+	Model          ModelDispatchTarget         `json:"model"`
+	ProviderTools  []ProviderManagedToolChoice `json:"providerTools,omitempty"`
+	ModelOverrides *ModelDefaultsOverride      `json:"modelOverrides,omitempty"`
+	Instructions   []InstructionDispatchPlan   `json:"instructions,omitempty"`
+	Texts          []TextDispatchPlan          `json:"texts,omitempty"`
+	Tools          []ToolDispatchPlan          `json:"tools,omitempty"`
+	Skills         []SkillDispatchPlan         `json:"skills,omitempty"`
+	MCP            []MCPDispatchPlan           `json:"mcp,omitempty"`
+	Attachments    []AttachmentDispatchPlan    `json:"attachments,omitempty"`
+	Messages       []MessageDispatchPlan       `json:"messages,omitempty"`
+	Context        []ContextDispatchPlan       `json:"context,omitempty"`
+	Channels       []ChannelDispatchPlan       `json:"channels,omitempty"`
+	Ports          []PortPlan                  `json:"ports,omitempty"`
+	PortInputs     []PortInput                 `json:"portInputs,omitempty"`
+	History        HistorySelection            `json:"history"`
+
+	ProviderInputs       []jsonutil.CanonicalValue `json:"providerInputs,omitempty"`
+	FinalSystemPrompt    string                    `json:"finalSystemPrompt,omitempty"`
+	PreparationOwner     string                    `json:"preparationOwner,omitempty"`
+	RuntimeConfiguration jsonutil.CanonicalValue   `json:"runtimeConfiguration,omitempty"`
 }
 
 type AgentDispatchPlan struct {
@@ -67,10 +71,12 @@ type ModelDispatchTarget struct {
 }
 
 type InstructionDispatchPlan struct {
-	ID       string       `json:"id"`
-	Label    string       `json:"label,omitempty"`
-	Content  string       `json:"content"`
-	Artifact *ArtifactPin `json:"artifact,omitempty"`
+	ID       string             `json:"id"`
+	Label    string             `json:"label,omitempty"`
+	Content  string             `json:"content"`
+	Owner    ConfigurationOwner `json:"owner,omitempty"`
+	Order    uint64             `json:"order,omitempty"`
+	Artifact *ArtifactPin       `json:"artifact,omitempty"`
 }
 
 type TextDispatchPlan struct {
@@ -143,6 +149,11 @@ func (p ModelDispatchPlan) Validate() error {
 	}
 	if len(p.RuntimeConfiguration) != 0 && !p.RuntimeConfiguration.Valid() {
 		return errors.New("model dispatch plan runtime configuration is invalid")
+	}
+	for index := range p.ProviderInputs {
+		if !p.ProviderInputs[index].Valid() {
+			return errors.New("model dispatch plan provider input is invalid")
+		}
 	}
 
 	instructionIDs := make(map[string]struct{}, len(p.Instructions))

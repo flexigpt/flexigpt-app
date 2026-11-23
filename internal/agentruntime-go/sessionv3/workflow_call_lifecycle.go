@@ -120,6 +120,7 @@ func (i *WorkflowInterpreter) startCall(
 		[]string(nil),
 		call.AllowedTargets...,
 	)
+	childCall.PortInputs = clonePortInputs(call.PortInputs)
 
 	if childCall.LLMInvocation != nil {
 		invocation, invocationErr := retryCaptureLLMInvocation(
@@ -255,8 +256,10 @@ func (i *WorkflowInterpreter) startCall(
 		Budget:          cloneBudget(budget),
 		Lifetime:        intentLifetime,
 		Cleanup:         program.Scope.Cleanup || workflowProgramRunsCleanup(childProgram),
+		WorkflowNesting: childProgram.InterpreterID == WorkflowInterpreterID,
 		Ownership:       &ownership,
 		Ports:           clonePortPlans(ports),
+		PortInputs:      clonePortInputs(call.PortInputs),
 		PortDelivery:    FramePortDeliveryModeForwardOnly,
 		Evaluation: &EvaluationBoundary{
 			DeclarationPath: declarationPath,

@@ -1,6 +1,13 @@
 package sessionv3
 
-import "errors"
+import (
+	"errors"
+)
+
+const (
+	budgetLabelMessages     = "messages"
+	budgetLabelMessageBytes = "message bytes"
+)
 
 type budgetMetric uint8
 
@@ -105,6 +112,21 @@ func budgetUsagePointer(
 	}
 }
 
+func mutableBudgetScope(
+	execution *Execution,
+	id string,
+) *ExecutionBudgetScope {
+	if execution == nil || id == "" {
+		return nil
+	}
+	for index := range execution.BudgetScopes {
+		if execution.BudgetScopes[index].ID == id {
+			return &execution.BudgetScopes[index]
+		}
+	}
+	return nil
+}
+
 // reserveScopedBudgetLocked applies each metric atomically to the shared
 // Execution budget, every enclosing ProgramFrame budget, and an optional
 // WorkItem budget. Attached frames therefore share execution aggregate usage
@@ -117,6 +139,11 @@ func (r *Runtime) reserveScopedBudgetLocked(
 ) error {
 	if execution == nil {
 		return errors.New("execution budget owner is unavailable")
+	}
+
+	var scope *ExecutionBudgetScope
+	if item != nil && item.BudgetScopeID != "" {
+		scope = mutableBudgetScope(execution, item.BudgetScopeID)
 	}
 
 	counters := make([]budgetCounter, 0, len(requests)*4)
@@ -142,6 +169,14 @@ func (r *Runtime) reserveScopedBudgetLocked(
 			counters = append(counters, budgetCounter{
 				Limit:     budgetLimit(*frame.Budget, request.Metric),
 				Current:   budgetUsagePointer(&frame.Usage, request.Metric),
+				Increment: request.Increment,
+				Label:     request.Label,
+			})
+		}
+		if scope != nil {
+			counters = append(counters, budgetCounter{
+				Limit:     budgetLimit(scope.Budget, request.Metric),
+				Current:   budgetUsagePointer(&scope.Usage, request.Metric),
 				Increment: request.Increment,
 				Label:     request.Label,
 			})
@@ -191,12 +226,42 @@ func (r *Runtime) reserveMessageBudgetForWorkLocked(
 		budgetMetricRequest{
 			Metric:    budgetMetricMessageCount,
 			Increment: 1,
-			Label:     "messages",
+			Label:     budgetLabelMessages,
 		},
 		budgetMetricRequest{
 			Metric:    budgetMetricMessageBytes,
 			Increment: bytes,
-			Label:     "message bytes",
+			Label:     budgetLabelMessageBytes,
+		},
+	)
+}
+
+func (r *Runtime) reserveMessageBudgetForOwnerLocked(
+	execution *Execution,
+	workItemID WorkItemID,
+	frameID ProgramFrameID,
+	bytes int,
+) error {
+	var item *WorkItem
+	if workItemID != "" {
+		item = mutableWorkItem(execution, workItemID)
+	}
+	if item != nil {
+		frameID = item.FrameID
+	}
+	return r.reserveScopedBudgetLocked(
+		execution,
+		item,
+		frameID,
+		budgetMetricRequest{
+			Metric:    budgetMetricMessageCount,
+			Increment: 1,
+			Label:     budgetLabelMessages,
+		},
+		budgetMetricRequest{
+			Metric:    budgetMetricMessageBytes,
+			Increment: bytes,
+			Label:     budgetLabelMessageBytes,
 		},
 	)
 }
@@ -207,6 +272,36 @@ func (r *Runtime) reserveEventBudgetForWorkLocked(
 	bytes int,
 ) error {
 	frameID := ProgramFrameID("")
+	if item != nil {
+		frameID = item.FrameID
+	}
+	return r.reserveScopedBudgetLocked(
+		execution,
+		item,
+		frameID,
+		budgetMetricRequest{
+			Metric:    budgetMetricEventCount,
+			Increment: 1,
+			Label:     "events",
+		},
+		budgetMetricRequest{
+			Metric:    budgetMetricEventBytes,
+			Increment: bytes,
+			Label:     "event bytes",
+		},
+	)
+}
+
+func (r *Runtime) reserveEventBudgetForOwnerLocked(
+	execution *Execution,
+	workItemID WorkItemID,
+	frameID ProgramFrameID,
+	bytes int,
+) error {
+	var item *WorkItem
+	if workItemID != "" {
+		item = mutableWorkItem(execution, workItemID)
+	}
 	if item != nil {
 		frameID = item.FrameID
 	}

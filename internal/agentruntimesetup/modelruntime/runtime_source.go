@@ -98,6 +98,19 @@ func (a *SourceResolver) RehydrateRuntimeConfiguration(
 	return a.runtime.RehydrateRuntimeConfiguration(ctx, value)
 }
 
+// FinalizePreparedRuntimeConfiguration records the final request-effective
+// configuration without consulting current Model, Agent, Workspace, or Session
+// state during future recovery.
+func (a *SourceResolver) FinalizePreparedRuntimeConfiguration(
+	raw jsonutil.CanonicalValue,
+	value inferenceRuntime.RuntimeConfiguration,
+) (inferenceRuntime.RuntimeConfiguration, jsonutil.CanonicalValue, error) {
+	if a == nil || a.runtime == nil {
+		return inferenceRuntime.RuntimeConfiguration{}, nil, storeSpec.ErrClosed
+	}
+	return FinalizePreparedRuntimeConfiguration(raw, value)
+}
+
 // ResolveRuntimeModelTarget handles source-backed Model capability targets.
 func (a *SourceResolver) ResolveRuntimeModelTarget(
 	ctx context.Context,

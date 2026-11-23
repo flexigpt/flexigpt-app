@@ -9,6 +9,7 @@ import (
 
 func (i *WorkflowInterpreter) startWorkflowRetry(
 	frame ProgramFrame,
+	execution Execution,
 	program WorkflowProgram,
 	state WorkflowState,
 	step WorkflowStep,
@@ -40,6 +41,7 @@ func (i *WorkflowInterpreter) startWorkflowRetry(
 	childStep, err = i.captureWorkflowRetryCall(
 		program,
 		state,
+		execution,
 		childStep,
 	)
 	if err != nil {
@@ -105,6 +107,7 @@ func (i *WorkflowInterpreter) startWorkflowRetry(
 func (i *WorkflowInterpreter) captureWorkflowRetryCall(
 	program WorkflowProgram,
 	state WorkflowState,
+	execution Execution,
 	step WorkflowStep,
 ) (WorkflowStep, error) {
 	if step.Call == nil {
@@ -137,6 +140,11 @@ func (i *WorkflowInterpreter) captureWorkflowRetryCall(
 		Kind:    WorkflowValueLiteral,
 		Literal: contextValue.Clone(),
 	}
+	output.Call.PortInputs = capturedWorkflowCallPortInputs(
+		execution,
+		*output.Call,
+		nil,
+	)
 	if output.Call.LLMInvocation != nil {
 		invocation, invocationErr := retryCaptureLLMInvocation(
 			program,

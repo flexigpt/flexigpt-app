@@ -1315,6 +1315,13 @@ func (i *WorkflowInterpreter) settleMachineChild(
 	}
 
 	result := *child.Result
+	setWorkflowCausalEffectWorkItemIDs(state, mergeWorkflowCausalEffectWorkItemIDs(
+		workflowCausalEffectWorkItemIDs(*state),
+		child.CausalEffectWorkItemIDs,
+	))
+	if progress.ChildMergesState {
+		progress.State = result.State.Clone()
+	}
 	switch result.Exit {
 	case WorkflowExitNormal,
 		WorkflowExitReturnBlock:
@@ -1332,14 +1339,6 @@ func (i *WorkflowInterpreter) settleMachineChild(
 		)
 	}
 
-	setWorkflowCausalEffectWorkItemIDs(state, mergeWorkflowCausalEffectWorkItemIDs(
-		workflowCausalEffectWorkItemIDs(*state),
-		child.CausalEffectWorkItemIDs,
-	))
-
-	if progress.ChildMergesState {
-		progress.State = result.State.Clone()
-	}
 	progress.ChildPath = ""
 	progress.ChildMergesState = false
 

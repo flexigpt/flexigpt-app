@@ -504,7 +504,24 @@ func (r *Runtime) markCompensationIntentLocked(
 	record.State = CompensationStateDispatching
 	record.CompensationWorkItemID = item.ID
 	record.Completed.CompensationWorkItemID = item.ID
-	record.Completed.CompensationFrameID = record.CompensationFrameID
+	record.CompensationFrameID = intent.CompensationFrameID
+	record.Completed.CompensationFrameID = intent.CompensationFrameID
+	completed, err := jsonutil.DecodeCanonicalValue[WorkflowCompletedOperationFacts](
+		intent.Completed,
+	)
+	if err != nil {
+		return err
+	}
+	if completed.OriginalWorkItemID != record.Completed.OriginalWorkItemID ||
+		completed.OriginalAttemptID != record.Completed.OriginalAttemptID ||
+		completed.EffectID != record.Completed.EffectID ||
+		completed.CompensationWorkItemID != item.ID ||
+		completed.CompensationFrameID != intent.CompensationFrameID {
+		return errors.New(
+			"compensation work completed facts differ from the durable effect record",
+		)
+	}
+	record.Completed = completed
 	original.EffectState = EffectStateCompensating
 	original.UpdatedAt = r.now()
 	return nil

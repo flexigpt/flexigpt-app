@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
+	"github.com/flexigpt/flexigpt-app/internal/agentruntime-go/workbinding"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	workflowAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workflow"
@@ -270,6 +271,7 @@ func (a *Admission) prepareBoundTarget(
 	case sessionv3Runtime.WorkflowTargetTool,
 		sessionv3Runtime.WorkflowTargetMCPTool:
 		target.Transport = workflowToolTransport()
+		target.KeyedCapable = false
 
 	case sessionv3Runtime.WorkflowTargetProviderTool:
 		if target.ProviderTool == nil || a.invocations == nil {
@@ -293,6 +295,7 @@ func (a *Admission) prepareBoundTarget(
 				target.BindingVersion,
 			)
 		}
+		target.KeyedCapable = target.KeyedCapable && workbinding.SupportsNativeIdempotencyKeying(binding)
 		target.Transport = externalBindingTransport(binding)
 
 	case sessionv3Runtime.WorkflowTargetActivity:
@@ -305,6 +308,7 @@ func (a *Admission) prepareBoundTarget(
 				target.BindingVersion,
 			)
 		}
+		target.KeyedCapable = target.KeyedCapable && workbinding.SupportsNativeIdempotencyKeying(binding)
 		target.Transport = externalBindingTransport(binding)
 
 	case sessionv3Runtime.WorkflowTargetWorkflow:

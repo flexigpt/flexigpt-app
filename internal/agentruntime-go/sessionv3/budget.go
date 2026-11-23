@@ -434,10 +434,10 @@ func (r *Runtime) reserveActivityBudgetLocked(
 	if err != nil {
 		return err
 	}
-	item := mutableWorkItem(execution, activity.WorkItemID)
-	return r.reserveMessageBudgetForWorkLocked(
+	return r.reserveMessageBudgetForOwnerLocked(
 		execution,
-		item,
+		activity.WorkItemID,
+		activity.FrameID,
 		bytes,
 	)
 }
@@ -473,22 +473,6 @@ func activityBudgetBytes(activity Activity) (int, error) {
 		return 0, err
 	}
 	return len(raw), nil
-}
-
-func (r *Runtime) reserveEventBudgetLocked(
-	execution *Execution,
-	data jsonutil.CanonicalValue,
-	correlation jsonutil.CanonicalValue,
-) error {
-	if execution == nil {
-		return errors.New("execution budget owner is unavailable")
-	}
-	bytes := len(data) + len(correlation)
-	return r.reserveEventBudgetForWorkLocked(
-		execution,
-		nil,
-		bytes,
-	)
 }
 
 func (r *Runtime) consumeLLMUsageLocked(
@@ -578,6 +562,26 @@ func (r *Runtime) beginCleanupLocked(
 		}
 	}
 	execution.Cleanup.Deadline = &deadline
+	r.rebaseCleanupDeadlinesLocked(execution)
+}
+
+func (r *Runtime) rebaseCleanupDeadlinesLocked(
+	execution *Execution,
+) {
+	if execution == nil ||
+		!execution.Cleanup.Active ||
+		execution.Cleanup.Deadline == nil {
+		return
+	}
+	for index := range execution.ProgramFrames {
+		frame := &execution.ProgramFrames[index]
+		if frame.Status.Terminal() ||
+			(!frame.Cleanup && !workflowFrameRunsCleanup(*frame)) {
+			continue
+		}
+		frame.Deadline = cloneTime(execution.Cleanup.Deadline)
+		frame.UpdatedAt = r.now()
+	}
 }
 
 func (r *Runtime) cleanupDispatchAllowedLocked(
@@ -944,12 +948,11 @@ func (r *Runtime) waitForExecutionDeadline(
 	for _, frameID := range frameIDs {
 		if frame := mutableFrame(execution, frameID); frame != nil {
 			r.releaseFrameResourcesLocked(execution, frame.ID)
+			frame.CancellationRequested = true
 		}
-		_ = r.advanceFrameLocked(
+		_ = r.settlePendingFrameCancellationsLocked(
 			session,
 			execution,
-			frameID,
-			ProgramEvent{Kind: ProgramEventCancelled},
 		)
 	}
 	execution = mutableSessionExecution(session, executionID)
@@ -957,6 +960,10 @@ func (r *Runtime) waitForExecutionDeadline(
 		return
 	}
 	r.touchExecutionLocked(session, execution)
+	if err := r.settlePendingFrameCancellationsLocked(session, execution); err != nil {
+		return
+	}
+	execution = mutableSessionExecution(session, executionID)
 	if err := r.persistLocked(persistContext, "executionDeadlineElapsed", session); err != nil {
 		return
 	}

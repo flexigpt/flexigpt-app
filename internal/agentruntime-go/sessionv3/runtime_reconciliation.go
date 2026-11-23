@@ -116,6 +116,12 @@ func (r *Runtime) applyReconciliationSettlementsLocked(
 			); err != nil {
 				return nil, err
 			}
+			if err := r.settlePendingFrameCancellationsLocked(
+				session,
+				execution,
+			); err != nil {
+				return nil, err
+			}
 			if item.Output != nil && item.Output.App != nil {
 				r.recordAppInstanceLocked(execution, item)
 			}

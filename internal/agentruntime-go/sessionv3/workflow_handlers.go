@@ -558,6 +558,10 @@ func (i *WorkflowInterpreter) settleWorkflowCatch(
 		return i.startWorkflowFinally(frame, execution, program, state)
 	}
 
+	setWorkflowCausalEffectWorkItemIDs(&state, mergeWorkflowCausalEffectWorkItemIDs(
+		workflowCausalEffectWorkItemIDs(state),
+		result.CausalEffectWorkItemIDs,
+	))
 	switch result.Exit {
 	case WorkflowExitNormal,
 		WorkflowExitReturnBlock,
@@ -593,6 +597,10 @@ func (i *WorkflowInterpreter) settleWorkflowFinally(
 	}
 
 	if childErr == nil {
+		setWorkflowCausalEffectWorkItemIDs(&state, mergeWorkflowCausalEffectWorkItemIDs(
+			workflowCausalEffectWorkItemIDs(state),
+			result.CausalEffectWorkItemIDs,
+		))
 		if state.Terminal.MergeState {
 			switch result.Exit {
 			case WorkflowExitNormal, WorkflowExitReturnBlock:

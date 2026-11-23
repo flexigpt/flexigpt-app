@@ -58,19 +58,32 @@ func (r *Runtime) UpdateContinuationInput(
 	)
 	input.AttachmentSources = nil
 
+	identity := command
+	r.mu.RLock()
+	if !r.closed {
+		if session := r.sessions[command.SessionID]; session != nil {
+			if owner, ownerErr := r.conversationMessageExecutionLocked(session); ownerErr == nil &&
+				owner != nil && !owner.State.Terminal() {
+				command.ExecutionID = owner.ID
+			}
+		}
+	}
+	r.mu.RUnlock()
+
 	return r.changeExecution(
 		ctx,
 		command.Meta,
 		command.SessionID,
 		command.ExecutionID,
-		command,
+		identity,
 		func(session *Session, execution *Execution) (*CommandReceipt, error) {
-			if !isNormalConversationExecution(*execution) {
+			if active, err := r.conversationMessageExecutionLocked(session); err != nil ||
+				active == nil || active.ID != execution.ID {
 				return &CommandReceipt{
 					CommandID:   command.Meta.ID,
 					SessionID:   session.ID,
 					ExecutionID: execution.ID,
-					Message:     "continuation input requires a conversation execution",
+					Message:     "continuation input has no active conversation owner",
 				}, nil
 			}
 			if command.ExpectedInputRevision != nil &&
@@ -757,6 +770,9 @@ func (r *Runtime) submitNormalMessageToFrameWithDefaultsLocked(
 			InvocationBudget:   cloneBudget(input.InvocationBudget),
 		},
 	}
+	if err := r.reserveActivityBudgetLocked(execution, activity); err != nil {
+		return Activity{}, err
+	}
 	session.Timeline = append(session.Timeline, activity)
 	if err := r.advanceFrameLocked(
 		session,
@@ -769,7 +785,15 @@ func (r *Runtime) submitNormalMessageToFrameWithDefaultsLocked(
 			InvocationBudget:   cloneBudget(input.InvocationBudget),
 		},
 	); err != nil {
+		session.Timeline = session.Timeline[:len(session.Timeline)-1]
 		return Activity{}, err
+	}
+	if current := mutableSessionExecution(session, execution.ID); current != nil {
+		execution = current
+	} else {
+		return Activity{}, errors.New(
+			"conversation execution disappeared while advancing its message frame",
+		)
 	}
 	r.touchExecutionLocked(session, execution)
 	return activity, nil
@@ -944,6 +968,20 @@ func (r *Runtime) requestAgentContinuationLocked(
 		frame.ID,
 		ProgramEvent{Kind: ProgramEventContinue},
 	)
+}
+
+func (r *Runtime) activeConversationExecutionIDLocked(
+	session *Session,
+	fallback ExecutionID,
+) ExecutionID {
+	if session == nil {
+		return fallback
+	}
+	if execution, err := r.conversationMessageExecutionLocked(session); err == nil &&
+		execution != nil && !execution.State.Terminal() {
+		return execution.ID
+	}
+	return fallback
 }
 
 func normalToolResultConsumed(

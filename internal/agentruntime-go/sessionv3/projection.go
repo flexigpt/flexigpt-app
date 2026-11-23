@@ -134,6 +134,11 @@ func BuildSessionRuntimeProjection(
 					copyValue.DebugDetails = item.Output.LLM.DebugDetails.Clone()
 					llm = &copyValue
 				}
+				stream := cloneProjectionStream(item.LLMStream)
+				if attempt := latestAttemptForWorkItem(execution, item.ID); attempt != nil &&
+					attempt.LLMStream != nil {
+					stream = cloneProjectionStream(attempt.LLMStream)
+				}
 				output.ModelOperations = append(
 					output.ModelOperations,
 					ModelOperationProjection{
@@ -143,7 +148,7 @@ func BuildSessionRuntimeProjection(
 						State:       item.State,
 						StartedAt:   cloneTime(item.DispatchedAt),
 						CompletedAt: cloneTime(item.CompletedAt),
-						Stream:      cloneProjectionStream(item.LLMStream),
+						Stream:      stream,
 						Output:      llm,
 						Error:       cloneWorkflowSanitizedError(item.Error),
 					},

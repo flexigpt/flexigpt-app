@@ -11,6 +11,7 @@ import (
 
 	inferenceRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inference"
 	secretModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	modelAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model"
 )
@@ -116,6 +117,69 @@ func (a *RuntimeAdapter) PreparedRuntimeConfiguration(
 		return nil, err
 	}
 	return jsonutil.CanonicalValueFrom(raw)
+}
+
+// FinalizePreparedRuntimeConfiguration captures the final effective non-secret
+// Model configuration after Session, Workspace, Agent, Skill, instruction,
+// and explicit invocation composition has completed. It retains the original
+// credential binding but never serializes a credential value.
+func FinalizePreparedRuntimeConfiguration(
+	raw jsonutil.CanonicalValue,
+	value inferenceRuntime.RuntimeConfiguration,
+) (inferenceRuntime.RuntimeConfiguration, jsonutil.CanonicalValue, error) {
+	snapshot, err := jsonutil.DecodeCanonicalValue[PreparedRuntimeConfiguration](raw)
+	if err != nil {
+		return inferenceRuntime.RuntimeConfiguration{}, nil, err
+	}
+	if err := snapshot.Validate(); err != nil {
+		return inferenceRuntime.RuntimeConfiguration{}, nil, err
+	}
+	modelRaw, err := jsonutil.EncodeToJSONRaw(value.ModelParam)
+	if err != nil {
+		return inferenceRuntime.RuntimeConfiguration{}, nil, err
+	}
+	model, err := jsonutil.CanonicalValueFrom(modelRaw)
+	if err != nil {
+		return inferenceRuntime.RuntimeConfiguration{}, nil, err
+	}
+	overridesRaw, err := jsonutil.EncodeToJSONRaw(value.CapabilityOverrides)
+	if err != nil {
+		return inferenceRuntime.RuntimeConfiguration{}, nil, err
+	}
+	overrides, err := jsonutil.CanonicalValueFrom(overridesRaw)
+	if err != nil {
+		return inferenceRuntime.RuntimeConfiguration{}, nil, err
+	}
+	snapshot.Model = model
+	snapshot.Overrides = overrides
+	fingerprint, err := cryptoutil.CanonicalDigest(struct {
+		Provider   ProviderRuntimeSnapshot `json:"provider"`
+		Model      jsonutil.CanonicalValue `json:"model"`
+		Overrides  jsonutil.CanonicalValue `json:"overrides,omitempty"`
+		Credential jsonutil.CanonicalValue `json:"credential,omitempty"`
+	}{
+		Provider:   snapshot.Provider,
+		Model:      snapshot.Model,
+		Overrides:  snapshot.Overrides,
+		Credential: snapshot.Credential,
+	})
+	if err != nil {
+		return inferenceRuntime.RuntimeConfiguration{}, nil, err
+	}
+	snapshot.Fingerprint = string(fingerprint)
+	value.Fingerprint = string(fingerprint)
+	if err := snapshot.Validate(); err != nil {
+		return inferenceRuntime.RuntimeConfiguration{}, nil, err
+	}
+	finalRaw, err := jsonutil.EncodeToJSONRaw(snapshot)
+	if err != nil {
+		return inferenceRuntime.RuntimeConfiguration{}, nil, err
+	}
+	final, err := jsonutil.CanonicalValueFrom(finalRaw)
+	if err != nil {
+		return inferenceRuntime.RuntimeConfiguration{}, nil, err
+	}
+	return value, final, nil
 }
 
 func (a *RuntimeAdapter) RehydrateRuntimeConfiguration(

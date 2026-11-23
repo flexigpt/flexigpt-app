@@ -105,6 +105,20 @@ const (
 	SessionDefaultFieldMCP                  SessionDefaultField = "mcp"
 )
 
+// ConfigurationOwner records which semantic layer contributed a retained
+// dispatch fact. It is a Runtime-neutral provenance label.
+type ConfigurationOwner string
+
+const (
+	ConfigurationOwnerPlatform   ConfigurationOwner = "platform"
+	ConfigurationOwnerModel      ConfigurationOwner = "model"
+	ConfigurationOwnerAgent      ConfigurationOwner = "agent"
+	ConfigurationOwnerWorkspace  ConfigurationOwner = "workspace"
+	ConfigurationOwnerSession    ConfigurationOwner = "session"
+	ConfigurationOwnerInvocation ConfigurationOwner = "invocation"
+	ConfigurationOwnerUser       ConfigurationOwner = "user"
+)
+
 type HistorySelection struct {
 	All                      bool `json:"all,omitempty"`
 	IncludePreviousUserTurns int  `json:"includePreviousUserTurns,omitempty"`
@@ -156,6 +170,9 @@ type Instruction struct {
 	ID      string `json:"id"`
 	Label   string `json:"label,omitempty"`
 	Content string `json:"content"`
+
+	Owner     ConfigurationOwner `json:"owner,omitempty"`
+	SourceKey string             `json:"sourceKey,omitempty"`
 }
 
 type ArtifactSelection struct {
@@ -264,6 +281,7 @@ type Activity struct {
 	ExecutionID ExecutionID        `json:"executionID,omitempty"`
 	FrameID     ProgramFrameID     `json:"frameID,omitempty"`
 	WorkItemID  WorkItemID         `json:"workItemID,omitempty"`
+	AttemptID   AttemptID          `json:"attemptID,omitempty"`
 	ParentID    ActivityID         `json:"parentID,omitempty"`
 	Message     *MessageActivity   `json:"message,omitempty"`
 	Action      *ActionActivity    `json:"action,omitempty"`
@@ -482,6 +500,16 @@ type ExecutionBudgetCost struct {
 	Currency string  `json:"currency"`
 }
 
+// ExecutionBudgetScope is one controlling structured-operation aggregate.
+// Child ProgramFrames retain their own narrowed budgets, but all work in this
+// scope consumes this one aggregate counter in addition to Execution usage.
+type ExecutionBudgetScope struct {
+	ID           string               `json:"id"`
+	OwnerFrameID ProgramFrameID       `json:"ownerFrameID"`
+	Budget       ExecutionBudget      `json:"budget"`
+	Usage        ExecutionBudgetUsage `json:"usage"`
+}
+
 // ChildExecutionOwnership is the evaluated ownership contract captured before
 // an independent child Execution starts.
 type ChildExecutionOwnership struct {
@@ -540,6 +568,7 @@ type Execution struct {
 	Deadline          *time.Time                   `json:"deadline,omitempty"`
 	Budget            ExecutionBudget              `json:"budget"`
 	Usage             ExecutionBudgetUsage         `json:"usage"`
+	BudgetScopes      []ExecutionBudgetScope       `json:"budgetScopes,omitempty"`
 	Cleanup           CleanupState                 `json:"cleanup"`
 	ProgramFrames     []ProgramFrame               `json:"programFrames"`
 	WorkItems         []WorkItem                   `json:"workItems"`
@@ -673,34 +702,36 @@ const (
 )
 
 type ProgramFrame struct {
-	ID                ProgramFrameID          `json:"id"`
-	ParentFrameID     ProgramFrameID          `json:"parentFrameID,omitempty"`
-	Lifetime          ChildFrameLifetime      `json:"lifetime,omitempty"`
-	Cleanup           bool                    `json:"cleanup,omitempty"`
-	Depth             int                     `json:"depth,omitempty"`
-	Program           ProgramSnapshot         `json:"program"`
-	State             ProgramState            `json:"state"`
-	Status            ProgramFrameState       `json:"status"`
-	Path              string                  `json:"path,omitempty"`
-	DeclarationPath   string                  `json:"declarationPath,omitempty"`
-	CreatedAt         time.Time               `json:"createdAt"`
-	UpdatedAt         time.Time               `json:"updatedAt"`
-	Deadline          *time.Time              `json:"deadline,omitempty"`
-	Budget            *ExecutionBudget        `json:"budget,omitempty"`
-	Usage             ExecutionBudgetUsage    `json:"usage"`
-	ChildFrameIDs     []ProgramFrameID        `json:"childFrameIDs,omitempty"`
-	ChildExecutionIDs []ExecutionID           `json:"childExecutionIDs,omitempty"`
-	WorkItemIDs       []WorkItemID            `json:"workItemIDs,omitempty"`
-	Ports             []PortPlan              `json:"ports,omitempty"`
-	PortInputs        []PortInput             `json:"portInputs,omitempty"`
-	PortDelivery      FramePortDeliveryMode   `json:"portDelivery,omitempty"`
-	Output            jsonutil.CanonicalValue `json:"output,omitempty"`
-	Receipt           *ExternalReceipt        `json:"receipt,omitempty"`
-	Error             *SanitizedError         `json:"error,omitempty"`
-	HandoffID         string                  `json:"handoffID,omitempty"`
-	Fork              *ForkBoundary           `json:"fork,omitempty"`
-	Joins             []JoinBoundary          `json:"joins,omitempty"`
-	Evaluation        *EvaluationBoundary     `json:"evaluation,omitempty"`
+	ID                    ProgramFrameID          `json:"id"`
+	ParentFrameID         ProgramFrameID          `json:"parentFrameID,omitempty"`
+	Lifetime              ChildFrameLifetime      `json:"lifetime,omitempty"`
+	Cleanup               bool                    `json:"cleanup,omitempty"`
+	Depth                 int                     `json:"depth,omitempty"`
+	Program               ProgramSnapshot         `json:"program"`
+	State                 ProgramState            `json:"state"`
+	Status                ProgramFrameState       `json:"status"`
+	Path                  string                  `json:"path,omitempty"`
+	CancellationRequested bool                    `json:"cancellationRequested,omitempty"`
+	DeclarationPath       string                  `json:"declarationPath,omitempty"`
+	CreatedAt             time.Time               `json:"createdAt"`
+	UpdatedAt             time.Time               `json:"updatedAt"`
+	Deadline              *time.Time              `json:"deadline,omitempty"`
+	Budget                *ExecutionBudget        `json:"budget,omitempty"`
+	Usage                 ExecutionBudgetUsage    `json:"usage"`
+	ChildFrameIDs         []ProgramFrameID        `json:"childFrameIDs,omitempty"`
+	BudgetScopeID         string                  `json:"budgetScopeID,omitempty"`
+	ChildExecutionIDs     []ExecutionID           `json:"childExecutionIDs,omitempty"`
+	WorkItemIDs           []WorkItemID            `json:"workItemIDs,omitempty"`
+	Ports                 []PortPlan              `json:"ports,omitempty"`
+	PortInputs            []PortInput             `json:"portInputs,omitempty"`
+	PortDelivery          FramePortDeliveryMode   `json:"portDelivery,omitempty"`
+	Output                jsonutil.CanonicalValue `json:"output,omitempty"`
+	Receipt               *ExternalReceipt        `json:"receipt,omitempty"`
+	Error                 *SanitizedError         `json:"error,omitempty"`
+	HandoffID             string                  `json:"handoffID,omitempty"`
+	Fork                  *ForkBoundary           `json:"fork,omitempty"`
+	Joins                 []JoinBoundary          `json:"joins,omitempty"`
+	Evaluation            *EvaluationBoundary     `json:"evaluation,omitempty"`
 }
 
 // ForkBoundary is a durable child-scheduling boundary. The parent frame
@@ -799,6 +830,7 @@ const (
 type EffectContract struct {
 	Kind           EffectKind `json:"kind"`
 	IdempotencyKey string     `json:"idempotencyKey,omitempty"`
+	KeyedNative    bool       `json:"keyedNative,omitempty"`
 	Reconcile      bool       `json:"reconcile,omitempty"`
 	Compensate     bool       `json:"compensate,omitempty"`
 }
@@ -1001,6 +1033,7 @@ type WorkItem struct {
 	Retry                  *RetryPolicy            `json:"retry,omitempty"`
 	RetryState             *RetryState             `json:"retryState,omitempty"`
 	Budget                 *ExecutionBudget        `json:"budget,omitempty"`
+	BudgetScopeID          string                  `json:"budgetScopeID,omitempty"`
 	Usage                  ExecutionBudgetUsage    `json:"usage"`
 	Cleanup                bool                    `json:"cleanup,omitempty"`
 	SagaID                 string                  `json:"sagaID,omitempty"`
@@ -1267,6 +1300,8 @@ type ExecutionSignal struct {
 	Correlation              jsonutil.CanonicalValue   `json:"correlation,omitempty"`
 	CreatedAt                time.Time                 `json:"createdAt"`
 	ConsumedBy               []WaitID                  `json:"consumedBy,omitempty"`
+	OwnerWorkItemID          WorkItemID                `json:"ownerWorkItemID,omitempty"`
+	OwnerFrameID             ProgramFrameID            `json:"ownerFrameID,omitempty"`
 	ConsumedSubscriptions    []string                  `json:"consumedSubscriptions,omitempty"`
 	SubscriptionConsumptions []SubscriptionConsumption `json:"subscriptionConsumptions,omitempty"`
 }
@@ -1290,6 +1325,9 @@ type ChannelMessage struct {
 	DeduplicationKey string                  `json:"deduplicationKey,omitempty"`
 	CreatedAt        time.Time               `json:"createdAt"`
 	ConsumedBy       []WaitID                `json:"consumedBy,omitempty"`
+	OwnerWorkItemID  WorkItemID              `json:"ownerWorkItemID,omitempty"`
+	OwnerFrameID     ProgramFrameID          `json:"ownerFrameID,omitempty"`
+	AttemptID        AttemptID               `json:"attemptID,omitempty"`
 }
 
 // ChannelLog is an invocation-local append-only channel log.
@@ -1325,9 +1363,11 @@ type EmitWork struct {
 }
 
 type CompensationWork struct {
-	OriginalWorkItemID WorkItemID              `json:"originalWorkItemID"`
-	EffectID           EffectRecordID          `json:"effectID"`
-	Input              jsonutil.CanonicalValue `json:"input,omitempty"`
+	OriginalWorkItemID  WorkItemID              `json:"originalWorkItemID"`
+	EffectID            EffectRecordID          `json:"effectID"`
+	Input               jsonutil.CanonicalValue `json:"input,omitempty"`
+	CompensationFrameID ProgramFrameID          `json:"compensationFrameID"`
+	Completed           jsonutil.CanonicalValue `json:"completed"`
 }
 
 type SemanticBinding struct {
@@ -1389,6 +1429,7 @@ type LLMStreamState struct {
 	Text      string    `json:"text,omitempty"`
 	Thinking  string    `json:"thinking,omitempty"`
 	UpdatedAt time.Time `json:"updatedAt"`
+	AttemptID AttemptID `json:"attemptID,omitempty"`
 }
 
 type LLMOutput struct {
@@ -1455,6 +1496,7 @@ type Attempt struct {
 	FinishedAt     *time.Time       `json:"finishedAt,omitempty"`
 	Receipt        *ExternalReceipt `json:"receipt,omitempty"`
 	Error          *SanitizedError  `json:"error,omitempty"`
+	LLMStream      *LLMStreamState  `json:"llmStream,omitempty"`
 }
 
 type WaitKind string
@@ -1468,6 +1510,10 @@ const (
 	WaitKindChannel  WaitKind = "channel"
 	WaitKindChild    WaitKind = "child"
 	WaitKindRecovery WaitKind = "recovery"
+)
+
+const recoveryReviewWorkItemID WorkItemID = WorkItemID(
+	WaitKindRecovery,
 )
 
 type WaitStatus string
@@ -1590,6 +1636,8 @@ type ProgramFrameIntent struct {
 	PortDelivery    FramePortDeliveryMode      `json:"portDelivery,omitempty"`
 	PortBoundary    ProgramFramePortBoundary   `json:"portBoundary,omitempty"`
 	Handoff         *ConversationHandoffIntent `json:"handoff,omitempty"`
+	PortInputs      []PortInput                `json:"portInputs,omitempty"`
+	BudgetScopeID   string                     `json:"budgetScopeID,omitempty"`
 	Evaluation      *EvaluationBoundary        `json:"evaluation,omitempty"`
 }
 
@@ -1597,6 +1645,7 @@ type WorkItemIntent struct {
 	ID                   WorkItemID              `json:"id,omitempty"`
 	ProgramPath          string                  `json:"programPath,omitempty"`
 	DeclarationPath      string                  `json:"declarationPath,omitempty"`
+	BudgetScopeID        string                  `json:"budgetScopeID,omitempty"`
 	Type                 WorkItemType            `json:"type"`
 	OriginWorkItemID     WorkItemID              `json:"originWorkItemID,omitempty"`
 	Automatic            bool                    `json:"automatic"`
@@ -1613,6 +1662,7 @@ type WorkItemIntent struct {
 	RetainClaimsForFrame bool                    `json:"retainClaimsForFrame,omitempty"`
 	Ports                []PortPlan              `json:"ports,omitempty"`
 	Input                WorkItemPayload         `json:"input"`
+	PortInputs           []PortInput             `json:"portInputs,omitempty"`
 	Evaluation           *EvaluationBoundary     `json:"evaluation,omitempty"`
 }
 

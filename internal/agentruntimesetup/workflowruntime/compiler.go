@@ -617,9 +617,10 @@ func compileWorkflowEffect(
 		Compensate: input.Compensate,
 	}
 	if sourceKind == sessionv3Runtime.EffectKindKeyed {
-		// A declaration-level target contract describes capability. The
-		// concrete key is a call-level stable semantic value.
-		output.Kind = sessionv3Runtime.EffectKindIdempotent
+		// A target capability is not an unconditional idempotence guarantee.
+		// A call becomes keyed only when its captured key is delivered through
+		// a target-native mechanism selected by its owning domain.
+		output.Kind = sessionv3Runtime.EffectKindNonIdempotent
 	} else {
 		output.Kind = sourceKind
 	}

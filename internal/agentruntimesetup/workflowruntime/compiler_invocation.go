@@ -35,13 +35,18 @@ const (
 func compileWorkflowLLMInvocation(
 	call workflowv1.Call,
 ) (*sessionv3Runtime.WorkflowLLMInvocation, error) {
-	messages, err := compileWorkflowLLMInputMessages(call.Input)
+	inputSegment, err := compileWorkflowLLMMessageSegment(
+		call.Input,
+		"workflow model or agent input messages",
+	)
 	if err != nil {
 		return nil, err
 	}
 
 	output := &sessionv3Runtime.WorkflowLLMInvocation{
-		Messages: messages,
+		MessageSegments: []sessionv3Runtime.WorkflowLLMMessageSegment{
+			inputSegment,
+		},
 	}
 	for name := range call.Context {
 		switch name {
@@ -57,23 +62,29 @@ func compileWorkflowLLMInvocation(
 	}
 
 	if value, found := call.Context[workflowLLMContextInstructions]; found {
-		instructions, instructionErr := compileWorkflowLLMInstructions(
+		segment, instructionErr := compileWorkflowLLMInstructionSegment(
 			value,
 		)
 		if instructionErr != nil {
 			return nil, instructionErr
 		}
-		output.Instructions = instructions
+		output.InstructionSegments = append(
+			output.InstructionSegments,
+			segment,
+		)
 	}
 	if value, found := call.Context[workflowLLMContextMessages]; found {
-		contextMessages, messageErr := compileWorkflowLLMMessageList(
+		segment, messageErr := compileWorkflowLLMMessageSegment(
 			value,
 			"workflow model or agent context messages",
 		)
 		if messageErr != nil {
 			return nil, messageErr
 		}
-		output.Messages = append(contextMessages, output.Messages...)
+		output.MessageSegments = append(
+			[]sessionv3Runtime.WorkflowLLMMessageSegment{segment},
+			output.MessageSegments...,
+		)
 	}
 	if value, found := call.Context[workflowLLMContextDefaults]; found {
 		defaults, defaultsErr := compileWorkflowLLMDefaults(value)
@@ -89,28 +100,27 @@ func compileWorkflowLLMInvocation(
 	return output, nil
 }
 
-func compileWorkflowLLMInputMessages(
+func compileWorkflowLLMMessageSegment(
 	value workflowv1.Value,
-) ([]sessionv3Runtime.WorkflowLLMMessage, error) {
-	object, err := workflowLLMObject(value, "workflow Model or Agent input")
+	label string,
+) (sessionv3Runtime.WorkflowLLMMessageSegment, error) {
+	template, err := compileWorkflowValue(value)
 	if err != nil {
-		return nil, err
+		return sessionv3Runtime.WorkflowLLMMessageSegment{}, err
 	}
-	if len(object) != 1 {
-		return nil, errors.New(
-			"workflow model or agent input must contain only messages",
-		)
+	if template.Kind == sessionv3Runtime.WorkflowValueExpression {
+		return sessionv3Runtime.WorkflowLLMMessageSegment{
+			Collection: &template,
+		}, nil
 	}
-	raw, found := object[workflowLLMFieldMessages]
-	if !found {
-		return nil, errors.New(
-			"workflow model or agent input requires messages",
-		)
+	if template.Kind == sessionv3Runtime.WorkflowValueLiteral {
+		value = workflowv1.Value(template.Literal)
 	}
-	return compileWorkflowLLMMessageList(
-		workflowv1.Value(raw),
-		"workflow model or agent input messages",
-	)
+	values, err := compileWorkflowLLMMessageList(value, label)
+	if err != nil {
+		return sessionv3Runtime.WorkflowLLMMessageSegment{}, err
+	}
+	return sessionv3Runtime.WorkflowLLMMessageSegment{Messages: values}, nil
 }
 
 func compileWorkflowLLMMessageList(
@@ -196,12 +206,25 @@ func compileWorkflowLLMMessage(
 	return output, nil
 }
 
-func compileWorkflowLLMInstructions(
+func compileWorkflowLLMInstructionSegment(
 	value workflowv1.Value,
-) ([]sessionv3Runtime.WorkflowLLMInstruction, error) {
+) (sessionv3Runtime.WorkflowLLMInstructionSegment, error) {
+	template, err := compileWorkflowValue(value)
+	if err != nil {
+		return sessionv3Runtime.WorkflowLLMInstructionSegment{}, err
+	}
+	if template.Kind == sessionv3Runtime.WorkflowValueExpression {
+		return sessionv3Runtime.WorkflowLLMInstructionSegment{
+			Collection: &template,
+		}, nil
+	}
+	if template.Kind == sessionv3Runtime.WorkflowValueLiteral {
+		value = workflowv1.Value(template.Literal)
+	}
+
 	var values []json.RawMessage
 	if err := json.Unmarshal(value, &values); err != nil {
-		return nil, errors.New(
+		return sessionv3Runtime.WorkflowLLMInstructionSegment{}, errors.New(
 			"workflow Model or Agent instructions must be an array",
 		)
 	}
@@ -214,7 +237,7 @@ func compileWorkflowLLMInstructions(
 	for index := range values {
 		var object map[string]json.RawMessage
 		if err := json.Unmarshal(values[index], &object); err != nil || object == nil {
-			return nil, fmt.Errorf(
+			return sessionv3Runtime.WorkflowLLMInstructionSegment{}, fmt.Errorf(
 				"workflow Model or Agent instruction %d must be an object",
 				index,
 			)
@@ -225,7 +248,7 @@ func compileWorkflowLLMInstructions(
 				workflowLLMFieldLabel,
 				workflowLLMFieldContent:
 			default:
-				return nil, fmt.Errorf(
+				return sessionv3Runtime.WorkflowLLMInstructionSegment{}, fmt.Errorf(
 					"workflow model or agent instruction %d has unsupported field %q",
 					index,
 					name,
@@ -235,7 +258,7 @@ func compileWorkflowLLMInstructions(
 
 		contentRaw, found := object[workflowLLMFieldContent]
 		if !found {
-			return nil, fmt.Errorf(
+			return sessionv3Runtime.WorkflowLLMInstructionSegment{}, fmt.Errorf(
 				"workflow model or agent instruction %d requires content",
 				index,
 			)
@@ -244,7 +267,7 @@ func compileWorkflowLLMInstructions(
 			workflowv1.Value(contentRaw),
 		)
 		if err != nil {
-			return nil, err
+			return sessionv3Runtime.WorkflowLLMInstructionSegment{}, err
 		}
 
 		instruction := sessionv3Runtime.WorkflowLLMInstruction{
@@ -252,24 +275,26 @@ func compileWorkflowLLMInstructions(
 		}
 		if idRaw, found := object[workflowLLMFieldID]; found {
 			if err := json.Unmarshal(idRaw, &instruction.ID); err != nil {
-				return nil, errors.New(
+				return sessionv3Runtime.WorkflowLLMInstructionSegment{}, errors.New(
 					"workflow model or agent instruction ID must be a string",
 				)
 			}
 		}
 		if labelRaw, found := object[workflowLLMFieldLabel]; found {
 			if err := json.Unmarshal(labelRaw, &instruction.Label); err != nil {
-				return nil, errors.New(
+				return sessionv3Runtime.WorkflowLLMInstructionSegment{}, errors.New(
 					"workflow model or agent instruction label must be a string",
 				)
 			}
 		}
 		if err := instruction.Validate(); err != nil {
-			return nil, err
+			return sessionv3Runtime.WorkflowLLMInstructionSegment{}, err
 		}
 		output = append(output, instruction)
 	}
-	return output, nil
+	return sessionv3Runtime.WorkflowLLMInstructionSegment{
+		Instructions: output,
+	}, nil
 }
 
 func compileWorkflowLLMDefaults(
@@ -301,21 +326,6 @@ func compileWorkflowLLMDefaults(
 		)
 	}
 	return &output, nil
-}
-
-func workflowLLMObject(
-	value workflowv1.Value,
-	label string,
-) (map[string]json.RawMessage, error) {
-	raw := bytes.TrimSpace(value)
-	if len(raw) == 0 {
-		return nil, fmt.Errorf("%s is required", label)
-	}
-	var object map[string]json.RawMessage
-	if err := json.Unmarshal(raw, &object); err != nil || object == nil {
-		return nil, fmt.Errorf("%s must be an object", label)
-	}
-	return object, nil
 }
 
 func slicesContainTargetClear(

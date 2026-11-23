@@ -285,13 +285,14 @@ func (r *Runtime) appendPublishedWorkflowPortInputLocked(
 		kind = portStreamMessageKind
 	}
 	message := ChannelMessage{
-		ID:          messageID,
-		Sequence:    channel.NextSequence,
-		Channel:     channel.Name,
-		Kind:        kind,
-		Data:        value.Clone(),
-		Correlation: correlation,
-		CreatedAt:   r.now(),
+		ID:           messageID,
+		Sequence:     channel.NextSequence,
+		Channel:      channel.Name,
+		Kind:         kind,
+		Data:         value.Clone(),
+		Correlation:  correlation,
+		CreatedAt:    r.now(),
+		OwnerFrameID: frameID,
 	}
 	channel.Messages = append(channel.Messages, message)
 	channel.Bytes += len(message.Data) + len(message.Correlation)
@@ -695,6 +696,21 @@ func (r *Runtime) portInputsLocked(
 		if plan.Direction != WorkflowPortDirectionInput {
 			continue
 		}
+
+		captured := false
+		for index := range output {
+			if output[index].Name == plan.Name && output[index].Captured {
+				captured = true
+				break
+			}
+		}
+		if captured {
+			// A Workflow call captured these records at its logical boundary.
+			// Retry, delayed dispatch, and recovery must not read later channel
+			// records into that operation.
+			continue
+		}
+
 		if err := plan.Validate(); err != nil {
 			return nil, err
 		}
@@ -1031,12 +1047,13 @@ func (r *Runtime) appendWorkPortStream(
 		return errors.New("streamed port is not declared for the work item")
 	}
 
-	sequence := nextPortStreamSequence(item, name)
+	attempt := activeAttempt(execution, item.ID)
+	sequence := nextPortStreamSequence(item, name, attemptID(attempt))
 	if err := r.appendPortMessageLocked(
 		session,
 		execution,
 		*plan,
-		portMessageID(item.ID, name, sequence),
+		portStreamMessageID(item.ID, attemptID(attempt), name, sequence),
 		portStreamMessageKind,
 		value,
 	); err != nil {
@@ -1075,12 +1092,13 @@ func (r *Runtime) deliverLLMStreamPortsLocked(
 		if plan.Direction != WorkflowPortDirectionOutput || !plan.Stream {
 			continue
 		}
-		sequence := nextPortStreamSequence(item, plan.Name)
+		attempt := activeAttempt(execution, item.ID)
+		sequence := nextPortStreamSequence(item, plan.Name, attemptID(attempt))
 		if err := r.appendPortMessageLocked(
 			session,
 			execution,
 			plan,
-			portMessageID(item.ID, plan.Name, sequence),
+			portStreamMessageID(item.ID, attemptID(attempt), plan.Name, sequence),
 			portStreamMessageKind,
 			streamValue,
 		); err != nil {
@@ -1093,17 +1111,31 @@ func (r *Runtime) deliverLLMStreamPortsLocked(
 func nextPortStreamSequence(
 	item *WorkItem,
 	name string,
+	currentAttempt AttemptID,
 ) uint64 {
 	index := portStreamIndex(item.PortStreams, name)
 	if index < 0 {
 		item.PortStreams = append(item.PortStreams, PortStream{
 			Name:         name,
 			NextSequence: 1,
+			AttemptID:    currentAttempt,
 		})
+		return 1
+	}
+	if item.PortStreams[index].AttemptID != currentAttempt {
+		item.PortStreams[index].AttemptID = currentAttempt
+		item.PortStreams[index].NextSequence = 1
 		return 1
 	}
 	item.PortStreams[index].NextSequence++
 	return item.PortStreams[index].NextSequence
+}
+
+func attemptID(value *Attempt) AttemptID {
+	if value == nil {
+		return ""
+	}
+	return value.ID
 }
 
 func portMessageID(
@@ -1116,6 +1148,18 @@ func portMessageID(
 		value += portMessageSeparator + strconv.FormatUint(sequence, 10)
 	}
 	return value
+}
+
+func portStreamMessageID(
+	workID WorkItemID,
+	attemptID AttemptID,
+	name string,
+	sequence uint64,
+) string {
+	if attemptID == "" {
+		return portMessageID(workID, name, sequence)
+	}
+	return portMessageID(WorkItemID(string(workID)+":"+string(attemptID)), name, sequence)
 }
 
 func (r *Runtime) appendPortMessageLocked(
@@ -1173,10 +1217,11 @@ func (r *Runtime) appendPortMessageLocked(
 	if channel.Bytes+len(value) > channel.MaxBytes {
 		return errors.New("port channel byte limit exceeded")
 	}
-	if err := r.reserveChannelMessageBudgetLocked(
+	if err := r.reserveMessageBudgetForOwnerLocked(
 		channelExecution,
-		value,
-		nil,
+		WorkItemID(""),
+		plan.OwnerFrameID,
+		len(value),
 	); err != nil {
 		return err
 	}
@@ -1184,12 +1229,13 @@ func (r *Runtime) appendPortMessageLocked(
 	now := r.now()
 	channel.NextSequence++
 	message := ChannelMessage{
-		ID:        messageID,
-		Sequence:  channel.NextSequence,
-		Channel:   channel.Name,
-		Kind:      kind,
-		Data:      value.Clone(),
-		CreatedAt: now,
+		ID:           messageID,
+		Sequence:     channel.NextSequence,
+		Channel:      channel.Name,
+		Kind:         kind,
+		Data:         value.Clone(),
+		CreatedAt:    now,
+		OwnerFrameID: plan.OwnerFrameID,
 	}
 	channel.Messages = append(channel.Messages, message)
 	channel.Bytes += len(message.Data)
@@ -1376,10 +1422,11 @@ func (r *Runtime) appendForwardedChannelMessageLocked(
 			"forwarded workflow port channel byte limit exceeded",
 		)
 	}
-	if err := r.reserveChannelMessageBudgetLocked(
+	if err := r.reserveMessageBudgetForOwnerLocked(
 		target,
-		source.Data,
-		source.Correlation,
+		source.OwnerWorkItemID,
+		source.OwnerFrameID,
+		len(source.Data)+len(source.Correlation),
 	); err != nil {
 		return ChannelMessage{}, false, err
 	}
@@ -1387,13 +1434,16 @@ func (r *Runtime) appendForwardedChannelMessageLocked(
 	now := r.now()
 	channel.NextSequence++
 	message := ChannelMessage{
-		ID:          messageID,
-		Sequence:    channel.NextSequence,
-		Channel:     channel.Name,
-		Kind:        source.Kind,
-		Data:        source.Data.Clone(),
-		Correlation: source.Correlation.Clone(),
-		CreatedAt:   now,
+		ID:              messageID,
+		Sequence:        channel.NextSequence,
+		Channel:         channel.Name,
+		Kind:            source.Kind,
+		Data:            source.Data.Clone(),
+		Correlation:     source.Correlation.Clone(),
+		CreatedAt:       now,
+		OwnerWorkItemID: source.OwnerWorkItemID,
+		OwnerFrameID:    source.OwnerFrameID,
+		AttemptID:       source.AttemptID,
 	}
 	channel.Messages = append(channel.Messages, message)
 	channel.Bytes += len(message.Data) + len(message.Correlation)

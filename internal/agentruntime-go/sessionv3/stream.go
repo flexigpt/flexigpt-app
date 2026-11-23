@@ -46,7 +46,7 @@ func (r *Runtime) appendLLMStream(
 		budgetMetricRequest{
 			Metric:    budgetMetricMessageBytes,
 			Increment: len(value),
-			Label:     "message bytes",
+			Label:     budgetLabelMessageBytes,
 		},
 	); err != nil {
 		return err
@@ -56,10 +56,26 @@ func (r *Runtime) appendLLMStream(
 	if item.LLMStream == nil {
 		item.LLMStream = &LLMStreamState{}
 	}
+	attempt := activeAttempt(execution, item.ID)
+	if attempt != nil {
+		if attempt.LLMStream == nil ||
+			attempt.LLMStream.AttemptID != attempt.ID {
+			attempt.LLMStream = &LLMStreamState{
+				AttemptID: attempt.ID,
+			}
+		}
+		item.LLMStream.AttemptID = attempt.ID
+	}
 	if thinking {
 		item.LLMStream.Thinking += value
+		if attempt != nil {
+			attempt.LLMStream.Thinking += value
+		}
 	} else {
 		item.LLMStream.Text += value
+		if attempt != nil {
+			attempt.LLMStream.Text += value
+		}
 	}
 	if !thinking {
 		if err := r.deliverLLMStreamPortsLocked(
@@ -93,9 +109,14 @@ func (r *Runtime) appendLLMStream(
 
 func mergeLLMStreamResult(
 	item WorkItem,
+	attempt *Attempt,
 	result WorkExecutionResult,
 ) WorkExecutionResult {
-	if item.LLMStream == nil ||
+	stream := item.LLMStream
+	if attempt != nil && attempt.LLMStream != nil {
+		stream = attempt.LLMStream
+	}
+	if stream == nil ||
 		result.Output == nil ||
 		result.Output.LLM == nil {
 		return result
@@ -103,10 +124,10 @@ func mergeLLMStreamResult(
 
 	output := *result.Output
 	llm := *output.LLM
-	llm.Text = mergeLLMStreamText(llm.Text, item.LLMStream.Text)
+	llm.Text = mergeLLMStreamText(llm.Text, stream.Text)
 	llm.Thinking = mergeLLMStreamText(
 		llm.Thinking,
-		item.LLMStream.Thinking,
+		stream.Thinking,
 	)
 	output.LLM = &llm
 	result.Output = &output

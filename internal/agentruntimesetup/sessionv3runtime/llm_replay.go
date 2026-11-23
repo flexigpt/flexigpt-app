@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/flexigpt/inference-go/capabilityoverride"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
@@ -43,25 +42,6 @@ func (b *Binder) bindRecoveredLLM(
 		)
 	}
 
-	requestDefaults := sessionv3Runtime.EffectiveModelDefaultsOverride(
-		defaults.ModelOverrides,
-		request.WorkItem.Input.LLM.Temperature,
-	)
-	modelDefaults, explicitPrompt, clearModelPrompt := splitV3ModelSystemPromptOverride(
-		requestDefaults,
-	)
-	if plan.Agent != nil &&
-		plan.Agent.IncludeModelSystemPrompt != nil &&
-		!*plan.Agent.IncludeModelSystemPrompt {
-		clearModelPrompt = true
-	}
-	if clearModelPrompt {
-		modelDefaults.Clear = appendV3ModelDefaultClear(
-			modelDefaults.Clear,
-			sessionv3Runtime.ModelDefaultFieldSystemPrompt,
-		)
-	}
-
 	if len(plan.RuntimeConfiguration) == 0 {
 		return sessionv3Runtime.BindResult{}, errors.New(
 			"recovered llm dispatch plan has no immutable runtime configuration",
@@ -74,45 +54,13 @@ func (b *Binder) bindRecoveredLLM(
 	if err != nil {
 		return sessionv3Runtime.BindResult{}, err
 	}
-
-	instructions := make([]string, 0, len(plan.Instructions))
-	for _, instruction := range plan.Instructions {
-		if strings.TrimSpace(instruction.Content) != "" {
-			instructions = append(instructions, instruction.Content)
-		}
-	}
-	if len(instructions) != 0 {
-		resolved.ModelParam.SystemPrompt = appendPrompt(
-			resolved.ModelParam.SystemPrompt,
-			strings.Join(instructions, "\n\n"),
+	if resolved.ModelParam.SystemPrompt != plan.FinalSystemPrompt {
+		return sessionv3Runtime.BindResult{}, errors.New(
+			"recovered llm runtime configuration differs from the captured final prompt",
 		)
 	}
 
-	contextValues := make([]string, 0, len(plan.Context))
-	for _, value := range plan.Context {
-		text, decodeErr := jsonutil.DecodeCanonicalValue[string](value.Value)
-		if decodeErr != nil {
-			return sessionv3Runtime.BindResult{}, fmt.Errorf(
-				"decode recovered context %q: %w",
-				value.Name,
-				decodeErr,
-			)
-		}
-		if strings.TrimSpace(text) != "" {
-			contextValues = append(contextValues, text)
-		}
-	}
-
-	activities, err := recoveredDispatchActivities(plan)
-	if err != nil {
-		return sessionv3Runtime.BindResult{}, err
-	}
-	inputs, err := b.buildInputs(
-		request,
-		defaults,
-		contextValues,
-		activities,
-	)
+	inputs, err := recoveredProviderInputs(plan)
 	if err != nil {
 		return sessionv3Runtime.BindResult{}, err
 	}
@@ -133,18 +81,7 @@ func (b *Binder) bindRecoveredLLM(
 		if hydrationErr != nil {
 			return sessionv3Runtime.BindResult{}, hydrationErr
 		}
-		if strings.TrimSpace(hydration.Prompt) != "" {
-			resolved.ModelParam.SystemPrompt = appendPrompt(
-				resolved.ModelParam.SystemPrompt,
-				hydration.Prompt,
-			)
-		}
-	}
-	if explicitPrompt != nil && strings.TrimSpace(*explicitPrompt) != "" {
-		resolved.ModelParam.SystemPrompt = appendPrompt(
-			resolved.ModelParam.SystemPrompt,
-			*explicitPrompt,
-		)
+		_ = hydration
 	}
 
 	choices, bindings, err := recoveredToolChoices(plan)
@@ -166,39 +103,27 @@ func (b *Binder) bindRecoveredLLM(
 	}, nil
 }
 
-func recoveredDispatchActivities(
+func recoveredProviderInputs(
 	plan sessionv3Runtime.ModelDispatchPlan,
-) ([]sessionv3Runtime.Activity, error) {
-	if len(plan.Messages) == 0 {
+) ([]inferenceSpec.InputUnion, error) {
+	if len(plan.ProviderInputs) == 0 {
 		return nil, errors.New(
-			"recovered llm dispatch plan has no captured message sequence",
+			"recovered llm dispatch plan has no exact captured provider inputs",
 		)
 	}
-
-	output := make(
-		[]sessionv3Runtime.Activity,
-		0,
-		len(plan.Messages),
-	)
-	for _, message := range plan.Messages {
-		if message.ID == "" {
-			return nil, errors.New(
-				"recovered llm dispatch plan has a message without identity",
+	output := make([]inferenceSpec.InputUnion, 0, len(plan.ProviderInputs))
+	for index := range plan.ProviderInputs {
+		value, err := jsonutil.DecodeCanonicalValue[inferenceSpec.InputUnion](
+			plan.ProviderInputs[index],
+		)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"decode recovered provider input %d: %w",
+				index,
+				err,
 			)
 		}
-		output = append(output, sessionv3Runtime.Activity{
-			ID:         sessionv3Runtime.ActivityID(message.ID),
-			Kind:       sessionv3Runtime.ActivityKindMessage,
-			Visibility: sessionv3Runtime.ActivityVisibilityBoth,
-			Message: &sessionv3Runtime.MessageActivity{
-				Role:        message.Role,
-				Text:        message.Text,
-				Attachments: jsonutil.CloneJSONInValue(message.Attachments),
-				ToolResults: jsonutil.CloneJSONInValue(message.ToolResults),
-				AppContext:  jsonutil.CloneJSONInValue(message.AppContext),
-				Metadata:    message.Metadata.Clone(),
-			},
-		})
+		output = append(output, value)
 	}
 	return output, nil
 }

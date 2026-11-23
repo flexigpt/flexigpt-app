@@ -1,6 +1,7 @@
 package sessionv3
 
 import (
+	"encoding/json"
 	"errors"
 	"slices"
 	"strconv"
@@ -17,13 +18,43 @@ type workflowLLMInvocation struct {
 }
 
 func (v WorkflowLLMInvocation) Validate() error {
-	if len(v.Messages) == 0 {
+	if len(v.Messages) == 0 && len(v.MessageSegments) == 0 {
 		return errors.New("workflow model or agent invocation requires messages")
 	}
 	if workflowInvocationOverridesTarget(v.Defaults) {
 		return errors.New(
 			"workflow model or agent defaults cannot replace the selected target",
 		)
+	}
+	for _, segment := range v.MessageSegments {
+		if (len(segment.Messages) == 0) == (segment.Collection == nil) {
+			return errors.New("workflow model or agent message segment is invalid")
+		}
+		if segment.Collection != nil {
+			if err := segment.Collection.Validate(); err != nil {
+				return err
+			}
+		}
+		for index := range segment.Messages {
+			if err := segment.Messages[index].Validate(); err != nil {
+				return err
+			}
+		}
+	}
+	for _, segment := range v.InstructionSegments {
+		if (len(segment.Instructions) == 0) == (segment.Collection == nil) {
+			return errors.New("workflow model or agent instruction segment is invalid")
+		}
+		if segment.Collection != nil {
+			if err := segment.Collection.Validate(); err != nil {
+				return err
+			}
+		}
+		for index := range segment.Instructions {
+			if err := segment.Instructions[index].Validate(); err != nil {
+				return err
+			}
+		}
 	}
 	for index := range v.Messages {
 		if err := v.Messages[index].Validate(); err != nil {
@@ -69,6 +100,150 @@ func (v WorkflowLLMInstruction) Validate() error {
 	return v.Content.Validate()
 }
 
+func (i *WorkflowInterpreter) captureWorkflowLLMInvocation(
+	program WorkflowProgram,
+	state WorkflowState,
+	template WorkflowLLMInvocation,
+) (WorkflowLLMInvocation, error) {
+	if err := template.Validate(); err != nil {
+		return WorkflowLLMInvocation{}, err
+	}
+	output := WorkflowLLMInvocation{
+		Defaults:        jsonutil.CloneJSONInValue(template.Defaults),
+		PreparedTargets: jsonutil.CloneJSONInValue(template.PreparedTargets),
+	}
+	messageSegments := template.MessageSegments
+	if len(messageSegments) == 0 {
+		messageSegments = []WorkflowLLMMessageSegment{{
+			Messages: jsonutil.CloneJSONInValue(template.Messages),
+		}}
+	}
+	for _, segment := range messageSegments {
+		values := segment.Messages
+		if segment.Collection != nil {
+			value, err := i.evaluate(*segment.Collection, program, state)
+			if err != nil {
+				return WorkflowLLMInvocation{}, err
+			}
+			values, err = decodeWorkflowLLMMessageCollection(value)
+			if err != nil {
+				return WorkflowLLMInvocation{}, err
+			}
+		}
+		for _, message := range values {
+			captured := WorkflowLLMMessage{
+				Role:        message.Role,
+				Attachments: jsonutil.CloneJSONInValue(message.Attachments),
+			}
+			if message.Text != nil {
+				value, err := i.evaluate(*message.Text, program, state)
+				if err != nil {
+					return WorkflowLLMInvocation{}, err
+				}
+				captured.Text = &WorkflowValue{
+					Kind:    WorkflowValueLiteral,
+					Literal: value.Clone(),
+				}
+			}
+			output.Messages = append(output.Messages, captured)
+		}
+	}
+	instructionSegments := template.InstructionSegments
+	if len(instructionSegments) == 0 && len(template.Instructions) != 0 {
+		instructionSegments = []WorkflowLLMInstructionSegment{{
+			Instructions: jsonutil.CloneJSONInValue(template.Instructions),
+		}}
+	}
+	for _, segment := range instructionSegments {
+		values := segment.Instructions
+		if segment.Collection != nil {
+			value, err := i.evaluate(*segment.Collection, program, state)
+			if err != nil {
+				return WorkflowLLMInvocation{}, err
+			}
+			values, err = decodeWorkflowLLMInstructionCollection(value)
+			if err != nil {
+				return WorkflowLLMInvocation{}, err
+			}
+		}
+		for _, instruction := range values {
+			value, err := i.evaluate(instruction.Content, program, state)
+			if err != nil {
+				return WorkflowLLMInvocation{}, err
+			}
+			output.Instructions = append(output.Instructions, WorkflowLLMInstruction{
+				ID:    instruction.ID,
+				Label: instruction.Label,
+				Content: WorkflowValue{
+					Kind:    WorkflowValueLiteral,
+					Literal: value.Clone(),
+				},
+			})
+		}
+	}
+	if err := output.Validate(); err != nil {
+		return WorkflowLLMInvocation{}, err
+	}
+	return output, nil
+}
+
+func decodeWorkflowLLMMessageCollection(
+	value jsonutil.CanonicalValue,
+) ([]WorkflowLLMMessage, error) {
+	var values []struct {
+		Role        MessageRole  `json:"role"`
+		Text        *string      `json:"text,omitempty"`
+		Attachments []Attachment `json:"attachments,omitempty"`
+	}
+	if err := json.Unmarshal(value, &values); err != nil || len(values) == 0 {
+		return nil, errors.New("workflow message collection did not produce typed messages")
+	}
+	output := make([]WorkflowLLMMessage, 0, len(values))
+	for _, value := range values {
+		message := WorkflowLLMMessage{
+			Role:        value.Role,
+			Attachments: jsonutil.CloneJSONInValue(value.Attachments),
+		}
+		if value.Text != nil {
+			message.Text = &WorkflowValue{
+				Kind:    WorkflowValueLiteral,
+				Literal: jsonutil.MustCanonicalValue(*value.Text),
+			}
+		}
+		if err := message.Validate(); err != nil {
+			return nil, err
+		}
+		output = append(output, message)
+	}
+	return output, nil
+}
+
+func decodeWorkflowLLMInstructionCollection(
+	value jsonutil.CanonicalValue,
+) ([]WorkflowLLMInstruction, error) {
+	var values []struct {
+		ID      string `json:"id,omitempty"`
+		Label   string `json:"label,omitempty"`
+		Content string `json:"content"`
+	}
+	if err := json.Unmarshal(value, &values); err != nil {
+		return nil, errors.New("workflow instruction collection did not produce typed instructions")
+	}
+	output := make([]WorkflowLLMInstruction, 0, len(values))
+	for _, value := range values {
+		instruction := WorkflowLLMInstruction{
+			ID:      value.ID,
+			Label:   value.Label,
+			Content: WorkflowValue{Kind: WorkflowValueLiteral, Literal: jsonutil.MustCanonicalValue(value.Content)},
+		}
+		if err := instruction.Validate(); err != nil {
+			return nil, err
+		}
+		output = append(output, instruction)
+	}
+	return output, nil
+}
+
 func (i *WorkflowInterpreter) prepareWorkflowLLMInvocation(
 	frame ProgramFrame,
 	path string,
@@ -78,9 +253,11 @@ func (i *WorkflowInterpreter) prepareWorkflowLLMInvocation(
 	program WorkflowProgram,
 	state WorkflowState,
 ) (workflowLLMInvocation, error) {
-	if err := template.Validate(); err != nil {
+	captured, err := i.captureWorkflowLLMInvocation(program, state, template)
+	if err != nil {
 		return workflowLLMInvocation{}, err
 	}
+	template = captured
 
 	defaults := SessionDefaults{}
 	if template.Defaults != nil {

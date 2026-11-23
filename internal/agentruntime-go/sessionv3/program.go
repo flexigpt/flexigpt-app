@@ -485,7 +485,10 @@ func (agentLoopInterpreter) Advance(
 					state,
 					*item,
 				)
-				transition.Activities = interruptedAssistantActivities(*item)
+				transition.Activities = interruptedAssistantActivitiesForAttempt(
+					*item,
+					latestAttemptForWorkItem(execution, item.ID),
+				)
 				return transition, transitionErr
 			}
 			if item.Output == nil || item.Output.LLM == nil {
@@ -880,6 +883,50 @@ func interruptedAssistantActivities(item WorkItem) []Activity {
 	}}
 }
 
+func interruptedAssistantActivitiesForAttempt(
+	item WorkItem,
+	attempt *Attempt,
+) []Activity {
+	values := interruptedAssistantActivities(item)
+	if len(values) == 0 || attempt == nil {
+		return values
+	}
+	for index := range values {
+		values[index].AttemptID = attempt.ID
+	}
+	return values
+}
+
+func (r *Runtime) appendInterruptedAssistantActivityLocked(
+	session *Session,
+	execution *Execution,
+	item WorkItem,
+	attempt *Attempt,
+	now time.Time,
+) {
+	if session == nil || execution == nil {
+		return
+	}
+	for _, activity := range session.Timeline {
+		if activity.Kind != ActivityKindMessage ||
+			activity.Message == nil ||
+			activity.Message.Role != MessageRoleAssistant ||
+			activity.WorkItemID != item.ID {
+			continue
+		}
+		if attempt == nil || activity.AttemptID == attempt.ID {
+			return
+		}
+	}
+	for _, activity := range interruptedAssistantActivitiesForAttempt(item, attempt) {
+		activity.ID = ActivityID(r.newID())
+		activity.CreatedAt = now.UTC()
+		activity.ExecutionID = execution.ID
+		activity.FrameID = item.FrameID
+		session.Timeline = append(session.Timeline, activity)
+	}
+}
+
 func encodeAgentLoopState(value agentLoopProgramState) ProgramState {
 	return ProgramState{
 		Type:    BuiltinAgentLoopInterpreterID,
@@ -1009,7 +1056,10 @@ func (singleModelInterpreter) Advance(
 				*item,
 			)
 			transition.State = encodeSingleModelState(state)
-			transition.Activities = interruptedAssistantActivities(*item)
+			transition.Activities = interruptedAssistantActivitiesForAttempt(
+				*item,
+				latestAttemptForWorkItem(execution, item.ID),
+			)
 			return transition, transitionErr
 		}
 		if item.Output == nil || item.Output.LLM == nil {

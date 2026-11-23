@@ -69,6 +69,27 @@ func mutableExecutionSignal(
 	return nil
 }
 
+func mutableChannelMessage(
+	execution *Execution,
+	channelName string,
+	messageID string,
+) *ChannelMessage {
+	if execution == nil {
+		return nil
+	}
+	for channelIndex := range execution.Channels {
+		if execution.Channels[channelIndex].Name != channelName {
+			continue
+		}
+		for messageIndex := range execution.Channels[channelIndex].Messages {
+			if execution.Channels[channelIndex].Messages[messageIndex].ID == messageID {
+				return &execution.Channels[channelIndex].Messages[messageIndex]
+			}
+		}
+	}
+	return nil
+}
+
 type completionWaitOutput struct {
 	WorkItemID  WorkItemID              `json:"workItemID,omitempty"`
 	FrameID     ProgramFrameID          `json:"frameID,omitempty"`
@@ -359,13 +380,6 @@ func (r *Runtime) dispatchEmit(
 	}
 	r.armExecutionRetriesLocked(ctx, session.ID, execution.ID, *execution)
 	r.publishLocked(ctx, session, execution.ID, RuntimeEventWorkChanged)
-	if item.State != WorkItemStateRetryWaiting {
-		r.launchReadyWork(
-			ctx,
-			session.ID,
-			r.readyWorkForSessionLocked(session),
-		)
-	}
 }
 
 func (r *Runtime) applyEmitLocked(
@@ -463,6 +477,8 @@ func (r *Runtime) applyEmitLocked(
 			Correlation:      payload.Correlation.Clone(),
 			DeduplicationKey: payload.DeduplicationKey,
 			CreatedAt:        now,
+			OwnerWorkItemID:  workItemID,
+			OwnerFrameID:     item.FrameID,
 		}
 		channel.Messages = append(channel.Messages, message)
 		channel.Bytes += len(message.Data) + len(message.Correlation)
@@ -488,12 +504,14 @@ func (r *Runtime) applyEmitLocked(
 			return EmitReceipt{}, nil, nil, err
 		}
 		signal := ExecutionSignal{
-			ID:          "emit:" + string(workItemID),
-			Name:        payload.Destination.Event,
-			Source:      firstNonEmpty(payload.EventSource, "workflow"),
-			Data:        payload.Data.Clone(),
-			Correlation: payload.Correlation.Clone(),
-			CreatedAt:   now,
+			ID:              "emit:" + string(workItemID),
+			Name:            payload.Destination.Event,
+			Source:          firstNonEmpty(payload.EventSource, "workflow"),
+			Data:            payload.Data.Clone(),
+			Correlation:     payload.Correlation.Clone(),
+			CreatedAt:       now,
+			OwnerWorkItemID: workItemID,
+			OwnerFrameID:    item.FrameID,
 		}
 		execution.Signals = append(execution.Signals, signal)
 		execution.EmitReceipts = append(execution.EmitReceipts, receipt)
@@ -620,11 +638,12 @@ func (r *Runtime) wakeEventWaitsLocked(
 			wait.Request.Signal != currentSignal.Name {
 			continue
 		}
+		consumption, subscriptionBound := subscriptionConsumptionForWait(
+			execution,
+			*wait,
+		)
 		if wait.Request.Consume {
-			if consumption, found := subscriptionConsumptionForWait(
-				execution,
-				*wait,
-			); found &&
+			if subscriptionBound &&
 				signalConsumedBySubscription(*currentSignal, consumption) {
 				continue
 			}
@@ -694,10 +713,7 @@ func (r *Runtime) wakeEventWaitsLocked(
 					wait.ID,
 				)
 			}
-			if consumption, found := subscriptionConsumptionForWait(
-				execution,
-				*wait,
-			); found &&
+			if subscriptionBound &&
 				!signalConsumedBySubscription(*currentSignal, consumption) {
 				if !slices.Contains(
 					currentSignal.ConsumedSubscriptions,
@@ -738,14 +754,23 @@ func (r *Runtime) wakeChannelWaitsLocked(
 			return errors.New("channel wait execution disappeared")
 		}
 		wait := mutableWait(execution, waitID)
-		if wait.Status != WaitStatusPending ||
+		if wait == nil ||
+			wait.Status != WaitStatusPending ||
 			wait.Request.Kind != WaitKindChannel ||
 			wait.Request.Channel != message.Channel ||
 			message.Sequence <= wait.Request.Cursor {
 			continue
 		}
+		currentMessage := mutableChannelMessage(
+			execution,
+			message.Channel,
+			message.ID,
+		)
+		if currentMessage == nil {
+			return errors.New("channel wait message disappeared")
+		}
 		if wait.Request.Consume &&
-			containsWaitID(message.ConsumedBy, wait.ID) {
+			containsWaitID(currentMessage.ConsumedBy, wait.ID) {
 			continue
 		}
 
@@ -754,8 +779,8 @@ func (r *Runtime) wakeChannelWaitsLocked(
 			Sequence:    message.Sequence,
 			Channel:     message.Channel,
 			Kind:        message.Kind,
-			Data:        message.Data.Clone(),
-			Correlation: message.Correlation.Clone(),
+			Data:        currentMessage.Data.Clone(),
+			Correlation: currentMessage.Correlation.Clone(),
 			Time:        message.CreatedAt,
 		})
 		if !waitMatchesEvent(
@@ -791,23 +816,13 @@ func (r *Runtime) wakeChannelWaitsLocked(
 			return errors.New("channel wait execution disappeared")
 		}
 		wait = mutableWait(execution, waitID)
-		if wait.Request.Consume {
-			for channelIndex := range execution.Channels {
-				channel := &execution.Channels[channelIndex]
-				if channel.Name != message.Channel {
-					continue
-				}
-				for messageIndex := range channel.Messages {
-					if channel.Messages[messageIndex].ID != message.ID {
-						continue
-					}
-					channel.Messages[messageIndex].ConsumedBy = append(
-						channel.Messages[messageIndex].ConsumedBy,
-						wait.ID,
-					)
-					break
-				}
-			}
+		currentMessage = mutableChannelMessage(execution, message.Channel, message.ID)
+		if wait != nil && wait.Request.Consume && currentMessage != nil &&
+			!containsWaitID(currentMessage.ConsumedBy, wait.ID) {
+			currentMessage.ConsumedBy = append(
+				currentMessage.ConsumedBy,
+				wait.ID,
+			)
 		}
 	}
 	return nil
@@ -860,8 +875,20 @@ func (r *Runtime) wakeCompletionWorkWaitsLocked(
 	execution *Execution,
 	completed WorkItem,
 ) {
-	for index := range execution.Waits {
-		wait := &execution.Waits[index]
+	executionID := execution.ID
+	waitIDs := make([]WaitID, 0, len(execution.Waits))
+	for _, wait := range execution.Waits {
+		waitIDs = append(waitIDs, wait.ID)
+	}
+	for _, waitID := range waitIDs {
+		execution = mutableSessionExecution(session, executionID)
+		if execution == nil {
+			return
+		}
+		wait := mutableWait(execution, waitID)
+		if wait == nil {
+			continue
+		}
 		if wait.Status != WaitStatusPending ||
 			wait.Request.Kind != WaitKindChild ||
 			wait.Request.Completion == nil ||
@@ -886,6 +913,10 @@ func (r *Runtime) wakeCompletionWorkWaitsLocked(
 			errorValue,
 			confirmed,
 		)
+		execution = mutableSessionExecution(session, executionID)
+		if execution == nil {
+			return
+		}
 	}
 }
 
@@ -897,8 +928,20 @@ func (r *Runtime) wakeCompletionFrameWaitsLocked(
 	if !frame.Status.Terminal() {
 		return
 	}
-	for index := range execution.Waits {
-		wait := &execution.Waits[index]
+	executionID := execution.ID
+	waitIDs := make([]WaitID, 0, len(execution.Waits))
+	for _, wait := range execution.Waits {
+		waitIDs = append(waitIDs, wait.ID)
+	}
+	for _, waitID := range waitIDs {
+		execution = mutableSessionExecution(session, executionID)
+		if execution == nil {
+			return
+		}
+		wait := mutableWait(execution, waitID)
+		if wait == nil {
+			continue
+		}
 		if wait.Status != WaitStatusPending ||
 			wait.Request.Kind != WaitKindChild ||
 			wait.Request.Completion == nil ||
@@ -929,6 +972,10 @@ func (r *Runtime) wakeCompletionFrameWaitsLocked(
 				errorValue,
 				confirmed,
 			)
+			execution = mutableSessionExecution(session, executionID)
+			if execution == nil {
+				return
+			}
 			continue
 		}
 
@@ -967,6 +1014,10 @@ func (r *Runtime) wakeCompletionFrameWaitsLocked(
 			errorValue,
 			confirmed,
 		)
+		execution = mutableSessionExecution(session, executionID)
+		if execution == nil {
+			return
+		}
 	}
 }
 

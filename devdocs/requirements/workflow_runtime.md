@@ -2307,7 +2307,10 @@ status-only updates, small implementation phases, or isolated helper changes.
     alive against caller-owned Store resources.
   - Existing Runtime-before-Store shutdown order remains unchanged.
 
-### Current task record
+### Superseded task record
+
+This historical record is retained for audit context only. It is superseded by
+the final `Current task record` at the end of this document.
 
 This subsection is the current functional status authority for every task ID
 listed below. Earlier evidence remains useful only as historical context.
@@ -3329,3 +3332,504 @@ changes.
   - Keep domain-native request grammar in Model, Tool, MCP, Skill, Service,
     Activity, Attachment, Agent, and Workspace domains.
 - Completion evidence: Pending implementation.
+
+### Current task record
+
+This is the only current Runtime and consumer-execution status authority.
+Every task in this record is implemented. Earlier task text is historical and
+does not describe the delivered source state.
+
+#### `RT-SETTLE-003` Authoritative mutation and terminal propagation
+
+- Status: Implemented.
+- Completion evidence:
+  - `internal/agentruntime-go/sessionv3/runtime.go:persistLocked` is the
+    committed Session-wide ready-work launch boundary. It accepts committed
+    derived-index errors and clears stale checkpoint barriers before readiness.
+  - `runtime_lifecycle.go:commitTerminalMutationLocked`,
+    `settlePendingFrameCancellationsLocked`, and
+    `executionTerminalReadyLocked` complete attempt, effect, claim, wait,
+    owner, Execution, checkpoint, and post-commit dispatch lifecycle work.
+  - `runtime.go:dispatchOne`, `finishWorkLocked`, `finishPanickedWork`, and
+    `runtime_durability.go:settleUndispatchedWorkLocked` route binding, port,
+    panic, deadline, retry, resource, cancellation, reconciliation, and child
+    terminal paths through the common lifecycle.
+
+##### `RT-SETTLE-003.a` Reacquire authoritative Session-owned objects
+
+- Status: Implemented.
+- Completion evidence:
+  - `coordination.go:wakeEventWaitsLocked`, `wakeChannelWaitsLocked`,
+    `wakeCompletionWorkWaitsLocked`, and `wakeCompletionFrameWaitsLocked`
+    re-acquire Session, Execution, Wait, signal, and channel records by
+    durable identity after each nested settlement.
+  - `runtime_children.go:wakeCompletionExecutionWaitsLocked`,
+    `runtime.go:advanceFrameLocked`, and
+    `runtime_durability.go:settleUndispatchedWorkLocked` re-acquire durable
+    owners after child, frame, and wait mutation.
+
+##### `RT-SETTLE-003.b` Use one terminal lifecycle and committed ready-work launch
+
+- Status: Implemented.
+- Completion evidence:
+  - `runtime.go:dispatchOne` routes port, binding, budget, resource, deadline,
+    immediate, and durable-wait terminal paths through the common lifecycle.
+  - `coordination.go:dispatchEmit` and
+    `ports_runtime.go:appendPortMessageLocked` do not launch work before the
+    enclosing Session checkpoint. `persistLocked` owns post-commit dispatch.
+
+#### `RT-CLEANUP-003` Execute cleanup through every owning lifecycle
+
+- Status: Implemented.
+- Completion evidence:
+  - `budget.go:beginCleanupLocked` and `rebaseCleanupDeadlinesLocked` retain
+    bounded cleanup deadlines independently from ordinary deadlines.
+  - `runtime.go:advanceFrameLocked` propagates cleanup classification through
+    child frames and synthetic WorkItems. `runtime_durability.go` and
+    `runtime_children.go` use the effective cleanup deadline for bind, retry,
+    waits, resources, streams, emits, and child frames.
+  - `runtime_child_cancel.go:cancelFrameTreeLocked` records frame cancellation
+    intent without terminalizing an owner that still has dispatched work.
+    `runtime_lifecycle.go:settlePendingFrameCancellationsLocked` completes the
+    frame only after late evidence, release, cleanup, and completion delivery.
+
+##### `RT-CLEANUP-003.a` Carry cleanup classification and effective deadline
+
+- Status: Implemented.
+- Completion evidence:
+  - `effectiveWorkDeadlineLocked`, `effectiveAttemptDeadlineLocked`,
+    `rebaseCleanupDeadlinesLocked`, `workflowFrameIntentRunsCleanup`, and
+    `childFrameDeadlineInputs` preserve cleanup classification and the bounded
+    deadline through built-in Agent, Model, Fork, Join, merge, wait, retry,
+    stream, emit, settlement, and recovery paths.
+
+##### `RT-CLEANUP-003.c` Preserve cancellation ownership until late settlement
+
+- Status: Implemented.
+- Completion evidence:
+  - `ProgramFrame.CancellationRequested`,
+    `settlePendingFrameCancellationsLocked`, and
+    `executionTerminalReadyLocked` keep frame and Execution ownership alive
+    until dispatched work, claims, reconciliation, compensation, cleanup, and
+    completion delivery settle.
+
+#### `RT-BUDGET-003` Complete scoped accounting and resource-ready scheduling
+
+- Status: Implemented.
+- Completion evidence:
+  - `budget_scope.go:ExecutionBudgetScope`,
+    `reserveScopedBudgetLocked`, and
+    `runtime_fork_join.go:deferFrameForkLocked` retain one Execution aggregate
+    and one controlling structured-scope aggregate.
+  - `workflow_program.go:startWorkflowChildCall` and
+    `workflow_call_lifecycle.go:startCall` set `WorkflowNesting` only for
+    actual nested Workflow boundaries.
+  - `reserveMessageBudgetForOwnerLocked`,
+    `reserveEventBudgetForOwnerLocked`, `normal_session.go`,
+    `runtime.go:SignalExecution`, `coordination.go`, and `ports_runtime.go`
+    account Activities, signals, channel records, forwarded ports, staged
+    inputs, and output ports by semantic owner. Cost metering remains absent.
+
+##### `RT-BUDGET-003.a` Wake waiters when a counted slot becomes available
+
+- Status: Implemented.
+- Completion evidence:
+  - `persistLocked`, `wakeBudgetConcurrencyWaitersLocked`, and
+    `wakeResourceWaitersLocked` commit durable wakeups before the common
+    post-commit ready-work launch.
+
+##### `RT-BUDGET-003.b` Apply structured limits and semantic Workflow depth
+
+- Status: Implemented.
+- Completion evidence:
+  - `ExecutionBudgetScope`, `ProgramFrame.BudgetScopeID`,
+    `WorkItem.BudgetScopeID`, and `ProgramFrameIntent.BudgetScopeID` retain
+    controlling structured aggregate accounting while child frames retain
+    narrowed limits.
+
+##### `RT-BUDGET-003.d` Account retained Runtime records through their semantic owner
+
+- Status: Implemented.
+- Completion evidence:
+  - `Activity`, `ExecutionSignal`, and `ChannelMessage` retain semantic owner
+    identities. Owner-aware budget reservation is used for retained Runtime
+    records and provider usage is consumed even when a Model result has an
+    execution error.
+
+#### `RT-COMMAND-003` Replay accepted commands independently of regenerated preparation
+
+- Status: Implemented.
+- Completion evidence:
+  - `runtime_triggers.go:acceptTriggerEvent` fingerprints a caller-owned
+    identity before Runtime assigns `OccurredAt`.
+  - `runtime.go:FindCommandReceipt` and wrapper command identities return
+    prior receipts before attachment or Workflow preparation.
+
+#### `RT-RECOVERY-003` Resume recovered operations through their actual owners
+
+- Status: Implemented.
+- Completion evidence:
+  - `runtime.go:recoverLocked` recreates eligible pre-invocation waits from
+    retained semantic requests and creates owner-specific recovery reviews.
+  - `resolveRecoveryWaitLocked` and `settleRecoveredReviewWorkLocked` route
+    review decisions through original WorkItem owners, catch, finally,
+    reconciliation, compensation, and completion lifecycle.
+  - `Runtime.Restore` and `resumeRestoredWork` finish restore with one
+    committed Session-wide readiness pass.
+
+#### `RT-SETUP-003` Publish and release the composed backend Runtime safely
+
+- Status: Implemented.
+- Completion evidence:
+  - `cmd/agentgo/wrapper_sessionv3_bootstrap.go:InitComposedSessionV3Runtime`
+    closes a restored Runtime after final wrapper publication fails.
+  - `cmd/agentgo/wrapper_sessionv3_runtime.go:SessionV3Wrapper.close` retains
+    Runtime-before-Store shutdown order.
+
+#### `WF-PREPARE-003` Preserve complete prepared target meaning
+
+- Status: Implemented.
+- Completion evidence:
+  - `WorkflowPreparedInvocation` retains immutable Model, Agent, Workspace,
+    Text, Tool, Skill, MCP, Workspace prompt/context, contribution-order, and
+    owner-provenance facts.
+  - `program.go:startAgentLLM`, retry capture, started calls, handoff,
+    nested preparation, and recovery retain one immutable prepared invocation.
+  - `compiler_invocation.go` lowers typed expression-backed message and
+    instruction collections. `workflow_invocation.go:captureWorkflowLLMInvocation`
+    evaluates and freezes those collections at the logical call boundary.
+
+##### `WF-PREPARE-003.a` Retain immutable pins and prepared contribution facts
+
+- Status: Implemented.
+- Completion evidence:
+  - `WorkflowPreparedInvocation`, `applyPreparedWorkflowInvocation`, and
+    canonical origin-plan references preserve prepared target facts through
+    invoke, start, retry, handoff, nested Workflow preparation, Agent rounds,
+    and recovery.
+
+##### `WF-PREPARE-003.c` Transfer expression-backed typed invocation collections
+
+- Status: Implemented.
+- Completion evidence:
+  - `WorkflowLLMMessageSegment`, `WorkflowLLMInstructionSegment`,
+    `compileWorkflowLLMMessageSegment`,
+    `compileWorkflowLLMInstructionSegment`, and
+    `captureWorkflowLLMInvocation` retain typed role, text, attachment,
+    ordering, instruction, and defaults facts without generic JSON chat
+    fallback.
+
+##### `WF-PREPARE-003.d` Keep prepared target transport authoritative at bind time
+
+- Status: Implemented.
+- Completion evidence:
+  - `workflowruntime/target_transport.go` and
+    `workflowruntime/binder.go:requireExternalPortCapabilities` use the
+    prepared target contract for Service, Activity, final-output, stream,
+    context, and input-port behavior.
+
+#### `WF-RETRY-003` Preserve one captured logical call through retry and started execution
+
+- Status: Implemented.
+- Completion evidence:
+  - `workflow_ports.go:captureWorkflowCallPortInputs`,
+    `WorkflowCall.PortInputs`, `WorkItemIntent.PortInputs`,
+    `ProgramFrameIntent.PortInputs`, `workflow_retry.go`, and
+    `retry_program.go` capture actual port values and cursors before dispatch
+    or child materialization.
+  - `ports_runtime.go:portInputsLocked` respects captured inputs and does not
+    append later channel records on retry or recovery.
+
+##### `WF-RETRY-003.a` Capture the original evaluation boundary
+
+- Status: Implemented.
+- Completion evidence:
+  - Captured target, target-set membership, input, context, messages,
+    instructions, ports, key, policy, declaration path, and logical time are
+    retained in WorkItem and child ProgramFrame intent facts.
+
+##### `WF-RETRY-003.b` Apply complete retry selection and effect replay semantics
+
+- Status: Implemented.
+- Completion evidence:
+  - `effect_state.go:effectReplaySafe`,
+    `workflow_program.go:workflowCallEffect`, and retry boundaries allow
+    replay only for read, unconditional idempotent, target-native keyed, or
+    confirmed-not-applied work.
+
+##### `WF-RETRY-003.c` Preserve native Model and Agent failure classification
+
+- Status: Implemented.
+- Completion evidence:
+  - Model and Agent child settlement preserves `SanitizedError` category,
+    details, causes, receipt, and effect state through retry, catch, outcome,
+    projection, and completion boundaries.
+
+#### `WF-CHANNEL-003` Preserve invocation-local coordination and declaration-visible meaning
+
+- Status: Implemented.
+- Completion evidence:
+  - `namespaceWorkflowProgramChannels`,
+    `workflowDeclaredChannelName`, `EvaluationBoundary.Messages`, and captured
+    call snapshots preserve declared aliases and actual Execution visibility.
+  - `wakeEventWaitsLocked` captures originating subscription identity before
+    settlement and re-reads durable signal consumption before the next wait.
+
+##### `WF-CHANNEL-003.b` Capture each evaluation boundary
+
+- Status: Implemented.
+- Completion evidence:
+  - Workflow step, structured completion, root-output, retry, and started-call
+    boundaries use the actual invocation Execution and a durable authorized
+    channel snapshot.
+
+##### `WF-CHANNEL-003.c` Preserve inherited subscription identity
+
+- Status: Implemented.
+- Completion evidence:
+  - `WorkflowSubscriptionState.OwnerFrameID`,
+    `subscriptionConsumptionForWait`, and `wakeEventWaitsLocked` preserve one
+    consumption identity for each originating subscription owner.
+
+#### `WF-EFFECT-003` Preserve declaration effects and actual business-effect facts
+
+- Status: Implemented.
+- Completion evidence:
+  - `compileWorkflowEffect`, `workflowCallEffect`, `EffectContract.KeyedNative`,
+    `KeyedEffectCapability`, and `effectReplaySafe` distinguish unconditional
+    idempotence from target-native keyed deduplication.
+  - `workflowChildCallBoundary`,
+    `appendWorkflowCausalDependencies`, structured settlement, machine,
+    catch, finally, reconciliation, and Saga paths preserve causal facts.
+  - `workflow_saga.go` and `compensation.go:markCompensationIntentLocked`
+    persist complete compensation identities before compensation code consumes
+    completed-operation facts.
+
+##### `WF-EFFECT-003.c` Preserve compensation causality and operation facts
+
+- Status: Implemented.
+- Completion evidence:
+  - Compensation WorkItems retain original WorkItem, Attempt, frame, target,
+    receipt, effect, idempotency key, compensation WorkItem, and compensation
+    ProgramFrame identities before child materialization.
+
+##### `WF-EFFECT-003.d` Preserve target-owned effect and keying guarantees
+
+- Status: Implemented.
+- Completion evidence:
+  - Keyed replay requires a stable captured key and
+    `WorkflowNativeIdempotencyKeying`. Go Tool, MCP Tool, Skill Tool, Model,
+    and Agent grammars receive no generic Workflow metadata.
+
+#### `WF-CONTROL-003` Complete structured-control value and lifetime behavior
+
+- Status: Implemented.
+- Completion evidence:
+  - `WorkflowParallelProgress.CompletionSequence`,
+    `WorkflowForeachProgress.CompletionSequence`, and child completion order
+    retain actual settlement order for first-completed and first-success.
+  - Structured exits merge child state and causal facts before return, break,
+    continue, Workflow return, and Saga exit while preserving all outcomes.
+
+##### `WF-CONTROL-003.d` Preserve state and causality through structured exits
+
+- Status: Implemented.
+- Completion evidence:
+  - `settleSingleStructuredChild`, `settleRepeatChild`,
+    `settleMachineChild`, `settleSagaBodySuccess`, catch, and finally merge
+    state and causal frontiers before nonlocal control exits.
+
+#### `WF-OUTCOME-003` Preserve complete Workflow and conversation terminal meaning
+
+- Status: Implemented.
+- Completion evidence:
+  - `workflow_outcomes.go`, child completion, reconciliation, and
+    cross-Execution settlement preserve typed errors, categories, causes,
+    receipts, effects, outputs, aggregates, and declaration paths.
+  - `Attempt.LLMStream`, `PortStream.AttemptID`,
+    `appendInterruptedAssistantActivityLocked`, and projection logic keep
+    interrupted and replayed output separate by Attempt.
+
+##### `WF-OUTCOME-003.a` Record complete settled step facts
+
+- Status: Implemented.
+- Completion evidence:
+  - Ordinary, inline, child, reconciliation, cancellation, return, break,
+    continue, and recovery paths record the actual step and clear output for
+    terminal states that cannot carry output.
+
+##### `WF-OUTCOME-003.b` Persist interrupted assistant output truthfully
+
+- Status: Implemented.
+- Completion evidence:
+  - Failed, cancelled, and uncertain LLM Attempts append one Attempt-scoped
+    assistant Activity with actual terminal meaning. Replayed Attempts use
+    separate streams and port-record identities.
+
+#### `V3-REPLAY-003` Reconstruct private resources from the exact retained operation
+
+- Status: Implemented.
+- Completion evidence:
+  - `ModelDispatchPlan.ProviderInputs`, `FinalSystemPrompt`, and
+    `RuntimeConfiguration` retain exact provider inputs and final non-secret
+    configuration.
+  - `modelruntime.FinalizePreparedRuntimeConfiguration` retains final Model
+    configuration with a Store-validated credential binding only.
+  - `bindRecoveredLLM` reconstructs credentials, clients, and private Skill
+    state from immutable plan facts without current defaults, history,
+    contribution graphs, or later outcomes.
+
+##### `V3-REPLAY-003.a` Retain semantic LLM bindings
+
+- Status: Implemented.
+- Completion evidence:
+  - One canonical immutable dispatch plan retains provider inputs, Tool
+    choices, pins, prompt, configuration, protocol facts, attachments, App
+    context, and canonical generated-Tool origin references.
+
+##### `V3-REPLAY-003.b` Reproduce captured message order and configuration
+
+- Status: Implemented.
+- Completion evidence:
+  - Recovery decodes `ProviderInputs` directly and verifies the final prompt
+    from `RuntimeConfiguration`; it does not recompose current Session data.
+
+##### `V3-REPLAY-003.c` Separate interrupted and replayed streams
+
+- Status: Implemented.
+- Completion evidence:
+  - `Attempt.LLMStream`, `LLMStreamState.AttemptID`, and
+    Attempt-qualified port stream identities prevent replay from extending an
+    earlier interrupted Attempt stream.
+
+#### `V3-CONFIG-003` Complete inherited and explicit invocation configuration
+
+- Status: Implemented.
+- Completion evidence:
+  - `applySpecificCollections`, `llmExecutionPlan.applySpecificInstructionPolicy`,
+    `Instruction.Owner`, `Instruction.SourceKey`, and
+    `InstructionDispatchPlan.Owner` preserve policy precedence, explicit
+    removal, empty replacement, owner provenance, and ordering.
+
+##### `V3-CONFIG-003.b` Apply effective contribution precedence
+
+- Status: Implemented.
+- Completion evidence:
+  - Specific Session and invocation policies filter inherited Agent and
+    Workspace Text, instruction Skill, Tool, Skill, MCP, prompt, and context
+    effects before final request construction.
+
+##### `V3-CONFIG-003.c` Retain truthful ownership and ordering
+
+- Status: Implemented.
+- Completion evidence:
+  - The canonical Model dispatch plan retains effective owner and order facts
+    without copying complete effective collections into Agent or Workspace
+    records.
+
+#### `DOMAIN-SKILL-003` Reconstruct and release Skill resources for the exact owner
+
+- Status: Implemented.
+- Completion evidence:
+  - `V3Executor.Choices` and `EffectiveActiveSelectionsForFrame` use the exact
+    Execution and ProgramFrame owner key.
+  - `runtime_lifecycle.go:scheduleCommittedFrameClosuresLocked` starts private
+    frame cleanup only after the terminal ownership checkpoint commits.
+
+##### `DOMAIN-SKILL-003.a` Select applicable active Skill state
+
+- Status: Implemented.
+- Completion evidence:
+  - Active Skill lookup filters terminal lifecycle Tool results by exact frame,
+    enabled pins, and durable completion order.
+
+##### `DOMAIN-SKILL-003.b` Release Skill sessions on natural completion
+
+- Status: Implemented.
+- Completion evidence:
+  - Committed terminal frame lifecycle cleanup covers normal completion,
+    cancellation, deadline, panic, Fork, Join, cleanup expiry, and parent
+    terminal propagation.
+
+#### `V3-CONTINUE-003` Complete active-operation continuation and manual Tool ownership
+
+- Status: Implemented.
+- Completion evidence:
+  - `UpdateContinuationInput`, `ContinueExecution`,
+    `conversationMessageExecutionLocked`, and
+    `requestAgentContinuationLocked` route public and staged continuation to
+    one active semantic conversation owner, including handoff ownership.
+  - Existing consumed-result and current Tool-batch protections scope manual
+    Tool control and automation holds to the active operation.
+
+##### `V3-CONTINUE-003.a` Resume the active conversation operation
+
+- Status: Implemented.
+- Completion evidence:
+  - Staged continuation transfers exact defaults, budget, attachments, Tool
+    results, and approved App context to the active owner frame.
+
+##### `V3-CONTINUE-003.b` Scope manual controls to the current operation
+
+- Status: Implemented.
+- Completion evidence:
+  - Manual Tool mutation protects consumed results, current Tool-batch
+    ownership, and active conversation ownership.
+
+#### `ARC-DOMAIN-003` Complete owning-domain setup boundaries
+
+- Status: Implemented.
+- Completion evidence:
+  - `attachmentruntime.SessionV3Admitter` owns V3 attachment admission and
+    immutable snapshot construction.
+  - `modelruntime.FinalizePreparedRuntimeConfiguration` owns final effective
+    non-secret Model configuration capture.
+  - Workflow and Session setup compose neutral domain facts. Core Runtime
+    remains Artifact Store independent.
+
+##### `ARC-DOMAIN-003.a` Move contribution preparation to owning domains
+
+- Status: Implemented.
+- Completion evidence:
+  - Prepared Agent and Workspace invocation facts are neutral source-pinned
+    domain results consumed by Workflow lowering and Session dispatch.
+
+##### `ARC-DOMAIN-003.b` Move attachment and Model conversion to owning domains
+
+- Status: Implemented.
+- Completion evidence:
+  - Attachment setup owns snapshot admission. Model setup owns final
+    configuration materialization and private credential reconstruction.
+
+#### `DOMAIN-ATTACH-003` Preserve semantic attachment identity in native Model input
+
+- Status: Implemented.
+- Completion evidence:
+  - `attachmentruntime.SessionV3Admitter` preserves admitted labels and stable
+    directory-relative paths. `inputs.go:attachmentToContentItem` retains
+    text, image, and file labels without reopening source paths.
+
+##### `DOMAIN-ATTACH-003.a` Carry labels and directory-relative names
+
+- Status: Implemented.
+- Completion evidence:
+  - Text uses `attachmentTextForProvider`, images set `ImageName`, and files
+    set `FileName` from the immutable admitted label.
+
+#### `ARC-DUP-003` Remove replicated effective state and duplicated execution algorithms
+
+- Status: Implemented.
+- Completion evidence:
+  - `persistLocked` is the sole committed ready-work launcher.
+  - `runtime_lifecycle.go` is the shared Runtime terminal lifecycle.
+  - `ModelDispatchPlan` is the canonical immutable LLM plan and generated
+    Tool WorkItems retain canonical origin-plan references.
+
+##### `ARC-DUP-003.c` Consolidate Runtime algorithms and lowered-tree traversal
+
+- Status: Implemented.
+- Completion evidence:
+  - Shared lifecycle, captured evaluation, owner accounting, retry matching,
+    effect replay, channel forwarding, and scoped budget algorithms remain
+    Runtime-owned. Native request grammars remain in Model, Tool, MCP, Skill,
+    Service, Activity, Attachment, Agent, and Workspace domains.

@@ -149,6 +149,7 @@ func (r *Runtime) cancelFrameTreeLocked(
 	if workflowFrameRunsCleanup(*frame) {
 		return nil
 	}
+	frame.CancellationRequested = true
 
 	children := append([]ProgramFrameID(nil), frame.ChildFrameIDs...)
 	for _, childID := range children {
@@ -191,11 +192,9 @@ func (r *Runtime) cancelFrameTreeLocked(
 	if frame == nil || frame.Status.Terminal() {
 		return nil
 	}
-	return r.advanceFrameLocked(
+	return r.settlePendingFrameCancellationsLocked(
 		session,
 		execution,
-		frame.ID,
-		ProgramEvent{Kind: ProgramEventCancelled},
 	)
 }
 
@@ -364,8 +363,13 @@ func (r *Runtime) cancelIndependentExecutionLocked(
 			return
 		}
 	}
-	if hasDispatched(*execution) ||
-		hasOutstandingCleanup(*execution) {
+	if err := r.settlePendingFrameCancellationsLocked(
+		session,
+		execution,
+	); err != nil {
+		return
+	}
+	if !executionTerminalReadyLocked(session, *execution) {
 		r.touchExecutionLocked(session, execution)
 		return
 	}

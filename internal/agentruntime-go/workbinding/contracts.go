@@ -87,3 +87,16 @@ type PortCapabilities struct {
 type PortCapability interface {
 	WorkflowPortCapabilities() PortCapabilities
 }
+
+// KeyedEffectCapability is an explicit target-domain declaration. It means
+// that this binding has a native request mechanism for the stable key supplied
+// in Request.IdempotencyKey. Runtime never adds that key to another domain's
+// generic request grammar.
+type KeyedEffectCapability interface {
+	WorkflowNativeIdempotencyKeying() bool
+}
+
+func SupportsNativeIdempotencyKeying(value Binding) bool {
+	capability, found := value.(KeyedEffectCapability)
+	return found && capability.WorkflowNativeIdempotencyKeying()
+}

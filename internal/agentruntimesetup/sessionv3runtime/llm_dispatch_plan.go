@@ -6,6 +6,7 @@ import (
 
 	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
+	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
 
 func (b *Binder) durableLLMDispatchPlan(
@@ -13,6 +14,8 @@ func (b *Binder) durableLLMDispatchPlan(
 	plan llmExecutionPlan,
 	model sessionv3Runtime.ArtifactPin,
 	choices []preparedChoice,
+	inputs []inferenceSpec.InputUnion,
+	finalSystemPrompt string,
 	runtimeConfiguration jsonutil.CanonicalValue,
 ) (sessionv3Runtime.ModelDispatchPlan, error) {
 	output := sessionv3Runtime.ModelDispatchPlan{
@@ -23,7 +26,10 @@ func (b *Binder) durableLLMDispatchPlan(
 		Ports:                clonePlanPortValues(request.WorkItem.Ports),
 		PortInputs:           clonePlanPortInputs(request.WorkItem.PortInputs),
 		History:              plan.defaults.History,
+		FinalSystemPrompt:    finalSystemPrompt,
+		PreparationOwner:     string(sessionv3Runtime.ConfigurationOwnerModel),
 	}
+	output.ProviderInputs = canonicalProviderInputs(inputs)
 
 	if payload := request.WorkItem.Input.LLM; payload != nil {
 		overrides := sessionv3Runtime.EffectiveModelDefaultsOverride(
@@ -62,13 +68,15 @@ func (b *Binder) durableLLMDispatchPlan(
 		}
 	}
 
-	for _, instruction := range plan.systemInstructions {
+	for index, instruction := range plan.systemInstructions {
 		output.Instructions = append(
 			output.Instructions,
 			sessionv3Runtime.InstructionDispatchPlan{
 				ID:      instruction.ID,
 				Label:   instruction.Label,
 				Content: instruction.Content,
+				Owner:   instruction.Owner,
+				Order:   uint64(index),
 			},
 		)
 	}
@@ -211,6 +219,20 @@ func pinForSelection(
 		}
 	}
 	return sessionv3Runtime.ArtifactPin{}, false
+}
+
+func canonicalProviderInputs(
+	values []inferenceSpec.InputUnion,
+) []jsonutil.CanonicalValue {
+	output := make([]jsonutil.CanonicalValue, 0, len(values))
+	for index := range values {
+		raw, err := jsonutil.EncodeToJSONRaw(values[index])
+		if err != nil {
+			return nil
+		}
+		output = append(output, jsonutil.MustCanonicalValue(raw))
+	}
+	return output
 }
 
 func containsSelection(

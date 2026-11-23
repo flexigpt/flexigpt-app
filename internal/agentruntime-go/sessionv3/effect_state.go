@@ -157,10 +157,11 @@ func recordEffectSettlement(
 
 func effectReplaySafe(effect EffectContract) bool {
 	switch effect.Kind {
-	case EffectKindRead,
-		EffectKindIdempotent,
-		EffectKindKeyed:
+	case EffectKindRead, EffectKindIdempotent:
 		return true
+	case EffectKindKeyed:
+		return effect.KeyedNative &&
+			effect.IdempotencyKey != ""
 	default:
 		return false
 	}

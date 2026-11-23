@@ -74,10 +74,16 @@ func (e *V3Executor) Choices(
 	request sessionv3Runtime.WorkDispatchRequest,
 ) ([]toolruntime.V3PreparedChoice, error) {
 	owner := v3SkillOwnerKey(request, nil)
-	active, err := e.EffectiveActiveSelections(
+	defaults := request.Session.Defaults
+	if request.WorkItem.Input.LLM != nil &&
+		request.WorkItem.Input.LLM.InvocationDefaults != nil {
+		defaults = *request.WorkItem.Input.LLM.InvocationDefaults
+	}
+	active, err := e.EffectiveActiveSelectionsForFrame(
 		request.Execution,
-		request.Session.Defaults.Skills,
-		request.Session.Defaults.ActiveSkills,
+		owner.FrameID,
+		defaults.Skills,
+		defaults.ActiveSkills,
 	)
 	if err != nil {
 		return nil, err
@@ -86,7 +92,7 @@ func (e *V3Executor) Choices(
 		ctx,
 		owner.ExecutionID,
 		owner.FrameID,
-		request.Session.Defaults.Skills,
+		defaults.Skills,
 		active,
 	)
 	if err != nil {

@@ -19,6 +19,7 @@ type WorkflowSagaActiveCompensation struct {
 	EffectID   EffectRecordID                `json:"effectID"`
 	WorkItemID WorkItemID                    `json:"workItemID"`
 	ChildPath  string                        `json:"childPath,omitempty"`
+	FrameID    ProgramFrameID                `json:"frameID,omitempty"`
 	Phase      WorkflowSagaCompensationPhase `json:"phase"`
 }
 
@@ -273,11 +274,22 @@ func (i *WorkflowInterpreter) driveSaga(
 			)
 		}
 
+		frameID := ProgramFrameID(
+			string(frame.ID) + ":saga:" + string(effectID) + ":compensation-frame",
+		)
 		workID := WorkItemID(
 			string(frame.ID) + ":saga:" + string(effectID) + ":compensation",
 		)
-		record.State = CompensationStateDispatching
-		record.CompensationWorkItemID = workID
+		completed := record.Completed
+		completed.CompensationWorkItemID = workID
+		completed.CompensationFrameID = frameID
+		if err := completed.Validate(); err != nil {
+			return workflowFailure(
+				state,
+				"workflow_compensation_invalid",
+				err.Error(),
+			)
+		}
 		progress.Remaining = removeWorkflowSagaEffect(
 			progress.Remaining,
 			effectID,
@@ -287,6 +299,7 @@ func (i *WorkflowInterpreter) driveSaga(
 			WorkflowSagaActiveCompensation{
 				EffectID:   effectID,
 				WorkItemID: workID,
+				FrameID:    frameID,
 				Phase:      WorkflowSagaCompensationPhaseIntent,
 			},
 		)
@@ -300,9 +313,11 @@ func (i *WorkflowInterpreter) driveSaga(
 			Effect:      EffectContract{Kind: EffectKindRead},
 			Input: WorkItemPayload{
 				Compensation: &CompensationWork{
-					OriginalWorkItemID: record.OriginalWorkItemID,
-					EffectID:           effectID,
-					Input:              jsonutil.MustCanonicalValue(record.Completed),
+					OriginalWorkItemID:  record.OriginalWorkItemID,
+					EffectID:            effectID,
+					CompensationFrameID: frameID,
+					Input:               jsonutil.MustCanonicalValue(completed),
+					Completed:           jsonutil.MustCanonicalValue(completed),
 				},
 			},
 		})
@@ -504,8 +519,7 @@ func (i *WorkflowInterpreter) settleSagaWork(
 			"workflow compensation block is unavailable",
 		)
 	}
-
-	completed := jsonutil.MustCanonicalValue(record.Completed)
+	completed := item.Input.Compensation.Completed.Clone()
 	scope := WorkflowScopeContext{
 		Completed: &completed,
 		Cleanup:   true,
@@ -531,6 +545,7 @@ func (i *WorkflowInterpreter) settleSagaWork(
 	t, err := workflowStructuredTransition(
 		state,
 		[]ProgramFrameIntent{{
+			ID:              active.FrameID,
 			Path:            childPath,
 			DeclarationPath: firstText(record.Compensation.DeclarationPath, state.PendingDeclarationPath),
 			Program:         snapshot,

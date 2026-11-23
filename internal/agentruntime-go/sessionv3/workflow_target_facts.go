@@ -3,6 +3,7 @@ package sessionv3
 import (
 	"errors"
 	"slices"
+	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
@@ -85,6 +86,11 @@ type WorkflowPreparedInvocation struct {
 	Tools                    []WorkflowPreparedTool  `json:"tools,omitempty"`
 	Skills                   []WorkflowPreparedSkill `json:"skills,omitempty"`
 	MCP                      []WorkflowPreparedMCP   `json:"mcp,omitempty"`
+	WorkspaceInstructions    []Instruction           `json:"workspaceInstructions,omitempty"`
+	WorkspaceContext         []string                `json:"workspaceContext,omitempty"`
+	ContributionOrder        []string                `json:"contributionOrder,omitempty"`
+	WorkspacePromptPrepared  bool                    `json:"workspacePromptPrepared,omitempty"`
+	OwnerProvenance          string                  `json:"ownerProvenance,omitempty"`
 }
 
 // LLMToolOrigin preserves immutable invocation facts for Tool WorkItems that
@@ -248,6 +254,11 @@ func (v WorkflowPreparedInvocation) Validate() error {
 				return errors.New("prepared workflow invocation contribution is duplicated")
 			}
 			seen[key] = struct{}{}
+		}
+	}
+	for _, instruction := range v.WorkspaceInstructions {
+		if strings.TrimSpace(instruction.Content) == "" {
+			return errors.New("prepared workflow workspace instruction is empty")
 		}
 	}
 	return nil

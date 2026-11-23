@@ -56,6 +56,7 @@ func (r *Runtime) prepareRetryLocked(
 	item.State = WorkItemStateRetryWaiting
 	item.Output = nil
 	item.LLMStream = nil
+	item.PortStreams = nil
 	item.EffectState = EffectStateNotStarted
 	item.CompletedAt = nil
 	item.RetryState = &RetryState{

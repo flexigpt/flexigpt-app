@@ -165,6 +165,15 @@ func (b *Binder) bindLLM(
 		)
 	}
 
+	configuration, finalRuntimeConfiguration, err := b.deps.Models.
+		FinalizePreparedRuntimeConfiguration(
+			modelUse.PreparedRuntimeConfiguration,
+			resolved,
+		)
+	if err != nil {
+		return sessionv3Runtime.BindResult{}, err
+	}
+
 	choices, bindings, preparedChoices, err := b.toolChoices(
 		ctx,
 		req,
@@ -200,12 +209,12 @@ func (b *Binder) bindLLM(
 		artifacts = append(artifacts, modelPin)
 	}
 
-	configuration := resolved
 	configuration.ProviderParam.DefaultHeaders = maps.Clone(
-		resolved.ProviderParam.DefaultHeaders,
+		configuration.ProviderParam.DefaultHeaders,
 	)
-	configuration.CapabilityOverrides = slices.Clone(
-		resolved.CapabilityOverrides,
+	configuration.CapabilityOverrides = slices.Clone(configuration.CapabilityOverrides)
+	configuration.ProviderParam.DefaultHeaders = maps.Clone(
+		configuration.ProviderParam.DefaultHeaders,
 	)
 	semantic := sessionv3Runtime.SemanticBinding{
 		Version:           "v3-llm/v1",
@@ -218,7 +227,9 @@ func (b *Binder) bindLLM(
 		plan,
 		modelPin,
 		preparedChoices,
-		modelUse.PreparedRuntimeConfiguration,
+		inputs,
+		configuration.ModelParam.SystemPrompt,
+		finalRuntimeConfiguration,
 	)
 	if err != nil {
 		return sessionv3Runtime.BindResult{}, err

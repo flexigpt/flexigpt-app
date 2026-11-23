@@ -291,41 +291,46 @@ type WorkflowChild struct {
 	Result                  *WorkflowBlockResult `json:"result,omitempty"`
 	Error                   *SanitizedError      `json:"error,omitempty"`
 	CausalEffectWorkItemIDs []WorkItemID         `json:"causalEffectWorkItemIDs,omitempty"`
+	CompletedOrder          uint64               `json:"completedOrder,omitempty"`
 }
 
 type WorkflowNamedOutcome struct {
-	Name   string                  `json:"name"`
-	State  WorkflowChildState      `json:"state"`
-	Output jsonutil.CanonicalValue `json:"output,omitempty"`
-	Error  *SanitizedError         `json:"error,omitempty"`
+	Name               string                  `json:"name"`
+	State              WorkflowChildState      `json:"state"`
+	Output             jsonutil.CanonicalValue `json:"output,omitempty"`
+	Error              *SanitizedError         `json:"error,omitempty"`
+	CompletionSequence uint64                  `json:"completionSequence,omitempty"`
 }
 
 type WorkflowParallelProgress struct {
-	Completion WorkflowCompletion `json:"completion"`
-	Errors     string             `json:"errors,omitempty"`
-	Remaining  string             `json:"remaining,omitempty"`
-	Winners    []string           `json:"winners,omitempty"`
-	Cancelling bool               `json:"cancelling,omitempty"`
+	Completion         WorkflowCompletion `json:"completion"`
+	Errors             string             `json:"errors,omitempty"`
+	Remaining          string             `json:"remaining,omitempty"`
+	Winners            []string           `json:"winners,omitempty"`
+	Cancelling         bool               `json:"cancelling,omitempty"`
+	CompletionSequence uint64             `json:"completionSequence,omitempty"`
 }
 
 type WorkflowItemOutcome struct {
-	Index  int                     `json:"index"`
-	State  WorkflowChildState      `json:"state"`
-	Output jsonutil.CanonicalValue `json:"output,omitempty"`
-	Error  *SanitizedError         `json:"error,omitempty"`
+	Index          int                     `json:"index"`
+	State          WorkflowChildState      `json:"state"`
+	Output         jsonutil.CanonicalValue `json:"output,omitempty"`
+	Error          *SanitizedError         `json:"error,omitempty"`
+	CompletedOrder uint64                  `json:"completedOrder,omitempty"`
 }
 
 type WorkflowForeachProgress struct {
-	Items       []jsonutil.CanonicalValue `json:"items"`
-	Outcomes    []WorkflowItemOutcome     `json:"outcomes"`
-	Next        int                       `json:"next"`
-	Concurrency int                       `json:"concurrency"`
-	Completion  WorkflowCompletion        `json:"completion"`
-	Errors      string                    `json:"errors,omitempty"`
-	Remaining   string                    `json:"remaining,omitempty"`
-	Merge       *WorkflowParentStateMerge `json:"merge,omitempty"`
-	Winners     []int                     `json:"winners,omitempty"`
-	Cancelling  bool                      `json:"cancelling,omitempty"`
+	Items              []jsonutil.CanonicalValue `json:"items"`
+	Outcomes           []WorkflowItemOutcome     `json:"outcomes"`
+	Next               int                       `json:"next"`
+	Concurrency        int                       `json:"concurrency"`
+	Completion         WorkflowCompletion        `json:"completion"`
+	Errors             string                    `json:"errors,omitempty"`
+	Remaining          string                    `json:"remaining,omitempty"`
+	Merge              *WorkflowParentStateMerge `json:"merge,omitempty"`
+	Winners            []int                     `json:"winners,omitempty"`
+	Cancelling         bool                      `json:"cancelling,omitempty"`
+	CompletionSequence uint64                    `json:"completionSequence,omitempty"`
 }
 
 type WorkflowRepeatProgress struct {
@@ -1504,10 +1509,20 @@ func (i *WorkflowInterpreter) settleStructuredChild(
 		child.Result = &result
 		child.State = WorkflowChildStateSucceeded
 	}
+	switch state.Pending.Kind {
+	case WorkflowPendingParallel:
+		state.Pending.Parallel.CompletionSequence++
+		child.CompletedOrder = state.Pending.Parallel.CompletionSequence
+	case WorkflowPendingForeach:
+		state.Pending.Foreach.CompletionSequence++
+		child.CompletedOrder = state.Pending.Foreach.CompletionSequence
+	default:
+	}
 
 	if state.Pending.Kind == WorkflowPendingParallel &&
 		state.Pending.Parallel != nil {
 		progress := state.Pending.Parallel
+		mode := workflowCompletionMode(progress.Completion)
 		switch workflowCompletionMode(progress.Completion) {
 		case firstCompletedStr:
 			if len(progress.Winners) == 0 {
@@ -1515,6 +1530,7 @@ func (i *WorkflowInterpreter) settleStructuredChild(
 			}
 		case firstSuccessStr, quorumStr:
 			if workflowParallelSucceeded(*child) &&
+				(mode != firstSuccessStr || len(progress.Winners) == 0) &&
 				!slices.Contains(progress.Winners, child.Name) {
 				progress.Winners = append(progress.Winners, child.Name)
 			}
@@ -1575,6 +1591,13 @@ func (i *WorkflowInterpreter) settleSingleStructuredChild(
 	}
 
 	result := *child.Result
+	setWorkflowCausalEffectWorkItemIDs(state, mergeWorkflowCausalEffectWorkItemIDs(
+		workflowCausalEffectWorkItemIDs(*state),
+		child.CausalEffectWorkItemIDs,
+	))
+	if pending.MergeState {
+		state.State = result.State.Clone()
+	}
 	switch result.Exit {
 	case WorkflowExitReturnWorkflow,
 		WorkflowExitBreak,
@@ -1593,13 +1616,6 @@ func (i *WorkflowInterpreter) settleSingleStructuredChild(
 	if err != nil {
 		return err
 	}
-	if pending.MergeState {
-		state.State = result.State.Clone()
-	}
-	setWorkflowCausalEffectWorkItemIDs(state, mergeWorkflowCausalEffectWorkItemIDs(
-		workflowCausalEffectWorkItemIDs(*state),
-		child.CausalEffectWorkItemIDs,
-	))
 	if err := i.validateStepOutput(program, *state, step, result.Value); err != nil {
 		return err
 	}
@@ -1995,6 +2011,28 @@ func workflowForeachHasFailure(
 	return false
 }
 
+func compareWorkflowItemCompletionOrder(
+	left WorkflowItemOutcome,
+	right WorkflowItemOutcome,
+) int {
+	switch {
+	case left.CompletedOrder == 0 && right.CompletedOrder != 0:
+		return 1
+	case left.CompletedOrder != 0 && right.CompletedOrder == 0:
+		return -1
+	case left.CompletedOrder < right.CompletedOrder:
+		return -1
+	case left.CompletedOrder > right.CompletedOrder:
+		return 1
+	case left.Index < right.Index:
+		return -1
+	case left.Index > right.Index:
+		return 1
+	default:
+		return 0
+	}
+}
+
 func (i *WorkflowInterpreter) settleForeachChild(
 	frame ProgramFrame,
 	state *WorkflowState,
@@ -2028,12 +2066,15 @@ func (i *WorkflowInterpreter) settleForeachChild(
 			copyValue.Causes = append([]SanitizedError(nil), child.Error.Causes...)
 			outcome.Error = &copyValue
 		}
+		outcome.CompletedOrder = child.CompletedOrder
 	}
 
 	switch workflowCompletionMode(progress.Completion) {
 	case firstCompletedStr:
 		if len(progress.Winners) == 0 {
-			for _, outcome := range progress.Outcomes {
+			outcomes := append([]WorkflowItemOutcome(nil), progress.Outcomes...)
+			slices.SortFunc(outcomes, compareWorkflowItemCompletionOrder)
+			for _, outcome := range outcomes {
 				if outcome.State.terminal() {
 					progress.Winners = []int{outcome.Index}
 					break
@@ -2041,12 +2082,17 @@ func (i *WorkflowInterpreter) settleForeachChild(
 			}
 		}
 	case firstSuccessStr, quorumStr:
-		for _, outcome := range progress.Outcomes {
+		outcomes := append([]WorkflowItemOutcome(nil), progress.Outcomes...)
+		slices.SortFunc(outcomes, compareWorkflowItemCompletionOrder)
+		for _, outcome := range outcomes {
 			if outcome.State != WorkflowChildStateSucceeded ||
 				slices.Contains(progress.Winners, outcome.Index) {
 				continue
 			}
 			progress.Winners = append(progress.Winners, outcome.Index)
+			if workflowCompletionMode(progress.Completion) == firstSuccessStr {
+				break
+			}
 		}
 	}
 

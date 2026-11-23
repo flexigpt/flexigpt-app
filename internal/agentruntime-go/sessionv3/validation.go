@@ -675,10 +675,6 @@ func (e Execution) Validate(sessionID SessionID) error {
 	if err := e.Cleanup.Validate(); err != nil {
 		return err
 	}
-	if e.Cleanup.Deadline != nil && e.Deadline != nil &&
-		e.Cleanup.Deadline.Before(*e.Deadline) {
-		return errors.New("execution cleanup deadline is invalid")
-	}
 	if e.Trigger != nil {
 		if err := e.Trigger.Validate(); err != nil {
 			return err
@@ -723,7 +719,8 @@ func (e Execution) Validate(sessionID SessionID) error {
 	}
 	waits := make(map[WaitID]struct{}, len(e.Waits))
 	for _, wait := range e.Waits {
-		if _, found := items[wait.WorkItemID]; !found && wait.WorkItemID != "recovery" {
+		if _, found := items[wait.WorkItemID]; !found &&
+			wait.WorkItemID != recoveryReviewWorkItemID {
 			return fmt.Errorf("wait %q has no work item", wait.ID)
 		}
 		if err := wait.Validate(); err != nil {
@@ -1072,12 +1069,18 @@ func (e EffectContract) Validate() error {
 	default:
 		return fmt.Errorf("unsupported effect kind %q", e.Kind)
 	}
-	if e.Kind == EffectKindKeyed &&
-		strings.TrimSpace(e.IdempotencyKey) == "" {
-		return errors.New("keyed work item has no idempotency key")
-	}
-	if e.Kind != EffectKindKeyed && e.IdempotencyKey != "" {
-		return errors.New("non-keyed work item has an idempotency key")
+	switch e.Kind {
+	case EffectKindKeyed:
+		if strings.TrimSpace(e.IdempotencyKey) == "" {
+			return errors.New("keyed work item has no idempotency key")
+		}
+		if !e.KeyedNative {
+			return errors.New("keyed work item has no target-native keying capability")
+		}
+	default:
+		if e.IdempotencyKey != "" || e.KeyedNative {
+			return errors.New("non-keyed work item has keying facts")
+		}
 	}
 	return nil
 }
@@ -1422,7 +1425,9 @@ func (p WorkItemPayload) Validate(kind WorkItemType) error {
 	case WorkItemTypeCompensation:
 		if p.Compensation.OriginalWorkItemID == "" ||
 			p.Compensation.EffectID == "" ||
-			!p.Compensation.Input.Valid() {
+			p.Compensation.CompensationFrameID == "" ||
+			!p.Compensation.Input.Valid() ||
+			!p.Compensation.Completed.Valid() {
 			return errors.New("invalid compensation WorkItem")
 		}
 	case WorkItemTypeReconciliation:
@@ -1677,6 +1682,10 @@ func (a Attempt) Validate() error {
 	}
 	if err := a.EffectState.Validate(); err != nil {
 		return err
+	}
+	if a.LLMStream != nil && a.LLMStream.AttemptID != "" &&
+		a.LLMStream.AttemptID != a.ID {
+		return errors.New("attempt stream belongs to another attempt")
 	}
 	return nil
 }

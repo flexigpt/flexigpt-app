@@ -46,6 +46,22 @@ func (b *Binder) applyPreparedWorkflowInvocation(
 	}
 	plan.agentModelIncludeSystemPrompt = cloneBool(value.IncludeModelSystemPrompt)
 
+	for _, instruction := range value.WorkspaceInstructions {
+		instruction.Owner = sessionv3Runtime.ConfigurationOwnerWorkspace
+		if instruction.SourceKey == "" {
+			instruction.SourceKey = "prepared-workspace:" + instruction.ID
+		}
+		plan.addInstruction(instruction)
+	}
+	for _, contextValue := range value.WorkspaceContext {
+		plan.addContext(contextValue)
+	}
+	if value.Workspace != nil && !value.WorkspacePromptPrepared {
+		return errors.New(
+			"prepared workflow workspace has no immutable prompt and context facts",
+		)
+	}
+
 	for _, prepared := range value.Texts {
 		selection := selectionForPreparedPin(prepared.Artifact)
 		if err := plan.addArtifact(prepared.Artifact); err != nil {

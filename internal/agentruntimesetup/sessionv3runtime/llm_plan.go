@@ -29,6 +29,25 @@ type llmExecutionPlan struct {
 	agentModelIncludeSystemPrompt *bool
 }
 
+func (p *llmExecutionPlan) applySpecificInstructionPolicy(
+	policy sessionv3Runtime.CollectionPolicy,
+) {
+	removed := removedCollectionKeys(policy)
+	filtered := p.systemInstructions[:0]
+	for _, instruction := range p.systemInstructions {
+		if collectionMode(policy) == sessionv3Runtime.CollectionOverrideReplace &&
+			(instruction.Owner == sessionv3Runtime.ConfigurationOwnerAgent ||
+				instruction.Owner == sessionv3Runtime.ConfigurationOwnerWorkspace) {
+			continue
+		}
+		if _, removedValue := removed[instruction.SourceKey]; removedValue {
+			continue
+		}
+		filtered = append(filtered, instruction)
+	}
+	p.systemInstructions = filtered
+}
+
 func (b *Binder) prepareLLMPlan(
 	ctx context.Context,
 	request sessionv3Runtime.WorkDispatchRequest,
@@ -102,7 +121,12 @@ func (b *Binder) prepareLLMPlan(
 		}
 	}
 	applySpecificCollections(&plan.defaults, specificCollections)
+	plan.applySpecificInstructionPolicy(
+		specificCollections.CollectionPolicies.SystemInstructions,
+	)
 	for _, instruction := range plan.defaults.SystemInstructions {
+		instruction.Owner = sessionv3Runtime.ConfigurationOwnerSession
+		instruction.SourceKey = instructionKey(instruction)
 		plan.addInstruction(instruction)
 	}
 	plan.defaults.MCP, err = normalizeMCPSelections(plan.defaults.MCP)
@@ -483,8 +507,10 @@ func (b *Binder) appendAgentTextInstruction(
 			ID: "agent-text:" +
 				selection.RootID + ":" +
 				selection.ArtifactID,
-			Label:   contribution.Label,
-			Content: contribution.Dispatch.Content,
+			Label:     contribution.Label,
+			Content:   contribution.Dispatch.Content,
+			Owner:     sessionv3Runtime.ConfigurationOwnerAgent,
+			SourceKey: selection.RootID + "\x00" + selection.ArtifactID,
 		})
 		return nil
 
@@ -587,8 +613,10 @@ func (b *Binder) applyInstructionArtifacts(
 			ID: "session-text:" +
 				selection.RootID + ":" +
 				selection.ArtifactID,
-			Label:   contribution.Label,
-			Content: contribution.Dispatch.Content,
+			Label:     contribution.Label,
+			Content:   contribution.Dispatch.Content,
+			Owner:     sessionv3Runtime.ConfigurationOwnerSession,
+			SourceKey: selection.RootID + "\x00" + selection.ArtifactID,
 		})
 	}
 	return nil
@@ -719,9 +747,11 @@ func (b *Binder) applyWorkspacePlan(
 	}
 
 	plan.addInstruction(sessionv3Runtime.Instruction{
-		ID:      "workspace:" + selection.RootID + ":" + selection.ArtifactID,
-		Label:   selection.ArtifactID,
-		Content: runtimePlan.Prompt.Instructions,
+		ID:        "workspace:" + selection.RootID + ":" + selection.ArtifactID,
+		Label:     selection.ArtifactID,
+		Content:   runtimePlan.Prompt.Instructions,
+		Owner:     sessionv3Runtime.ConfigurationOwnerWorkspace,
+		SourceKey: selection.RootID + "\x00" + selection.ArtifactID,
 	})
 	plan.addContext(runtimePlan.Prompt.UserMessage)
 
@@ -1102,6 +1132,10 @@ func (p *llmExecutionPlan) addArtifact(
 func (p *llmExecutionPlan) addInstruction(
 	instruction sessionv3Runtime.Instruction,
 ) {
+	if instruction.Owner == "" {
+		instruction.Owner = sessionv3Runtime.ConfigurationOwnerSession
+	}
+	instruction.SourceKey = firstText(instruction.SourceKey, instructionKey(instruction))
 	instruction.Content = strings.TrimSpace(instruction.Content)
 	if instruction.Content == "" {
 		return
@@ -1111,7 +1145,7 @@ func (p *llmExecutionPlan) addInstruction(
 			instruction.ID == current.ID {
 			return
 		}
-		if instruction.Content == current.Content {
+		if instruction.SourceKey == current.SourceKey {
 			return
 		}
 	}

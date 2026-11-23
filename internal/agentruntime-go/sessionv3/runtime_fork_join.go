@@ -82,7 +82,36 @@ func (r *Runtime) deferFrameForkLocked(
 		}
 	}
 
+	scopeID := ""
+	var scopeBudget *ExecutionBudget
+	for _, intent := range prepared {
+		if intent.Budget == nil {
+			continue
+		}
+		if scopeBudget == nil {
+			value := cloneExecutionBudget(*intent.Budget)
+			scopeBudget = &value
+			continue
+		}
+		value, err := narrowExecutionBudget(*scopeBudget, *intent.Budget)
+		if err != nil {
+			return err
+		}
+		scopeBudget = &value
+	}
+
 	workID := WorkItemID(r.newID())
+	if scopeBudget != nil {
+		scopeID = "scope:" + string(workID)
+		execution.BudgetScopes = append(execution.BudgetScopes, ExecutionBudgetScope{
+			ID:           scopeID,
+			OwnerFrameID: frame.ID,
+			Budget:       *scopeBudget,
+		})
+		for index := range prepared {
+			prepared[index].BudgetScopeID = scopeID
+		}
+	}
 	now := r.now()
 	work := WorkItem{
 		ID:                     workID,
@@ -95,6 +124,7 @@ func (r *Runtime) deferFrameForkLocked(
 		Dependencies:           append([]WorkItemID(nil), dependencies...),
 		Effect:                 EffectContract{Kind: EffectKindRead},
 		Automatic:              true,
+		BudgetScopeID:          scopeID,
 		Cleanup:                cleanup,
 		RetainClaimsForFrame:   len(forkClaims) != 0,
 		RetainClaimsForFrameID: claimOwner,
@@ -126,6 +156,7 @@ func cloneForkIntent(value ProgramFrameIntent) (ProgramFrameIntent, error) {
 	output.Program.Payload = value.Program.Payload.Clone()
 	output.Evaluation = cloneEvaluationBoundary(value.Evaluation)
 	output.Budget = cloneBudget(value.Budget)
+	output.PortInputs = clonePortInputs(value.PortInputs)
 	output.Claims = append([]ResourceClaim(nil), value.Claims...)
 	if value.Program.Artifact != nil {
 		pin := *value.Program.Artifact
@@ -350,7 +381,9 @@ func (r *Runtime) materializeForkFramesLocked(
 			Usage:           ExecutionBudgetUsage{},
 			Evaluation:      cloneEvaluationBoundary(intent.Evaluation),
 			Budget:          cloneBudget(&childBudget),
+			BudgetScopeID:   intent.BudgetScopeID,
 			Ports:           ports,
+			PortInputs:      clonePortInputs(intent.PortInputs),
 			PortDelivery:    intent.PortDelivery,
 		}
 		execution.ProgramFrames = append(execution.ProgramFrames, child)

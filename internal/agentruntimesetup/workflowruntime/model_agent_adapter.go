@@ -347,6 +347,13 @@ func (a *ModelAgentInvocationAdapter) appendWorkspaceInvocationForPin(
 	if err != nil {
 		return err
 	}
+	if output.Workspace == nil {
+		value := pin
+		output.Workspace = &value
+	}
+	output.WorkspacePromptPrepared = true
+	output.OwnerProvenance = "agent-workspace-prepared"
+	output.ContributionOrder = append(output.ContributionOrder, "workspace:"+pin.ArtifactID)
 	return a.appendWorkspaceInvocationCapabilities(
 		ctx,
 		output,
@@ -385,13 +392,18 @@ func (a *ModelAgentInvocationAdapter) appendWorkspaceInvocationCapabilities(
 		}
 
 		switch occurrence.Type {
+		case declaration.TypeText:
+			appendPreparedWorkflowText(output, pin)
+			output.ContributionOrder = append(
+				output.ContributionOrder,
+				"text:"+pin.ArtifactID,
+			)
+
 		case declaration.TypeModel:
 			if output.Model == nil {
 				value := pin
 				output.Model = &value
 			}
-		case declaration.TypeText:
-			appendPreparedWorkflowText(output, pin)
 		case declaration.TypeTool:
 			appendPreparedWorkflowTool(output, pin, nil)
 		case declaration.TypeSkill:

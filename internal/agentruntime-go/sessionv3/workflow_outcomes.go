@@ -93,6 +93,12 @@ func (s *WorkflowState) recordTerminalOutcome(
 		}
 		return nil
 	}
+	if outcome.Status == WorkflowStepOutcomeCancelled {
+		outcome.Output = nil
+	}
+	if outcome.Status == WorkflowStepOutcomeFailed || outcome.Status == WorkflowStepOutcomeUncertain {
+		outcome.Output = nil
+	}
 	s.Outcomes = append(s.Outcomes, cloneWorkflowStepOutcome(outcome))
 	return nil
 }

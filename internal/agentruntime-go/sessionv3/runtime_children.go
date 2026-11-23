@@ -319,6 +319,7 @@ func (r *Runtime) createIndependentChildExecutionLocked(
 			Evaluation:      cloneEvaluationBoundary(intent.Evaluation),
 			HandoffID:       handoffID,
 			Ports:           ports,
+			PortInputs:      clonePortInputs(intent.PortInputs),
 			PortDelivery:    intent.PortDelivery,
 		}},
 		WorkItems:      []WorkItem{},
@@ -613,8 +614,19 @@ func (r *Runtime) wakeCompletionExecutionWaitsLocked(
 		if waiter == nil {
 			continue
 		}
-		for index := range waiter.Waits {
-			wait := &waiter.Waits[index]
+		waitIDs := make([]WaitID, 0, len(waiter.Waits))
+		for _, wait := range waiter.Waits {
+			waitIDs = append(waitIDs, wait.ID)
+		}
+		for _, waitID := range waitIDs {
+			waiter = mutableSessionExecution(session, waiterID)
+			if waiter == nil {
+				break
+			}
+			wait := mutableWait(waiter, waitID)
+			if wait == nil {
+				continue
+			}
 			if wait.Status != WaitStatusPending ||
 				wait.Request.Kind != WaitKindChild ||
 				wait.Request.Completion == nil ||
@@ -637,6 +649,10 @@ func (r *Runtime) wakeCompletionExecutionWaitsLocked(
 				errorValue,
 				confirmed,
 			)
+			waiter = mutableSessionExecution(session, waiterID)
+			if waiter == nil {
+				break
+			}
 		}
 	}
 }

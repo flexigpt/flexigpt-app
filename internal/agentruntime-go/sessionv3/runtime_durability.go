@@ -68,6 +68,9 @@ func (r *Runtime) resumeRestoredWork(ctx context.Context) {
 	if r.closed {
 		return
 	}
+	// Restore runs under Runtime.restoring. Every mutation persists, but this
+	// function intentionally performs no per-Execution launch. Restore emits
+	// one committed Session-wide readiness wave after all Sessions are stable.
 	for _, session := range r.sessions {
 		if r.checkpointPending[session.ID] {
 			continue
@@ -199,7 +202,6 @@ func (r *Runtime) resumeRestoredWork(ctx context.Context) {
 				execution.ID,
 				*execution,
 			)
-			r.launchWork(ctx, session.ID, execution.ID, r.readyWorkLocked(*execution))
 		}
 	}
 }
@@ -500,6 +502,9 @@ func (r *Runtime) settleUndispatchedWorkLocked(
 	if execution == nil {
 		return nil
 	}
+	if err := r.settlePendingFrameCancellationsLocked(session, execution); err != nil {
+		return nil
+	}
 	r.resumeSagaCompensationFramesLocked(session, execution)
 
 	execution = mutableSessionExecution(session, executionID)
@@ -509,6 +514,10 @@ func (r *Runtime) settleUndispatchedWorkLocked(
 	r.refreshExecutionStateLocked(execution)
 	r.settleTerminalExecutionLocked(session, execution)
 
+	execution = mutableSessionExecution(session, executionID)
+	if execution == nil {
+		return nil
+	}
 	execution = mutableSessionExecution(session, executionID)
 	if execution == nil {
 		return nil
