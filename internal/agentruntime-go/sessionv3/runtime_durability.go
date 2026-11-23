@@ -319,7 +319,6 @@ func (r *Runtime) settleTimerLocked(
 		return true
 	}
 	r.publishLocked(ctx, session, execution.ID, RuntimeEventWaitChanged)
-	r.launchWork(ctx, session.ID, execution.ID, r.readyWorkLocked(*execution))
 	return true
 }
 
@@ -390,7 +389,6 @@ func (r *Runtime) settleUnstartedAttemptLocked(
 		return
 	}
 	r.publishLocked(ctx, session, execution.ID, RuntimeEventWorkChanged)
-	r.launchWork(ctx, session.ID, execution.ID, r.readyWorkLocked(*execution))
 }
 
 // settleUndispatchedWorkLocked settles work that has not crossed the native

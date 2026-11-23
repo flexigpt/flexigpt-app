@@ -137,13 +137,53 @@ func (r *Runtime) reserveScopedBudgetLocked(
 	frameID ProgramFrameID,
 	requests ...budgetMetricRequest,
 ) error {
+	return r.reserveScopedBudgetForOwnerLocked(
+		execution,
+		item,
+		frameID,
+		"",
+		requests...,
+	)
+}
+
+// reserveScopedBudgetForOwnerLocked applies the one scoped-accounting
+// algorithm to a durable semantic record owner. A record can be owned by a
+// WorkItem, a ProgramFrame, or a persisted forwarding fact that records both
+// identities. The scope identity is explicit for cross-Execution forwarding,
+// where a source WorkItem cannot exist in the receiving Execution.
+func (r *Runtime) reserveScopedBudgetForOwnerLocked(
+	execution *Execution,
+	item *WorkItem,
+	frameID ProgramFrameID,
+	budgetScopeID string,
+	requests ...budgetMetricRequest,
+) error {
 	if execution == nil {
 		return errors.New("execution budget owner is unavailable")
 	}
 
 	var scope *ExecutionBudgetScope
 	if item != nil && item.BudgetScopeID != "" {
-		scope = mutableBudgetScope(execution, item.BudgetScopeID)
+		if budgetScopeID != "" &&
+			budgetScopeID != item.BudgetScopeID {
+			return errors.New(
+				"budget record scope differs from its work item owner",
+			)
+		}
+		budgetScopeID = item.BudgetScopeID
+	}
+	if budgetScopeID == "" && frameID != "" {
+		frame := mutableFrame(execution, frameID)
+		if frame == nil {
+			return errors.New("budget record frame owner is unavailable")
+		}
+		budgetScopeID = frame.BudgetScopeID
+	}
+	if budgetScopeID != "" {
+		scope = mutableBudgetScope(execution, budgetScopeID)
+		if scope == nil {
+			return errors.New("budget record scope owner is unavailable")
+		}
 	}
 
 	counters := make([]budgetCounter, 0, len(requests)*4)
@@ -242,17 +282,42 @@ func (r *Runtime) reserveMessageBudgetForOwnerLocked(
 	frameID ProgramFrameID,
 	bytes int,
 ) error {
+	return r.reserveMessageBudgetForSemanticOwnerLocked(
+		execution,
+		workItemID,
+		frameID,
+		"",
+		bytes,
+	)
+}
+
+func (r *Runtime) reserveMessageBudgetForSemanticOwnerLocked(
+	execution *Execution,
+	workItemID WorkItemID,
+	frameID ProgramFrameID,
+	budgetScopeID string,
+	bytes int,
+) error {
 	var item *WorkItem
 	if workItemID != "" {
 		item = mutableWorkItem(execution, workItemID)
+		if item == nil {
+			return errors.New("message budget work item owner is unavailable")
+		}
 	}
 	if item != nil {
+		if frameID != "" && frameID != item.FrameID {
+			return errors.New(
+				"message budget frame differs from its work item owner",
+			)
+		}
 		frameID = item.FrameID
 	}
-	return r.reserveScopedBudgetLocked(
+	return r.reserveScopedBudgetForOwnerLocked(
 		execution,
 		item,
 		frameID,
+		budgetScopeID,
 		budgetMetricRequest{
 			Metric:    budgetMetricMessageCount,
 			Increment: 1,

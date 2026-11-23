@@ -18,6 +18,9 @@ const (
 	portChannelParentExecutionUnavailableMessage = "parent port channel execution is unavailable"
 	portChannelParentFrameUnavailableMessage     = "parent port channel frame is unavailable"
 	portChannelForwardingCycleMessage            = "port channel forwarding contains a cycle"
+	portForwardReceivingFrameUnavailableMessage  = "forwarded port receiving frame is unavailable"
+	portForwardReceivingWorkUnavailableMessage   = "forwarded port receiving work item is unavailable"
+	portForwardReceivingScopeUnavailableMessage  = "forwarded port receiving budget scope is unavailable"
 )
 
 const (
@@ -68,8 +71,11 @@ func (r *Runtime) preparePublishedWorkflowPortBoundaryLocked(
 	if session == nil || childExecution == nil || childFrame == nil {
 		return errors.New("published workflow port owner is unavailable")
 	}
-	if parentExecutionID == "" ||
-		mutableSessionExecution(session, parentExecutionID) == nil {
+	if parentExecutionID == "" {
+		return errors.New(portChannelParentExecutionUnavailableMessage)
+	}
+	parentExecution := mutableSessionExecution(session, parentExecutionID)
+	if parentExecution == nil {
 		return errors.New(portChannelParentExecutionUnavailableMessage)
 	}
 	if err := r.stageFramePortInputsLocked(
@@ -166,18 +172,33 @@ func (r *Runtime) preparePublishedWorkflowPortBoundaryLocked(
 			localInputs = append(localInputs, local)
 
 		case WorkflowPortDirectionOutput:
+			receivingWorkItemID,
+				receivingFrameID,
+				receivingBudgetScope,
+				ownerErr := channelForwardReceivingOwner(
+				parentExecution,
+				*childExecution,
+				*childFrame,
+				plan,
+			)
+			if ownerErr != nil {
+				return ownerErr
+			}
 			if err := appendChannelForward(
 				childExecution,
 				ChannelForward{
-					SourceChannel:     localChannel,
-					TargetExecutionID: parentExecutionID,
-					TargetChannel:     plan.Channel,
-					PortName:          plan.Name,
-					Stream:            plan.Stream,
-					Schema:            plan.Schema.Clone(),
-					ChannelSchema:     plan.ChannelSchema.Clone(),
-					MaxMessages:       plan.MaxMessages,
-					MaxBytes:          plan.MaxBytes,
+					SourceChannel:        localChannel,
+					TargetExecutionID:    parentExecutionID,
+					TargetChannel:        plan.Channel,
+					PortName:             plan.Name,
+					Stream:               plan.Stream,
+					Schema:               plan.Schema.Clone(),
+					ChannelSchema:        plan.ChannelSchema.Clone(),
+					MaxMessages:          plan.MaxMessages,
+					MaxBytes:             plan.MaxBytes,
+					ReceivingWorkItemID:  receivingWorkItemID,
+					ReceivingFrameID:     receivingFrameID,
+					ReceivingBudgetScope: receivingBudgetScope,
 				},
 			); err != nil {
 				return err
@@ -271,10 +292,16 @@ func (r *Runtime) appendPublishedWorkflowPortInputLocked(
 	if channel.Bytes+len(value)+len(correlation) > channel.MaxBytes {
 		return 0, errors.New("published workflow input channel byte limit exceeded")
 	}
-	if err := r.reserveChannelMessageBudgetLocked(
+	receiver := mutableFrame(execution, frameID)
+	if receiver == nil {
+		return 0, errors.New(portForwardReceivingFrameUnavailableMessage)
+	}
+	if err := r.reserveMessageBudgetForSemanticOwnerLocked(
 		execution,
-		value,
-		correlation,
+		"",
+		frameID,
+		receiver.BudgetScopeID,
+		len(value)+len(correlation),
 	); err != nil {
 		return 0, err
 	}
@@ -313,6 +340,114 @@ func publishedWorkflowChannelRetention(
 	return maxMessages, maxBytes
 }
 
+func channelForwardReceivingOwner(
+	parent *Execution,
+	child Execution,
+	childFrame ProgramFrame,
+	plan PortPlan,
+) (WorkItemID, ProgramFrameID, string, error) {
+	if parent == nil {
+		return "", "", "", errors.New(
+			portChannelParentExecutionUnavailableMessage,
+		)
+	}
+
+	frameID := plan.ParentFrameID
+	if frameID == "" {
+		frameID = child.ParentFrameID
+	}
+	if frameID == "" {
+		return "", "", "", errors.New(
+			portForwardReceivingFrameUnavailableMessage,
+		)
+	}
+	frame := mutableFrame(parent, frameID)
+	if frame == nil {
+		return "", "", "", errors.New(
+			portForwardReceivingFrameUnavailableMessage,
+		)
+	}
+
+	workItemID := WorkItemID("")
+	budgetScopeID := frame.BudgetScopeID
+	for _, item := range parent.WorkItems {
+		if item.FrameID != frame.ID ||
+			item.Type != WorkItemTypeChildCall ||
+			item.Input.ChildCall == nil {
+			continue
+		}
+		completion := item.Input.ChildCall.Completion
+		if completion.FrameID != childFrame.ID &&
+			completion.ExecutionID != child.ID {
+			continue
+		}
+		workItemID = item.ID
+		if item.BudgetScopeID != "" {
+			budgetScopeID = item.BudgetScopeID
+		}
+		break
+	}
+
+	return workItemID, frame.ID, budgetScopeID, nil
+}
+
+func channelForwardReceivingBudgetOwner(
+	target *Execution,
+	forward ChannelForward,
+) (WorkItemID, ProgramFrameID, string, error) {
+	if target == nil {
+		return "", "", "", errors.New(
+			portChannelParentExecutionUnavailableMessage,
+		)
+	}
+
+	frameID := forward.ReceivingFrameID
+	if frameID == "" {
+		if len(target.ProgramFrames) == 0 {
+			return "", "", "", errors.New(
+				portForwardReceivingFrameUnavailableMessage,
+			)
+		}
+		frameID = target.ProgramFrames[0].ID
+	}
+	frame := mutableFrame(target, frameID)
+	if frame == nil {
+		return "", "", "", errors.New(
+			portForwardReceivingFrameUnavailableMessage,
+		)
+	}
+
+	scopeID := forward.ReceivingBudgetScope
+	if scopeID == "" {
+		scopeID = frame.BudgetScopeID
+	}
+	if scopeID != "" && mutableBudgetScope(target, scopeID) == nil {
+		return "", "", "", errors.New(
+			portForwardReceivingScopeUnavailableMessage,
+		)
+	}
+	if forward.ReceivingWorkItemID == "" {
+		return "", frame.ID, scopeID, nil
+	}
+
+	item := mutableWorkItem(target, forward.ReceivingWorkItemID)
+	if item == nil || item.FrameID != frame.ID {
+		return "", "", "", errors.New(
+			portForwardReceivingWorkUnavailableMessage,
+		)
+	}
+	if item.BudgetScopeID != "" && scopeID != "" &&
+		item.BudgetScopeID != scopeID {
+		return "", "", "", errors.New(
+			portForwardReceivingScopeUnavailableMessage,
+		)
+	}
+	if scopeID == "" {
+		scopeID = item.BudgetScopeID
+	}
+	return item.ID, frame.ID, scopeID, nil
+}
+
 func appendChannelForward(
 	execution *Execution,
 	value ChannelForward,
@@ -347,6 +482,9 @@ func sameChannelForward(left, right ChannelForward) bool {
 		left.Stream == right.Stream &&
 		left.MaxMessages == right.MaxMessages &&
 		left.MaxBytes == right.MaxBytes &&
+		left.ReceivingWorkItemID == right.ReceivingWorkItemID &&
+		left.ReceivingFrameID == right.ReceivingFrameID &&
+		left.ReceivingBudgetScope == right.ReceivingBudgetScope &&
 		canonicalValuesEqual(left.Schema, right.Schema) &&
 		canonicalValuesEqual(left.ChannelSchema, right.ChannelSchema)
 }
@@ -1162,6 +1300,42 @@ func portStreamMessageID(
 	return portMessageID(WorkItemID(string(workID)+":"+string(attemptID)), name, sequence)
 }
 
+func portRecordReceivingOwner(
+	source *Execution,
+	target *Execution,
+	plan PortPlan,
+) (WorkItemID, ProgramFrameID, string, error) {
+	if target == nil {
+		return "", "", "", errors.New(
+			portChannelParentExecutionUnavailableMessage,
+		)
+	}
+
+	frameID := plan.OwnerFrameID
+	if source == nil || source.ID != target.ID ||
+		mutableFrame(target, frameID) == nil {
+		frameID = plan.ParentFrameID
+	}
+	if frameID == "" {
+		return "", "", "", errors.New(
+			portForwardReceivingFrameUnavailableMessage,
+		)
+	}
+	frame := mutableFrame(target, frameID)
+	if frame == nil {
+		return "", "", "", errors.New(
+			portForwardReceivingFrameUnavailableMessage,
+		)
+	}
+	if frame.BudgetScopeID != "" &&
+		mutableBudgetScope(target, frame.BudgetScopeID) == nil {
+		return "", "", "", errors.New(
+			portForwardReceivingScopeUnavailableMessage,
+		)
+	}
+	return "", frame.ID, frame.BudgetScopeID, nil
+}
+
 func (r *Runtime) appendPortMessageLocked(
 	session *Session,
 	execution *Execution,
@@ -1217,10 +1391,22 @@ func (r *Runtime) appendPortMessageLocked(
 	if channel.Bytes+len(value) > channel.MaxBytes {
 		return errors.New("port channel byte limit exceeded")
 	}
-	if err := r.reserveMessageBudgetForOwnerLocked(
+	ownerWorkItemID,
+		ownerFrameID,
+		ownerBudgetScope,
+		ownerErr := portRecordReceivingOwner(
+		execution,
 		channelExecution,
-		WorkItemID(""),
-		plan.OwnerFrameID,
+		plan,
+	)
+	if ownerErr != nil {
+		return ownerErr
+	}
+	if err := r.reserveMessageBudgetForSemanticOwnerLocked(
+		channelExecution,
+		ownerWorkItemID,
+		ownerFrameID,
+		ownerBudgetScope,
 		len(value),
 	); err != nil {
 		return err
@@ -1235,7 +1421,7 @@ func (r *Runtime) appendPortMessageLocked(
 		Kind:         kind,
 		Data:         value.Clone(),
 		CreatedAt:    now,
-		OwnerFrameID: plan.OwnerFrameID,
+		OwnerFrameID: ownerFrameID,
 	}
 	channel.Messages = append(channel.Messages, message)
 	channel.Bytes += len(message.Data)
@@ -1422,10 +1608,21 @@ func (r *Runtime) appendForwardedChannelMessageLocked(
 			"forwarded workflow port channel byte limit exceeded",
 		)
 	}
-	if err := r.reserveMessageBudgetForOwnerLocked(
+	ownerWorkItemID,
+		ownerFrameID,
+		ownerBudgetScope,
+		ownerErr := channelForwardReceivingBudgetOwner(
 		target,
-		source.OwnerWorkItemID,
-		source.OwnerFrameID,
+		forward,
+	)
+	if ownerErr != nil {
+		return ChannelMessage{}, false, ownerErr
+	}
+	if err := r.reserveMessageBudgetForSemanticOwnerLocked(
+		target,
+		ownerWorkItemID,
+		ownerFrameID,
+		ownerBudgetScope,
 		len(source.Data)+len(source.Correlation),
 	); err != nil {
 		return ChannelMessage{}, false, err
@@ -1441,8 +1638,8 @@ func (r *Runtime) appendForwardedChannelMessageLocked(
 		Data:            source.Data.Clone(),
 		Correlation:     source.Correlation.Clone(),
 		CreatedAt:       now,
-		OwnerWorkItemID: source.OwnerWorkItemID,
-		OwnerFrameID:    source.OwnerFrameID,
+		OwnerWorkItemID: ownerWorkItemID,
+		OwnerFrameID:    ownerFrameID,
 		AttemptID:       source.AttemptID,
 	}
 	channel.Messages = append(channel.Messages, message)

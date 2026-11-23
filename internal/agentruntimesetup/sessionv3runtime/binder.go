@@ -11,6 +11,7 @@ import (
 	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
 	skillRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/skill"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/attachmentruntime"
+	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/contributionruntime"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/mcpruntime"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/modelruntime"
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/skillruntime"
@@ -40,10 +41,11 @@ type Dependencies struct {
 type Binder struct {
 	deps Dependencies
 
-	goTools     *toolruntime.V3Executor
-	mcpTools    *mcpruntime.V3Executor
-	skillTools  *skillruntime.V3Executor
-	attachments *attachmentruntime.SessionV3Admitter
+	goTools       *toolruntime.V3Executor
+	mcpTools      *mcpruntime.V3Executor
+	skillTools    *skillruntime.V3Executor
+	attachments   *attachmentruntime.SessionV3Admitter
+	contributions *contributionruntime.Preparer
 
 	deterministic sessionv3Runtime.DeterministicExecutor
 }
@@ -99,6 +101,15 @@ func New(deps Dependencies) (*Binder, error) {
 	if err != nil {
 		return nil, err
 	}
+	contributions, err := contributionruntime.New(
+		deps.Artifacts,
+		deps.Agents,
+		deps.Workspaces,
+		deps.Texts,
+	)
+	if err != nil {
+		return nil, err
+	}
 
 	attachments := attachmentruntime.NewSessionV3Admitter()
 
@@ -106,6 +117,7 @@ func New(deps Dependencies) (*Binder, error) {
 	output.mcpTools = mcpTools
 	output.skillTools = skillTools
 	output.attachments = attachments
+	output.contributions = contributions
 	return output, nil
 }
 

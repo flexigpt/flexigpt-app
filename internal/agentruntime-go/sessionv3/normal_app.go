@@ -156,17 +156,8 @@ func (r *Runtime) ExecuteAppTool(
 		},
 	)
 
-	var (
-		ready           []readyExecutionWork
-		launchSessionID SessionID
-	)
 	r.mu.Lock()
-	defer func() {
-		r.mu.Unlock()
-		if len(ready) != 0 {
-			r.launchReadyWork(ctx, launchSessionID, ready)
-		}
-	}()
+	defer r.mu.Unlock()
 	if r.closed {
 		return nil, ErrRuntimeClosed
 	}
@@ -288,8 +279,6 @@ func (r *Runtime) ExecuteAppTool(
 	if err := r.persistLocked(ctx, "appToolQueued", session); err != nil {
 		return nil, err
 	}
-	ready = r.readyWorkForSessionLocked(session)
-	launchSessionID = session.ID
 	r.publishLocked(ctx, session, execution.ID, RuntimeEventWorkChanged)
 	return &receipt, nil
 }

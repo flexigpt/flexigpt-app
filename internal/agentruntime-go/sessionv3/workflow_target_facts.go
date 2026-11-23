@@ -46,51 +46,107 @@ type WorkflowRequirementFact struct {
 	BindingVersion string             `json:"bindingVersion,omitempty"`
 }
 
-// WorkflowPreparedText records a source-backed Text contribution selected
-// during Workflow preparation. Text materialization occurs later through the
-// Text domain, after exact Artifact-pin verification.
+// PreparedContributionKind identifies a durable source-pinned contribution
+// category. It is shared by normal Session setup and Workflow setup.
+type PreparedContributionKind string
+
+const (
+	PreparedContributionKindModel           PreparedContributionKind = "model"
+	PreparedContributionKindAgent           PreparedContributionKind = "agent"
+	PreparedContributionKindWorkspace       PreparedContributionKind = "workspace"
+	PreparedContributionKindWorkspacePrompt PreparedContributionKind = "workspacePrompt"
+	PreparedContributionKindText            PreparedContributionKind = "text"
+	PreparedContributionKindTool            PreparedContributionKind = "tool"
+	PreparedContributionKindSkill           PreparedContributionKind = "skill"
+	PreparedContributionKindMCP             PreparedContributionKind = "mcp"
+)
+
+type PreparedContributionOrder struct {
+	Kind  PreparedContributionKind `json:"kind"`
+	Key   string                   `json:"key"`
+	Owner ConfigurationOwner       `json:"owner"`
+}
+
+type WorkflowPreparedWorkspacePrompt struct {
+	Instructions string `json:"instructions"`
+	UserContext  string `json:"userContext"`
+}
+
+// WorkflowPreparedText records immutable Text content and source identity.
+// Binding can use this captured value without resolving a current Agent or
+// Workspace contribution graph.
 type WorkflowPreparedText struct {
-	Artifact ArtifactPin `json:"artifact"`
+	Artifact ArtifactPin        `json:"artifact"`
+	Insert   TextDispatchInsert `json:"insert"`
+	Content  string             `json:"content,omitempty"`
+	Label    string             `json:"label,omitempty"`
+	Owner    ConfigurationOwner `json:"owner"`
+	Included bool               `json:"included"`
 }
 
 type WorkflowPreparedTool struct {
-	Artifact    ArtifactPin `json:"artifact"`
-	AutoExecute *bool       `json:"autoExecute,omitempty"`
+	Artifact    ArtifactPin        `json:"artifact"`
+	AutoExecute *bool              `json:"autoExecute,omitempty"`
+	Owner       ConfigurationOwner `json:"owner"`
 }
 
 type WorkflowPreparedSkill struct {
-	Artifact     ArtifactPin `json:"artifact"`
-	Active       bool        `json:"active,omitempty"`
-	Instructions bool        `json:"instructions,omitempty"`
+	Artifact           ArtifactPin        `json:"artifact"`
+	Active             bool               `json:"active,omitempty"`
+	Instructions       bool               `json:"instructions,omitempty"`
+	InstructionContent string             `json:"instructionContent,omitempty"`
+	Owner              ConfigurationOwner `json:"owner"`
 }
 
 type WorkflowPreparedMCP struct {
-	Server                    ArtifactPin     `json:"server"`
-	IncludeServerInstructions bool            `json:"includeServerInstructions,omitempty"`
-	ToolExposure              MCPToolExposure `json:"toolExposure"`
+	Server                    ArtifactPin                    `json:"server"`
+	IncludeServerInstructions bool                           `json:"includeServerInstructions,omitempty"`
+	ToolExposure              MCPToolExposure                `json:"toolExposure"`
+	Tools                     []MCPToolSelection             `json:"tools,omitempty"`
+	Resources                 []MCPResourceSelection         `json:"resources,omitempty"`
+	ResourceTemplates         []MCPResourceTemplateSelection `json:"resourceTemplates,omitempty"`
+	Prompts                   []MCPPromptSelection           `json:"prompts,omitempty"`
+	Owner                     ConfigurationOwner             `json:"owner"`
 }
 
-// WorkflowPreparedInvocation is a setup-owned immutable contribution
-// snapshot. It contains source-backed pins and declaration contribution facts,
-// but no client, credential, Artifact Store handle, callback, or provider
-// request.
+// PreparedContributionPlan is the neutral domain-owned, source-pinned
+// contribution contract. It contains no client, credential, Artifact Store
+// handle, callback, or provider request.
 //
-// Runtime uses this snapshot for Workflow Model and Agent child calls instead
-// of resolving current Agent or Workspace contribution graphs at dispatch.
-type WorkflowPreparedInvocation struct {
-	Model                    *ArtifactPin            `json:"model,omitempty"`
-	Agent                    *ArtifactPin            `json:"agent,omitempty"`
-	Workspace                *ArtifactPin            `json:"workspace,omitempty"`
-	IncludeModelSystemPrompt *bool                   `json:"includeModelSystemPrompt,omitempty"`
-	Texts                    []WorkflowPreparedText  `json:"texts,omitempty"`
-	Tools                    []WorkflowPreparedTool  `json:"tools,omitempty"`
-	Skills                   []WorkflowPreparedSkill `json:"skills,omitempty"`
-	MCP                      []WorkflowPreparedMCP   `json:"mcp,omitempty"`
-	WorkspaceInstructions    []Instruction           `json:"workspaceInstructions,omitempty"`
-	WorkspaceContext         []string                `json:"workspaceContext,omitempty"`
-	ContributionOrder        []string                `json:"contributionOrder,omitempty"`
-	WorkspacePromptPrepared  bool                    `json:"workspacePromptPrepared,omitempty"`
-	OwnerProvenance          string                  `json:"ownerProvenance,omitempty"`
+// Runtime retains this semantic value for Workflow Model and Agent child
+// calls. Normal Session setup consumes the same contract before it builds an
+// immutable ModelDispatchPlan.
+type PreparedContributionPlan struct {
+	Model                    *ArtifactPin                     `json:"model,omitempty"`
+	Agent                    *ArtifactPin                     `json:"agent,omitempty"`
+	Workspace                *ArtifactPin                     `json:"workspace,omitempty"`
+	IncludeModelSystemPrompt *bool                            `json:"includeModelSystemPrompt,omitempty"`
+	Texts                    []WorkflowPreparedText           `json:"texts,omitempty"`
+	Tools                    []WorkflowPreparedTool           `json:"tools,omitempty"`
+	Skills                   []WorkflowPreparedSkill          `json:"skills,omitempty"`
+	MCP                      []WorkflowPreparedMCP            `json:"mcp,omitempty"`
+	WorkspaceInstructions    []Instruction                    `json:"workspaceInstructions,omitempty"`
+	WorkspaceContext         []string                         `json:"workspaceContext,omitempty"`
+	WorkspacePrompt          *WorkflowPreparedWorkspacePrompt `json:"workspacePrompt,omitempty"`
+	ContributionOrder        []PreparedContributionOrder      `json:"contributionOrder,omitempty"`
+	WorkspacePromptPrepared  bool                             `json:"workspacePromptPrepared,omitempty"`
+	OwnerProvenance          ConfigurationOwner               `json:"ownerProvenance,omitempty"`
+}
+
+// WorkflowPreparedInvocation remains the Workflow-facing name for the
+// neutral PreparedContributionPlan. It is an alias, not a second contract.
+type WorkflowPreparedInvocation = PreparedContributionPlan
+
+func PreparedContributionKey(
+	kind PreparedContributionKind,
+	pin ArtifactPin,
+) string {
+	return string(kind) + ":" + pin.RootID + ":" + pin.ArtifactID
+}
+
+func PreparedWorkspacePromptKey(pin ArtifactPin) string {
+	return string(PreparedContributionKindWorkspacePrompt) + ":" +
+		pin.RootID + ":" + pin.ArtifactID
 }
 
 // LLMToolOrigin preserves immutable invocation facts for Tool WorkItems that
@@ -208,7 +264,7 @@ func (v LLMToolOrigin) Validate() error {
 	return validateID("llm tool origin plan reference", v.PlanReference)
 }
 
-func (v WorkflowPreparedInvocation) Validate() error {
+func (v PreparedContributionPlan) Validate() error {
 	for _, pin := range []*ArtifactPin{v.Model, v.Agent, v.Workspace} {
 		if pin != nil {
 			if err := validatePin(*pin); err != nil {
@@ -217,29 +273,50 @@ func (v WorkflowPreparedInvocation) Validate() error {
 		}
 	}
 	for _, value := range v.Texts {
-		if err := validatePin(value.Artifact); err != nil {
+		if err := value.Validate(); err != nil {
 			return err
 		}
 	}
 	for _, value := range v.Tools {
-		if err := validatePin(value.Artifact); err != nil {
+		if err := value.Validate(); err != nil {
 			return err
 		}
 	}
 	for _, value := range v.Skills {
-		if err := validatePin(value.Artifact); err != nil {
+		if err := value.Validate(); err != nil {
 			return err
 		}
 	}
 	for _, value := range v.MCP {
-		if err := validatePin(value.Server); err != nil {
+		if err := value.Validate(); err != nil {
 			return err
 		}
-		switch value.ToolExposure {
-		case MCPToolExposureNone, MCPToolExposureAll, MCPToolExposureSelected:
-		default:
-			return errors.New("prepared workflow MCP exposure is invalid")
+	}
+	if v.WorkspacePromptPrepared && v.WorkspacePrompt == nil {
+		return errors.New(
+			"prepared workspace prompt marker has no immutable prompt facts",
+		)
+	}
+	if v.WorkspacePrompt != nil && !v.WorkspacePromptPrepared {
+		return errors.New(
+			"prepared workspace prompt facts have no prepared marker",
+		)
+	}
+	if v.WorkspacePromptPrepared && v.Workspace == nil {
+		return errors.New(
+			"prepared workspace prompt facts have no workspace artifact pin",
+		)
+	}
+	seenOrder := make(map[string]struct{}, len(v.ContributionOrder))
+	for _, value := range v.ContributionOrder {
+		if err := value.Validate(); err != nil {
+			return err
 		}
+		key := string(value.Kind) + "\x00" + value.Key
+		if _, duplicate := seenOrder[key]; duplicate {
+			return errors.New("prepared contribution order is duplicated")
+		}
+		seenOrder[key] = struct{}{}
 	}
 	for _, duplicate := range [][]ArtifactPin{
 		preparedInvocationTextPins(v.Texts),
@@ -261,7 +338,101 @@ func (v WorkflowPreparedInvocation) Validate() error {
 			return errors.New("prepared workflow workspace instruction is empty")
 		}
 	}
+	for _, contextValue := range v.WorkspaceContext {
+		if strings.TrimSpace(contextValue) == "" {
+			return errors.New("prepared workflow workspace context is empty")
+		}
+	}
 	return nil
+}
+
+func (v PreparedContributionOrder) Validate() error {
+	switch v.Kind {
+	case PreparedContributionKindModel,
+		PreparedContributionKindAgent,
+		PreparedContributionKindWorkspace,
+		PreparedContributionKindWorkspacePrompt,
+		PreparedContributionKindText,
+		PreparedContributionKindTool,
+		PreparedContributionKindSkill,
+		PreparedContributionKindMCP:
+	default:
+		return errors.New("prepared contribution kind is invalid")
+	}
+	if err := validateID("prepared contribution key", v.Key); err != nil {
+		return err
+	}
+	switch v.Owner {
+	case "",
+		ConfigurationOwnerModel,
+		ConfigurationOwnerAgent,
+		ConfigurationOwnerWorkspace,
+		ConfigurationOwnerSession,
+		ConfigurationOwnerInvocation,
+		ConfigurationOwnerUser:
+		return nil
+	default:
+		return errors.New("prepared contribution owner is invalid")
+	}
+}
+
+func (v WorkflowPreparedText) Validate() error {
+	if err := validatePin(v.Artifact); err != nil {
+		return err
+	}
+	switch v.Insert {
+	case TextDispatchInsertInstructions, TextDispatchInsertUserMessage:
+	default:
+		return errors.New("prepared text contribution insert is invalid")
+	}
+	return PreparedContributionOrder{
+		Kind:  PreparedContributionKindText,
+		Key:   PreparedContributionKey(PreparedContributionKindText, v.Artifact),
+		Owner: v.Owner,
+	}.Validate()
+}
+
+func (v WorkflowPreparedTool) Validate() error {
+	if err := validatePin(v.Artifact); err != nil {
+		return err
+	}
+	return PreparedContributionOrder{
+		Kind:  PreparedContributionKindTool,
+		Key:   PreparedContributionKey(PreparedContributionKindTool, v.Artifact),
+		Owner: v.Owner,
+	}.Validate()
+}
+
+func (v WorkflowPreparedSkill) Validate() error {
+	if err := validatePin(v.Artifact); err != nil {
+		return err
+	}
+	if !v.Instructions && v.InstructionContent != "" {
+		return errors.New(
+			"prepared non-instruction skill has instruction content",
+		)
+	}
+	return PreparedContributionOrder{
+		Kind:  PreparedContributionKindSkill,
+		Key:   PreparedContributionKey(PreparedContributionKindSkill, v.Artifact),
+		Owner: v.Owner,
+	}.Validate()
+}
+
+func (v WorkflowPreparedMCP) Validate() error {
+	if err := validatePin(v.Server); err != nil {
+		return err
+	}
+	switch v.ToolExposure {
+	case MCPToolExposureNone, MCPToolExposureAll, MCPToolExposureSelected:
+	default:
+		return errors.New("prepared workflow mcp exposure is invalid")
+	}
+	return PreparedContributionOrder{
+		Kind:  PreparedContributionKindMCP,
+		Key:   PreparedContributionKey(PreparedContributionKindMCP, v.Server),
+		Owner: v.Owner,
+	}.Validate()
 }
 
 func preparedInvocationTextPins(values []WorkflowPreparedText) []ArtifactPin {

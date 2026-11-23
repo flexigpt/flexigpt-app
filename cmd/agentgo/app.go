@@ -726,6 +726,7 @@ func (a *App) initManagers() {
 		a.agentStoreAPI.api,
 		a.mcpRuntimeAPI.runtime,
 		a.workspaceStoreAPI.api,
+		a.textStoreAPI.service,
 	)
 	if err != nil {
 		panic(

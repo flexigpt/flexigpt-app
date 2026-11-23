@@ -537,12 +537,28 @@ func (s *Store) SearchSessions(ctx context.Context, request SearchSessionsReques
 	return SessionPage{Items: items, NextPageToken: next}, nil
 }
 
-func (s *Store) ExportSession(id sessionv3Runtime.SessionID) ([]byte, error) {
+// ExportSemanticSession returns only durable Session facts from the
+// authoritative Store document. It deliberately does not consult the live
+// Runtime, setup bindings, Artifact Store, provider clients, callbacks, or
+// frontend state.
+func (s *Store) ExportSemanticSession(
+	id sessionv3Runtime.SessionID,
+) (SemanticSessionExport, error) {
 	session, err := s.ReadSession(id)
+	if err != nil {
+		return SemanticSessionExport{}, err
+	}
+	return SemanticSessionExport{Session: session}, nil
+}
+
+// ExportSession keeps the byte-oriented Store capability while sourcing its
+// value from the Store-owned semantic export operation.
+func (s *Store) ExportSession(id sessionv3Runtime.SessionID) ([]byte, error) {
+	exported, err := s.ExportSemanticSession(id)
 	if err != nil {
 		return nil, err
 	}
-	return json.MarshalIndent(session, "", "  ")
+	return json.MarshalIndent(exported.Session, "", "  ")
 }
 
 func (s *Store) RebuildDerived(ctx context.Context) error {

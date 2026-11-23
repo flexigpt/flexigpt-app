@@ -605,6 +605,18 @@ func (w *SessionV3Wrapper) Session(
 	})
 }
 
+// ExportSession reads the durable semantic Session document from Store v3.
+// It does not read Runtime-private execution bindings or frontend state.
+func (w *SessionV3Wrapper) ExportSession(
+	id sessionv3Runtime.SessionID,
+) (sessionstorev3.SemanticSessionExport, error) {
+	store, err := w.projectionStore()
+	if err != nil {
+		return sessionstorev3.SemanticSessionExport{}, err
+	}
+	return store.ExportSemanticSession(id)
+}
+
 func (w *SessionV3Wrapper) findCommandReceipt(
 	sessionID sessionv3Runtime.SessionID,
 	meta sessionv3Runtime.CommandMeta,

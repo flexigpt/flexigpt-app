@@ -46,6 +46,13 @@ type SessionPage struct {
 	NextPageToken string            `json:"nextPageToken,omitempty"`
 }
 
+// SemanticSessionExport is a Store-owned export of durable Session facts.
+// It contains no live Runtime maps, private bindings, clients, callbacks,
+// Artifact Store handles, or frontend state.
+type SemanticSessionExport struct {
+	Session sessionv3Runtime.Session `json:"session"`
+}
+
 type ListExecutionsRequest struct {
 	SessionID  sessionv3Runtime.SessionID `json:"sessionID"`
 	ActiveOnly bool                       `json:"activeOnly,omitempty"`

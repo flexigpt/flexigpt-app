@@ -73,11 +73,11 @@ this implementation cycle.
 This HLD does not publish a completion percentage. Completion estimates are
 reported outside this status record.
 
-The remaining work is limited to items marked `Partial` or `Not implemented`
-in the task ledger. It concerns one post-checkpoint dispatch authority,
-owner-scoped accounting for nested Workflow port transfer, complete
-domain-owned prepared Model and Agent contributions, removal of duplicate V3
-setup algorithms, and the remaining backend semantic-export surface.
+All Runtime and setup tasks in this ledger are implemented in source. The
+implementation uses one normal post-checkpoint dispatch authority,
+receiver-scoped nested Workflow port accounting, one domain-owned prepared
+contribution contract, one V3 attachment admission implementation, and a
+Store-owned semantic Session export surface.
 
 This audit does not create Artifact planning work.
 `workflow_artifact.md` remains the authority for source admission, retrieval,
@@ -1255,20 +1255,19 @@ the implemented behavior.
 
 ##### `RT-SETTLE-003.b` Use one terminal lifecycle and committed ready-work launch
 
-- Status: Partial.
-- Implemented behavior:
-  - `persistLocked` provides a committed Session-wide ready-work launch path.
-  - Dispatch guards prevent a second queued dispatch from normally reaching a
-    second native invocation.
-- Remaining functional gap:
-  - `runtime.go:blockWorkForBudgetLocked`,
-    `runtime_durability.go:settleTimerLocked`,
-    `runtime_durability.go:settleUnstartedAttemptLocked`,
-    `runtime_triggers.go:waitForTrigger`, `normal_app.go:ExecuteAppTool`, and
-    `normal_session.go:EditAndResend` still launch ready work after
-    `persistLocked`.
-  - The duplicated launch waves violate the single committed launch authority.
-    Only the completed post-restore readiness wave may remain separate.
+- Status: Implemented.
+- Completion evidence:
+  - `R/runtime.go:persistLocked` is the sole normal committed
+    checkpoint-to-ready-work boundary.
+  - `R/runtime.go:blockWorkForBudgetLocked`,
+    `R/runtime_durability.go:settleTimerLocked`,
+    `R/runtime_durability.go:settleUnstartedAttemptLocked`,
+    `R/runtime_triggers.go:waitForTrigger`,
+    `R/normal_app.go:ExecuteAppTool`, and
+    `R/normal_session.go:EditAndResend` no longer launch a second ready-work
+    wave after persistence.
+  - `R/Runtime.Restore` retains the one explicit Session-wide post-restore
+    readiness wave after `resumeRestoredWork` completes.
 
 #### `RT-CLEANUP-003` Execute cleanup through every owning lifecycle
 
@@ -1364,22 +1363,18 @@ the implemented behavior.
 
 ##### `RT-BUDGET-003.d` Account retained Runtime records through their semantic owner
 
-- Status: Partial.
-- Implemented behavior:
-  - `Activity`, `ExecutionSignal`, and `ChannelMessage` retain semantic owner
-    identities. Owner-aware budget reservation is used for retained Runtime
-    records and provider usage is consumed even when a Model result has an
-    execution error.
-- Remaining functional gap:
-  - `ports_runtime.go:appendPublishedWorkflowPortInputLocked` receives a
-    child frame identity but reserves message budget without that frame or its
-    structured budget scope.
-  - `appendForwardedChannelMessageLocked` uses source WorkItem and frame
-    identities while it charges the target Execution. Those identities do not
-    exist in the parent Execution for an independent child Workflow.
-  - `ChannelForward` has no receiving-side semantic owner. Nested input and
-    forwarded port records can therefore bypass the intended owner-scoped
-    message and byte budgets.
+- Status: Implemented.
+- Completion evidence:
+  - `R/ports_runtime.go:appendPublishedWorkflowPortInputLocked` charges each
+    retained child input record through its receiving ProgramFrame and that
+    frame's structured scope.
+  - `R/ports.go:ChannelForward` persists receiving WorkItem, ProgramFrame,
+    and budget-scope ownership facts.
+  - `R/ports_runtime.go:appendForwardedChannelMessageLocked` uses receiving
+    ownership only. It does not charge a parent Execution through foreign
+    child WorkItem or ProgramFrame identities.
+  - `R/budget_scope.go:reserveMessageBudgetForSemanticOwnerLocked` performs
+    one count and byte reservation for each retained physical record.
 
 #### `RT-TRIGGER-003` Resume trigger lifecycle changes and expose one event meaning
 
@@ -1516,36 +1511,30 @@ the implemented behavior.
 
 #### `WF-PREPARE-003` Preserve complete prepared target meaning
 
-- Status: Partial.
+- Status: Implemented.
 - Completion evidence:
-  - `WorkflowPreparedInvocation` retains immutable Model, Agent, Workspace,
-    Text, Tool, Skill, MCP, Workspace prompt/context, contribution-order, and
-    owner-provenance facts.
+  - `R/PreparedContributionPlan` is the neutral source-pinned contract used
+    by normal Session V3 setup and Workflow Model or Agent preparation.
+  - It retains immutable Model, Agent, Workspace, Text, Tool, Skill, MCP,
+    Workspace prompt, user context, ordered contribution, and provenance
+    facts.
   - `program.go:startAgentLLM`, retry capture, started calls, handoff,
     nested preparation, and recovery retain one immutable prepared invocation.
   - `compiler_invocation.go` lowers typed expression-backed message and
     instruction collections. `workflow_invocation.go:captureWorkflowLLMInvocation`
     evaluates and freezes those collections at the logical call boundary.
-- Remaining functional gap:
-  - The data type contains Workspace prompt, context, and contribution-order
-    fields, but the current Workflow Agent preparation path does not fully
-    populate or consume them. The complete requirement is tracked by
-    `WF-PREPARE-004`.
 
 ##### `WF-PREPARE-003.a` Retain immutable pins and prepared contribution facts
 
-- Status: Partial.
-- Implemented behavior:
-  - Immutable target pins and typed message and instruction collections are
-    retained through invoke, start, retry, handoff, nested Workflow
-    preparation, Agent rounds, and recovery.
-- Remaining functional gap:
-  - `workflowruntime/model_agent_adapter.go` marks a Workspace prompt as
-    prepared after it reads Workspace capabilities, but it does not capture
-    `ResolveWorkspaceRuntimePlan` prompt instructions or user context.
-  - `sessionv3runtime/workflow_invocation.go` accepts that marker and applies
-    empty Workspace prompt and context fields. It also does not consume
-    `ContributionOrder`.
+- Status: Implemented.
+- Completion evidence:
+  - `S/contributionruntime/prepared.go` captures source-pinned Agent and
+    Workspace contributions before Workflow ProgramSnapshot creation.
+  - `S/sessionv3runtime/workflow_invocation.go` consumes the captured ordered
+    Text, Tool, Skill, MCP, prompt, and context facts without rereading an
+    Agent or Workspace contribution graph.
+  - `S/sessionv3runtime/llm_replay.go` reconstructs only private resources
+    from captured dispatch facts and exact provider inputs.
 
 ##### `WF-PREPARE-003.b` Resolve an owner Model only where required
 
@@ -1942,30 +1931,27 @@ the implemented behavior.
 
 #### `ARC-DOMAIN-003` Complete owning-domain setup boundaries
 
-- Status: Partial.
+- Status: Implemented.
 - Completion evidence:
   - `attachmentruntime.SessionV3Admitter` owns V3 attachment admission and
     immutable snapshot construction.
   - `modelruntime.FinalizePreparedRuntimeConfiguration` owns final effective
     non-secret Model configuration capture.
-  - Workflow and Session setup compose neutral domain facts. Core Runtime
-    remains Artifact Store independent.
-- Remaining functional gap:
-  - Workflow Model and Agent preparation still contains a second Agent and
-    Workspace contribution interpreter. The required domain-owned preparation
-    consolidation is tracked by `WF-PREPARE-004`.
+  - `S/contributionruntime` owns neutral source-pinned Agent and Workspace
+    contribution preparation. Workflow and normal Session setup consume the
+    same contract.
+  - Core Runtime remains Artifact Store independent.
 
 ##### `ARC-DOMAIN-003.a` Move contribution preparation to owning domains
 
-- Status: Partial.
-- Remaining functional gap:
-  - `sessionv3runtime/llm_plan.go:applyAgentPlan` and
-    `workflowruntime/model_agent_adapter.go` independently traverse Agent and
-    Workspace capability facts. The Workflow path also omits Workspace runtime
-    prompt and context materialization.
-  - Agent, Workspace, Model, Text, Tool, Skill, and MCP domains must expose
-    one neutral prepared contribution result that normal Session setup and
-    Workflow setup both consume.
+- Status: Implemented.
+- Completion evidence:
+  - `S/contributionruntime.Preparer` resolves Agent and Workspace domain
+    capability facts, Workspace runtime-plan prompt facts, and immutable pins.
+  - `S/sessionv3runtime/llm_plan.go` consumes that contract for normal Session
+    LLM preparation.
+  - `S/workflowruntime/model_agent_adapter.go` uses the same contract for
+    Workflow Model and Agent preparation.
 
 ##### `ARC-DOMAIN-003.b` Move attachment and Model conversion to owning domains
 
@@ -2006,12 +1992,14 @@ the implemented behavior.
 
 #### `ARC-DUP-003` Remove replicated effective state and duplicated execution algorithms
 
-- Status: Partial.
+- Status: Implemented.
 - Completion evidence:
   - `persistLocked` is the sole committed ready-work launcher.
   - `runtime_lifecycle.go` is the shared Runtime terminal lifecycle.
   - `ModelDispatchPlan` is the canonical immutable LLM plan and generated
     Tool WorkItems retain canonical origin-plan references.
+  - `attachmentruntime.SessionV3Admitter` is the canonical V3 attachment
+    admission implementation.
 
 ##### `ARC-DUP-003.a` Retain one canonical effective plan
 
@@ -2041,17 +2029,15 @@ the implemented behavior.
 
 ##### `ARC-DUP-003.d` Keep one V3 attachment admission implementation
 
-- Status: Not implemented.
-- Source evidence:
-  - `attachmentruntime/sessionv3_admission.go` and
-    `sessionv3runtime/attachments.go` both implement V3 file, directory, and
-    URL admission, snapshot, mode, and digest behavior.
-  - `sessionv3runtime.Binder` uses
-    `attachmentruntime.NewSessionV3Admitter`, leaving the second implementation
-    as parallel behavior that can drift.
-- Required behavior:
-  - Keep one Attachment-domain implementation and reduce any remaining setup
-    symbol to a non-behavioral forwarding compatibility layer or remove it.
+- Status: Implemented.
+- Completion evidence:
+  - `S/attachmentruntime/sessionv3_admission.go` is the only public V3
+    admission implementation for file, directory, and URL sources.
+  - It preserves immutable content, digest, label, directory-relative label,
+    and URL source facts in the durable Attachment snapshot.
+  - `S/sessionv3runtime/attachments.go:V3AttachmentAdmitter.AdmitAttachments`
+    is a compatibility forwarding layer to
+    `attachmentruntime.SessionV3Admitter`.
 
 ### Runtime setup lifecycle
 
@@ -2074,93 +2060,97 @@ work, migration cleanup, cost metering, or version changes.
 
 #### `RT-DISPATCH-004` Make committed persistence the one normal ready-work launch authority
 
-- Status: Not implemented.
-- Required behavior:
-  - `persistLocked` is the one normal committed checkpoint-to-ready-work
-    boundary.
-  - Remove manual ready-work launches after successful persistence from
-    command, trigger, timer, budget, and settlement paths.
-  - Retain one explicit Session-wide ready-work wave only after complete
-    restore finishes.
+- Status: Implemented.
+- Completion evidence:
+  - `R/runtime.go:persistLocked` launches normal ready work only after the
+    durable checkpoint commits.
+  - Normal budget, timer, trigger, settlement, App Tool, and edit-and-resend
+    paths persist through that boundary without a second launch wave.
+  - `R/Runtime.Restore` retains one explicit post-restore Session-wide wave.
 
 ##### `RT-DISPATCH-004.a` Remove duplicated normal ready-work launches
 
-- Status: Not implemented.
-- Required behavior:
-  - Route every normal ready-work launch through `persistLocked`.
-  - Keep dispatch guards as safety checks, not as the mechanism that hides
-    duplicated launch waves.
+- Status: Implemented.
+- Completion evidence:
+  - `R/normal_app.go`, `R/normal_session.go`, `R/runtime_durability.go`, and
+    `R/runtime_triggers.go` no longer launch ready work after `persistLocked`.
+  - Dispatch guards remain stale-work and idempotency safety checks only.
 
 ##### `RT-DISPATCH-004.b` Preserve complete restore readiness behavior
 
-- Status: Not implemented.
-- Required behavior:
-  - Keep the post-restore Session-wide readiness wave after all restored
-    Sessions, timers, trigger recovery, waits, and reconciliation state are
-    stable.
+- Status: Implemented.
+- Completion evidence:
+  - `R/runtime.go:Restore` clears `restoring` only after
+    `resumeRestoredWork`, then launches one Session-wide ready-work wave.
 
 #### `RT-PORT-BUDGET-004` Account nested Workflow port records at their semantic owner
 
-- Status: Not implemented.
-- Required behavior:
-  - Charge published input-port records to the receiving child frame and its
-    effective structured budget scope.
-  - Persist receiving-side ownership in forwarded-port facts so a parent-side
-    forwarded record does not use a foreign child WorkItem or frame identity.
-  - Charge every retained source and forwarded record exactly at the boundary
-    that owns that retained record.
+- Status: Implemented.
+- Completion evidence:
+  - `R/ports_runtime.go:appendPublishedWorkflowPortInputLocked` reserves the
+    receiving child frame and its effective scope.
+  - `R/ports.go:ChannelForward` retains receiving WorkItem, frame, and scope
+    facts for each durable forwarding edge.
+  - `R/ports_runtime.go:appendForwardedChannelMessageLocked` charges the
+    receiving parent owner for each retained forwarded record.
 
 ##### `RT-PORT-BUDGET-004.a` Account published child input records
 
-- Status: Not implemented.
-- Required behavior:
-  - Use the child frame identity already available during published-port input
-    staging when reserving message count and message byte budget.
+- Status: Implemented.
+- Completion evidence:
+  - Published input staging uses `childFrame.ID` and
+    `childFrame.BudgetScopeID` through
+    `reserveMessageBudgetForSemanticOwnerLocked`.
 
 ##### `RT-PORT-BUDGET-004.b` Account cross-Execution forwarded records
 
-- Status: Not implemented.
-- Required behavior:
-  - Extend `ChannelForward` with receiving-side owner facts and use them for
-    parent Execution budget attribution.
+- Status: Implemented.
+- Completion evidence:
+  - Forward creation persists receiving ownership from the parent child-call
+    boundary.
+  - Forward delivery rejects unavailable receiving owners and never charges a
+    target Execution through source-side identities.
 
 #### `WF-PREPARE-004` Preserve complete, domain-owned Workflow Model and Agent invocation meaning
 
-- Status: Not implemented.
-- Required behavior:
-  - Replace Workflow-specific Agent and Workspace capability walkers with one
-    neutral, source-pinned domain-prepared contribution result.
-  - Capture the actual Workspace runtime-plan instructions, user context,
-    selected pins, Tool selections, Skills, MCP selections, Model prompt
-    behavior, and contribution order before `ProgramSnapshot` creation.
-  - Do not mark Workspace prompt facts prepared when the prompt and context
-    payload is absent.
-  - Consume the captured order and facts during Workflow LLM binding. Private
-    resource reconstruction may use captured pins but must not rebuild current
-    Agent or Workspace contribution graphs.
+- Status: Implemented.
+- Completion evidence:
+  - `S/contributionruntime/prepared.go` produces the common neutral
+    source-pinned contribution contract.
+  - It captures Workspace runtime-plan instructions, user context, selected
+    Text, Tool, Skill, MCP, Model prompt behavior, immutable pins, and typed
+    contribution order before Workflow ProgramSnapshot creation.
+  - `PreparedContributionPlan.WorkspacePromptPrepared` is set only with a
+    complete immutable `WorkspacePrompt` payload.
+  - `S/sessionv3runtime/workflow_invocation.go` consumes captured order and
+    facts without graph traversal. Recovery uses the immutable dispatch plan.
 
 ##### `WF-PREPARE-004.a` Reuse owner-domain contribution preparation
 
-- Status: Not implemented.
-- Required behavior:
-  - Make normal V3 setup and Workflow setup consume the same Agent and
-    Workspace prepared contribution semantics.
+- Status: Implemented.
+- Completion evidence:
+  - Normal `S/sessionv3runtime/llm_plan.go` and Workflow
+    `S/workflowruntime/model_agent_adapter.go` both call
+    `S/contributionruntime.Preparer`.
 
 ##### `WF-PREPARE-004.b` Preserve and consume complete Workspace invocation facts
 
-- Status: Not implemented.
-- Required behavior:
-  - Persist and apply Workspace prompt instructions, user context, and
-    deterministic contribution order for Workflow Model and Agent calls.
+- Status: Implemented.
+- Completion evidence:
+  - Workspace runtime-plan prompt instructions and user context are retained
+    in `PreparedContributionPlan.WorkspacePrompt`.
+  - `applyPreparedContributionPlan` applies the persisted typed order when it
+    composes Workflow Model and Agent child invocation facts.
 
 #### `V3-STORE-004` Provide Store-owned semantic Session export
 
-- Status: Not implemented.
-- Required behavior:
-  - Add a V3 Store export that reads the durable Session document and returns
-    semantic Session data only.
-  - Expose the export through `SessionV3Wrapper`.
-  - Do not read live private bindings, clients, callbacks, Artifact Store, or
-    frontend state while producing the export.
-  - This is V3 backend functionality. It does not create V2 conversion,
-    retirement, or deletion work.
+- Status: Implemented.
+- Completion evidence:
+  - `internal/sessionstorev3.Store.ExportSemanticSession` reads only the
+    durable Session document through `ReadSession`.
+  - `cmd/agentgo/SessionV3Wrapper.ExportSession` exposes that Store-owned
+    semantic export.
+  - The export has no dependency on live Runtime maps, private bindings,
+    clients, callbacks, Artifact Store, or frontend state.
+  - The capability adds no V2 conversion, retirement, deletion, migration, or
+    version-change work.

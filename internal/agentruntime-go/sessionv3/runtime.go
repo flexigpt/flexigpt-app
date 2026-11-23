@@ -116,6 +116,9 @@ func (r *Runtime) Restore(ctx context.Context) error {
 	}
 	r.resumeRestoredWork(ctx)
 
+	// Restore is the one explicit readiness wave that is outside
+	// persistLocked. At this point every restored Session, trigger, wait,
+	// reconciliation, and due-time fact is stable.
 	r.mu.Lock()
 	r.restoring = false
 	ready := make(map[SessionID][]readyExecutionWork, len(r.sessions))
@@ -3011,11 +3014,8 @@ func (r *Runtime) blockWorkForBudgetLocked(
 	if err := r.persistLocked(ctx, reason, session); err != nil {
 		return
 	}
-
 	r.armSessionExecutionTimersLocked(ctx, session)
-	ready := r.readyWorkForSessionLocked(session)
 	r.publishLocked(ctx, session, execution.ID, RuntimeEventWorkChanged)
-	r.launchReadyWork(ctx, session.ID, ready)
 }
 
 func (r *Runtime) startDispatchedLocked(
@@ -3767,7 +3767,6 @@ func (r *Runtime) expireAt(
 		*execution,
 	)
 	r.publishLocked(ctx, session, execution.ID, RuntimeEventWaitChanged)
-	r.launchWork(ctx, sessionID, executionID, r.readyWorkLocked(*execution))
 }
 
 func (r *Runtime) finishPanickedWork(
@@ -4197,9 +4196,9 @@ func (r *Runtime) persistLocked(ctx context.Context, reason string, session *Ses
 	// post-commit dispatcher computes readiness.
 	delete(r.checkpointPending, session.ID)
 
-	// All durable command, settlement, retry, wait, and resource paths pass
-	// through persistLocked. Launch only after the authoritative checkpoint
-	// has committed. Dispatch guards make duplicate launch requests harmless.
+	// All normal command, settlement, retry, wait, resource, timer, trigger,
+	// and port paths pass through persistLocked. This is the only normal
+	// post-checkpoint ready-work launch boundary.
 	r.scheduleCommittedFrameClosuresLocked(session)
 	if !r.closed && !r.restoring {
 		r.launchReadyWork(

@@ -223,6 +223,13 @@ func sessionV3AttachmentSnapshot(
 	ctx context.Context,
 	value attachmentRuntime.Attachment,
 ) (sessionv3Runtime.Attachment, error) {
+	sourceURL := ""
+	if value.URLRef != nil {
+		sourceURL = strings.TrimSpace(value.URLRef.Normalized)
+		if sourceURL == "" {
+			sourceURL = strings.TrimSpace(value.URLRef.URL)
+		}
+	}
 	blocks, err := attachmentRuntime.BuildContentBlocks(ctx, []attachmentRuntime.Attachment{value})
 	if err != nil || len(blocks) != 1 {
 		return sessionv3Runtime.Attachment{}, errors.Join(
@@ -230,9 +237,15 @@ func sessionV3AttachmentSnapshot(
 			errors.New("attachment did not produce one immutable content block"),
 		)
 	}
-	output := sessionv3Runtime.Attachment{Label: value.Label}
+	output := sessionv3Runtime.Attachment{
+		Label:     value.Label,
+		SourceURL: sourceURL,
+	}
 	if blocks[0].MIMEType != nil {
 		output.MIMEType = *blocks[0].MIMEType
+	}
+	if blocks[0].URL != nil {
+		output.URL = strings.TrimSpace(*blocks[0].URL)
 	}
 	switch blocks[0].Kind {
 	case attachmentRuntime.ContentBlockText:

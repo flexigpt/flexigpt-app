@@ -579,10 +579,8 @@ func (r *Runtime) EditAndResend(
 		r.mu.Unlock()
 		return nil, err
 	}
-	ready := r.readyWorkForSessionLocked(session)
 	r.publishLocked(ctx, session, current.ID, RuntimeEventExecutionChanged)
 	r.mu.Unlock()
-	r.launchReadyWork(ctx, session.ID, ready)
 	return &receipt, nil
 }
 

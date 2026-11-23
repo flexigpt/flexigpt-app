@@ -475,7 +475,7 @@ func (r *Runtime) waitForTrigger(
 		return
 	}
 	r.consumeDueTimeLocked(triggerDueTimeKey(sessionID, triggerID))
-	ready, changed, err := r.fireScheduledTriggerLocked(
+	_, changed, err := r.fireScheduledTriggerLocked(
 		persistContext,
 		session,
 		registration,
@@ -502,7 +502,6 @@ func (r *Runtime) waitForTrigger(
 		RuntimeEventExecutionChanged,
 	)
 	r.mu.Unlock()
-	r.launchReadyWork(persistContext, sessionID, ready)
 }
 
 func (r *Runtime) fireScheduledTriggerLocked(

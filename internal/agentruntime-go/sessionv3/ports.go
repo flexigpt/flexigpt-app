@@ -77,6 +77,10 @@ type ChannelForward struct {
 	ChannelSchema     jsonutil.CanonicalValue `json:"channelSchema"`
 	MaxMessages       int                     `json:"maxMessages,omitempty"`
 	MaxBytes          int                     `json:"maxBytes,omitempty"`
+
+	ReceivingWorkItemID  WorkItemID     `json:"receivingWorkItemID,omitempty"`
+	ReceivingFrameID     ProgramFrameID `json:"receivingFrameID,omitempty"`
+	ReceivingBudgetScope string         `json:"receivingBudgetScope,omitempty"`
 }
 
 func (m FramePortDeliveryMode) Validate() error {
@@ -247,6 +251,30 @@ func (f ChannelForward) Validate() error {
 	}
 	if f.MaxMessages < 0 || f.MaxBytes < 0 {
 		return errors.New("channel forward retention limit is invalid")
+	}
+	if f.ReceivingWorkItemID != "" {
+		if err := validateID(
+			"channel forward receiving work item ID",
+			string(f.ReceivingWorkItemID),
+		); err != nil {
+			return err
+		}
+	}
+	if f.ReceivingFrameID != "" {
+		if err := validateID(
+			"channel forward receiving frame ID",
+			string(f.ReceivingFrameID),
+		); err != nil {
+			return err
+		}
+	}
+	if f.ReceivingBudgetScope != "" {
+		if err := validateID(
+			"channel forward receiving budget scope",
+			f.ReceivingBudgetScope,
+		); err != nil {
+			return err
+		}
 	}
 	return nil
 }

@@ -6,8 +6,6 @@ import (
 	"errors"
 	"strings"
 	"time"
-
-	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 const (
@@ -438,31 +436,6 @@ func (r *Runtime) reserveActivityBudgetLocked(
 		execution,
 		activity.WorkItemID,
 		activity.FrameID,
-		bytes,
-	)
-}
-
-func (r *Runtime) reserveChannelMessageBudgetLocked(
-	execution *Execution,
-	data jsonutil.CanonicalValue,
-	correlation jsonutil.CanonicalValue,
-) error {
-	return r.reserveMessageBudgetLocked(
-		execution,
-		len(data)+len(correlation),
-	)
-}
-
-func (r *Runtime) reserveMessageBudgetLocked(
-	execution *Execution,
-	bytes int,
-) error {
-	if execution == nil {
-		return errors.New("execution budget owner is unavailable")
-	}
-	return r.reserveMessageBudgetForWorkLocked(
-		execution,
-		nil,
 		bytes,
 	)
 }
