@@ -262,47 +262,54 @@ func (r *Runtime) waitForRetry(
 	if execution.State.Terminal() ||
 		(execution.Controls.CancellationRequested &&
 			!r.cleanupDispatchAllowedLocked(*execution, *item)) {
-		item.State = WorkItemStateCancelled
-		item.CompletedAt = &now
-		item.UpdatedAt = now
-		item.RetryState = nil
-		r.touchExecutionLocked(session, execution)
-		_ = r.persistLocked(persistContext, "retryCancelled", session)
-		return
-	}
-	if deadline := r.effectiveWorkDeadlineLocked(*execution, *item); deadline != nil &&
-		!now.Before(deadline.UTC()) {
-		item.State = WorkItemStateFailed
-		item.Error = deadlineError()
-		item.CompletedAt = &now
-		item.UpdatedAt = now
-		item.RetryState = nil
-		r.advanceSettledWorkLocked(
+		failure := &SanitizedError{
+			Code:     workflowCancelledBeforeInvocation,
+			Category: ErrorCategoryCancellation,
+			Message:  "retry was cancelled before external invocation",
+		}
+		execution = r.settleUndispatchedWorkLocked(
 			session,
 			execution,
-			item.FrameID,
-			item.ID,
+			item,
+			WorkItemStateCancelled,
+			failure,
+			true,
 		)
-		execution = mutableSessionExecution(session, executionID)
 		if execution == nil {
 			return
 		}
-		r.refreshExecutionStateLocked(execution)
-		r.touchExecutionLocked(session, execution)
-		if err := r.persistLocked(persistContext, "retryDeadlineElapsed", session); err != nil {
-			return
-		}
+		_ = r.persistLocked(persistContext, "retryCancelled", session)
+		r.armSessionExecutionTimersLocked(persistContext, session)
 		r.publishLocked(
 			persistContext,
 			session,
 			execution.ID,
 			RuntimeEventWorkChanged,
 		)
-		r.launchWork(
+		return
+	}
+	if deadline := r.effectiveWorkDeadlineLocked(*execution, *item); deadline != nil &&
+		!now.Before(deadline.UTC()) {
+		execution = r.settleUndispatchedWorkLocked(
+			session,
+			execution,
+			item,
+			WorkItemStateFailed,
+			deadlineError(),
+			true,
+		)
+		if execution == nil {
+			return
+		}
+		if err := r.persistLocked(persistContext, "retryDeadlineElapsed", session); err != nil {
+			return
+		}
+		r.armSessionExecutionTimersLocked(persistContext, session)
+		r.publishLocked(
 			persistContext,
-			session.ID,
+			session,
 			execution.ID,
-			r.readyWorkLocked(*execution),
+			RuntimeEventWorkChanged,
 		)
 		return
 	}
@@ -319,11 +326,5 @@ func (r *Runtime) waitForRetry(
 		session,
 		execution.ID,
 		RuntimeEventWorkChanged,
-	)
-	r.launchWork(
-		persistContext,
-		session.ID,
-		execution.ID,
-		r.readyWorkLocked(*execution),
 	)
 }

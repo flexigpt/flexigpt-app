@@ -1199,14 +1199,32 @@ func (r *Runtime) CancelExecution(ctx context.Context, command CancelExecutionCo
 				execution.ID,
 				firstText(command.Reason, "execution was cancelled"),
 			)
-			rootFrames := make([]ProgramFrameID, 0, len(execution.ProgramFrames))
-			for index := range execution.WorkItems {
-				r.cancelFrameWorkItemLocked(
-					execution,
-					&execution.WorkItems[index],
-					now,
-				)
+			executionID := execution.ID
+			workItemIDs := make([]WorkItemID, 0, len(execution.WorkItems))
+			for _, item := range execution.WorkItems {
+				if item.State.Terminal() {
+					continue
+				}
+				workItemIDs = append(workItemIDs, item.ID)
 			}
+			for _, workItemID := range workItemIDs {
+				current := mutableSessionExecution(session, executionID)
+				if current == nil {
+					return nil, ErrExecutionNotFound
+				}
+				item := mutableWorkItem(current, workItemID)
+				if item == nil || item.State.Terminal() {
+					continue
+				}
+				r.cancelFrameWorkItemLocked(session, current, item)
+			}
+			execution = mutableSessionExecution(session, executionID)
+			if execution == nil {
+				return nil, ErrExecutionNotFound
+			}
+
+			rootFrames := make([]ProgramFrameID, 0, len(execution.ProgramFrames))
+
 			for _, frame := range execution.ProgramFrames {
 				if frame.ParentFrameID == "" &&
 					!frame.Status.Terminal() &&
@@ -1706,21 +1724,36 @@ func (r *Runtime) resolveRecoveryWaitLocked(
 	wait.UpdatedAt = now
 	delete(r.privateWaits, wait.ID)
 
-	outcome := ExecutionOutcome{
-		Kind:        ExecutionOutcomeFailed,
-		Code:        "recovery_outcome_uncertain",
-		Message:     "An external WorkItem outcome was uncertain after recovery and was not replayed.",
-		CompletedAt: now,
-	}
 	if command.Resolution == WaitResolutionCancel {
-		outcome = ExecutionOutcome{
-			Kind:        ExecutionOutcomeCancelled,
-			Code:        "recovery_cancelled",
-			Message:     "Execution was cancelled during recovery review.",
-			CompletedAt: now,
+		r.cancelIndependentExecutionLocked(
+			ctx,
+			session,
+			execution,
+			"execution was cancelled during recovery review",
+		)
+	} else {
+		if err := r.settleRecoveredReviewWorkLocked(
+			session,
+			execution,
+		); err != nil {
+			*session = previous
+			return nil, err
 		}
 	}
-	r.completeExecutionLocked(ctx, session, execution, outcome)
+
+	execution = mutableSessionExecution(session, execution.ID)
+	if execution == nil {
+		*session = previous
+		return nil, ErrExecutionNotFound
+	}
+	r.refreshExecutionStateLocked(execution)
+	r.settleTerminalExecutionLocked(session, execution)
+	execution = mutableSessionExecution(session, execution.ID)
+	if execution == nil {
+		*session = previous
+		return nil, ErrExecutionNotFound
+	}
+	r.touchExecutionLocked(session, execution)
 
 	receipt := CommandReceipt{
 		CommandID:         command.Meta.ID,
@@ -1736,6 +1769,10 @@ func (r *Runtime) resolveRecoveryWaitLocked(
 		*session = previous
 		return nil, err
 	}
+	r.armSessionExecutionTimersLocked(
+		ctx,
+		session,
+	)
 	r.publishLocked(ctx, session, execution.ID, RuntimeEventWaitChanged)
 	return &receipt, nil
 }
@@ -4439,7 +4476,10 @@ func (r runtimeRestorer) RestoreSession(ctx context.Context, value Session) erro
 		return fmt.Errorf("duplicate restored Session %q", value.ID)
 	}
 	copyValue := cloneSession(value)
-	changed := r.runtime.recoverLocked(&copyValue)
+	changed, recoverErr := r.runtime.recoverLocked(&copyValue)
+	if recoverErr != nil {
+		return recoverErr
+	}
 	if _, retired := r.runtime.retired[copyValue.ID]; retired {
 		return fmt.Errorf("restored Session %q is tombstoned", copyValue.ID)
 	}
@@ -4488,7 +4528,12 @@ func (r runtimeRestorer) RestoreSessionTombstone(
 	return nil
 }
 
-func (r *Runtime) recoverLocked(session *Session) bool {
+func (r *Runtime) recoverLocked(
+	session *Session,
+) (bool, error) {
+	if session == nil {
+		return false, nil
+	}
 	changed := false
 	now := r.now()
 	for executionIndex := range session.Executions {
@@ -4533,6 +4578,12 @@ func (r *Runtime) recoverLocked(session *Session) bool {
 				}
 				//nolint:gocritic // No switch.
 				if replaySafe {
+					r.appendRecoveredInterruptedAssistantActivitiesLocked(
+						session,
+						execution,
+						*item,
+						now,
+					)
 					item.State = WorkItemStateReady
 					item.Binding = retainedBinding
 					item.Output = nil
@@ -4541,6 +4592,7 @@ func (r *Runtime) recoverLocked(session *Session) bool {
 					item.CompletedAt = nil
 					item.DispatchedAt = nil
 					item.RetryState = nil
+					item.LLMStream = nil
 					item.Requested = item.Automatic
 				} else if r.reconciliationRequiredLocked(execution, item) {
 					item.State = WorkItemStateReconciling
@@ -4548,6 +4600,12 @@ func (r *Runtime) recoverLocked(session *Session) bool {
 					item.RetryState = nil
 					item.Requested = false
 				} else {
+					if outcomeErr := r.recordUncertainWorkflowStepOutcomeLocked(
+						execution,
+						item,
+					); outcomeErr != nil {
+						return changed, outcomeErr
+					}
 					needsReview = true
 				}
 			default:
@@ -4569,7 +4627,39 @@ func (r *Runtime) recoverLocked(session *Session) bool {
 				wait.UpdatedAt = now
 				changed = true
 			}
-			if wait.Request.RuntimeBound && (wait.Status == WaitStatusPending || wait.Status == WaitStatusResolving) {
+			if !wait.Request.RuntimeBound ||
+				(wait.Status != WaitStatusPending &&
+					wait.Status != WaitStatusResolving) {
+				continue
+			}
+
+			item := mutableWorkItem(execution, wait.WorkItemID)
+			if item != nil && item.State == WorkItemStateWaiting {
+				wait.Status = WaitStatusCancelled
+				wait.Error = &SanitizedError{
+					Code:     "recovered_runtime_wait_rebound",
+					Category: ErrorCategoryCancellation,
+					Message:  "runtime-bound wait will be recreated from the captured operation",
+				}
+				wait.UpdatedAt = now
+				r.cancelWaitDeadlineLocked(wait.ID)
+				delete(r.privateWaits, wait.ID)
+
+				item.WaitID = ""
+				item.State = WorkItemStateReady
+				item.Output = nil
+				item.Error = nil
+				item.RetryState = nil
+				item.ResourceWait = nil
+				item.BudgetConcurrencyWait = false
+				item.EffectState = undispatchedEffectState(item.Effect)
+				item.Requested = true
+				item.UpdatedAt = now
+				changed = true
+				continue
+			}
+
+			if wait.Request.RuntimeBound {
 				wait.Status = WaitStatusInvalid
 				wait.Error = &SanitizedError{
 					Code:    "recovered_runtime_wait_unavailable",
@@ -4623,7 +4713,30 @@ func (r *Runtime) recoverLocked(session *Session) bool {
 	if changed {
 		r.touchSessionLocked(session)
 	}
-	return changed
+	return changed, nil
+}
+
+func (r *Runtime) appendRecoveredInterruptedAssistantActivitiesLocked(
+	session *Session,
+	execution *Execution,
+	item WorkItem,
+	now time.Time,
+) {
+	if r == nil ||
+		session == nil ||
+		execution == nil ||
+		item.Type != WorkItemTypeLLM ||
+		item.LLMStream == nil {
+		return
+	}
+
+	for _, activity := range interruptedAssistantActivities(item) {
+		activity.ID = ActivityID(r.newID())
+		activity.CreatedAt = now
+		activity.ExecutionID = execution.ID
+		activity.FrameID = item.FrameID
+		session.Timeline = append(session.Timeline, activity)
+	}
 }
 
 // retainedLLMDispatchBinding preserves durable semantic LLM facts while
@@ -4638,4 +4751,70 @@ func retainedLLMDispatchBinding(item WorkItem) *SemanticBinding {
 
 	value := jsonutil.CloneJSONInValue(*item.Binding)
 	return &value
+}
+
+func (r *Runtime) settleRecoveredReviewWorkLocked(
+	session *Session,
+	execution *Execution,
+) error {
+	if session == nil || execution == nil {
+		return errors.New("recovery review execution is unavailable")
+	}
+
+	executionID := execution.ID
+	workItemIDs := make([]WorkItemID, 0)
+	for _, item := range execution.WorkItems {
+		if item.State == WorkItemStateUncertain {
+			workItemIDs = append(workItemIDs, item.ID)
+		}
+	}
+
+	for _, workItemID := range workItemIDs {
+		current := mutableSessionExecution(session, executionID)
+		if current == nil {
+			return ErrExecutionNotFound
+		}
+		item := mutableWorkItem(current, workItemID)
+		if item == nil || item.State != WorkItemStateUncertain {
+			continue
+		}
+
+		now := r.now()
+		if item.Error == nil {
+			item.Error = &SanitizedError{
+				Code:     "recovery_outcome_uncertain",
+				Category: ErrorCategoryUncertainty,
+				Effect:   EffectStateUncertain,
+				Message:  "external work remained uncertain after recovery review",
+			}
+		}
+		item.State = WorkItemStateFailed
+		item.CompletedAt = &now
+		item.UpdatedAt = now
+
+		r.advanceSettledWorkLocked(
+			session,
+			current,
+			item.FrameID,
+			item.ID,
+		)
+
+		current = mutableSessionExecution(session, executionID)
+		if current == nil {
+			return ErrExecutionNotFound
+		}
+		item = mutableWorkItem(current, workItemID)
+		if item == nil {
+			continue
+		}
+		r.wakeCompletionWorkWaitsLocked(session, current, *item)
+
+		current = mutableSessionExecution(session, executionID)
+		if current == nil {
+			return ErrExecutionNotFound
+		}
+		r.resumeSagaCompensationFramesLocked(session, current)
+	}
+
+	return nil
 }

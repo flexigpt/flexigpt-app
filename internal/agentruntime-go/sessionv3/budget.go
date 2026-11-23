@@ -880,7 +880,6 @@ func (r *Runtime) waitForExecutionDeadline(
 	}
 	r.consumeDueTimeLocked(executionDeadlineDueTimeKey(executionID))
 
-	now := r.now()
 	execution.Controls.CancellationRequested = true
 	execution.State = ExecutionStateCancelling
 	primary := &SanitizedError{
@@ -890,9 +889,20 @@ func (r *Runtime) waitForExecutionDeadline(
 	}
 	r.beginCleanupLocked(execution, primary)
 
-	for index := range execution.WorkItems {
-		item := &execution.WorkItems[index]
+	workItemIDs := make([]WorkItemID, 0, len(execution.WorkItems))
+	for _, item := range execution.WorkItems {
 		if item.Cleanup || item.State.Terminal() {
+			continue
+		}
+		workItemIDs = append(workItemIDs, item.ID)
+	}
+	for _, workItemID := range workItemIDs {
+		execution = mutableSessionExecution(session, executionID)
+		if execution == nil {
+			return
+		}
+		item := mutableWorkItem(execution, workItemID)
+		if item == nil || item.Cleanup || item.State.Terminal() {
 			continue
 		}
 		switch item.State {
@@ -901,15 +911,17 @@ func (r *Runtime) waitForExecutionDeadline(
 			WorkItemStateResourceWaiting,
 			WorkItemStateRetryWaiting,
 			WorkItemStateWaiting:
-			if cancel := r.cancels[item.ID]; cancel != nil {
-				cancel()
-				delete(r.cancels, item.ID)
+			execution = r.settleUndispatchedWorkLocked(
+				session,
+				execution,
+				item,
+				WorkItemStateCancelled,
+				primary,
+				false,
+			)
+			if execution == nil {
+				return
 			}
-			r.cancelResourceWaitLocked(item.ID)
-			r.cancelRetryLocked(item.ID)
-			item.State = WorkItemStateCancelled
-			item.CompletedAt = &now
-			item.UpdatedAt = now
 		case WorkItemStateDispatched:
 			if cancel := r.cancels[item.ID]; cancel != nil {
 				cancel()
@@ -917,6 +929,10 @@ func (r *Runtime) waitForExecutionDeadline(
 			}
 		default:
 		}
+	}
+	execution = mutableSessionExecution(session, executionID)
+	if execution == nil {
+		return
 	}
 	frameIDs := make([]ProgramFrameID, 0, len(execution.ProgramFrames))
 	for _, frame := range execution.ProgramFrames {
@@ -955,11 +971,5 @@ func (r *Runtime) waitForExecutionDeadline(
 		session.ID,
 		execution.ID,
 		*execution,
-	)
-	r.launchWork(
-		persistContext,
-		session.ID,
-		execution.ID,
-		r.readyWorkLocked(*execution),
 	)
 }

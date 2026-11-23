@@ -5,6 +5,7 @@ const (
 	completionCancelled               = "completion_cancelled"
 	workflowProgramFrameFailedCode    = "program_frame_failed"
 	workflowProgramFrameCancelledCode = "program_frame_cancelled"
+	workflowCancelledBeforeInvocation = "cancelled_before_invocation"
 	workflowProgramFrameFailedMessage = "a root program frame failed"
 	workflowProgramFrameCancelMessage = "a root program frame was cancelled"
 	cleanupDeadlineExceededCode       = "cleanup_deadline_elapsed"

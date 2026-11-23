@@ -947,6 +947,14 @@ func workflowProgramRunsCleanup(
 	}
 }
 
+func workflowFrameIntentRunsCleanup(
+	intent ProgramFrameIntent,
+) bool {
+	return intent.Cleanup ||
+		workflowProgramRunsCleanup(intent.Program)
+}
+
 func workflowFrameRunsCleanup(frame ProgramFrame) bool {
-	return workflowProgramRunsCleanup(frame.Program)
+	return frame.Cleanup ||
+		workflowProgramRunsCleanup(frame.Program)
 }

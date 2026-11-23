@@ -553,23 +553,55 @@ func (r *Runtime) waitForResource(
 	if execution.State.Terminal() ||
 		(execution.Controls.CancellationRequested &&
 			!r.cleanupDispatchAllowedLocked(*execution, *item)) {
-		item.State = WorkItemStateCancelled
-		item.ResourceWait = nil
-		item.UpdatedAt = r.now()
-		r.touchExecutionLocked(session, execution)
+		failure := &SanitizedError{
+			Code:     workflowCancelledBeforeInvocation,
+			Category: ErrorCategoryCancellation,
+			Message:  "resource wait was cancelled before external invocation",
+		}
+		execution = r.settleUndispatchedWorkLocked(
+			session,
+			execution,
+			item,
+			WorkItemStateCancelled,
+			failure,
+			true,
+		)
+		if execution == nil {
+			return
+		}
 		_ = r.persistLocked(persistContext, "resourceWaitCancelled", session)
+		r.armSessionExecutionTimersLocked(persistContext, session)
+		r.publishLocked(
+			persistContext,
+			session,
+			execution.ID,
+			RuntimeEventWorkChanged,
+		)
 		return
 	}
 	if deadline := r.effectiveWorkDeadlineLocked(*execution, *item); deadline != nil &&
 		!r.now().Before(deadline.UTC()) {
-		now := r.now()
-		item.State = WorkItemStateFailed
-		item.Error = deadlineError()
-		item.CompletedAt = &now
-		item.ResourceWait = nil
-		item.UpdatedAt = now
-		r.touchExecutionLocked(session, execution)
-		_ = r.persistLocked(persistContext, "resourceDeadlineElapsed", session)
+		execution = r.settleUndispatchedWorkLocked(
+			session,
+			execution,
+			item,
+			WorkItemStateFailed,
+			deadlineError(),
+			true,
+		)
+		if execution == nil {
+			return
+		}
+		if err := r.persistLocked(persistContext, "resourceDeadlineElapsed", session); err != nil {
+			return
+		}
+		r.armSessionExecutionTimersLocked(persistContext, session)
+		r.publishLocked(
+			persistContext,
+			session,
+			execution.ID,
+			RuntimeEventWorkChanged,
+		)
 		return
 	}
 	item.State = WorkItemStateReady
@@ -584,12 +616,6 @@ func (r *Runtime) waitForResource(
 		session,
 		execution.ID,
 		RuntimeEventWorkChanged,
-	)
-	r.launchWork(
-		persistContext,
-		session.ID,
-		execution.ID,
-		r.readyWorkLocked(*execution),
 	)
 }
 

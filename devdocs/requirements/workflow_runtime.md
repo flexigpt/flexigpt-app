@@ -2575,12 +2575,16 @@ changes.
 
 ##### `RT-COMMAND-003.b` Keep generated occurrence time outside caller identity
 
-- Status: Partial.
+- Status: Implemented.
 - Completion result:
   - Copy caller identity before assigning a generated occurrence time.
   - Use that unchanged identity for durable command fingerprinting.
   - Keep the normalized generated time only in the durable occurrence record.
-- Completion evidence: Pending implementation.
+- Completion evidence:
+  - `R/runtime_triggers.go:acceptTriggerEvent` copies caller identity before
+    Runtime assigns or normalizes `OccurredAt`.
+  - `changeSession` fingerprints the unchanged identity while the mutation
+    closure persists the normalized trigger occurrence time.
 
 #### `RT-RECOVERY-003` Resume recovered operations through their actual owners
 
@@ -2612,7 +2616,12 @@ changes.
 
 ##### `RT-RECOVERY-003.a` Reconstruct pre-invocation domain waits
 
-- Status: Not implemented.
+- Status: Partial.
+- Implemented evidence:
+  - `R/runtime.go:recoverLocked` now requeues a waiting Runtime-bound WorkItem
+    from its retained semantic request.
+  - The prior private wait record is cancelled, then normal binding recreates
+    current domain-private authorization state after restore.
 - Completion result:
   - Distinguish a pre-invocation authorization wait from dispatched uncertain
     business work.
@@ -2620,7 +2629,9 @@ changes.
   - Obtain a new domain-owned private wait state when required.
   - Preserve logical operation identity, captured input, effect policy, and
     idempotency key.
-- Completion evidence: Pending implementation.
+- Completion evidence:
+  - Partial. Runtime-bound waits can now rebind. Other domain-specific private
+    wait forms still require explicit ownership classification.
 
 ##### `RT-RECOVERY-003.b` Resume the complete committed Session dependency wave
 
@@ -2636,7 +2647,13 @@ changes.
 
 ##### `RT-RECOVERY-003.c` Settle recovery review through operation lifecycle
 
-- Status: Not implemented.
+- Status: Partial.
+- Implemented evidence:
+  - `R/runtime.go:resolveRecoveryWaitLocked` now settles retained uncertain
+    WorkItems through owner advancement instead of immediately failing the
+    entire Execution.
+  - Recovery cancellation now uses Execution cancellation and cleanup
+    lifecycle rather than direct terminal replacement.
 - Completion result:
   - Preserve uncertainty when no domain evidence proves application or
     non-application.
@@ -2646,7 +2663,10 @@ changes.
     reconciliation, and compensation.
   - Do not force the whole Execution terminal before its owned settlement
     completes.
-- Completion evidence: Pending implementation.
+- Completion evidence:
+  - Partial. Original uncertain WorkItems now advance their owners. Recovery
+    review still needs complete reconciliation-specific and cross-Execution
+    settlement coverage.
 
 #### `RT-SETUP-003` Publish and release the composed backend Runtime safely
 
@@ -3258,11 +3278,15 @@ changes.
 
 ##### `DOMAIN-ATTACH-003.a` Carry labels and directory-relative names
 
-- Status: Partial.
+- Status: Implemented.
 - Completion result:
   - Populate the native image name from the admitted attachment label.
   - Retain the existing text and file label behavior.
-- Completion evidence: Pending implementation.
+- Completion evidence:
+  - `S/sessionv3runtime/inputs.go:attachmentToContentItem` now maps the
+    admitted image label to `ContentItemImage.ImageName`.
+  - Existing text and file conversion continue to preserve the admitted label
+    without reopening the original source.
 
 #### `ARC-DUP-003` Remove replicated effective state and duplicated execution algorithms
 

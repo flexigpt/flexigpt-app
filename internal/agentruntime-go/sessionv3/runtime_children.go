@@ -135,7 +135,7 @@ func childFrameDeadlineInputs(
 	parent ProgramFrame,
 	intent ProgramFrameIntent,
 ) (parentDeadline, intentDeadline *time.Time) {
-	if workflowProgramRunsCleanup(intent.Program) &&
+	if workflowFrameIntentRunsCleanup(intent) &&
 		execution.Cleanup.Active {
 		return cloneTime(execution.Cleanup.Deadline), nil
 	}
@@ -308,6 +308,7 @@ func (r *Runtime) createIndependentChildExecutionLocked(
 			Program:         intent.Program,
 			State:           state,
 			Status:          ProgramFrameStateRunning,
+			Cleanup:         workflowFrameIntentRunsCleanup(intent),
 			Path:            intent.Path,
 			DeclarationPath: intent.DeclarationPath,
 			CreatedAt:       now,
@@ -568,12 +569,22 @@ func completionExecutionResult(
 	case ExecutionOutcomeCompleted:
 		return value, nil, true
 	case ExecutionOutcomeCancelled:
+		if execution.Outcome.Error != nil {
+			return value, cloneWorkflowSanitizedError(
+				execution.Outcome.Error,
+			), true
+		}
 		return value, &SanitizedError{
 			Code:     completionCancelled,
 			Category: ErrorCategoryCancellation,
 			Message:  firstText(execution.Outcome.Message, "completed execution was cancelled"),
 		}, true
 	default:
+		if execution.Outcome.Error != nil {
+			return value, cloneWorkflowSanitizedError(
+				execution.Outcome.Error,
+			), true
+		}
 		return value, &SanitizedError{
 			Code:     firstText(execution.Outcome.Code, "completion_failed"),
 			Category: ErrorCategoryExecution,

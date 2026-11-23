@@ -254,6 +254,7 @@ func (i *WorkflowInterpreter) startCall(
 		Deadline:        cloneTime(frame.Deadline),
 		Budget:          cloneBudget(budget),
 		Lifetime:        intentLifetime,
+		Cleanup:         program.Scope.Cleanup || workflowProgramRunsCleanup(childProgram),
 		Ownership:       &ownership,
 		Ports:           clonePortPlans(ports),
 		PortDelivery:    FramePortDeliveryModeForwardOnly,

@@ -357,7 +357,7 @@ func (r *Runtime) settleUnstartedAttemptLocked(
 	failure := deadlineError()
 	if execution.Controls.CancellationRequested || execution.State.Terminal() {
 		failure = &SanitizedError{
-			Code:     "cancelled_before_invocation",
+			Code:     workflowCancelledBeforeInvocation,
 			Category: ErrorCategoryCancellation,
 			Message:  "work was cancelled before external invocation",
 		}
@@ -389,6 +389,132 @@ func (r *Runtime) settleUnstartedAttemptLocked(
 	}
 	r.publishLocked(ctx, session, execution.ID, RuntimeEventWorkChanged)
 	r.launchWork(ctx, session.ID, execution.ID, r.readyWorkLocked(*execution))
+}
+
+// settleUndispatchedWorkLocked settles work that has not crossed the native
+// invocation boundary. It is used by Runtime-owned retry, resource, and
+// deadline paths so they retain the ordinary owner, effect, resource, wait,
+// completion, Saga, and Execution consequences.
+func (r *Runtime) settleUndispatchedWorkLocked(
+	session *Session,
+	execution *Execution,
+	item *WorkItem,
+	terminalState WorkItemState,
+	failure *SanitizedError,
+	advanceOwner bool,
+) *Execution {
+	if session == nil || execution == nil || item == nil || item.State.Terminal() {
+		return execution
+	}
+	switch terminalState {
+	case WorkItemStateCancelled, WorkItemStateFailed, WorkItemStateBlocked:
+	default:
+		return execution
+	}
+
+	executionID := execution.ID
+	workItemID := item.ID
+	now := r.now()
+
+	if failure == nil {
+		failure = &SanitizedError{
+			Code:     "work_not_dispatched",
+			Category: ErrorCategoryCancellation,
+			Message:  "work ended before external invocation",
+		}
+	}
+
+	if cancel := r.cancels[item.ID]; cancel != nil {
+		cancel()
+		delete(r.cancels, item.ID)
+	}
+	delete(r.privateBindings, item.ID)
+	r.cancelRetryLocked(item.ID)
+	r.cancelResourceWaitLocked(item.ID)
+
+	if item.WaitID != "" {
+		if wait := mutableWait(execution, item.WaitID); wait != nil &&
+			(wait.Status == WaitStatusPending ||
+				wait.Status == WaitStatusResolving) {
+			wait.Status = WaitStatusCancelled
+			wait.Error = cloneWorkflowSanitizedError(failure)
+			wait.UpdatedAt = now
+		}
+		r.cancelWaitDeadlineLocked(item.WaitID)
+		delete(r.privateWaits, item.WaitID)
+		item.WaitID = ""
+	}
+
+	item.State = terminalState
+	item.Output = nil
+	item.Error = cloneWorkflowSanitizedError(failure)
+	item.CompletedAt = &now
+	item.UpdatedAt = now
+	item.RetryState = nil
+	item.ResourceWait = nil
+	item.BudgetConcurrencyWait = false
+
+	attempt := activeAttempt(execution, item.ID)
+	if attempt != nil {
+		switch terminalState {
+		case WorkItemStateCancelled:
+			attempt.State = AttemptStateCancelled
+		default:
+			attempt.State = AttemptStateFailed
+		}
+		attempt.FinishedAt = &now
+		attempt.Error = cloneWorkflowSanitizedError(failure)
+		attempt.Receipt = nil
+	}
+	recordEffectSettlement(
+		item,
+		attempt,
+		WorkExecutionResult{
+			Error:     item.Error,
+			Confirmed: true,
+		},
+	)
+
+	released := r.releaseWorkResourcesLocked(execution, item.ID)
+	r.wakeResourceWaitersLocked(execution, released)
+	if advanceOwner {
+		r.advanceSettledWorkLocked(
+			session,
+			execution,
+			item.FrameID,
+			item.ID,
+		)
+
+		execution = mutableSessionExecution(session, executionID)
+		if execution == nil {
+			return nil
+		}
+		item = mutableWorkItem(execution, workItemID)
+		if item == nil {
+			return execution
+		}
+	}
+	r.wakeCompletionWorkWaitsLocked(session, execution, *item)
+
+	execution = mutableSessionExecution(session, executionID)
+	if execution == nil {
+		return nil
+	}
+	r.resumeSagaCompensationFramesLocked(session, execution)
+
+	execution = mutableSessionExecution(session, executionID)
+	if execution == nil {
+		return nil
+	}
+	r.refreshExecutionStateLocked(execution)
+	r.settleTerminalExecutionLocked(session, execution)
+
+	execution = mutableSessionExecution(session, executionID)
+	if execution == nil {
+		return nil
+	}
+	r.touchExecutionLocked(session, execution)
+	return execution
 }
 
 // advanceSettledWorkLocked converts interpreter integrity failures into an

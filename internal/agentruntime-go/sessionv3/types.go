@@ -676,6 +676,7 @@ type ProgramFrame struct {
 	ID                ProgramFrameID          `json:"id"`
 	ParentFrameID     ProgramFrameID          `json:"parentFrameID,omitempty"`
 	Lifetime          ChildFrameLifetime      `json:"lifetime,omitempty"`
+	Cleanup           bool                    `json:"cleanup,omitempty"`
 	Depth             int                     `json:"depth,omitempty"`
 	Program           ProgramSnapshot         `json:"program"`
 	State             ProgramState            `json:"state"`
@@ -1582,6 +1583,7 @@ type ProgramFrameIntent struct {
 	Budget          *ExecutionBudget           `json:"budget,omitempty"`
 	Lifetime        ChildFrameLifetime         `json:"lifetime,omitempty"`
 	WorkflowNesting bool                       `json:"workflowNesting,omitempty"`
+	Cleanup         bool                       `json:"cleanup,omitempty"`
 	Ownership       *ChildExecutionOwnership   `json:"ownership,omitempty"`
 	Claims          []ResourceClaim            `json:"claims,omitempty"`
 	Ports           []PortPlan                 `json:"ports,omitempty"`

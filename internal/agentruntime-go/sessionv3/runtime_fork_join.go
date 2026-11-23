@@ -77,7 +77,7 @@ func (r *Runtime) deferFrameForkLocked(
 		seen[intent.ID] = struct{}{}
 		prepared = append(prepared, intent)
 		childIDs = append(childIDs, intent.ID)
-		if workflowProgramRunsCleanup(intent.Program) {
+		if workflowFrameIntentRunsCleanup(intent) {
 			cleanup = true
 		}
 	}
@@ -337,6 +337,7 @@ func (r *Runtime) materializeForkFramesLocked(
 			ParentFrameID:   parent.ID,
 			Lifetime:        lifetime,
 			Depth:           depth,
+			Cleanup:         workflowFrameIntentRunsCleanup(intent),
 			Program:         intent.Program,
 			State:           state,
 			Status:          ProgramFrameStateRunning,
