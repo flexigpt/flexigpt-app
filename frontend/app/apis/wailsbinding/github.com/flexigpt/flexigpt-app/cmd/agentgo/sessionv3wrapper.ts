@@ -76,6 +76,14 @@ export function Execution(sessionID: sessionv3$0.SessionID, executionID: session
     return $Call.ByName("main.SessionV3Wrapper.Execution", sessionID, executionID);
 }
 
+/**
+ * ExportSession reads the durable semantic Session document from Store v3.
+ * It does not read Runtime-private execution bindings or frontend state.
+ */
+export function ExportSession(id: sessionv3$0.SessionID): $CancellablePromise<sessionstorev3$0.SemanticSessionExport> {
+    return $Call.ByName("main.SessionV3Wrapper.ExportSession", id);
+}
+
 export function ListExecutions(request: sessionstorev3$0.ListExecutionsRequest): $CancellablePromise<sessionstorev3$0.ExecutionListItem[] | null> {
     return $Call.ByName("main.SessionV3Wrapper.ListExecutions", request);
 }

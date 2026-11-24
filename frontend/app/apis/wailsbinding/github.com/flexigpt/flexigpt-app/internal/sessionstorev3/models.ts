@@ -32,6 +32,15 @@ export interface SearchSessionsRequest {
     "pageToken"?: string;
 }
 
+/**
+ * SemanticSessionExport is a Store-owned export of durable Session facts.
+ * It contains no live Runtime maps, private bindings, clients, callbacks,
+ * Artifact Store handles, or frontend state.
+ */
+export interface SemanticSessionExport {
+    "session": sessionv3$0.Session;
+}
+
 export interface SessionListItem {
     "id": sessionv3$0.SessionID;
     "revision": sessionv3$0.Revision;

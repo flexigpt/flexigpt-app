@@ -85,8 +85,8 @@ export interface MCPSettingsView {
 }
 
 /**
- * WorkflowStartCommand is the transport command accepted by composition.
- * Runtime v3 receives only the prepared ProgramSnapshot.
+ * WorkflowStartCommand is the transport command accepted by the setup-owned
+ * Workflow command service. Runtime v3 receives only a prepared ProgramSnapshot.
  */
 export interface WorkflowStartCommand {
     "meta": sessionv3$0.CommandMeta;

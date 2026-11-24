@@ -24,7 +24,6 @@ const (
 	agentLoopSkillWorkPrefix    = "skill-lifecycle:"
 	agentLoopLLMPathFormat      = "llm/%d"
 	singleModelWorkPath         = "model"
-	actionKindTool              = ActionKindTool
 	providerManagedToolSummary  = "Provider managed tool observed."
 	errAgentLoopInputRequired   = "agent-loop input activity is required"
 	errSingleModelInputRequired = "single-model input activity is required"
@@ -1010,7 +1009,7 @@ func splitExecutableCalls(calls []ToolCall) ([]ToolCall, []Activity) {
 				Action: &ActionActivity{
 					Title:      firstNonEmpty(call.DisplayName, call.Name),
 					Summary:    providerManagedToolSummary,
-					ActionKind: actionKindTool,
+					ActionKind: ActionKindTool,
 					Outcome:    string(ToolOutputKindSuccess),
 				},
 			})

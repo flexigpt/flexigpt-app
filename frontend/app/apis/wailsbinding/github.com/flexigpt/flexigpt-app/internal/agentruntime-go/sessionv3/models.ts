@@ -29,12 +29,21 @@ export interface AcceptTriggerEventCommand {
 export interface ActionActivity {
     "title": string;
     "summary"?: string;
-    "actionKind"?: string;
+    "actionKind"?: ActionKind;
     "outcome"?: string;
     "output"?: jsonutil$0.CanonicalValue;
     "error"?: SanitizedError | null;
     "receipt"?: ExternalReceipt | null;
 }
+
+export enum ActionKind {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    ActionKindTool = "tool",
+};
 
 export interface Activity {
     "id": ActivityID;
@@ -44,6 +53,7 @@ export interface Activity {
     "executionID"?: ExecutionID;
     "frameID"?: ProgramFrameID;
     "workItemID"?: WorkItemID;
+    "attemptID"?: AttemptID;
     "parentID"?: ActivityID;
     "message"?: MessageActivity | null;
     "action"?: ActionActivity | null;
@@ -286,6 +296,7 @@ export interface Attempt {
     "finishedAt"?: string | null;
     "receipt"?: ExternalReceipt | null;
     "error"?: SanitizedError | null;
+    "llmStream"?: LLMStreamState | null;
 }
 
 export type AttemptID = string;
@@ -349,6 +360,9 @@ export interface ChannelForward {
     "channelSchema": jsonutil$0.CanonicalValue;
     "maxMessages"?: number;
     "maxBytes"?: number;
+    "receivingWorkItemID"?: WorkItemID;
+    "receivingFrameID"?: ProgramFrameID;
+    "receivingBudgetScope"?: string;
 }
 
 /**
@@ -376,6 +390,9 @@ export interface ChannelMessage {
     "deduplicationKey"?: string;
     "createdAt": string;
     "consumedBy"?: WaitID[] | null;
+    "ownerWorkItemID"?: WorkItemID;
+    "ownerFrameID"?: ProgramFrameID;
+    "attemptID"?: AttemptID;
 }
 
 /**
@@ -415,6 +432,7 @@ export interface CleanupState {
     "active": boolean;
     "startedAt"?: string | null;
     "deadline"?: string | null;
+    "stopping"?: boolean;
     "expired"?: boolean;
     "primary"?: SanitizedError | null;
 }
@@ -499,6 +517,8 @@ export interface CompensationWork {
     "originalWorkItemID": WorkItemID;
     "effectID": EffectRecordID;
     "input"?: jsonutil$0.CanonicalValue;
+    "compensationFrameID": ProgramFrameID;
+    "completed": jsonutil$0.CanonicalValue;
 }
 
 /**
@@ -534,6 +554,25 @@ export interface CompletionHandle {
 export interface ConditionWork {
     "input": jsonutil$0.CanonicalValue;
 }
+
+/**
+ * ConfigurationOwner records which semantic layer contributed a retained
+ * dispatch fact. It is a Runtime-neutral provenance label.
+ */
+export enum ConfigurationOwner {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    ConfigurationOwnerPlatform = "platform",
+    ConfigurationOwnerModel = "model",
+    ConfigurationOwnerAgent = "agent",
+    ConfigurationOwnerWorkspace = "workspace",
+    ConfigurationOwnerSession = "session",
+    ConfigurationOwnerInvocation = "invocation",
+    ConfigurationOwnerUser = "user",
+};
 
 export interface ContextDispatchPlan {
     "name": string;
@@ -634,6 +673,7 @@ export interface EditAndResendCommand {
 export interface EffectContract {
     "kind": EffectKind;
     "idempotencyKey"?: string;
+    "keyedNative"?: boolean;
     "reconcile"?: boolean;
     "compensate"?: boolean;
 }
@@ -802,6 +842,7 @@ export interface Execution {
     "deadline"?: string | null;
     "budget": ExecutionBudget;
     "usage": ExecutionBudgetUsage;
+    "budgetScopes"?: ExecutionBudgetScope[] | null;
     "cleanup": CleanupState;
     "programFrames": ProgramFrame[] | null;
     "workItems": WorkItem[] | null;
@@ -846,6 +887,19 @@ export interface ExecutionBudget {
 export interface ExecutionBudgetCost {
     "amount": number;
     "currency": string;
+}
+
+/**
+ * ExecutionBudgetScope is one controlling structured-operation aggregate.
+ * Child ProgramFrames retain their own narrowed budgets, but all work in this
+ * scope consumes this one aggregate counter in addition to Execution usage.
+ */
+export interface ExecutionBudgetScope {
+    "id": string;
+    "ownerFrameID": ProgramFrameID;
+    "parentID"?: string;
+    "budget": ExecutionBudget;
+    "usage": ExecutionBudgetUsage;
 }
 
 export interface ExecutionBudgetUsage {
@@ -915,6 +969,8 @@ export interface ExecutionSignal {
     "correlation"?: jsonutil$0.CanonicalValue;
     "createdAt": string;
     "consumedBy"?: WaitID[] | null;
+    "ownerWorkItemID"?: WorkItemID;
+    "ownerFrameID"?: ProgramFrameID;
     "consumedSubscriptions"?: string[] | null;
     "subscriptionConsumptions"?: SubscriptionConsumption[] | null;
 }
@@ -998,12 +1054,16 @@ export interface Instruction {
     "id": string;
     "label"?: string;
     "content": string;
+    "owner"?: ConfigurationOwner;
+    "sourceKey"?: string;
 }
 
 export interface InstructionDispatchPlan {
     "id": string;
     "label"?: string;
     "content": string;
+    "owner"?: ConfigurationOwner;
+    "order"?: number;
     "artifact"?: ArtifactPin | null;
 }
 
@@ -1033,9 +1093,18 @@ export interface JoinBoundary {
 
 export interface JoinWork {
     "childFrames": ProgramFrameID[] | null;
-    "policy": string;
+    "policy": JoinWorkPolicy;
     "quorum"?: number;
 }
+
+export enum JoinWorkPolicy {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    JoinWorkPolicyChildSettled = "child-settled",
+};
 
 export interface LLMOutput {
     "text"?: string;
@@ -1054,6 +1123,7 @@ export interface LLMStreamState {
     "text"?: string;
     "thinking"?: string;
     "updatedAt": string;
+    "attemptID"?: AttemptID;
 }
 
 /**
@@ -1106,6 +1176,7 @@ export interface MCPDispatchPlan {
     "server": ArtifactPin;
     "includeServerInstructions"?: boolean;
     "toolExposure": MCPToolExposure;
+    "discoveryDigest"?: string;
     "tools"?: MCPToolDispatchPlan[] | null;
     "resources"?: MCPResourceDispatchPlan[] | null;
     "resourceTemplates"?: MCPResourceTemplateDispatchPlan[] | null;
@@ -1207,7 +1278,7 @@ export type MCPToolTarget = WorkflowMCP;
 
 export interface MessageActivity {
     "role": MessageRole;
-    "status"?: string;
+    "status"?: MessageStatus;
     "text"?: string;
     "attachments"?: Attachment[] | null;
     "toolResults"?: ToolResultActivity[] | null;
@@ -1248,6 +1319,21 @@ export enum MessageRole {
     MessageRoleUser = "user",
     MessageRoleAssistant = "assistant",
     MessageRoleTool = "tool",
+};
+
+export enum MessageStatus {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    MessageStatusAccepted = "accepted",
+    MessageStatusContinuation = "continuation",
+    MessageStatusCompleted = "completed",
+    MessageStatusFailed = "failed",
+    MessageStatusCancelled = "cancelled",
+    MessageStatusUncertain = "uncertain",
+    MessageStatusInterrupted = "interrupted",
 };
 
 export interface ModelCacheControlOverride {
@@ -1317,6 +1403,9 @@ export interface ModelDispatchPlan {
     "ports"?: PortPlan[] | null;
     "portInputs"?: PortInput[] | null;
     "history": HistorySelection;
+    "providerInputs"?: jsonutil$0.CanonicalValue[] | null;
+    "finalSystemPrompt"?: string;
+    "preparationOwner"?: string;
     "runtimeConfiguration"?: jsonutil$0.CanonicalValue;
 }
 
@@ -1382,6 +1471,7 @@ export interface PortInput {
     "cursor"?: number;
     "values"?: jsonutil$0.CanonicalValue[] | null;
     "streamed"?: boolean;
+    "captured"?: boolean;
 }
 
 export interface PortPlan {
@@ -1402,17 +1492,72 @@ export interface PortPlan {
 export interface PortStream {
     "name": string;
     "nextSequence": number;
+    "attemptID"?: AttemptID;
+}
+
+/**
+ * PreparedContributionKind identifies a durable source-pinned contribution
+ * category. It is shared by normal Session setup and Workflow setup.
+ */
+export enum PreparedContributionKind {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    PreparedContributionKindModel = "model",
+    PreparedContributionKindAgent = "agent",
+    PreparedContributionKindWorkspace = "workspace",
+    PreparedContributionKindWorkspacePrompt = "workspacePrompt",
+    PreparedContributionKindText = "text",
+    PreparedContributionKindTool = "tool",
+    PreparedContributionKindSkill = "skill",
+    PreparedContributionKindMCP = "mcp",
+};
+
+export interface PreparedContributionOrder {
+    "kind": PreparedContributionKind;
+    "key": string;
+    "owner": ConfigurationOwner;
+}
+
+/**
+ * PreparedContributionPlan is the neutral domain-owned, source-pinned
+ * contribution contract. It contains no client, credential, Artifact Store
+ * handle, callback, or provider request.
+ * 
+ * Runtime retains this semantic value for Workflow Model and Agent child
+ * calls. Normal Session setup consumes the same contract before it builds an
+ * immutable ModelDispatchPlan.
+ */
+export interface PreparedContributionPlan {
+    "model"?: ArtifactPin | null;
+    "agent"?: ArtifactPin | null;
+    "workspace"?: ArtifactPin | null;
+    "includeModelSystemPrompt"?: boolean | null;
+    "texts"?: WorkflowPreparedText[] | null;
+    "tools"?: WorkflowPreparedTool[] | null;
+    "skills"?: WorkflowPreparedSkill[] | null;
+    "mcp"?: WorkflowPreparedMCP[] | null;
+    "workspaceInstructions"?: Instruction[] | null;
+    "workspaceContext"?: string[] | null;
+    "workspacePrompt"?: WorkflowPreparedWorkspacePrompt | null;
+    "contributionOrder"?: PreparedContributionOrder[] | null;
+    "workspacePromptPrepared"?: boolean;
+    "ownerProvenance"?: ConfigurationOwner;
 }
 
 export interface ProgramFrame {
     "id": ProgramFrameID;
     "parentFrameID"?: ProgramFrameID;
     "lifetime"?: ChildFrameLifetime;
+    "cleanup"?: boolean;
     "depth"?: number;
     "program": ProgramSnapshot;
     "state": ProgramState;
     "status": ProgramFrameState;
     "path"?: string;
+    "cancellationRequested"?: boolean;
     "declarationPath"?: string;
     "createdAt": string;
     "updatedAt": string;
@@ -1420,6 +1565,7 @@ export interface ProgramFrame {
     "budget"?: ExecutionBudget | null;
     "usage": ExecutionBudgetUsage;
     "childFrameIDs"?: ProgramFrameID[] | null;
+    "budgetScopeID"?: string;
     "childExecutionIDs"?: ExecutionID[] | null;
     "workItemIDs"?: WorkItemID[] | null;
     "ports"?: PortPlan[] | null;
@@ -1446,12 +1592,15 @@ export interface ProgramFrameIntent {
     "budget"?: ExecutionBudget | null;
     "lifetime"?: ChildFrameLifetime;
     "workflowNesting"?: boolean;
+    "cleanup"?: boolean;
     "ownership"?: ChildExecutionOwnership | null;
     "claims"?: ResourceClaim[] | null;
     "ports"?: PortPlan[] | null;
     "portDelivery"?: FramePortDeliveryMode;
     "portBoundary"?: ProgramFramePortBoundary;
     "handoff"?: ConversationHandoffIntent | null;
+    "portInputs"?: PortInput[] | null;
+    "budgetScopeID"?: string;
     "evaluation"?: EvaluationBoundary | null;
 }
 
@@ -2241,6 +2390,7 @@ export interface Wait {
     "updatedAt": string;
     "resolvedBy"?: HumanActor | null;
     "error"?: SanitizedError | null;
+    "resolutionIntent"?: WaitResolutionIntent | null;
 }
 
 export interface WaitActivity {
@@ -2320,6 +2470,22 @@ export enum WaitResolution {
     WaitResolutionSignal = "signal",
 };
 
+/**
+ * WaitResolutionIntent is the accepted durable command meaning. It remains
+ * attached to its Wait until the owner settles the requested resolution.
+ */
+export interface WaitResolutionIntent {
+    "meta": CommandMeta;
+    "sessionID": SessionID;
+    "executionID": ExecutionID;
+    "waitID": WaitID;
+    "resolution": WaitResolution;
+    "response"?: jsonutil$0.CanonicalValue;
+    "actor"?: HumanActor | null;
+    "receipt": CommandReceipt;
+    "requestedAt": string;
+}
+
 export enum WaitStatus {
     /**
      * The Go zero value for the underlying type of the enum.
@@ -2356,6 +2522,7 @@ export interface WorkItem {
     "retry"?: RetryPolicy | null;
     "retryState"?: RetryState | null;
     "budget"?: ExecutionBudget | null;
+    "budgetScopeID"?: string;
     "usage": ExecutionBudgetUsage;
     "cleanup"?: boolean;
     "sagaID"?: string;
@@ -2384,7 +2551,14 @@ export interface WorkItem {
     "evaluation"?: EvaluationBoundary | null;
 }
 
-export type WorkItemID = string;
+export enum WorkItemID {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    recoveryReviewWorkItemID = "recovery",
+};
 
 export interface WorkItemOutput {
     "llm"?: LLMOutput | null;
@@ -2463,12 +2637,24 @@ export enum WorkItemType {
 };
 
 export interface WorkflowActivity {
-    "phase": string;
+    "phase": WorkflowActivityPhase;
     "summary"?: string;
     "path"?: string;
     "output"?: jsonutil$0.CanonicalValue;
     "error"?: SanitizedError | null;
 }
+
+export enum WorkflowActivityPhase {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    WorkflowActivityPhaseStarted = "started",
+    WorkflowActivityPhaseSignal = "signal",
+    WorkflowActivityPhaseTriggered = "triggered",
+    WorkflowActivityPhaseTriggerSignal = "trigger-signal",
+};
 
 export interface WorkflowBlock {
     "declarationPath": string;
@@ -2500,9 +2686,10 @@ export interface WorkflowCall {
     "lifetime"?: WorkflowChildLifetime;
     "conversation"?: WorkflowValue | null;
     "ownership"?: WorkflowChildOwnership | null;
-    "onCompletion"?: string;
+    "onCompletion"?: WorkflowHandoffCompletionPolicy;
     "internalLifecycleChild"?: boolean;
     "llmInvocation"?: WorkflowLLMInvocation | null;
+    "portInputs"?: PortInput[] | null;
 }
 
 export enum WorkflowCallMode {
@@ -2577,6 +2764,16 @@ export interface WorkflowChoose {
     "default"?: WorkflowBlock | null;
 }
 
+export enum WorkflowCollectionErrorPolicy {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    WorkflowCollectionErrorFailFast = "fail-fast",
+    WorkflowCollectionErrorCollect = "collect",
+};
+
 export interface WorkflowCompletedOperationFacts {
     "originalWorkItemID": WorkItemID;
     "originalAttemptID": AttemptID;
@@ -2594,9 +2791,21 @@ export interface WorkflowCompletedOperationFacts {
 }
 
 export interface WorkflowCompletion {
-    "mode"?: string;
+    "mode"?: WorkflowCompletionMode;
     "quorum"?: number;
 }
+
+export enum WorkflowCompletionMode {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    WorkflowCompletionModeAll = "all",
+    WorkflowCompletionModeFirstCompleted = "first-completed",
+    WorkflowCompletionModeFirstSuccess = "first-success",
+    WorkflowCompletionModeQuorum = "quorum",
+};
 
 export interface WorkflowCompletionWait {
     "handle": WorkflowValue;
@@ -2659,11 +2868,21 @@ export interface WorkflowForeach {
     "concurrency"?: number;
     "maxItems"?: number | null;
     "completion": WorkflowCompletion;
-    "errors"?: string;
+    "errors"?: WorkflowCollectionErrorPolicy;
     "merge"?: WorkflowParentStateMerge | null;
-    "remaining"?: string;
+    "remaining"?: WorkflowRemainingPolicy;
     "do": WorkflowBlock;
 }
+
+export enum WorkflowHandoffCompletionPolicy {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    WorkflowHandoffCompletionRestore = "restore",
+    WorkflowHandoffCompletionRetain = "retain",
+};
 
 export interface WorkflowHumanWait {
     "users"?: WorkflowValue | null;
@@ -2678,6 +2897,11 @@ export interface WorkflowLLMInstruction {
     "content": WorkflowValue;
 }
 
+export interface WorkflowLLMInstructionSegment {
+    "instructions"?: WorkflowLLMInstruction[] | null;
+    "collection"?: WorkflowValue | null;
+}
+
 /**
  * WorkflowLLMInvocation is the setup-lowered typed Model or Agent invocation
  * form. Workflow setup converts source data to this value before Runtime
@@ -2685,8 +2909,10 @@ export interface WorkflowLLMInstruction {
  * not decode a generic Workflow JSON request envelope.
  */
 export interface WorkflowLLMInvocation {
-    "messages": WorkflowLLMMessage[] | null;
+    "messages"?: WorkflowLLMMessage[] | null;
+    "messageSegments"?: WorkflowLLMMessageSegment[] | null;
     "instructions"?: WorkflowLLMInstruction[] | null;
+    "instructionSegments"?: WorkflowLLMInstructionSegment[] | null;
     "defaults"?: SessionDefaultsOverride | null;
     "preparedTargets"?: { [_ in string]?: WorkflowPreparedInvocation } | null;
 }
@@ -2695,6 +2921,11 @@ export interface WorkflowLLMMessage {
     "role": MessageRole;
     "text"?: WorkflowValue | null;
     "attachments"?: Attachment[] | null;
+}
+
+export interface WorkflowLLMMessageSegment {
+    "messages"?: WorkflowLLMMessage[] | null;
+    "collection"?: WorkflowValue | null;
 }
 
 export interface WorkflowMCP {
@@ -2759,8 +2990,8 @@ export interface WorkflowOperationTargetFacts {
 
 export interface WorkflowParallel {
     "completion": WorkflowCompletion;
-    "errors"?: string;
-    "remaining"?: string;
+    "errors"?: WorkflowCollectionErrorPolicy;
+    "remaining"?: WorkflowRemainingPolicy;
     "merge"?: WorkflowParentStateMerge | null;
     "branches": WorkflowBranch[] | null;
 }
@@ -2802,49 +3033,60 @@ export enum WorkflowPortDirection {
 };
 
 /**
- * WorkflowPreparedInvocation is a setup-owned immutable contribution
- * snapshot. It contains source-backed pins and declaration contribution facts,
- * but no client, credential, Artifact Store handle, callback, or provider
- * request.
- * 
- * Runtime uses this snapshot for Workflow Model and Agent child calls instead
- * of resolving current Agent or Workspace contribution graphs at dispatch.
+ * WorkflowPreparedInvocation remains the Workflow-facing name for the
+ * neutral PreparedContributionPlan. It is an alias, not a second contract.
  */
-export interface WorkflowPreparedInvocation {
-    "model"?: ArtifactPin | null;
-    "agent"?: ArtifactPin | null;
-    "workspace"?: ArtifactPin | null;
-    "includeModelSystemPrompt"?: boolean | null;
-    "texts"?: WorkflowPreparedText[] | null;
-    "tools"?: WorkflowPreparedTool[] | null;
-    "skills"?: WorkflowPreparedSkill[] | null;
-    "mcp"?: WorkflowPreparedMCP[] | null;
-}
+export type WorkflowPreparedInvocation = PreparedContributionPlan;
 
 export interface WorkflowPreparedMCP {
     "server": ArtifactPin;
     "includeServerInstructions"?: boolean;
     "toolExposure": MCPToolExposure;
+    "tools"?: MCPToolSelection[] | null;
+    "resources"?: MCPResourceSelection[] | null;
+    "resourceTemplates"?: MCPResourceTemplateSelection[] | null;
+    "prompts"?: MCPPromptSelection[] | null;
+    "owner": ConfigurationOwner;
+    "prepared"?: boolean;
+    "discoveryDigest"?: string;
+    "serverDisplay"?: string;
+    "context"?: string[] | null;
+    "preparedTools"?: ToolDispatchPlan[] | null;
 }
 
 export interface WorkflowPreparedSkill {
     "artifact": ArtifactPin;
+    "enabled"?: boolean;
     "active"?: boolean;
     "instructions"?: boolean;
+    "instructionContent"?: string;
+    "owner": ConfigurationOwner;
 }
 
 /**
- * WorkflowPreparedText records a source-backed Text contribution selected
- * during Workflow preparation. Text materialization occurs later through the
- * Text domain, after exact Artifact-pin verification.
+ * WorkflowPreparedText records immutable Text content and source identity.
+ * Binding can use this captured value without resolving a current Agent or
+ * Workspace contribution graph.
  */
 export interface WorkflowPreparedText {
     "artifact": ArtifactPin;
+    "insert": TextDispatchInsert;
+    "content"?: string;
+    "label"?: string;
+    "owner": ConfigurationOwner;
+    "included": boolean;
 }
 
 export interface WorkflowPreparedTool {
     "artifact": ArtifactPin;
+    "userArguments"?: jsonutil$0.CanonicalValue;
     "autoExecute"?: boolean | null;
+    "owner": ConfigurationOwner;
+}
+
+export interface WorkflowPreparedWorkspacePrompt {
+    "instructions": string;
+    "userContext": string;
 }
 
 export interface WorkflowProjection {
@@ -2856,17 +3098,46 @@ export interface WorkflowProjection {
     "stepOutcomes": WorkflowStepOutcomeProjection[] | null;
 }
 
+export enum WorkflowRemainingPolicy {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    WorkflowRemainingCancel = "cancel",
+    WorkflowRemainingWait = "wait",
+};
+
 export interface WorkflowRepeat {
     "count"?: WorkflowValue | null;
     "while"?: WorkflowValue | null;
     "until"?: WorkflowValue | null;
-    "lifetime"?: string;
+    "lifetime"?: WorkflowRepeatLifetime;
     "state"?: WorkflowStateSpec | null;
     "maxIterations"?: number | null;
-    "onExhausted"?: string;
+    "onExhausted"?: WorkflowRepeatExhaustedPolicy;
     "timeout"?: WorkflowDuration;
     "do": WorkflowBlock;
 }
+
+export enum WorkflowRepeatExhaustedPolicy {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    WorkflowRepeatOnExhaustedFail = "fail",
+    WorkflowRepeatOnExhaustedReturn = "return",
+};
+
+export enum WorkflowRepeatLifetime {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    WorkflowRepeatLifetimeUntilCancelled = "until-cancelled",
+};
 
 /**
  * WorkflowResourceClaim is a declaration-level resource claim template. Key
