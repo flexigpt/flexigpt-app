@@ -224,11 +224,19 @@ func InitComposedSessionV3Runtime(
 		runtime.Close()
 		return err
 	}
+	workflowCommands, err := workflowruntime.NewWorkflowCommandService(
+		runtime,
+		params.Workflow,
+	)
+	if err != nil {
+		runtime.Close()
+		return err
+	}
 	if err := InitSessionV3Wrapper(
 		wrapper,
 		runtime,
 		store,
-		params.Workflow,
+		workflowCommands,
 	); err != nil {
 		runtime.Close()
 		return err

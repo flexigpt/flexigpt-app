@@ -773,7 +773,7 @@ func (r *Runtime) consumeContinuationLocked(
 	execution.Continuation.InvocationDefaults = nil
 	execution.Continuation.InvocationBudget = nil
 	execution.Continuation.UpdatedAt = r.now()
-	clearConsumedAppContextLocked(session, execution.ID, appSources)
+	r.clearConsumedAppContextLocked(session, execution.ID, appSources)
 	r.touchExecutionLocked(session, execution)
 	return []ActivityID{activity.ID}, true, nil
 }
@@ -1477,21 +1477,33 @@ type stagedAppContextSource struct {
 	Revision    Revision
 }
 
+// stagedConversationAppContextLocked transfers App context only from the
+// active conversation owner or from the durable previous owner of its active
+// handoff. Other Executions do not implicitly contribute context to a normal
+// conversation message.
 func stagedConversationAppContextLocked(
 	session *Session,
 	owner Execution,
 ) ([]AppContextUpdate, []stagedAppContextSource) {
-	if session == nil {
+	if session == nil || owner.ID == "" {
 		return nil, nil
 	}
 	values := make([]AppContextUpdate, 0)
 	sources := make([]stagedAppContextSource, 0)
 	seen := make(map[string]struct{})
 	for _, execution := range session.Executions {
+		if !appContextSourceRoutesToConversationOwner(
+			session,
+			owner,
+			execution,
+		) {
+			continue
+		}
 		if execution.Continuation.Revision <= execution.Continuation.ConsumedRevision ||
 			len(execution.Continuation.AppContext) == 0 {
 			continue
 		}
+		copied := false
 		for _, update := range execution.Continuation.AppContext {
 			key := string(jsonutil.MustCanonicalValue(update))
 			if _, duplicate := seen[key]; duplicate {
@@ -1499,23 +1511,51 @@ func stagedConversationAppContextLocked(
 			}
 			seen[key] = struct{}{}
 			values = append(values, cloneAppContextUpdate(update))
+			copied = true
 		}
-		sources = append(sources, stagedAppContextSource{
-			ExecutionID: execution.ID,
-			Revision:    execution.Continuation.Revision,
-		})
+		if copied {
+			sources = append(sources, stagedAppContextSource{
+				ExecutionID: execution.ID,
+				Revision:    execution.Continuation.Revision,
+			})
+		}
 	}
 	return values, sources
 }
 
-func clearConsumedAppContextLocked(
+func appContextSourceRoutesToConversationOwner(
+	session *Session,
+	owner Execution,
+	source Execution,
+) bool {
+	if session == nil || owner.ID == "" || source.ID == "" {
+		return false
+	}
+	if owner.ID == source.ID {
+		return true
+	}
+	for _, ownership := range session.ConversationOwnership {
+		if ownership.ConversationID != string(session.ID) ||
+			ownership.ActiveHandoffID == "" ||
+			ownership.Owner.ExecutionID != owner.ID ||
+			ownership.PreviousOwner == nil ||
+			ownership.PreviousOwner.ExecutionID != source.ID {
+			continue
+		}
+		return true
+	}
+	return false
+}
+
+func (r *Runtime) clearConsumedAppContextLocked(
 	session *Session,
 	owner ExecutionID,
 	sources []stagedAppContextSource,
 ) {
-	if session == nil {
+	if r == nil || session == nil {
 		return
 	}
+	now := r.now()
 	for _, source := range sources {
 		execution := mutableSessionExecution(session, source.ExecutionID)
 		if execution == nil ||
@@ -1523,11 +1563,14 @@ func clearConsumedAppContextLocked(
 			continue
 		}
 		execution.Continuation.AppContext = nil
-		execution.Continuation.UpdatedAt = time.Now().UTC()
+		execution.Continuation.UpdatedAt = now
 		if execution.ID != owner &&
 			strings.TrimSpace(execution.Continuation.Text) == "" &&
 			len(execution.Continuation.Attachments) == 0 {
 			execution.Continuation.ConsumedRevision = execution.Continuation.Revision
+		}
+		if execution.ID != owner {
+			r.touchExecutionLocked(session, execution)
 		}
 	}
 }

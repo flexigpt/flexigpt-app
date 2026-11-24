@@ -604,7 +604,7 @@ func (r *Runtime) SubmitMessage(ctx context.Context, command SubmitMessageComman
 		r.mu.Unlock()
 		return nil, errors.New("conversation execution disappeared during message submission")
 	}
-	clearConsumedAppContextLocked(session, current.ID, appSources)
+	r.clearConsumedAppContextLocked(session, current.ID, appSources)
 	r.refreshExecutionStateLocked(current)
 	receipt := CommandReceipt{
 		CommandID:         command.Meta.ID,
@@ -3221,7 +3221,7 @@ func (r *Runtime) finishWorkLocked(
 				Action: &ActionActivity{
 					Title:      firstText(item.Input.Tool.Call.DisplayName, item.Input.Tool.Call.Name),
 					Summary:    item.Output.Tool.Text,
-					ActionKind: "tool",
+					ActionKind: ActionKindTool,
 					Outcome:    string(item.Output.Tool.Kind),
 					Output:     item.Output.Tool.Structured.Clone(),
 					Error:      item.Error,

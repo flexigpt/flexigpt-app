@@ -17,6 +17,9 @@ const (
 	errAppToolArgumentsNotCanonical  = "app tool arguments are not canonical json"
 	errAppToolExecutionNotAllowed    = "terminal or cancelling executions cannot execute app tools"
 	errAppViewNotAttached            = "app instance is not attached to this view"
+	errAppToolExecutionPaused        = "paused executions cannot execute app tools"
+	errAppToolExecutionRecovery      = "recovery review must be resolved before app tool execution"
+	errAppContextStagingNotAllowed   = "terminal or cancelling executions cannot stage app context"
 	errExecutionChangedPreparingTool = "execution changed while app tool execution was prepared; retry"
 	errAppChangedPreparingTool       = "app instance changed while app tool execution was prepared"
 	errAppOriginFrameUnavailable     = "app origin program frame is unavailable"
@@ -31,6 +34,28 @@ type AppToolPreparationRequest struct {
 	App         AppInstance
 	ToolName    string
 	Arguments   jsonutil.CanonicalValue
+}
+
+func appToolExecutionMessage(execution Execution) string {
+	switch {
+	case execution.State.Terminal() ||
+		execution.Controls.CancellationRequested:
+		return errAppToolExecutionNotAllowed
+	case execution.Controls.Paused:
+		return errAppToolExecutionPaused
+	case hasPendingRecoveryReviewWait(execution):
+		return errAppToolExecutionRecovery
+	default:
+		return ""
+	}
+}
+
+func appContextStagingMessage(execution Execution) string {
+	if execution.State.Terminal() ||
+		execution.Controls.CancellationRequested {
+		return errAppContextStagingNotAllowed
+	}
+	return ""
 }
 
 func (r *Runtime) OpenAppView(
@@ -134,13 +159,12 @@ func (r *Runtime) ExecuteAppTool(
 		r.mu.Unlock()
 		return receipt, nil
 	}
-	if execution.State.Terminal() ||
-		execution.Controls.CancellationRequested {
+	if message := appToolExecutionMessage(*execution); message != "" {
 		receipt := r.rejectLocked(
 			session,
 			command.Meta,
 			command,
-			errAppToolExecutionNotAllowed,
+			message,
 		)
 		r.mu.Unlock()
 		return receipt, nil
@@ -200,21 +224,20 @@ func (r *Runtime) ExecuteAppTool(
 			errExecutionChangedPreparingTool,
 		), nil
 	}
+	if message := appToolExecutionMessage(*execution); message != "" {
+		return r.rejectLocked(
+			session,
+			command.Meta,
+			command,
+			message,
+		), nil
+	}
 	if prepareErr != nil {
 		return r.rejectLocked(
 			session,
 			command.Meta,
 			command,
 			prepareErr.Error(),
-		), nil
-	}
-	if execution.State.Terminal() ||
-		execution.Controls.CancellationRequested {
-		return r.rejectLocked(
-			session,
-			command.Meta,
-			command,
-			errAppToolExecutionNotAllowed,
 		), nil
 	}
 	app = mutableAppInstance(execution, command.AppInstanceID)
@@ -337,6 +360,16 @@ func (r *Runtime) StageAppContext(
 		r.mu.Unlock()
 		return receipt, nil
 	}
+	if message := appContextStagingMessage(*execution); message != "" {
+		receipt := r.rejectLocked(
+			session,
+			command.Meta,
+			command,
+			message,
+		)
+		r.mu.Unlock()
+		return receipt, nil
+	}
 	app := mutableAppInstance(execution, command.AppInstanceID)
 	if app == nil || !containsAppView(*app, command.ViewID) {
 		receipt := r.rejectLocked(
@@ -390,6 +423,14 @@ func (r *Runtime) StageAppContext(
 			command.Meta,
 			command,
 			errExecutionChangedPreparingCtx,
+		), nil
+	}
+	if message := appContextStagingMessage(*execution); message != "" {
+		return r.rejectLocked(
+			session,
+			command.Meta,
+			command,
+			message,
 		), nil
 	}
 	if validateErr != nil {

@@ -156,10 +156,6 @@ func MergeModelDefaultsOverride(
 			output.Clear,
 			ModelDefaultFieldStopSequences,
 		)
-		output.Clear = removeModelDefaultClear(
-			output.Clear,
-			ModelDefaultFieldStopSequences,
-		)
 	}
 	if override.AdapterParameters != nil {
 		output.AdapterParameters = make(

@@ -855,12 +855,6 @@ func (e *V3Executor) Execute(
 		}
 		return result, true, nil
 	}
-
-	if request.WorkItem.Effect.Kind == sessionv3Runtime.EffectKindRead {
-		effect := sessionv3Runtime.EffectStateNotApplicable
-		result.EffectState = &effect
-		return result, true, nil
-	}
 	effect := sessionv3Runtime.EffectStateUncertain
 	result.Confirmed = true
 	result.EffectState = &effect

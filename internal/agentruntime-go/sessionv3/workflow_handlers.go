@@ -432,9 +432,6 @@ func (i *WorkflowInterpreter) workflowTerminalChildProgram(
 	child.Scope.Cleanup = child.Scope.Cleanup ||
 		state.Terminal.Status != ProgramFrameStateCompleted
 
-	// The completed cleanup marker is persisted in the child Program snapshot.
-	child.Scope.Cleanup = child.Scope.Cleanup ||
-		state.Terminal.Status != ProgramFrameStateCompleted
 	child.Scope.Event = nil
 
 	payload, err := canonicalWorkflowValue(child)

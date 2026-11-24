@@ -17,13 +17,13 @@ type SessionV3Wrapper struct {
 	mu       sync.RWMutex
 	runtime  *sessionv3Runtime.Runtime
 	store    *sessionstorev3.Store
-	workflow *workflowruntime.Admission
+	commands *workflowruntime.WorkflowCommandService
 	desktop  *application.App
 	closed   bool
 }
 
-// WorkflowStartCommand is the transport command accepted by composition.
-// Runtime v3 receives only the prepared ProgramSnapshot.
+// WorkflowStartCommand is the transport command accepted by the setup-owned
+// Workflow command service. Runtime v3 receives only a prepared ProgramSnapshot.
 type WorkflowStartCommand struct {
 	Meta        sessionv3Runtime.CommandMeta       `json:"meta"`
 	SessionID   sessionv3Runtime.SessionID         `json:"sessionID"`
@@ -38,18 +38,13 @@ type WorkflowTriggerRegistrationCommand struct {
 	Workflow  sessionv3Runtime.ArtifactSelection `json:"workflow"`
 }
 
-type sessionV3CommandLookup struct {
-	Receipt *sessionv3Runtime.CommandReceipt
-	Found   bool
-}
-
 func InitSessionV3Wrapper(
 	wrapper *SessionV3Wrapper,
 	runtime *sessionv3Runtime.Runtime,
 	store *sessionstorev3.Store,
-	workflow *workflowruntime.Admission,
+	commands *workflowruntime.WorkflowCommandService,
 ) error {
-	if wrapper == nil || runtime == nil || store == nil || workflow == nil {
+	if wrapper == nil || runtime == nil || store == nil || commands == nil {
 		return errSessionV3Deps
 	}
 	wrapper.mu.Lock()
@@ -59,7 +54,7 @@ func InitSessionV3Wrapper(
 	}
 	wrapper.runtime = runtime
 	wrapper.store = store
-	wrapper.workflow = workflow
+	wrapper.commands = commands
 	return nil
 }
 
@@ -102,128 +97,37 @@ func (w *SessionV3Wrapper) SubmitMessage(
 func (w *SessionV3Wrapper) StartWorkflow(
 	command WorkflowStartCommand,
 ) (*sessionv3Runtime.CommandReceipt, error) {
-	identity := sessionv3Runtime.WorkflowStartCommandIdentity{
-		Meta:        command.Meta,
-		SessionID:   command.SessionID,
-		ExecutionID: command.ExecutionID,
-		Workflow:    command.Workflow,
-		Input:       command.Input.Clone(),
-	}
-	lookup, err := w.findCommandReceipt(
-		command.SessionID,
-		command.Meta,
-		identity,
-	)
+	commands, err := w.workflowCommands()
 	if err != nil {
 		return nil, err
 	}
-	if lookup.Found {
-		return lookup.Receipt, nil
-	}
-
-	preparation, err := w.workflowPreparation()
-	if err != nil {
-		return nil, err
-	}
-	session, err := withSessionV3(
-		w,
-		func(r *sessionv3Runtime.Runtime) (sessionv3Runtime.Session, error) {
-			return r.GetSession(context.Background(), command.SessionID)
-		},
-	)
-	if err != nil {
-		return nil, err
-	}
-	defaults := session.Defaults
-	program, err := preparation.PrepareWorkflow(
+	return commands.StartWorkflow(
 		context.Background(),
-		workflowruntime.PreparationRequest{
-			Workflow:           command.Workflow,
-			Input:              command.Input.Clone(),
-			InvocationDefaults: &defaults,
-		},
-	)
-	if err != nil {
-		return &sessionv3Runtime.CommandReceipt{
-			CommandID:   command.Meta.ID,
+		workflowruntime.WorkflowStartRequest{
+			Meta:        command.Meta,
 			SessionID:   command.SessionID,
 			ExecutionID: command.ExecutionID,
-			Message:     err.Error(),
-		}, nil
-	}
-	return withSessionV3(w, func(r *sessionv3Runtime.Runtime) (*sessionv3Runtime.CommandReceipt, error) {
-		return r.StartWorkflow(
-			context.Background(),
-			sessionv3Runtime.StartWorkflowCommand{
-				Meta:            command.Meta,
-				SessionID:       command.SessionID,
-				ExecutionID:     command.ExecutionID,
-				Program:         program,
-				CommandIdentity: &identity,
-			},
-		)
-	})
+			Workflow:    command.Workflow,
+			Input:       command.Input.Clone(),
+		},
+	)
 }
 
 func (w *SessionV3Wrapper) RegisterWorkflowTriggers(
 	command WorkflowTriggerRegistrationCommand,
 ) (*sessionv3Runtime.CommandReceipt, error) {
-	identity := sessionv3Runtime.WorkflowTriggerRegistrationCommandIdentity{
-		Meta:      command.Meta,
-		SessionID: command.SessionID,
-		Workflow:  command.Workflow,
-	}
-	lookup, err := w.findCommandReceipt(
-		command.SessionID,
-		command.Meta,
-		identity,
-	)
+	commands, err := w.workflowCommands()
 	if err != nil {
 		return nil, err
 	}
-	if lookup.Found {
-		return lookup.Receipt, nil
-	}
-
-	preparation, err := w.workflowPreparation()
-	if err != nil {
-		return nil, err
-	}
-	session, err := withSessionV3(
-		w,
-		func(r *sessionv3Runtime.Runtime) (sessionv3Runtime.Session, error) {
-			return r.GetSession(context.Background(), command.SessionID)
-		},
-	)
-	if err != nil {
-		return nil, err
-	}
-	defaults := session.Defaults
-	program, err := preparation.PrepareWorkflowTriggers(
+	return commands.RegisterWorkflowTriggers(
 		context.Background(),
-		workflowruntime.TriggerPreparationRequest{
-			Workflow:           command.Workflow,
-			InvocationDefaults: &defaults,
+		workflowruntime.WorkflowTriggerRegistrationRequest{
+			Meta:      command.Meta,
+			SessionID: command.SessionID,
+			Workflow:  command.Workflow,
 		},
 	)
-	if err != nil {
-		return &sessionv3Runtime.CommandReceipt{
-			CommandID: command.Meta.ID,
-			SessionID: command.SessionID,
-			Message:   err.Error(),
-		}, nil
-	}
-	return withSessionV3(w, func(r *sessionv3Runtime.Runtime) (*sessionv3Runtime.CommandReceipt, error) {
-		return r.RegisterWorkflowTriggers(
-			context.Background(),
-			sessionv3Runtime.RegisterWorkflowTriggersCommand{
-				Meta:            command.Meta,
-				SessionID:       command.SessionID,
-				Program:         program,
-				CommandIdentity: &identity,
-			},
-		)
-	})
 }
 
 func (w *SessionV3Wrapper) SetTriggerRegistrationState(
@@ -617,40 +521,21 @@ func (w *SessionV3Wrapper) ExportSession(
 	return store.ExportSemanticSession(id)
 }
 
-func (w *SessionV3Wrapper) findCommandReceipt(
-	sessionID sessionv3Runtime.SessionID,
-	meta sessionv3Runtime.CommandMeta,
-	payload any,
-) (sessionV3CommandLookup, error) {
-	return withSessionV3(
-		w,
-		func(r *sessionv3Runtime.Runtime) (sessionV3CommandLookup, error) {
-			receipt, found, err := r.FindCommandReceipt(
-				context.Background(),
-				sessionID,
-				meta,
-				payload,
-			)
-			return sessionV3CommandLookup{Receipt: receipt, Found: found}, err
-		},
-	)
-}
-
-func (w *SessionV3Wrapper) workflowPreparation() (
-	*workflowruntime.Admission,
+func (w *SessionV3Wrapper) workflowCommands() (
+	*workflowruntime.WorkflowCommandService,
 	error,
 ) {
 	if w == nil {
 		return nil, errSessionV3Closed
 	}
 	w.mu.RLock()
-	preparation := w.workflow
+	commands := w.commands
 	closed := w.closed
 	w.mu.RUnlock()
-	if closed || preparation == nil {
+	if closed || commands == nil {
 		return nil, errSessionV3Closed
 	}
-	return preparation, nil
+	return commands, nil
 }
 
 func (w *SessionV3Wrapper) projectionStore() (*sessionstorev3.Store, error) {
@@ -685,7 +570,7 @@ func (w *SessionV3Wrapper) close() {
 	store := w.store
 	w.runtime = nil
 	w.store = nil
-	w.workflow = nil
+	w.commands = nil
 	w.desktop = nil
 	w.closed = true
 	w.mu.Unlock()

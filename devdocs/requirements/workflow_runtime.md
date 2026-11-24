@@ -101,6 +101,19 @@ The task statuses below are corrected from source inspection. This remains
 work in progress. No version identifier may change while these tasks are
 implemented.
 
+### SessionV2 to SessionV3 backend migration handoff
+
+`sessionv2_to_sessionv3_migration.md` records the backend replacement
+assessment and migration-specific functional status.
+
+The setup-owned `workflowruntime.WorkflowCommandService` now owns Workflow
+command duplicate lookup, preparation, and prepared Runtime command submission.
+`SessionV3Wrapper` delegates transport commands and no longer owns
+`workflowruntime.Admission`.
+
+The migration HLD remains separate from Artifact planning. It does not create
+Artifact Store execution work or authorize SessionV2 retirement.
+
 ### Scope exclusions
 
 This implementation cycle excludes:
@@ -108,8 +121,11 @@ This implementation cycle excludes:
 - Tests and all validation work.
 - Validation-only hardening and cleanup.
 - Frontend integration.
-- SessionV2 deletion, replacement cleanup, migration, and stored-session
-  conversion.
+- SessionV2 deletion, replacement cleanup, stored-session conversion, and
+  legacy-runtime retirement.
+- Frontend traffic switching and caller migration to the SessionV3 transport.
+  Backend replacement assessment and V3-only backend work are tracked in
+  `sessionv2_to_sessionv3_migration.md`.
 - Version changes, release work, and release notes.
 - Cost-budget metering.
 
@@ -2113,6 +2129,11 @@ the implemented behavior.
   - `R/runtime.go:SubmitMessage` transfers unconsumed
     `execution.Continuation.AppContext` into the created user
     `MessageActivity` and clears consumed `AppContext`.
+  - `R/normal_app.go:appToolExecutionMessage` and
+    `appContextStagingMessage` enforce App-command lifecycle restrictions
+    before and after setup preparation.
+  - `R/normal_session.go:appContextSourceRoutesToConversationOwner` allows
+    cross-Execution App context only through active durable handoff ownership.
 
 ##### `V3-APP-003.a` Persist MCP App instances, views, resources, and App Tool calls
 
@@ -2121,6 +2142,10 @@ the implemented behavior.
   - `recordAppInstanceLocked`, `OpenAppView`, `ExecuteAppTool`,
     `ReadAppResource`, and `StageAppContext` persist semantic App facts without
     retaining live MCP sessions in checkpoints.
+  - `ExecuteAppTool` rejects terminal, cancelling, paused, and recovery-review
+    Executions before and after App Tool preparation.
+  - `StageAppContext` rejects terminal and cancelling Executions before and
+    after App-context preparation.
 
 ##### `V3-APP-003.b` Transfer staged App context on normal message submission
 
@@ -2129,12 +2154,15 @@ the implemented behavior.
   - `R/runtime.go:SubmitMessage` passes unconsumed
     `execution.Continuation.AppContext` into
     `submitNormalMessageWithDefaultsLocked`, clears consumed `AppContext`, and
-    advances `ConsumedRevision` when no unconsumed draft text or attachments
-    remain.
+    advances `ConsumedRevision` for copied non-owner context with no remaining
+    draft text or attachments.
+  - `R/normal_session.go:stagedConversationAppContextLocked` selects the
+    active owner or its active durable handoff predecessor and does not scan
+    unrelated Executions.
 
 #### `ARC-DUP-003` Remove replicated effective state and duplicated execution algorithms
 
-- Status: Partial.
+- Status: Implemented.
 - Completion evidence:
   - `persistLocked` is the sole committed ready-work launcher.
   - `runtime_lifecycle.go` is the shared Runtime terminal lifecycle.
@@ -2150,10 +2178,10 @@ the implemented behavior.
     `R/projection.go:BuildConversationProjection` and
     `BuildActivityProjection`, and the single `collectMCPServerChoices` loop
     exist.
-  - `S/sessionv3runtime/attachments.go` still exists as a redundant delegate
-    with an unused `maximumDirectoryFiles` field.
-  - Store v3 still builds conversation and Activity projections separately.
-    Remaining ownership and algorithm consolidation is `ARC-CLEAN-006`.
+  - The redundant `S/sessionv3runtime/attachments.go` delegate is removed.
+  - Store v3 reads shared Runtime conversation and Activity projections.
+  - V3-local duplicate stop-sequence, MCP read-effect, Workflow cleanup, and
+    Action-kind paths are removed.
 
 ##### `ARC-DUP-003.a` Retain one canonical effective plan
 
@@ -2174,7 +2202,7 @@ the implemented behavior.
 
 ##### `ARC-DUP-003.c` Consolidate Runtime algorithms and lowered-tree traversal
 
-- Status: Partial.
+- Status: Implemented.
 - Completion evidence:
   - Shared lifecycle, captured evaluation, owner accounting, retry matching,
     effect replay, channel forwarding, and scoped budget algorithms remain
@@ -2189,8 +2217,9 @@ the implemented behavior.
     shared pinning/selection helpers in `S/contributionruntime`, added
     `BuildConversationProjection` and `BuildActivityProjection` in
     `R/projection.go`.
-  - Remaining Runtime algorithms, native-domain conversion ownership, Store
-    projection reuse, and literal consistency are `ARC-CLEAN-006`.
+  - `SessionV3Admitter`, Model completion interpretation, Runtime projection
+    builders, and lower-tree traversal retain one V3 owner.
+  - Touched V3 Runtime paths use existing constants and typed enums.
 
 ##### `ARC-DUP-003.d` Keep one V3 attachment admission implementation
 
@@ -2200,8 +2229,8 @@ the implemented behavior.
     admission implementation for file, directory, and URL sources.
   - It preserves immutable content, digest, label, directory-relative label,
     and URL source facts in the durable Attachment snapshot.
-  - Session setup uses that implementation directly. The unused compatibility
-    delegate still exists and is tracked under `ARC-CLEAN-006`.
+  - Session setup uses that implementation directly. No compatibility delegate
+    remains in `S/sessionv3runtime`.
 
 ### Runtime setup lifecycle
 
@@ -2778,9 +2807,10 @@ existing exclusions and no version changes.
 - Source evidence:
   - `R/normal_session.go:consumeContinuationLocked` resolves the active
     Agent-loop frame for normal and handoff Executions.
-  - `R/normal_session.go:stagedConversationAppContextLocked` and
-    `clearConsumedAppContextLocked` preserve App provenance while routing
-    one unconsumed context set through the actual next-message owner.
+  - `R/normal_session.go:stagedConversationAppContextLocked` accepts only the
+    active owner or its active handoff predecessor.
+  - `R/normal_session.go:clearConsumedAppContextLocked` uses Runtime-owned
+    logical time and updates copied non-owner continuation state durably.
 - Functional subtasks:
   - `V3-CONTINUE-007.a`, Status: Implemented.
     Source evidence: `R/normal_session.go:consumeContinuationLocked` and
