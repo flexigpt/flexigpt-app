@@ -2203,9 +2203,8 @@ func (r *Runtime) dispatchOne(ctx context.Context, sessionID SessionID, executio
 	if item == nil || item.State != WorkItemStateReady ||
 		!r.dispatchAllowedForWorkLocked(*execution, *item) ||
 		(!item.Automatic && !item.Requested) ||
-		(item.Type == WorkItemTypeTool && item.Automatic &&
-			!normalToolBatchDispatchAllowed(*execution, *item) ||
-			automationHoldApplies(execution.Controls.AutomaticTools, item.OriginWorkItemID)) ||
+		(item.Type == WorkItemTypeTool &&
+			!normalToolDispatchAllowed(*execution, *item)) ||
 		unresolvedDependencies(*execution, *item) {
 		r.mu.Unlock()
 		return
@@ -2991,6 +2990,13 @@ func (r *Runtime) finishWorkLocked(
 	workItemID := item.ID
 	result = mergeLLMStreamResult(*item, att, result)
 	result = normalizeWorkResult(*item, result)
+	preserveUsableNormalLLMError := normalConversationLLMOutputUsable(
+		session,
+		*execution,
+		*item,
+		result,
+	)
+
 	now := r.now()
 	item.Output = result.Output
 	item.Error = result.Error
@@ -3013,6 +3019,7 @@ func (r *Runtime) finishWorkLocked(
 				}
 			}
 			item.Error = result.Error
+			preserveUsableNormalLLMError = false
 		}
 	}
 	if result.Error == nil &&
@@ -3098,7 +3105,8 @@ func (r *Runtime) finishWorkLocked(
 		}
 	}
 	switch {
-	case result.Confirmed && result.Error == nil:
+	case result.Confirmed &&
+		(result.Error == nil || preserveUsableNormalLLMError):
 		if workflowMutatingToolObservationIsUncertain(
 			session,
 			*execution,
@@ -3324,21 +3332,7 @@ func conversationToolObservation(
 	if item.Input.Tool == nil {
 		return false
 	}
-	frame := mutableFrame(&execution, item.FrameID)
-	if frame == nil || frame.Program.InterpreterID != BuiltinAgentLoopInterpreterID {
-		return false
-	}
-	if isNormalConversationExecution(execution) || frame.HandoffID != "" {
-		return true
-	}
-	for _, owner := range session.ConversationOwnership {
-		if owner.Owner.ExecutionID == execution.ID &&
-			owner.Owner.FrameID == frame.ID &&
-			owner.ActiveHandoffID != "" {
-			return true
-		}
-	}
-	return false
+	return normalConversationAgentLoopFrame(session, execution, item.FrameID)
 }
 
 func (r *Runtime) resumeSagaCompensationFramesLocked(
@@ -3602,13 +3596,7 @@ func (r *Runtime) readyWorkLocked(execution Execution) []WorkItemID {
 			!unresolvedDependencies(execution, item) &&
 			r.dispatchAllowedForWorkLocked(execution, item) {
 			if item.Type == WorkItemTypeTool &&
-				item.Automatic &&
-				!item.Requested &&
-				automationHoldApplies(execution.Controls.AutomaticTools, item.OriginWorkItemID) {
-				continue
-			}
-			if item.Type == WorkItemTypeTool &&
-				!normalToolBatchDispatchAllowed(execution, item) {
+				!normalToolDispatchAllowed(execution, item) {
 				continue
 			}
 			values = append(values, item.ID)

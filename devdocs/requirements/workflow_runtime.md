@@ -111,11 +111,10 @@ command duplicate lookup, preparation, and prepared Runtime command submission.
 `SessionV3Wrapper` delegates transport commands and no longer owns
 `workflowruntime.Admission`.
 
-The migration HLD is the authoritative ledger for remaining SessionV2 normal
-replacement parity work. It records the residual Tool-hold, partial-provider
-completion, configuration, contribution, and local-duplication corrections.
-This HLD references that ledger instead of creating a second migration task
-register.
+The migration HLD is the authoritative ledger for SessionV2 normal replacement
+status. Its current source evidence records the completed Tool-hold,
+partial-provider completion, configuration, contribution, and local-duplication
+corrections.
 
 The migration HLD remains separate from Artifact planning. It does not create
 Artifact Store execution work or authorize SessionV2 retirement.
@@ -2168,7 +2167,7 @@ the implemented behavior.
 
 #### `ARC-DUP-003` Remove replicated effective state and duplicated execution algorithms
 
-- Status: Partial.
+- Status: Implemented.
 - Completion evidence:
   - `persistLocked` is the sole committed ready-work launcher.
   - `runtime_lifecycle.go` is the shared Runtime terminal lifecycle.
@@ -2186,10 +2185,8 @@ the implemented behavior.
     exist.
   - The redundant `S/sessionv3runtime/attachments.go` delegate is removed.
   - Store v3 reads shared Runtime conversation and Activity projections.
-  - The stop-sequence clear, MCP read-effect, and Action-kind corrections are
-    present.
-  - `R/workflow_handlers.go:workflowTerminalChildProgram` retains a repeated
-    cleanup assignment. The migration task `MIG-ARCH-004.b` owns its removal.
+  - V3-local duplicate stop-sequence, MCP read-effect, Workflow cleanup, and
+    Action-kind paths are removed.
 
 ##### `ARC-DUP-003.a` Retain one canonical effective plan
 
@@ -2210,7 +2207,7 @@ the implemented behavior.
 
 ##### `ARC-DUP-003.c` Consolidate Runtime algorithms and lowered-tree traversal
 
-- Status: Partial.
+- Status: Implemented.
 - Completion evidence:
   - Shared lifecycle, captured evaluation, owner accounting, retry matching,
     effect replay, channel forwarding, and scoped budget algorithms remain
@@ -2228,10 +2225,6 @@ the implemented behavior.
   - `SessionV3Admitter`, Model completion interpretation, Runtime projection
     builders, and lower-tree traversal retain one V3 owner.
   - Touched V3 Runtime paths use existing constants and typed enums.
-- Remaining behavior:
-  - Remove the repeated terminal-child cleanup assignment without introducing
-    another Workflow lifecycle path.
-  - Update this status only after `MIG-ARCH-004.b` is complete.
 
 ##### `ARC-DUP-003.d` Keep one V3 attachment admission implementation
 
@@ -2545,7 +2538,7 @@ existing exclusions and no version changes.
 
 #### `V3-TOOL-006` Complete normal conversation Tool error settlement and manual Tool guards
 
-- Status: Partial.
+- Status: Implemented.
 - Completion evidence:
   - `S/mcpruntime/v3.go:V3Executor.Execute` preserves MCP returned error
     content, structured output, and durable provider-call identity as a
@@ -2567,13 +2560,9 @@ existing exclusions and no version changes.
   - `V3-TOOL-006.c`, Status: Implemented.
     Source evidence: `S/sessionv3runtime/inputs.go:completedSemanticToolOutput`
     and `R/program.go:startAgentLLM`.
-  - `V3-TOOL-006.d`, Status: Partial.
-    Source evidence: `R/normal_session.go:normalToolBatchDispatchAllowed` and
-    `R/runtime.go:readyWorkLocked` scope automation holds to automatic,
-    unrequested Tools, but `R/runtime.go:dispatchOne` applies the hold outside
-    that Tool-only condition.
-    Required behavior: a hold must not block a requested Tool or non-Tool
-    WorkItem. `MIG-NORMAL-001.b` owns the migration correction.
+  - `V3-TOOL-006.d`, Status: Implemented.
+    Source evidence: `R/normal_session.go:normalToolDispatchAllowed`,
+    `R/runtime.go:readyWorkLocked`, and `R/runtime.go:dispatchOne`.
 
 #### `V3-APP-006` Consume staged MCP App context on `SubmitMessage`
 
@@ -2584,7 +2573,7 @@ existing exclusions and no version changes.
 
 #### `ARC-CLEAN-006` Consolidate owning-domain code and Runtime algorithms
 
-- Status: Partial.
+- Status: Implemented.
 - Completion evidence:
   - `S/attachmentruntime/provider_content.go` owns immutable Attachment to
     provider-content conversion, and `S/sessionv3runtime/inputs.go` consumes
@@ -2596,8 +2585,6 @@ existing exclusions and no version changes.
   - `S/sessionv3runtime/workflow_invocation.go:applyPreparedContributionPlan`
     uses the Workspace prompt as the one Workspace instruction route while
     retaining Text dispatch provenance.
-  - `S/sessionv3runtime/llm.go:bindLLM` still contains two consecutive
-    `ProviderParam.DefaultHeaders` clone operations.
 - Functional subtasks:
   - `ARC-CLEAN-006.a`, Status: Implemented.
     Source evidence: `S/attachmentruntime/sessionv3_admission.go`,
@@ -2611,12 +2598,10 @@ existing exclusions and no version changes.
   - `ARC-CLEAN-006.d`, Status: Implemented.
     Source evidence: `R/projection.go`, `sessionstorev3/store.go`,
     `R/budget_scope.go`, and `R/workflow_structured.go`.
-  - `ARC-CLEAN-006.e`, Status: Partial.
-    Source evidence: `S/sessionv3runtime/llm.go:bindLLM` has two consecutive
-    header clones. `S/workflowruntime/compiler_invocation.go` has one effective
+  - `ARC-CLEAN-006.e`, Status: Implemented.
+    Source evidence: `S/sessionv3runtime/llm.go:bindLLM` has one header clone
+    and `S/workflowruntime/compiler_invocation.go` has one effective
     call-target preparation path.
-    Required behavior: retain one header clone only. `MIG-ARCH-004.b` owns the
-    migration correction.
   - `ARC-CLEAN-006.f`, Status: Implemented.
     Source evidence: `S/sessionv3runtime/workflow_invocation.go` suppresses
     duplicate Workspace Text instruction injection after applying the durable
@@ -2841,7 +2826,7 @@ existing exclusions and no version changes.
 
 #### `V3-CONFIG-007` Preserve explicit collection and nested Model patch intent
 
-- Status: Partial.
+- Status: Implemented.
 - Affected entries: `V3-CONFIG-003.a`, `V3-CONFIG-003.b`, and `V3-CONFIG-003.c`.
 - Source evidence:
   - `R/normal_configuration.go:preserveSuppliedCollectionPolicy` retains an
@@ -2849,18 +2834,14 @@ existing exclusions and no version changes.
     to replacement.
   - `R/normal_model_defaults.go:MergeModelDefaultsOverride` merges nested
     typed patches by field presence and preserves explicit clears.
-  - `S/modelruntime/runtime_request_patch.go:applyRuntimeDefaults` currently
-    ignores an explicit empty `stopSequences` collection.
+  - `S/modelruntime/runtime_request_patch.go:applyRuntimeDefaults` preserves
+    explicit empty stop-sequence replacement.
 - Functional subtasks:
   - `V3-CONFIG-007.a`, Status: Implemented.
     Source evidence: `R/normal_configuration.go:preserveSuppliedCollectionPolicy`.
-  - `V3-CONFIG-007.b`, Status: Partial.
-    Source evidence: `R/normal_model_defaults.go` preserves a present empty
-    collection, but `S/modelruntime/runtime_request_patch.go` applies it only
-    when nonempty.
-    Required behavior: explicit empty replacement must clear inherited stop
-    sequences at the Model-domain patch boundary. `MIG-CONFIG-007` owns the
-    migration correction.
+  - `V3-CONFIG-007.b`, Status: Implemented.
+    Source evidence: `R/normal_model_defaults.go` nested merge helpers and
+    `S/modelruntime/runtime_request_patch.go`.
   - `V3-CONFIG-007.c`, Status: Implemented.
     Source evidence: `S/contributionruntime/prepared.go`,
     `S/sessionv3runtime/workflow_invocation.go`, and

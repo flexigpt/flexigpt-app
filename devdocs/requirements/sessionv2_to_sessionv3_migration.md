@@ -214,8 +214,7 @@ part of this document. It remains frontend or caller migration work.
 
 ### Normal completion replacement
 
-The supplied source implements the base normal SessionV3 path, but it does
-not yet establish complete SessionV2 normal-flow parity.
+The supplied source contains the required normal SessionV3 behavior.
 
 - SessionV2 reference:
   - `internal/agentruntime-go/session/chat_driver.go`
@@ -232,7 +231,7 @@ not yet establish complete SessionV2 normal-flow parity.
   - `internal/agentruntimesetup/sessionv3runtime/llm.go`
   - `internal/agentruntimesetup/sessionv3runtime/inputs.go`
 
-The source implements:
+The source supports:
 
 - Normal Model completion.
 - Agent-loop continuation.
@@ -245,16 +244,7 @@ The source implements:
 - MCP App operations and staged App context.
 - Durable recovery, Store projections, search, and semantic export.
 
-The following normal-flow behavior remains incomplete:
-
-- An automatic Tool hold can block requested Tools and non-Tool WorkItems in
-  `Runtime.dispatchOne`.
-- A provider completion with usable output or Tool calls plus an error becomes
-  a failed V3 LLM WorkItem, while V2 continues its normal completion flow.
-
-`MIG-NORMAL-001.b` and `MIG-NORMAL-001.c` are backend blockers. The remaining
-open tasks in this document are also required before this migration can claim
-full normal-session configuration and contribution behavior.
+No source-proven normal-completion capability is missing.
 
 ### Source-backed migration limitations
 
@@ -284,13 +274,10 @@ Intentional V2 and V3 coexistence is not a duplicate implementation to remove:
 - `cmd/agentgo/main.go` registers both wrappers during the coexistence
   checkpoint.
 
-Residual V3-local duplication remains:
-
-- `sessionv3runtime/llm.go:bindLLM` clones the same Model Provider header map
-  twice in succession.
-- `sessionv3/workflow_handlers.go:workflowTerminalChildProgram` assigns
-  `child.Scope.Cleanup` in both the error branch and the unconditional common
-  path.
+No source-proven V3-local duplicate statement remains in the reviewed migration
+paths. `sessionv3runtime/llm.go:bindLLM` has one header clone, and
+`sessionv3/workflow_handlers.go:workflowTerminalChildProgram` has one cleanup
+assignment.
 
 The supplied Workspace prompt producer was not inspected. Setup currently
 uses the Workspace prompt as the one Workspace instruction route. Exact
@@ -324,7 +311,7 @@ document in the same substantial backend delivery.
 
 #### `MIG-NORMAL-001` Provide the SessionV2 normal completion capability in SessionV3
 
-- Status: Partial.
+- Status: Implemented.
 - Source evidence:
   - `sessionv3/runtime.go:SubmitMessage` creates or reuses the durable
     normal-conversation Execution.
@@ -335,19 +322,13 @@ document in the same substantial backend delivery.
   - `sessionv3/normal_session.go` provides continuation and manual Tool
     controls.
   - `sessionv3/stream.go` persists stream output.
-- Missing parity evidence:
-  - `sessionv3/runtime.go:dispatchOne` has a Tool-hold dispatch predicate
-    that is broader than its Tool-only ready-work predicate.
-  - `sessionv3runtime/llm.go:executeLLM` and
-    `sessionv3/runtime.go:finishWorkLocked` do not preserve usable output
-    from an errored provider response.
 - Completed behavior:
   - Normal Model completion.
-  - Agent-loop Tool cycles in the ordinary successful path.
-  - Automatic and requested Tool execution when automation holds are absent.
+  - Agent-loop Tool cycles.
+  - Automatic and requested Tool execution.
   - Continuation.
   - Streamed output.
-  - Baseline configuration composition.
+  - Configuration composition.
   - Artifact-backed domain contributions.
 
 ##### `MIG-NORMAL-001.a` Preserve durable normal conversation state
@@ -363,43 +344,42 @@ document in the same substantial backend delivery.
 
 ##### `MIG-NORMAL-001.b` Preserve normal Tool-loop behavior
 
-- Status: Partial.
+- Status: Implemented.
 - Source evidence:
   - `sessionv3/program.go:agentLoopInterpreter`.
   - `sessionv3/normal_session.go:normalToolBatchDispatchAllowed`.
   - `sessionv3/runtime.go:readyWorkLocked` scopes Tool holds to automatic,
     unrequested Tool WorkItems.
-  - `sessionv3/runtime.go:dispatchOne` applies
-    `automationHoldApplies` outside that Tool-only condition.
-- Implemented behavior:
+  - `sessionv3/normal_session.go:normalToolDispatchAllowed` is the shared
+    Tool-only hold and batch gate used by `readyWorkLocked` and `dispatchOne`.
+- Completed behavior:
   - Create local Tool WorkItems from Model output.
   - Preserve ordered automatic Tool execution.
   - Support user-requested Tool execution, retry, skip, explicit error
     completion, and continuation.
-- Missing behavior:
-  - A Tool automation hold must not block a manually requested Tool WorkItem.
-  - A Tool automation hold must not block LLM, Fork, Join, Wait, Emit, retry,
-    resource, or other non-Tool WorkItems.
-  - Ready-work selection and final dispatch must use one Tool-only hold rule.
+  - Keep requested Tools dispatchable during an automatic Tool hold.
+  - Keep non-Tool WorkItems dispatchable during an automatic Tool hold.
 
 ##### `MIG-NORMAL-001.c` Preserve usable provider completion output with an accompanying error
 
-- Status: Partial.
+- Status: Implemented.
 - Source evidence:
   - `session/dispatch.go:finishModelExecution` completes a V2 Model operation
     when `Usable` output or Tool calls exist despite `result.Error`.
   - `sessionv3runtime/llm.go:executeLLM` returns both `LLMOutput` and a
     `SanitizedError` for `out.Error`.
-  - `sessionv3/runtime.go:finishWorkLocked` converts that V3 result to
-    `WorkItemStateFailed`.
+  - `sessionv3/normal_session.go:normalConversationLLMOutputUsable` identifies
+    usable normal-conversation Agent-loop output.
+  - `sessionv3/runtime.go:finishWorkLocked` completes that normal LLM WorkItem
+    while retaining its durable error.
   - `sessionv3/program.go:agentLoopInterpreter` consumes only a completed LLM
     WorkItem.
-- Missing behavior:
+- Completed behavior:
   - Retain usable text, protocol output, and Tool calls from an errored
     provider response.
-  - Preserve the provider error durably without preventing normal Agent-loop
-    Tool dispatch or completion.
-  - Fail only a completion with no usable output and no Tool calls.
+  - Retain the provider error in the completed WorkItem, Attempt, and
+    assistant Activity.
+  - Fail a completion with no usable output and no Tool calls.
 
 ### Store isolation and durable replacement
 
@@ -466,7 +446,7 @@ document in the same substantial backend delivery.
 
 #### `MIG-ARCH-004` Remove duplicated V3 behavior and use canonical owners
 
-- Status: Partial.
+- Status: Implemented.
 - Source evidence:
   - `attachmentruntime.SessionV3Admitter` is the canonical V3 attachment
     admission owner.
@@ -474,20 +454,15 @@ document in the same substantial backend delivery.
   - `normal_model_defaults.go` has one stop-sequence clear removal.
   - `mcpruntime/v3.go:V3Executor.Execute` has no unreachable repeated
     read-effect branch.
-  - `workflow_handlers.go:workflowTerminalChildProgram` still has one cleanup
-    assignment in its error branch and one identical unconditional assignment.
-  - `sessionv3runtime/llm.go:bindLLM` still has two consecutive
-    `DefaultHeaders` clone operations.
+  - `workflow_handlers.go:workflowTerminalChildProgram` has one cleanup
+    assignment.
+  - `sessionv3runtime/llm.go:bindLLM` has one `DefaultHeaders` clone.
   - `runtime.go:finishWorkLocked` uses `ActionKindTool`.
-- Implemented behavior:
+- Completed behavior:
   - One V3 attachment admission implementation remains.
-  - The reported stop-sequence clear, MCP read-effect, and Action-kind paths
-    are consolidated.
+  - Repeated and dead V3-local behavior is removed.
   - Existing constants and enums own stable values in touched code.
   - SessionV2 coexistence remains unchanged.
-- Remaining behavior:
-  - Remove the two residual V3-local duplicate statements without adding a
-    second helper or lifecycle path.
 
 ##### `MIG-ARCH-004.a` Remove the redundant V3 attachment delegate
 
@@ -500,47 +475,45 @@ document in the same substantial backend delivery.
 
 ##### `MIG-ARCH-004.b` Remove identified repeated and dead local logic
 
-- Status: Partial.
-  - `sessionv3runtime/llm.go:bindLLM` repeats the same header-map clone after
-    `CapabilityOverrides` cloning.
-  - `sessionv3/workflow_handlers.go:workflowTerminalChildProgram` repeats the
-    cleanup assignment for an errored terminal state.
-- Missing behavior:
-  - Keep one necessary Model Provider header clone.
-  - Keep one cleanup-state assignment after terminal child scope construction.
-  - Preserve current Runtime semantics and do not add a new validation,
-    preparation, or execution path.
+- Status: Implemented.
+- Source evidence:
+  - `sessionv3runtime/llm.go:bindLLM` retains one necessary header-map clone
+    before immutable semantic binding construction.
+  - `sessionv3/workflow_handlers.go:workflowTerminalChildProgram` retains one
+    cleanup-state assignment after terminal child scope construction.
+- Completed behavior:
+  - Repeated V3-local statements are removed without adding another helper,
+    validation, preparation, or execution path.
 
 ### Normal configuration and contribution parity
 
 #### `MIG-CONFIG-007` Preserve explicit empty Model stop-sequence replacement
 
-- Status: Partial.
+- Status: Implemented.
 - Source evidence:
   - `sessionv3/normal_model_defaults.go:MergeModelDefaultsOverride` retains a
     present empty `StopSequences` collection.
-  - `modelruntime/runtime_request_patch.go:applyRuntimeDefaults` applies
-    `stopSequences` only when its decoded collection is nonempty.
-- Missing behavior:
-  - A supplied empty collection must clear inherited stop sequences.
-  - Omission must retain inherited stop sequences.
-  - The Model runtime patch owner must implement this once for all consumers.
-  - Do not add a V3-local patch-merging implementation.
+  - `modelruntime/runtime_request_patch.go:applyRuntimeDefaults` applies a
+    present `stopSequences` collection, including an explicit empty collection.
+- Completed behavior:
+  - An explicit empty collection clears inherited stop sequences.
+  - Omission retains inherited stop sequences.
+  - The shared Model runtime patch owner implements this once for all
+    consumers without a V3-specific patch-merging path.
 
 #### `MIG-CONTRIB-008` Preserve duplicate Skill contribution replacement by identity
 
-- Status: Partial.
+- Status: Implemented.
 - Source evidence:
-  - `contributionruntime/prepared.go:appendPreparedSkill` finds a matching
-    contribution, calls `enableOrAppendPreparedSkill`, and then writes
-    instruction and activity facts through `output.Skills[len(output.Skills)-1]`.
-- Missing behavior:
-  - Update the matching Skill contribution, even when it is not the final
-    collection entry.
-  - Preserve pin identity, owner precedence, enabled state, active state,
-    instruction mode, instruction content, and contribution order for that
-    same Skill only.
-  - Keep normal Session and Workflow invocation preparation on the one
+  - `contributionruntime/prepared.go:appendPreparedSkill` replaces the
+    matching indexed Skill contribution and updates its contribution order.
+- Completed behavior:
+  - Duplicate Skill contributions update the matching Skill, including when it
+    is not the final collection entry.
+  - Pin identity, owner precedence, enabled state, active state, instruction
+    mode, instruction content, and contribution order remain attached to the
+    same Skill.
+  - Normal Session and Workflow invocation preparation use the one
     `contributionruntime.Preparer` behavior.
 
 ### MCP App lifecycle parity

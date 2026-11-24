@@ -1206,14 +1206,28 @@ func appendPreparedSkill(
 	instructionContent string,
 	owner sessionv3Runtime.ConfigurationOwner,
 ) {
-	for _, current := range output.Skills {
+	for index := range output.Skills {
+		current := output.Skills[index]
 		if current.Artifact.RootID == pin.RootID &&
 			current.Artifact.ArtifactID == pin.ArtifactID {
 			if contributionOwnerRank(owner) > contributionOwnerRank(current.Owner) {
-				enableOrAppendPreparedSkill(output, pin, owner)
-				output.Skills[len(output.Skills)-1].Instructions = instructions
-				output.Skills[len(output.Skills)-1].InstructionContent = instructionContent
-				output.Skills[len(output.Skills)-1].Active = active
+				output.Skills[index] = sessionv3Runtime.WorkflowPreparedSkill{
+					Artifact:           pin,
+					Enabled:            enabled,
+					Active:             active,
+					Instructions:       instructions,
+					InstructionContent: instructionContent,
+					Owner:              owner,
+				}
+				replaceContributionOrder(
+					output,
+					sessionv3Runtime.PreparedContributionKindSkill,
+					sessionv3Runtime.PreparedContributionKey(
+						sessionv3Runtime.PreparedContributionKindSkill,
+						pin,
+					),
+					owner,
+				)
 			}
 			return
 		}

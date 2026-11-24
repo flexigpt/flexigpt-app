@@ -1269,6 +1269,28 @@ func readyCurrentBatchToolIDs(
 	return uniqueNormalWorkItemIDs(output)
 }
 
+// normalToolDispatchAllowed is the single normal-conversation Tool dispatch
+// gate used by ready-work selection and final dispatch. A Tool hold suppresses
+// only automatic, unrequested Tool WorkItems. Explicit user requests must
+// remain dispatchable.
+func normalToolDispatchAllowed(
+	execution Execution,
+	item WorkItem,
+) bool {
+	if item.Type != WorkItemTypeTool {
+		return true
+	}
+	if item.Automatic &&
+		!item.Requested &&
+		automationHoldApplies(
+			execution.Controls.AutomaticTools,
+			item.OriginWorkItemID,
+		) {
+		return false
+	}
+	return normalToolBatchDispatchAllowed(execution, item)
+}
+
 // normalToolBatchDispatchAllowed keeps automatic Agent-loop Tool batches
 // sequential. Explicitly requested work uses the same durable batch order,
 // but only selected Tool WorkItems participate.
@@ -1316,11 +1338,7 @@ func normalToolBatchDispatchAllowed(
 			}
 			return candidate.ID == item.ID
 		}
-		if !candidate.Automatic ||
-			automationHoldApplies(
-				execution.Controls.AutomaticTools,
-				candidate.OriginWorkItemID,
-			) {
+		if !candidate.Automatic {
 			return false
 		}
 		return candidate.ID == item.ID
@@ -1330,6 +1348,64 @@ func normalToolBatchDispatchAllowed(
 
 func isNormalConversationExecution(execution Execution) bool {
 	return normalConversationFrame(&execution) != nil
+}
+
+func normalConversationAgentLoopFrame(
+	session *Session,
+	execution Execution,
+	frameID ProgramFrameID,
+) bool {
+	if session == nil || frameID == "" {
+		return false
+	}
+
+	frame := mutableFrame(&execution, frameID)
+	if frame == nil ||
+		frame.Program.InterpreterID != BuiltinAgentLoopInterpreterID {
+		return false
+	}
+	if isNormalConversationExecution(execution) || frame.HandoffID != "" {
+		return true
+	}
+
+	for _, ownership := range session.ConversationOwnership {
+		if ownership.ActiveHandoffID == "" ||
+			ownership.Owner.ExecutionID != execution.ID ||
+			ownership.Owner.FrameID != frame.ID {
+			continue
+		}
+		return true
+	}
+	return false
+}
+
+// normalConversationLLMOutputUsable preserves SessionV2 normal completion
+// behavior when a provider supplies usable output together with an error.
+// The error remains durable, but a normal Agent loop can consume the output.
+func normalConversationLLMOutputUsable(
+	session *Session,
+	execution Execution,
+	item WorkItem,
+	result WorkExecutionResult,
+) bool {
+	if item.Type != WorkItemTypeLLM ||
+		result.Error == nil ||
+		result.Output == nil ||
+		result.Output.LLM == nil {
+		return false
+	}
+
+	output := result.Output.LLM
+	if strings.TrimSpace(output.Text) == "" &&
+		len(output.ToolCalls) == 0 &&
+		len(output.ProtocolOutputs) == 0 {
+		return false
+	}
+	return normalConversationAgentLoopFrame(
+		session,
+		execution,
+		item.FrameID,
+	)
 }
 
 func normalConversationFrame(execution *Execution) *ProgramFrame {

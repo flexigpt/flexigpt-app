@@ -216,9 +216,6 @@ func (b *Binder) bindLLM(
 		configuration.ProviderParam.DefaultHeaders,
 	)
 	configuration.CapabilityOverrides = slices.Clone(configuration.CapabilityOverrides)
-	configuration.ProviderParam.DefaultHeaders = maps.Clone(
-		configuration.ProviderParam.DefaultHeaders,
-	)
 	semantic := sessionv3Runtime.SemanticBinding{
 		Version:           v3LLMSemanticBindingVersion,
 		Artifacts:         artifacts,

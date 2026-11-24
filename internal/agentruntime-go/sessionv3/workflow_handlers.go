@@ -419,8 +419,6 @@ func (i *WorkflowInterpreter) workflowTerminalChildProgram(
 		errorValue, encodeErr := canonicalWorkflowValue(
 			state.Terminal.Error,
 		)
-		child.Scope.Cleanup = child.Scope.Cleanup ||
-			state.Terminal.Status != ProgramFrameStateCompleted
 		if encodeErr != nil {
 			return ProgramSnapshot{}, encodeErr
 		}

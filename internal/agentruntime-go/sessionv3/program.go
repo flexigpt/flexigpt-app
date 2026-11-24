@@ -523,7 +523,7 @@ func (agentLoopInterpreter) Advance(
 				Kind:       ActivityKindMessage,
 				Visibility: ActivityVisibilityBoth,
 				WorkItemID: item.ID,
-				Message:    &MessageActivity{Role: MessageRoleAssistant, Text: item.Output.LLM.Text},
+				Message:    completedLLMAssistantMessage(*item),
 			}
 			executable, observed := splitExecutableCalls(item.Output.LLM.ToolCalls)
 			activities := make([]Activity, 0, 1+len(observed))
@@ -897,6 +897,20 @@ func workItemFailureMessage(item WorkItem) string {
 	return llmWorkFailedMessage
 }
 
+func completedLLMAssistantMessage(item WorkItem) *MessageActivity {
+	message := &MessageActivity{
+		Role: MessageRoleAssistant,
+	}
+	if item.Output != nil && item.Output.LLM != nil {
+		message.Text = item.Output.LLM.Text
+	}
+	if item.Error != nil {
+		message.Status = MessageStatusFailed
+		message.Error = cloneWorkflowSanitizedError(item.Error)
+	}
+	return message
+}
+
 // interruptedAssistantActivities retains observed assistant text after a
 // failed or cancelled LLM WorkItem. The Activity reports its actual terminal
 // meaning and does not fabricate a successful Model result.
@@ -1132,7 +1146,7 @@ func (singleModelInterpreter) Advance(
 					Kind:       ActivityKindMessage,
 					Visibility: ActivityVisibilityBoth,
 					WorkItemID: item.ID,
-					Message:    &MessageActivity{Role: MessageRoleAssistant, Text: item.Output.LLM.Text},
+					Message:    completedLLMAssistantMessage(*item),
 				},
 			},
 		}, nil
