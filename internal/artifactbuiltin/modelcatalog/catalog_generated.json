@@ -22,7 +22,7 @@
                 "body": {
                   "adapter": "anthropic.messages",
                   "authentication": {
-                    "headerName": "x-api-key",
+                    "headerName": "Authorization",
                     "mode": "apiKeyHeader"
                   },
                   "capabilities": {
@@ -89,7 +89,7 @@
                     "headers": {
                       "set": {
                         "accept": "application/json",
-                        "anthropic-version": "2023-06-01",
+                        "anthropic-version": "2026-10-21",
                         "content-type": "application/json"
                       }
                     },
@@ -104,7 +104,7 @@
                   "name": "anthropic",
                   "type": "model.provider"
                 },
-                "digest": "sha256:92e5e2d8cad24d0a446596cfbbf06eaae4f9416e181807aeb6b96789e1f9acf2",
+                "digest": "sha256:cf05c314a6e92314d234d91547b88f0e474ced19b5f96ef9f27f48777a91f7d5",
                 "displayName": "Anthropic",
                 "kind": "model.provider",
                 "logicalName": "anthropic",
@@ -113,20 +113,20 @@
               }
             }
           ],
-          "digest": "sha256:942e10e6c1143ce442c096b3250b50a2df787918922d1057e09ef96770aa9621",
+          "digest": "sha256:c22bbafc1aecd0ef77869827326169791d38fe60098dadc39af47cd8c0516eec",
           "locator": "model-provider.yaml"
         }
       ],
       "embeddedRoot": "model-provider/anthropic/unversioned",
       "files": [
         {
-          "content": "eyJhZGFwdGVyIjoiYW50aHJvcGljLm1lc3NhZ2VzIiwiYXV0aGVudGljYXRpb24iOnsiaGVhZGVyTmFtZSI6IngtYXBpLWtleSIsIm1vZGUiOiJhcGlLZXlIZWFkZXIifSwiY2FwYWJpbGl0aWVzIjp7Im1vZGFsaXRpZXNJbiI6WyJ0ZXh0SW4iLCJpbWFnZUluIiwiZmlsZUluIl0sIm1vZGFsaXRpZXNPdXQiOlsidGV4dE91dCJdLCJvdXRwdXRDYXBhYmlsaXRpZXMiOnsic3VwcG9ydGVkT3V0cHV0Rm9ybWF0cyI6WyJ0ZXh0IiwianNvblNjaGVtYSJdLCJzdXBwb3J0c1ZlcmJvc2l0eSI6dHJ1ZX0sInJlYXNvbmluZ0NhcGFiaWxpdGllcyI6eyJzdXBwb3J0ZWRSZWFzb25pbmdMZXZlbHMiOlsibm9uZSIsIm1pbmltYWwiLCJsb3ciLCJtZWRpdW0iLCJoaWdoIiwieGhpZ2giLCJtYXgiXSwic3VwcG9ydGVkUmVhc29uaW5nVHlwZXMiOlsiaHlicmlkV2l0aFRva2VucyIsInNpbmdsZVdpdGhMZXZlbHMiXSwic3VwcG9ydHNFbmNyeXB0ZWRSZWFzb25pbmdJbnB1dCI6ZmFsc2UsInN1cHBvcnRzUmVhc29uaW5nQ29udGV4dCI6ZmFsc2UsInN1cHBvcnRzUmVhc29uaW5nTW9kZSI6ZmFsc2UsInN1cHBvcnRzU3VtbWFyeVN0eWxlIjp0cnVlLCJ0ZW1wZXJhdHVyZURpc2FsbG93ZWRXaGVuRW5hYmxlZCI6dHJ1ZX0sInN0b3BTZXF1ZW5jZUNhcGFiaWxpdGllcyI6eyJkaXNhbGxvd2VkV2l0aFJlYXNvbmluZyI6ZmFsc2UsImlzU3VwcG9ydGVkIjp0cnVlLCJtYXhTZXF1ZW5jZXMiOjB9LCJ0b29sQ2FwYWJpbGl0aWVzIjp7Im1heEZvcmNlZFRvb2xzIjoxLCJzdXBwb3J0ZWRDbGllbnRUb29sT3V0cHV0Rm9ybWF0cyI6WyJjb250ZW50SXRlbUxpc3QiXSwic3VwcG9ydGVkVG9vbFBvbGljeU1vZGVzIjpbImF1dG8iLCJhbnkiLCJ0b29sIiwibm9uZSJdLCJzdXBwb3J0ZWRUb29sVHlwZXMiOlsiZnVuY3Rpb24iLCJjdXN0b20iLCJ3ZWJTZWFyY2giXSwic3VwcG9ydHNQYXJhbGxlbFRvb2xDYWxscyI6dHJ1ZX19LCJjb25uZWN0aW9uIjp7ImhlYWRlcnMiOnsic2V0Ijp7ImFjY2VwdCI6ImFwcGxpY2F0aW9uL2pzb24iLCJhbnRocm9waWMtdmVyc2lvbiI6IjIwMjMtMDYtMDEiLCJjb250ZW50LXR5cGUiOiJhcHBsaWNhdGlvbi9qc29uIn19LCJvcmlnaW4iOiJodHRwczovL2FwaS5hbnRocm9waWMuY29tIiwicGF0aCI6Ii92MS9tZXNzYWdlcyJ9LCJkZWZhdWx0TW9kZWwiOnsibmFtZSI6ImFudGhyb3BpYy1jbGF1ZGUtc29ubmV0LTUiLCJzY29wZSI6ImJ1aWx0aW4ifSwiZGlzcGxheU5hbWUiOiJBbnRocm9waWMiLCJuYW1lIjoiYW50aHJvcGljIiwidHlwZSI6Im1vZGVsLnByb3ZpZGVyIn0=",
-          "digest": "sha256:942e10e6c1143ce442c096b3250b50a2df787918922d1057e09ef96770aa9621",
+          "content": "eyJhZGFwdGVyIjoiYW50aHJvcGljLm1lc3NhZ2VzIiwiYXV0aGVudGljYXRpb24iOnsiaGVhZGVyTmFtZSI6IkF1dGhvcml6YXRpb24iLCJtb2RlIjoiYXBpS2V5SGVhZGVyIn0sImNhcGFiaWxpdGllcyI6eyJtb2RhbGl0aWVzSW4iOlsidGV4dEluIiwiaW1hZ2VJbiIsImZpbGVJbiJdLCJtb2RhbGl0aWVzT3V0IjpbInRleHRPdXQiXSwib3V0cHV0Q2FwYWJpbGl0aWVzIjp7InN1cHBvcnRlZE91dHB1dEZvcm1hdHMiOlsidGV4dCIsImpzb25TY2hlbWEiXSwic3VwcG9ydHNWZXJib3NpdHkiOnRydWV9LCJyZWFzb25pbmdDYXBhYmlsaXRpZXMiOnsic3VwcG9ydGVkUmVhc29uaW5nTGV2ZWxzIjpbIm5vbmUiLCJtaW5pbWFsIiwibG93IiwibWVkaXVtIiwiaGlnaCIsInhoaWdoIiwibWF4Il0sInN1cHBvcnRlZFJlYXNvbmluZ1R5cGVzIjpbImh5YnJpZFdpdGhUb2tlbnMiLCJzaW5nbGVXaXRoTGV2ZWxzIl0sInN1cHBvcnRzRW5jcnlwdGVkUmVhc29uaW5nSW5wdXQiOmZhbHNlLCJzdXBwb3J0c1JlYXNvbmluZ0NvbnRleHQiOmZhbHNlLCJzdXBwb3J0c1JlYXNvbmluZ01vZGUiOmZhbHNlLCJzdXBwb3J0c1N1bW1hcnlTdHlsZSI6dHJ1ZSwidGVtcGVyYXR1cmVEaXNhbGxvd2VkV2hlbkVuYWJsZWQiOnRydWV9LCJzdG9wU2VxdWVuY2VDYXBhYmlsaXRpZXMiOnsiZGlzYWxsb3dlZFdpdGhSZWFzb25pbmciOmZhbHNlLCJpc1N1cHBvcnRlZCI6dHJ1ZSwibWF4U2VxdWVuY2VzIjowfSwidG9vbENhcGFiaWxpdGllcyI6eyJtYXhGb3JjZWRUb29scyI6MSwic3VwcG9ydGVkQ2xpZW50VG9vbE91dHB1dEZvcm1hdHMiOlsiY29udGVudEl0ZW1MaXN0Il0sInN1cHBvcnRlZFRvb2xQb2xpY3lNb2RlcyI6WyJhdXRvIiwiYW55IiwidG9vbCIsIm5vbmUiXSwic3VwcG9ydGVkVG9vbFR5cGVzIjpbImZ1bmN0aW9uIiwiY3VzdG9tIiwid2ViU2VhcmNoIl0sInN1cHBvcnRzUGFyYWxsZWxUb29sQ2FsbHMiOnRydWV9fSwiY29ubmVjdGlvbiI6eyJoZWFkZXJzIjp7InNldCI6eyJhY2NlcHQiOiJhcHBsaWNhdGlvbi9qc29uIiwiYW50aHJvcGljLXZlcnNpb24iOiIyMDI2LTEwLTIxIiwiY29udGVudC10eXBlIjoiYXBwbGljYXRpb24vanNvbiJ9fSwib3JpZ2luIjoiaHR0cHM6Ly9hcGkuYW50aHJvcGljLmNvbSIsInBhdGgiOiIvdjEvbWVzc2FnZXMifSwiZGVmYXVsdE1vZGVsIjp7Im5hbWUiOiJhbnRocm9waWMtY2xhdWRlLXNvbm5ldC01Iiwic2NvcGUiOiJidWlsdGluIn0sImRpc3BsYXlOYW1lIjoiQW50aHJvcGljIiwibmFtZSI6ImFudGhyb3BpYyIsInR5cGUiOiJtb2RlbC5wcm92aWRlciJ9",
+          "digest": "sha256:c22bbafc1aecd0ef77869827326169791d38fe60098dadc39af47cd8c0516eec",
           "locator": "model-provider.yaml",
-          "size": 1292
+          "size": 1296
         }
       ],
-      "fingerprint": "sha256:26cf9123b06fca61b2fd1f19f6bf387023b55df9c8f31f50651ab5d46fc245ee"
+      "fingerprint": "sha256:ed72f713f758651899599ab5044b877d5b3ec7e9f564cf35edda8197b798bb94"
     },
     {
       "address": {
@@ -340,14 +340,14 @@
                     "path": "/"
                   },
                   "defaultModel": {
-                    "name": "googlegemini-gemini-4-hydrogen",
+                    "name": "googlegemini-gemini-3.8-flash",
                     "scope": "builtin"
                   },
                   "displayName": "Google Gemini API",
                   "name": "googlegemini",
                   "type": "model.provider"
                 },
-                "digest": "sha256:90dcade84d2652a5efa7d9ddf2768df3f20868995153b8a3431c680cd7c96ef2",
+                "digest": "sha256:6cda17322558de451630854b0f5ffad781d9b71a498379b82364f57840202615",
                 "displayName": "Google Gemini API",
                 "kind": "model.provider",
                 "logicalName": "googlegemini",
@@ -356,20 +356,78 @@
               }
             }
           ],
-          "digest": "sha256:235ff57face9349cc267b93f2d8f20779e484c8511a316519085dc56c08cca35",
+          "digest": "sha256:de20aa30fd9f303a1f32766f26eaf8202e87568655221d0e1f6e09457fa68b65",
           "locator": "model-provider.yaml"
         }
       ],
       "embeddedRoot": "model-provider/googlegemini/unversioned",
       "files": [
         {
-          "content": "eyJhZGFwdGVyIjoiZ29vZ2xlLmdlbmVyYXRlQ29udGVudCIsImF1dGhlbnRpY2F0aW9uIjp7ImhlYWRlck5hbWUiOiJ4LWdvb2ctYXBpLWtleSIsIm1vZGUiOiJhcGlLZXlIZWFkZXIifSwiY2FwYWJpbGl0aWVzIjp7Im1vZGFsaXRpZXNJbiI6WyJ0ZXh0SW4iLCJpbWFnZUluIiwiZmlsZUluIl0sIm1vZGFsaXRpZXNPdXQiOlsidGV4dE91dCJdLCJvdXRwdXRDYXBhYmlsaXRpZXMiOnsic3VwcG9ydGVkT3V0cHV0Rm9ybWF0cyI6WyJ0ZXh0IiwianNvblNjaGVtYSJdLCJzdXBwb3J0c1ZlcmJvc2l0eSI6dHJ1ZX0sInJlYXNvbmluZ0NhcGFiaWxpdGllcyI6eyJoeWJyaWRUb2tlbkJ1ZGdldENhcGFiaWxpdGllcyI6eyJtYXhBbGxvd2VkIjozMjc2OCwibWluQWxsb3dlZCI6MSwibWludXNPbmVBbGxvd2VkIjp0cnVlLCJ6ZXJvQWxsb3dlZCI6dHJ1ZX0sInN1cHBvcnRlZFJlYXNvbmluZ0xldmVscyI6WyJub25lIiwibWluaW1hbCIsImxvdyIsIm1lZGl1bSIsImhpZ2giLCJ4aGlnaCIsIm1heCJdLCJzdXBwb3J0ZWRSZWFzb25pbmdUeXBlcyI6WyJzaW5nbGVXaXRoTGV2ZWxzIiwiaHlicmlkV2l0aFRva2VucyJdLCJzdXBwb3J0c0VuY3J5cHRlZFJlYXNvbmluZ0lucHV0IjpmYWxzZSwic3VwcG9ydHNSZWFzb25pbmdDb250ZXh0IjpmYWxzZSwic3VwcG9ydHNSZWFzb25pbmdNb2RlIjpmYWxzZSwic3VwcG9ydHNTdW1tYXJ5U3R5bGUiOnRydWUsInRlbXBlcmF0dXJlRGlzYWxsb3dlZFdoZW5FbmFibGVkIjpmYWxzZX0sInN0b3BTZXF1ZW5jZUNhcGFiaWxpdGllcyI6eyJkaXNhbGxvd2VkV2l0aFJlYXNvbmluZyI6ZmFsc2UsImlzU3VwcG9ydGVkIjp0cnVlLCJtYXhTZXF1ZW5jZXMiOjR9LCJ0b29sQ2FwYWJpbGl0aWVzIjp7Im1heEZvcmNlZFRvb2xzIjoxLCJzdXBwb3J0ZWRDbGllbnRUb29sT3V0cHV0Rm9ybWF0cyI6WyJzdHJpbmciXSwic3VwcG9ydGVkVG9vbFBvbGljeU1vZGVzIjpbImF1dG8iLCJhbnkiLCJ0b29sIiwibm9uZSJdLCJzdXBwb3J0ZWRUb29sVHlwZXMiOlsiZnVuY3Rpb24iLCJjdXN0b20iLCJ3ZWJTZWFyY2giXSwic3VwcG9ydHNQYXJhbGxlbFRvb2xDYWxscyI6dHJ1ZX19LCJjb25uZWN0aW9uIjp7ImhlYWRlcnMiOnsic2V0Ijp7ImNvbnRlbnQtdHlwZSI6ImFwcGxpY2F0aW9uL2pzb24ifX0sIm9yaWdpbiI6Imh0dHBzOi8vZ2VuZXJhdGl2ZWxhbmd1YWdlLmdvb2dsZWFwaXMuY29tIiwicGF0aCI6Ii8ifSwiZGVmYXVsdE1vZGVsIjp7Im5hbWUiOiJnb29nbGVnZW1pbmktZ2VtaW5pLTQtaHlkcm9nZW4iLCJzY29wZSI6ImJ1aWx0aW4ifSwiZGlzcGxheU5hbWUiOiJHb29nbGUgR2VtaW5pIEFQSSIsIm5hbWUiOiJnb29nbGVnZW1pbmkiLCJ0eXBlIjoibW9kZWwucHJvdmlkZXIifQ==",
-          "digest": "sha256:235ff57face9349cc267b93f2d8f20779e484c8511a316519085dc56c08cca35",
+          "content": "eyJhZGFwdGVyIjoiZ29vZ2xlLmdlbmVyYXRlQ29udGVudCIsImF1dGhlbnRpY2F0aW9uIjp7ImhlYWRlck5hbWUiOiJ4LWdvb2ctYXBpLWtleSIsIm1vZGUiOiJhcGlLZXlIZWFkZXIifSwiY2FwYWJpbGl0aWVzIjp7Im1vZGFsaXRpZXNJbiI6WyJ0ZXh0SW4iLCJpbWFnZUluIiwiZmlsZUluIl0sIm1vZGFsaXRpZXNPdXQiOlsidGV4dE91dCJdLCJvdXRwdXRDYXBhYmlsaXRpZXMiOnsic3VwcG9ydGVkT3V0cHV0Rm9ybWF0cyI6WyJ0ZXh0IiwianNvblNjaGVtYSJdLCJzdXBwb3J0c1ZlcmJvc2l0eSI6dHJ1ZX0sInJlYXNvbmluZ0NhcGFiaWxpdGllcyI6eyJoeWJyaWRUb2tlbkJ1ZGdldENhcGFiaWxpdGllcyI6eyJtYXhBbGxvd2VkIjozMjc2OCwibWluQWxsb3dlZCI6MSwibWludXNPbmVBbGxvd2VkIjp0cnVlLCJ6ZXJvQWxsb3dlZCI6dHJ1ZX0sInN1cHBvcnRlZFJlYXNvbmluZ0xldmVscyI6WyJub25lIiwibWluaW1hbCIsImxvdyIsIm1lZGl1bSIsImhpZ2giLCJ4aGlnaCIsIm1heCJdLCJzdXBwb3J0ZWRSZWFzb25pbmdUeXBlcyI6WyJzaW5nbGVXaXRoTGV2ZWxzIiwiaHlicmlkV2l0aFRva2VucyJdLCJzdXBwb3J0c0VuY3J5cHRlZFJlYXNvbmluZ0lucHV0IjpmYWxzZSwic3VwcG9ydHNSZWFzb25pbmdDb250ZXh0IjpmYWxzZSwic3VwcG9ydHNSZWFzb25pbmdNb2RlIjpmYWxzZSwic3VwcG9ydHNTdW1tYXJ5U3R5bGUiOnRydWUsInRlbXBlcmF0dXJlRGlzYWxsb3dlZFdoZW5FbmFibGVkIjpmYWxzZX0sInN0b3BTZXF1ZW5jZUNhcGFiaWxpdGllcyI6eyJkaXNhbGxvd2VkV2l0aFJlYXNvbmluZyI6ZmFsc2UsImlzU3VwcG9ydGVkIjp0cnVlLCJtYXhTZXF1ZW5jZXMiOjR9LCJ0b29sQ2FwYWJpbGl0aWVzIjp7Im1heEZvcmNlZFRvb2xzIjoxLCJzdXBwb3J0ZWRDbGllbnRUb29sT3V0cHV0Rm9ybWF0cyI6WyJzdHJpbmciXSwic3VwcG9ydGVkVG9vbFBvbGljeU1vZGVzIjpbImF1dG8iLCJhbnkiLCJ0b29sIiwibm9uZSJdLCJzdXBwb3J0ZWRUb29sVHlwZXMiOlsiZnVuY3Rpb24iLCJjdXN0b20iLCJ3ZWJTZWFyY2giXSwic3VwcG9ydHNQYXJhbGxlbFRvb2xDYWxscyI6dHJ1ZX19LCJjb25uZWN0aW9uIjp7ImhlYWRlcnMiOnsic2V0Ijp7ImNvbnRlbnQtdHlwZSI6ImFwcGxpY2F0aW9uL2pzb24ifX0sIm9yaWdpbiI6Imh0dHBzOi8vZ2VuZXJhdGl2ZWxhbmd1YWdlLmdvb2dsZWFwaXMuY29tIiwicGF0aCI6Ii8ifSwiZGVmYXVsdE1vZGVsIjp7Im5hbWUiOiJnb29nbGVnZW1pbmktZ2VtaW5pLTMuOC1mbGFzaCIsInNjb3BlIjoiYnVpbHRpbiJ9LCJkaXNwbGF5TmFtZSI6Ikdvb2dsZSBHZW1pbmkgQVBJIiwibmFtZSI6Imdvb2dsZWdlbWluaSIsInR5cGUiOiJtb2RlbC5wcm92aWRlciJ9",
+          "digest": "sha256:de20aa30fd9f303a1f32766f26eaf8202e87568655221d0e1f6e09457fa68b65",
           "locator": "model-provider.yaml",
-          "size": 1363
+          "size": 1362
         }
       ],
-      "fingerprint": "sha256:b0a2634872a1bb5fbf687419ac58a2d20133ae92a5c4436d44de07576a5eba3a"
+      "fingerprint": "sha256:9da1967ecd127303f7e19984a1da3c09ee02a6144b04481de745311d294e2e2c"
+    },
+    {
+      "address": {
+        "kind": "model-provider",
+        "name": "googlegeminiinteractions",
+        "version": "unversioned"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "adapter": "google.interactions",
+                  "authentication": {
+                    "headerName": "x-goog-api-key",
+                    "mode": "apiKeyHeader"
+                  },
+                  "connection": {
+                    "headers": {
+                      "set": {
+                        "content-type": "application/json"
+                      }
+                    },
+                    "origin": "https://generativelanguage.googleapis.com",
+                    "path": "/"
+                  },
+                  "defaultModel": {
+                    "name": "googlegeminiinteractions-gemini-4-hydrogen",
+                    "scope": "builtin"
+                  },
+                  "displayName": "Google Gemini Interactions API",
+                  "name": "googlegeminiinteractions",
+                  "type": "model.provider"
+                },
+                "digest": "sha256:ce10858fade6dfb6fd475df51706f183f4a559668b9b76ca202de4eb85d5f6f3",
+                "displayName": "Google Gemini Interactions API",
+                "kind": "model.provider",
+                "logicalName": "googlegeminiinteractions",
+                "schemaID": "artifact.model-provider.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:486952d48c7464f788fff67ff4c60060b57d7c79477616cfecf6e21e92d01c26",
+          "locator": "model-provider.yaml"
+        }
+      ],
+      "embeddedRoot": "model-provider/googlegeminiinteractions/unversioned",
+      "files": [
+        {
+          "content": "eyJhZGFwdGVyIjoiZ29vZ2xlLmludGVyYWN0aW9ucyIsImF1dGhlbnRpY2F0aW9uIjp7ImhlYWRlck5hbWUiOiJ4LWdvb2ctYXBpLWtleSIsIm1vZGUiOiJhcGlLZXlIZWFkZXIifSwiY29ubmVjdGlvbiI6eyJoZWFkZXJzIjp7InNldCI6eyJjb250ZW50LXR5cGUiOiJhcHBsaWNhdGlvbi9qc29uIn19LCJvcmlnaW4iOiJodHRwczovL2dlbmVyYXRpdmVsYW5ndWFnZS5nb29nbGVhcGlzLmNvbSIsInBhdGgiOiIvIn0sImRlZmF1bHRNb2RlbCI6eyJuYW1lIjoiZ29vZ2xlZ2VtaW5paW50ZXJhY3Rpb25zLWdlbWluaS00LWh5ZHJvZ2VuIiwic2NvcGUiOiJidWlsdGluIn0sImRpc3BsYXlOYW1lIjoiR29vZ2xlIEdlbWluaSBJbnRlcmFjdGlvbnMgQVBJIiwibmFtZSI6Imdvb2dsZWdlbWluaWludGVyYWN0aW9ucyIsInR5cGUiOiJtb2RlbC5wcm92aWRlciJ9",
+          "digest": "sha256:486952d48c7464f788fff67ff4c60060b57d7c79477616cfecf6e21e92d01c26",
+          "locator": "model-provider.yaml",
+          "size": 429
+        }
+      ],
+      "fingerprint": "sha256:4bfb59dff04116d3d34a96731d0c3b57cf55d8daed4fcb3595e93abc1fb298d9"
     },
     {
       "address": {
@@ -1192,7 +1250,7 @@
                 "body": {
                   "adapter": "anthropic.messages",
                   "authentication": {
-                    "headerName": "x-api-key",
+                    "headerName": "Authorization",
                     "mode": "apiKeyHeader"
                   },
                   "capabilities": {
@@ -1282,7 +1340,7 @@
                     "headers": {
                       "set": {
                         "accept": "application/json",
-                        "anthropic-version": "2023-06-01",
+                        "anthropic-version": "2026-10-21",
                         "content-type": "application/json"
                       }
                     },
@@ -1297,7 +1355,7 @@
                   "name": "moonshot",
                   "type": "model.provider"
                 },
-                "digest": "sha256:9a8c17e7163db6610a22583819947aac161ed73767ef8445ee07225746709cd9",
+                "digest": "sha256:b93d6fcee4d73f872c01c8a545fb5ae311e48a6a5c6913196e147edbac76d15c",
                 "displayName": "Moonshot AI",
                 "kind": "model.provider",
                 "logicalName": "moonshot",
@@ -1306,20 +1364,20 @@
               }
             }
           ],
-          "digest": "sha256:bc685041b8225a485195afa64cff5a2aee4fd792530b5bbfc9131aa7ce159080",
+          "digest": "sha256:28f8a47fccf6e179fe5f196ae74ef51e1848d677573b03a82d5fa68e1da840bb",
           "locator": "model-provider.yaml"
         }
       ],
       "embeddedRoot": "model-provider/moonshot/unversioned",
       "files": [
         {
-          "content": "eyJhZGFwdGVyIjoiYW50aHJvcGljLm1lc3NhZ2VzIiwiYXV0aGVudGljYXRpb24iOnsiaGVhZGVyTmFtZSI6IngtYXBpLWtleSIsIm1vZGUiOiJhcGlLZXlIZWFkZXIifSwiY2FwYWJpbGl0aWVzIjp7ImNhY2hlQ2FwYWJpbGl0aWVzIjp7ImlucHV0T3V0cHV0Q29udGVudCI6eyJzdXBwb3J0ZWRLaW5kcyI6W10sInN1cHBvcnRlZFRUTHMiOltdLCJzdXBwb3J0c0tleSI6ZmFsc2UsInN1cHBvcnRzVFRMIjpmYWxzZX0sInJlYXNvbmluZ0NvbnRlbnQiOnsic3VwcG9ydGVkS2luZHMiOltdLCJzdXBwb3J0ZWRUVExzIjpbXSwic3VwcG9ydHNLZXkiOmZhbHNlLCJzdXBwb3J0c1RUTCI6ZmFsc2V9LCJzdXBwb3J0c0F1dG9tYXRpY0NhY2hpbmciOnRydWUsInRvb2xDYWxsIjp7InN1cHBvcnRlZEtpbmRzIjpbXSwic3VwcG9ydGVkVFRMcyI6W10sInN1cHBvcnRzS2V5IjpmYWxzZSwic3VwcG9ydHNUVEwiOmZhbHNlfSwidG9vbENob2ljZSI6eyJzdXBwb3J0ZWRLaW5kcyI6W10sInN1cHBvcnRlZFRUTHMiOltdLCJzdXBwb3J0c0tleSI6ZmFsc2UsInN1cHBvcnRzVFRMIjpmYWxzZX0sInRvb2xPdXRwdXQiOnsic3VwcG9ydGVkS2luZHMiOltdLCJzdXBwb3J0ZWRUVExzIjpbXSwic3VwcG9ydHNLZXkiOmZhbHNlLCJzdXBwb3J0c1RUTCI6ZmFsc2V9LCJ0b3BMZXZlbCI6eyJzdXBwb3J0ZWRLaW5kcyI6W10sInN1cHBvcnRlZFRUTHMiOltdLCJzdXBwb3J0c0tleSI6ZmFsc2UsInN1cHBvcnRzVFRMIjpmYWxzZX19LCJtb2RhbGl0aWVzSW4iOlsidGV4dEluIiwiaW1hZ2VJbiJdLCJtb2RhbGl0aWVzT3V0IjpbInRleHRPdXQiXSwib3V0cHV0Q2FwYWJpbGl0aWVzIjp7InN1cHBvcnRlZE91dHB1dEZvcm1hdHMiOlsidGV4dCJdLCJzdXBwb3J0c1ZlcmJvc2l0eSI6ZmFsc2V9LCJyZWFzb25pbmdDYXBhYmlsaXRpZXMiOnsic3VwcG9ydGVkUmVhc29uaW5nTGV2ZWxzIjpbXSwic3VwcG9ydGVkUmVhc29uaW5nVHlwZXMiOltdLCJzdXBwb3J0c0VuY3J5cHRlZFJlYXNvbmluZ0lucHV0IjpmYWxzZSwic3VwcG9ydHNSZWFzb25pbmdDb25maWciOmZhbHNlLCJzdXBwb3J0c1JlYXNvbmluZ0NvbnRleHQiOmZhbHNlLCJzdXBwb3J0c1JlYXNvbmluZ01vZGUiOmZhbHNlLCJzdXBwb3J0c1N1bW1hcnlTdHlsZSI6dHJ1ZSwidGVtcGVyYXR1cmVEaXNhbGxvd2VkV2hlbkVuYWJsZWQiOnRydWV9LCJzdG9wU2VxdWVuY2VDYXBhYmlsaXRpZXMiOnsiZGlzYWxsb3dlZFdpdGhSZWFzb25pbmciOmZhbHNlLCJpc1N1cHBvcnRlZCI6ZmFsc2UsIm1heFNlcXVlbmNlcyI6MH0sInRvb2xDYXBhYmlsaXRpZXMiOnsibWF4Rm9yY2VkVG9vbHMiOjAsInN1cHBvcnRlZENsaWVudFRvb2xPdXRwdXRGb3JtYXRzIjpbImNvbnRlbnRJdGVtTGlzdCJdLCJzdXBwb3J0ZWRUb29sUG9saWN5TW9kZXMiOlsiYXV0byIsIm5vbmUiXSwic3VwcG9ydGVkVG9vbFR5cGVzIjpbImZ1bmN0aW9uIl0sInN1cHBvcnRzUGFyYWxsZWxUb29sQ2FsbHMiOmZhbHNlfX0sImNvbm5lY3Rpb24iOnsiaGVhZGVycyI6eyJzZXQiOnsiYWNjZXB0IjoiYXBwbGljYXRpb24vanNvbiIsImFudGhyb3BpYy12ZXJzaW9uIjoiMjAyMy0wNi0wMSIsImNvbnRlbnQtdHlwZSI6ImFwcGxpY2F0aW9uL2pzb24ifX0sIm9yaWdpbiI6Imh0dHBzOi8vYXBpLm1vb25zaG90LmFpIiwicGF0aCI6Ii9hbnRocm9waWMvdjEvbWVzc2FnZXMifSwiZGVmYXVsdE1vZGVsIjp7Im5hbWUiOiJtb29uc2hvdC1raW1pLWszIiwic2NvcGUiOiJidWlsdGluIn0sImRpc3BsYXlOYW1lIjoiTW9vbnNob3QgQUkiLCJuYW1lIjoibW9vbnNob3QiLCJ0eXBlIjoibW9kZWwucHJvdmlkZXIifQ==",
-          "digest": "sha256:bc685041b8225a485195afa64cff5a2aee4fd792530b5bbfc9131aa7ce159080",
+          "content": "eyJhZGFwdGVyIjoiYW50aHJvcGljLm1lc3NhZ2VzIiwiYXV0aGVudGljYXRpb24iOnsiaGVhZGVyTmFtZSI6IkF1dGhvcml6YXRpb24iLCJtb2RlIjoiYXBpS2V5SGVhZGVyIn0sImNhcGFiaWxpdGllcyI6eyJjYWNoZUNhcGFiaWxpdGllcyI6eyJpbnB1dE91dHB1dENvbnRlbnQiOnsic3VwcG9ydGVkS2luZHMiOltdLCJzdXBwb3J0ZWRUVExzIjpbXSwic3VwcG9ydHNLZXkiOmZhbHNlLCJzdXBwb3J0c1RUTCI6ZmFsc2V9LCJyZWFzb25pbmdDb250ZW50Ijp7InN1cHBvcnRlZEtpbmRzIjpbXSwic3VwcG9ydGVkVFRMcyI6W10sInN1cHBvcnRzS2V5IjpmYWxzZSwic3VwcG9ydHNUVEwiOmZhbHNlfSwic3VwcG9ydHNBdXRvbWF0aWNDYWNoaW5nIjp0cnVlLCJ0b29sQ2FsbCI6eyJzdXBwb3J0ZWRLaW5kcyI6W10sInN1cHBvcnRlZFRUTHMiOltdLCJzdXBwb3J0c0tleSI6ZmFsc2UsInN1cHBvcnRzVFRMIjpmYWxzZX0sInRvb2xDaG9pY2UiOnsic3VwcG9ydGVkS2luZHMiOltdLCJzdXBwb3J0ZWRUVExzIjpbXSwic3VwcG9ydHNLZXkiOmZhbHNlLCJzdXBwb3J0c1RUTCI6ZmFsc2V9LCJ0b29sT3V0cHV0Ijp7InN1cHBvcnRlZEtpbmRzIjpbXSwic3VwcG9ydGVkVFRMcyI6W10sInN1cHBvcnRzS2V5IjpmYWxzZSwic3VwcG9ydHNUVEwiOmZhbHNlfSwidG9wTGV2ZWwiOnsic3VwcG9ydGVkS2luZHMiOltdLCJzdXBwb3J0ZWRUVExzIjpbXSwic3VwcG9ydHNLZXkiOmZhbHNlLCJzdXBwb3J0c1RUTCI6ZmFsc2V9fSwibW9kYWxpdGllc0luIjpbInRleHRJbiIsImltYWdlSW4iXSwibW9kYWxpdGllc091dCI6WyJ0ZXh0T3V0Il0sIm91dHB1dENhcGFiaWxpdGllcyI6eyJzdXBwb3J0ZWRPdXRwdXRGb3JtYXRzIjpbInRleHQiXSwic3VwcG9ydHNWZXJib3NpdHkiOmZhbHNlfSwicmVhc29uaW5nQ2FwYWJpbGl0aWVzIjp7InN1cHBvcnRlZFJlYXNvbmluZ0xldmVscyI6W10sInN1cHBvcnRlZFJlYXNvbmluZ1R5cGVzIjpbXSwic3VwcG9ydHNFbmNyeXB0ZWRSZWFzb25pbmdJbnB1dCI6ZmFsc2UsInN1cHBvcnRzUmVhc29uaW5nQ29uZmlnIjpmYWxzZSwic3VwcG9ydHNSZWFzb25pbmdDb250ZXh0IjpmYWxzZSwic3VwcG9ydHNSZWFzb25pbmdNb2RlIjpmYWxzZSwic3VwcG9ydHNTdW1tYXJ5U3R5bGUiOnRydWUsInRlbXBlcmF0dXJlRGlzYWxsb3dlZFdoZW5FbmFibGVkIjp0cnVlfSwic3RvcFNlcXVlbmNlQ2FwYWJpbGl0aWVzIjp7ImRpc2FsbG93ZWRXaXRoUmVhc29uaW5nIjpmYWxzZSwiaXNTdXBwb3J0ZWQiOmZhbHNlLCJtYXhTZXF1ZW5jZXMiOjB9LCJ0b29sQ2FwYWJpbGl0aWVzIjp7Im1heEZvcmNlZFRvb2xzIjowLCJzdXBwb3J0ZWRDbGllbnRUb29sT3V0cHV0Rm9ybWF0cyI6WyJjb250ZW50SXRlbUxpc3QiXSwic3VwcG9ydGVkVG9vbFBvbGljeU1vZGVzIjpbImF1dG8iLCJub25lIl0sInN1cHBvcnRlZFRvb2xUeXBlcyI6WyJmdW5jdGlvbiJdLCJzdXBwb3J0c1BhcmFsbGVsVG9vbENhbGxzIjpmYWxzZX19LCJjb25uZWN0aW9uIjp7ImhlYWRlcnMiOnsic2V0Ijp7ImFjY2VwdCI6ImFwcGxpY2F0aW9uL2pzb24iLCJhbnRocm9waWMtdmVyc2lvbiI6IjIwMjYtMTAtMjEiLCJjb250ZW50LXR5cGUiOiJhcHBsaWNhdGlvbi9qc29uIn19LCJvcmlnaW4iOiJodHRwczovL2FwaS5tb29uc2hvdC5haSIsInBhdGgiOiIvYW50aHJvcGljL3YxL21lc3NhZ2VzIn0sImRlZmF1bHRNb2RlbCI6eyJuYW1lIjoibW9vbnNob3Qta2ltaS1rMyIsInNjb3BlIjoiYnVpbHRpbiJ9LCJkaXNwbGF5TmFtZSI6Ik1vb25zaG90IEFJIiwibmFtZSI6Im1vb25zaG90IiwidHlwZSI6Im1vZGVsLnByb3ZpZGVyIn0=",
+          "digest": "sha256:28f8a47fccf6e179fe5f196ae74ef51e1848d677573b03a82d5fa68e1da840bb",
           "locator": "model-provider.yaml",
-          "size": 1810
+          "size": 1814
         }
       ],
-      "fingerprint": "sha256:0d4d1b444c1f6da36a9e25544dc17e69825acf227117d07ea539d66392085826"
+      "fingerprint": "sha256:156e7d2a88f70878fbcfd503c0675b7a5e8c6c6d902af48813d5e81d60fda775"
     },
     {
       "address": {
@@ -1335,7 +1393,7 @@
                 "body": {
                   "adapter": "anthropic.messages",
                   "authentication": {
-                    "headerName": "x-api-key",
+                    "headerName": "Authorization",
                     "mode": "apiKeyHeader"
                   },
                   "capabilities": {
@@ -1377,7 +1435,7 @@
                     "headers": {
                       "set": {
                         "accept": "application/json",
-                        "anthropic-version": "2023-06-01",
+                        "anthropic-version": "2026-10-21",
                         "content-type": "application/json"
                       }
                     },
@@ -1392,7 +1450,7 @@
                   "name": "ollama",
                   "type": "model.provider"
                 },
-                "digest": "sha256:2068fbc5b344a725270b86ac366cf897e1189edd7d60671fa987017c9d247d64",
+                "digest": "sha256:5d2ab325db0093800b7729434ccbc546058669b6ba9766a910e7767f8b8c8e82",
                 "displayName": "Ollama",
                 "kind": "model.provider",
                 "logicalName": "ollama",
@@ -1401,20 +1459,20 @@
               }
             }
           ],
-          "digest": "sha256:3d55fc0b147ccd686367e320a2ee694236ccc6a97d4c0180e89d4b9127178bbb",
+          "digest": "sha256:096e5c37fed0cc0023c4c33b61ffc7eb6ff7c4018a84c5a6dbfbd57140d13555",
           "locator": "model-provider.yaml"
         }
       ],
       "embeddedRoot": "model-provider/ollama/unversioned",
       "files": [
         {
-          "content": "eyJhZGFwdGVyIjoiYW50aHJvcGljLm1lc3NhZ2VzIiwiYXV0aGVudGljYXRpb24iOnsiaGVhZGVyTmFtZSI6IngtYXBpLWtleSIsIm1vZGUiOiJhcGlLZXlIZWFkZXIifSwiY2FwYWJpbGl0aWVzIjp7Im1vZGFsaXRpZXNJbiI6WyJ0ZXh0SW4iLCJpbWFnZUluIl0sIm1vZGFsaXRpZXNPdXQiOlsidGV4dE91dCJdLCJvdXRwdXRDYXBhYmlsaXRpZXMiOnsic3VwcG9ydGVkT3V0cHV0Rm9ybWF0cyI6WyJ0ZXh0IiwianNvblNjaGVtYSJdLCJzdXBwb3J0c1ZlcmJvc2l0eSI6dHJ1ZX0sInN0b3BTZXF1ZW5jZUNhcGFiaWxpdGllcyI6eyJkaXNhbGxvd2VkV2l0aFJlYXNvbmluZyI6ZmFsc2UsImlzU3VwcG9ydGVkIjp0cnVlLCJtYXhTZXF1ZW5jZXMiOjB9LCJ0b29sQ2FwYWJpbGl0aWVzIjp7Im1heEZvcmNlZFRvb2xzIjowLCJzdXBwb3J0ZWRDbGllbnRUb29sT3V0cHV0Rm9ybWF0cyI6WyJjb250ZW50SXRlbUxpc3QiXSwic3VwcG9ydGVkVG9vbFBvbGljeU1vZGVzIjpbImF1dG8iXSwic3VwcG9ydGVkVG9vbFR5cGVzIjpbImZ1bmN0aW9uIiwiY3VzdG9tIl0sInN1cHBvcnRzUGFyYWxsZWxUb29sQ2FsbHMiOmZhbHNlfX0sImNvbm5lY3Rpb24iOnsiaGVhZGVycyI6eyJzZXQiOnsiYWNjZXB0IjoiYXBwbGljYXRpb24vanNvbiIsImFudGhyb3BpYy12ZXJzaW9uIjoiMjAyMy0wNi0wMSIsImNvbnRlbnQtdHlwZSI6ImFwcGxpY2F0aW9uL2pzb24ifX0sIm9yaWdpbiI6Imh0dHA6Ly8xMjcuMC4wLjE6MTE0MzQiLCJwYXRoIjoiL3YxL21lc3NhZ2VzIn0sImRlZmF1bHRNb2RlbCI6eyJuYW1lIjoib2xsYW1hLXF3ZW4zLjYtMzViIiwic2NvcGUiOiJidWlsdGluIn0sImRpc3BsYXlOYW1lIjoiT2xsYW1hIiwibmFtZSI6Im9sbGFtYSIsInR5cGUiOiJtb2RlbC5wcm92aWRlciJ9",
-          "digest": "sha256:3d55fc0b147ccd686367e320a2ee694236ccc6a97d4c0180e89d4b9127178bbb",
+          "content": "eyJhZGFwdGVyIjoiYW50aHJvcGljLm1lc3NhZ2VzIiwiYXV0aGVudGljYXRpb24iOnsiaGVhZGVyTmFtZSI6IkF1dGhvcml6YXRpb24iLCJtb2RlIjoiYXBpS2V5SGVhZGVyIn0sImNhcGFiaWxpdGllcyI6eyJtb2RhbGl0aWVzSW4iOlsidGV4dEluIiwiaW1hZ2VJbiJdLCJtb2RhbGl0aWVzT3V0IjpbInRleHRPdXQiXSwib3V0cHV0Q2FwYWJpbGl0aWVzIjp7InN1cHBvcnRlZE91dHB1dEZvcm1hdHMiOlsidGV4dCIsImpzb25TY2hlbWEiXSwic3VwcG9ydHNWZXJib3NpdHkiOnRydWV9LCJzdG9wU2VxdWVuY2VDYXBhYmlsaXRpZXMiOnsiZGlzYWxsb3dlZFdpdGhSZWFzb25pbmciOmZhbHNlLCJpc1N1cHBvcnRlZCI6dHJ1ZSwibWF4U2VxdWVuY2VzIjowfSwidG9vbENhcGFiaWxpdGllcyI6eyJtYXhGb3JjZWRUb29scyI6MCwic3VwcG9ydGVkQ2xpZW50VG9vbE91dHB1dEZvcm1hdHMiOlsiY29udGVudEl0ZW1MaXN0Il0sInN1cHBvcnRlZFRvb2xQb2xpY3lNb2RlcyI6WyJhdXRvIl0sInN1cHBvcnRlZFRvb2xUeXBlcyI6WyJmdW5jdGlvbiIsImN1c3RvbSJdLCJzdXBwb3J0c1BhcmFsbGVsVG9vbENhbGxzIjpmYWxzZX19LCJjb25uZWN0aW9uIjp7ImhlYWRlcnMiOnsic2V0Ijp7ImFjY2VwdCI6ImFwcGxpY2F0aW9uL2pzb24iLCJhbnRocm9waWMtdmVyc2lvbiI6IjIwMjYtMTAtMjEiLCJjb250ZW50LXR5cGUiOiJhcHBsaWNhdGlvbi9qc29uIn19LCJvcmlnaW4iOiJodHRwOi8vMTI3LjAuMC4xOjExNDM0IiwicGF0aCI6Ii92MS9tZXNzYWdlcyJ9LCJkZWZhdWx0TW9kZWwiOnsibmFtZSI6Im9sbGFtYS1xd2VuMy42LTM1YiIsInNjb3BlIjoiYnVpbHRpbiJ9LCJkaXNwbGF5TmFtZSI6Ik9sbGFtYSIsIm5hbWUiOiJvbGxhbWEiLCJ0eXBlIjoibW9kZWwucHJvdmlkZXIifQ==",
+          "digest": "sha256:096e5c37fed0cc0023c4c33b61ffc7eb6ff7c4018a84c5a6dbfbd57140d13555",
           "locator": "model-provider.yaml",
-          "size": 891
+          "size": 895
         }
       ],
-      "fingerprint": "sha256:10ddc72dbf69f2fa47174e35f058813b9d1669e3cab0715f914b7b06df4a0ac8"
+      "fingerprint": "sha256:9407360e27e7a6e370db04c56805ca34378c1e6528f6e574f52c15b6f77a4e3d"
     },
     {
       "address": {
@@ -4309,9 +4367,6 @@
                     "timeoutMS": 1800000
                   },
                   "displayName": "Gemini 3.5 Flash Lite",
-                  "labels": {
-                    "model.initialEnabled": "false"
-                  },
                   "name": "googlegemini-gemini-3.5-flash-lite",
                   "provider": {
                     "name": "googlegemini",
@@ -4320,32 +4375,29 @@
                   "providerModelID": "gemini-3.5-flash-lite",
                   "type": "model"
                 },
-                "digest": "sha256:290a8def43581c573aec87c7fbbd9c57db9cbbea39544650a9ac47239e3a5127",
+                "digest": "sha256:8be2126c4a9752edd7e38f42011cb0a26fcf14faa7f24101df6eff96dd9c455d",
                 "displayName": "Gemini 3.5 Flash Lite",
                 "kind": "model",
-                "labels": {
-                  "model.initialEnabled": "false"
-                },
                 "logicalName": "googlegemini-gemini-3.5-flash-lite",
                 "schemaID": "artifact.model.v1",
                 "schemaVersion": "v1"
               }
             }
           ],
-          "digest": "sha256:cf602383840827666ecde1e63c7f565d181aa9d813222e975c45b04757855b2e",
+          "digest": "sha256:ec6d03bade3c3461ade5fdab959249207f971c3f59443a81d40f023e8d0fd93f",
           "locator": "model.yaml"
         }
       ],
       "embeddedRoot": "model/googlegemini-gemini-3.5-flash-lite/unversioned",
       "files": [
         {
-          "content": "eyJjYXBhYmlsaXRpZXMiOnsicmVhc29uaW5nQ2FwYWJpbGl0aWVzIjp7InN1cHBvcnRlZFJlYXNvbmluZ0xldmVscyI6WyJtaW5pbWFsIiwibG93IiwibWVkaXVtIiwiaGlnaCJdLCJzdXBwb3J0ZWRSZWFzb25pbmdUeXBlcyI6WyJzaW5nbGVXaXRoTGV2ZWxzIl0sInN1cHBvcnRzU3VtbWFyeVN0eWxlIjp0cnVlLCJ0ZW1wZXJhdHVyZURpc2FsbG93ZWRXaGVuRW5hYmxlZCI6dHJ1ZX19LCJkZWZhdWx0cyI6eyJtYXhPdXRwdXRUb2tlbnMiOjY1NTM2LCJtYXhQcm9tcHRUb2tlbnMiOjEwMDAwMDAsInJlYXNvbmluZyI6eyJsZXZlbCI6ImhpZ2giLCJ0b2tlbnMiOjAsInR5cGUiOiJzaW5nbGVXaXRoTGV2ZWxzIn0sInN0cmVhbSI6dHJ1ZSwic3lzdGVtUHJvbXB0IjoiIiwidGVtcGVyYXR1cmUiOjEsInRpbWVvdXRNUyI6MTgwMDAwMH0sImRpc3BsYXlOYW1lIjoiR2VtaW5pIDMuNSBGbGFzaCBMaXRlIiwibGFiZWxzIjp7Im1vZGVsLmluaXRpYWxFbmFibGVkIjoiZmFsc2UifSwibmFtZSI6Imdvb2dsZWdlbWluaS1nZW1pbmktMy41LWZsYXNoLWxpdGUiLCJwcm92aWRlciI6eyJuYW1lIjoiZ29vZ2xlZ2VtaW5pIiwic2NvcGUiOiJidWlsdGluIn0sInByb3ZpZGVyTW9kZWxJRCI6ImdlbWluaS0zLjUtZmxhc2gtbGl0ZSIsInR5cGUiOiJtb2RlbCJ9",
-          "digest": "sha256:cf602383840827666ecde1e63c7f565d181aa9d813222e975c45b04757855b2e",
+          "content": "eyJjYXBhYmlsaXRpZXMiOnsicmVhc29uaW5nQ2FwYWJpbGl0aWVzIjp7InN1cHBvcnRlZFJlYXNvbmluZ0xldmVscyI6WyJtaW5pbWFsIiwibG93IiwibWVkaXVtIiwiaGlnaCJdLCJzdXBwb3J0ZWRSZWFzb25pbmdUeXBlcyI6WyJzaW5nbGVXaXRoTGV2ZWxzIl0sInN1cHBvcnRzU3VtbWFyeVN0eWxlIjp0cnVlLCJ0ZW1wZXJhdHVyZURpc2FsbG93ZWRXaGVuRW5hYmxlZCI6dHJ1ZX19LCJkZWZhdWx0cyI6eyJtYXhPdXRwdXRUb2tlbnMiOjY1NTM2LCJtYXhQcm9tcHRUb2tlbnMiOjEwMDAwMDAsInJlYXNvbmluZyI6eyJsZXZlbCI6ImhpZ2giLCJ0b2tlbnMiOjAsInR5cGUiOiJzaW5nbGVXaXRoTGV2ZWxzIn0sInN0cmVhbSI6dHJ1ZSwic3lzdGVtUHJvbXB0IjoiIiwidGVtcGVyYXR1cmUiOjEsInRpbWVvdXRNUyI6MTgwMDAwMH0sImRpc3BsYXlOYW1lIjoiR2VtaW5pIDMuNSBGbGFzaCBMaXRlIiwibmFtZSI6Imdvb2dsZWdlbWluaS1nZW1pbmktMy41LWZsYXNoLWxpdGUiLCJwcm92aWRlciI6eyJuYW1lIjoiZ29vZ2xlZ2VtaW5pIiwic2NvcGUiOiJidWlsdGluIn0sInByb3ZpZGVyTW9kZWxJRCI6ImdlbWluaS0zLjUtZmxhc2gtbGl0ZSIsInR5cGUiOiJtb2RlbCJ9",
+          "digest": "sha256:ec6d03bade3c3461ade5fdab959249207f971c3f59443a81d40f023e8d0fd93f",
           "locator": "model.yaml",
-          "size": 651
+          "size": 609
         }
       ],
-      "fingerprint": "sha256:07206ed702418b15fa014b3d80829f437a46c7e72c3073c507a39cd6a94bf7b4"
+      "fingerprint": "sha256:ab49c86ba0c23b1bd344c287429d8b238b8fa0c71cef2675c0bc76b69dd7de95"
     },
     {
       "address": {
@@ -4623,9 +4675,6 @@
                     "timeoutMS": 1800000
                   },
                   "displayName": "Gemini 3.8 Flash",
-                  "labels": {
-                    "model.initialEnabled": "false"
-                  },
                   "name": "googlegemini-gemini-3.8-flash",
                   "provider": {
                     "name": "googlegemini",
@@ -4634,37 +4683,34 @@
                   "providerModelID": "gemini-3.8-flash",
                   "type": "model"
                 },
-                "digest": "sha256:71c1c9dff6962c8d3dfc44b3d253ea2ca6381f3b9df89f3f0f7698ec1f4a3af6",
+                "digest": "sha256:c5327a1e7d864e8a9f4c22099c17c1de63c157309bd937a975416e64167bf07f",
                 "displayName": "Gemini 3.8 Flash",
                 "kind": "model",
-                "labels": {
-                  "model.initialEnabled": "false"
-                },
                 "logicalName": "googlegemini-gemini-3.8-flash",
                 "schemaID": "artifact.model.v1",
                 "schemaVersion": "v1"
               }
             }
           ],
-          "digest": "sha256:e1cb2641e7b7739c931caa47ea13a29f2f8fd5ad7c602fac085ba01834c1502b",
+          "digest": "sha256:4058e39b21fe8806fb480243c631ff1b4760103a59ff971af071c7aac8f07da2",
           "locator": "model.yaml"
         }
       ],
       "embeddedRoot": "model/googlegemini-gemini-3.8-flash/unversioned",
       "files": [
         {
-          "content": "eyJjYXBhYmlsaXRpZXMiOnsicmVhc29uaW5nQ2FwYWJpbGl0aWVzIjp7InN1cHBvcnRlZFJlYXNvbmluZ0xldmVscyI6WyJsb3ciLCJtZWRpdW0iLCJoaWdoIl0sInN1cHBvcnRlZFJlYXNvbmluZ1R5cGVzIjpbInNpbmdsZVdpdGhMZXZlbHMiXSwic3VwcG9ydHNTdW1tYXJ5U3R5bGUiOnRydWUsInRlbXBlcmF0dXJlRGlzYWxsb3dlZFdoZW5FbmFibGVkIjp0cnVlfX0sImRlZmF1bHRzIjp7Im1heE91dHB1dFRva2VucyI6NjU1MzYsIm1heFByb21wdFRva2VucyI6MTAwMDAwMCwicmVhc29uaW5nIjp7ImxldmVsIjoiaGlnaCIsInRva2VucyI6MCwidHlwZSI6InNpbmdsZVdpdGhMZXZlbHMifSwic3RyZWFtIjp0cnVlLCJzeXN0ZW1Qcm9tcHQiOiIiLCJ0ZW1wZXJhdHVyZSI6MSwidGltZW91dE1TIjoxODAwMDAwfSwiZGlzcGxheU5hbWUiOiJHZW1pbmkgMy44IEZsYXNoIiwibGFiZWxzIjp7Im1vZGVsLmluaXRpYWxFbmFibGVkIjoiZmFsc2UifSwibmFtZSI6Imdvb2dsZWdlbWluaS1nZW1pbmktMy44LWZsYXNoIiwicHJvdmlkZXIiOnsibmFtZSI6Imdvb2dsZWdlbWluaSIsInNjb3BlIjoiYnVpbHRpbiJ9LCJwcm92aWRlck1vZGVsSUQiOiJnZW1pbmktMy44LWZsYXNoIiwidHlwZSI6Im1vZGVsIn0=",
-          "digest": "sha256:e1cb2641e7b7739c931caa47ea13a29f2f8fd5ad7c602fac085ba01834c1502b",
+          "content": "eyJjYXBhYmlsaXRpZXMiOnsicmVhc29uaW5nQ2FwYWJpbGl0aWVzIjp7InN1cHBvcnRlZFJlYXNvbmluZ0xldmVscyI6WyJsb3ciLCJtZWRpdW0iLCJoaWdoIl0sInN1cHBvcnRlZFJlYXNvbmluZ1R5cGVzIjpbInNpbmdsZVdpdGhMZXZlbHMiXSwic3VwcG9ydHNTdW1tYXJ5U3R5bGUiOnRydWUsInRlbXBlcmF0dXJlRGlzYWxsb3dlZFdoZW5FbmFibGVkIjp0cnVlfX0sImRlZmF1bHRzIjp7Im1heE91dHB1dFRva2VucyI6NjU1MzYsIm1heFByb21wdFRva2VucyI6MTAwMDAwMCwicmVhc29uaW5nIjp7ImxldmVsIjoiaGlnaCIsInRva2VucyI6MCwidHlwZSI6InNpbmdsZVdpdGhMZXZlbHMifSwic3RyZWFtIjp0cnVlLCJzeXN0ZW1Qcm9tcHQiOiIiLCJ0ZW1wZXJhdHVyZSI6MSwidGltZW91dE1TIjoxODAwMDAwfSwiZGlzcGxheU5hbWUiOiJHZW1pbmkgMy44IEZsYXNoIiwibmFtZSI6Imdvb2dsZWdlbWluaS1nZW1pbmktMy44LWZsYXNoIiwicHJvdmlkZXIiOnsibmFtZSI6Imdvb2dsZWdlbWluaSIsInNjb3BlIjoiYnVpbHRpbiJ9LCJwcm92aWRlck1vZGVsSUQiOiJnZW1pbmktMy44LWZsYXNoIiwidHlwZSI6Im1vZGVsIn0=",
+          "digest": "sha256:4058e39b21fe8806fb480243c631ff1b4760103a59ff971af071c7aac8f07da2",
           "locator": "model.yaml",
-          "size": 626
+          "size": 584
         }
       ],
-      "fingerprint": "sha256:95ab5df0bc868637d05d730eebfe8bf6ac682f816fbfa766db3d05b00d08e954"
+      "fingerprint": "sha256:f6dbd96ec5be9a77e040920866239834d007c5e407ab808d3f5eb9b905d1e5bd"
     },
     {
       "address": {
         "kind": "model",
-        "name": "googlegemini-gemini-4-argon",
+        "name": "googlegeminiinteractions-gemini-4-argon",
         "version": "unversioned"
       },
       "documents": [
@@ -4683,7 +4729,7 @@
                       "supportedReasoningTypes": [
                         "singleWithLevels"
                       ],
-                      "temperatureDisallowedWhenEnabled": true
+                      "temperatureDisallowedWhenEnabled": false
                     }
                   },
                   "defaults": {
@@ -4699,42 +4745,42 @@
                     "timeoutMS": 1800000
                   },
                   "displayName": "Gemini 4 Argon",
-                  "name": "googlegemini-gemini-4-argon",
+                  "name": "googlegeminiinteractions-gemini-4-argon",
                   "provider": {
-                    "name": "googlegemini",
+                    "name": "googlegeminiinteractions",
                     "scope": "builtin"
                   },
                   "providerModelID": "gemini-4-argon",
                   "type": "model"
                 },
-                "digest": "sha256:dcb87d51b5f5b2fb7969f38d858ea40ad2f3447eb39bfdd522b96f8eb39bf8f3",
+                "digest": "sha256:ae0ebf9caf755ae423fc29d916f5fc42747094d5e95e923d06dbf713785c1374",
                 "displayName": "Gemini 4 Argon",
                 "kind": "model",
-                "logicalName": "googlegemini-gemini-4-argon",
+                "logicalName": "googlegeminiinteractions-gemini-4-argon",
                 "schemaID": "artifact.model.v1",
                 "schemaVersion": "v1"
               }
             }
           ],
-          "digest": "sha256:db418941943491f731272d536477d6eba9a575bffaee08b22bf3085f057f23c8",
+          "digest": "sha256:ab9ec860c9c91cd255f4bc668431fc8fde770d3166478d6b3282252b18a7ab1a",
           "locator": "model.yaml"
         }
       ],
-      "embeddedRoot": "model/googlegemini-gemini-4-argon/unversioned",
+      "embeddedRoot": "model/googlegeminiinteractions-gemini-4-argon/unversioned",
       "files": [
         {
-          "content": "eyJjYXBhYmlsaXRpZXMiOnsicmVhc29uaW5nQ2FwYWJpbGl0aWVzIjp7InN1cHBvcnRlZFJlYXNvbmluZ0xldmVscyI6WyJsb3ciLCJtZWRpdW0iLCJoaWdoIl0sInN1cHBvcnRlZFJlYXNvbmluZ1R5cGVzIjpbInNpbmdsZVdpdGhMZXZlbHMiXSwidGVtcGVyYXR1cmVEaXNhbGxvd2VkV2hlbkVuYWJsZWQiOnRydWV9fSwiZGVmYXVsdHMiOnsibWF4T3V0cHV0VG9rZW5zIjo2NTUzNiwibWF4UHJvbXB0VG9rZW5zIjo5ODMwNDAsInJlYXNvbmluZyI6eyJsZXZlbCI6Im1lZGl1bSIsInRva2VucyI6MCwidHlwZSI6InNpbmdsZVdpdGhMZXZlbHMifSwic3RyZWFtIjp0cnVlLCJzeXN0ZW1Qcm9tcHQiOiIiLCJ0aW1lb3V0TVMiOjE4MDAwMDB9LCJkaXNwbGF5TmFtZSI6IkdlbWluaSA0IEFyZ29uIiwibmFtZSI6Imdvb2dsZWdlbWluaS1nZW1pbmktNC1hcmdvbiIsInByb3ZpZGVyIjp7Im5hbWUiOiJnb29nbGVnZW1pbmkiLCJzY29wZSI6ImJ1aWx0aW4ifSwicHJvdmlkZXJNb2RlbElEIjoiZ2VtaW5pLTQtYXJnb24iLCJ0eXBlIjoibW9kZWwifQ==",
-          "digest": "sha256:db418941943491f731272d536477d6eba9a575bffaee08b22bf3085f057f23c8",
+          "content": "eyJjYXBhYmlsaXRpZXMiOnsicmVhc29uaW5nQ2FwYWJpbGl0aWVzIjp7InN1cHBvcnRlZFJlYXNvbmluZ0xldmVscyI6WyJsb3ciLCJtZWRpdW0iLCJoaWdoIl0sInN1cHBvcnRlZFJlYXNvbmluZ1R5cGVzIjpbInNpbmdsZVdpdGhMZXZlbHMiXSwidGVtcGVyYXR1cmVEaXNhbGxvd2VkV2hlbkVuYWJsZWQiOmZhbHNlfX0sImRlZmF1bHRzIjp7Im1heE91dHB1dFRva2VucyI6NjU1MzYsIm1heFByb21wdFRva2VucyI6OTgzMDQwLCJyZWFzb25pbmciOnsibGV2ZWwiOiJtZWRpdW0iLCJ0b2tlbnMiOjAsInR5cGUiOiJzaW5nbGVXaXRoTGV2ZWxzIn0sInN0cmVhbSI6dHJ1ZSwic3lzdGVtUHJvbXB0IjoiIiwidGltZW91dE1TIjoxODAwMDAwfSwiZGlzcGxheU5hbWUiOiJHZW1pbmkgNCBBcmdvbiIsIm5hbWUiOiJnb29nbGVnZW1pbmlpbnRlcmFjdGlvbnMtZ2VtaW5pLTQtYXJnb24iLCJwcm92aWRlciI6eyJuYW1lIjoiZ29vZ2xlZ2VtaW5paW50ZXJhY3Rpb25zIiwic2NvcGUiOiJidWlsdGluIn0sInByb3ZpZGVyTW9kZWxJRCI6ImdlbWluaS00LWFyZ29uIiwidHlwZSI6Im1vZGVsIn0=",
+          "digest": "sha256:ab9ec860c9c91cd255f4bc668431fc8fde770d3166478d6b3282252b18a7ab1a",
           "locator": "model.yaml",
-          "size": 535
+          "size": 560
         }
       ],
-      "fingerprint": "sha256:d91a0cec83a40f370a95a7c71ce152415f32df11fe18f1c2c3cc5da1818d7e76"
+      "fingerprint": "sha256:a326d626cbfc21b2432d21f495f9c2eddba2b4386eaac02b95ec2468b0bdb3e2"
     },
     {
       "address": {
         "kind": "model",
-        "name": "googlegemini-gemini-4-carbon",
+        "name": "googlegeminiinteractions-gemini-4-carbon",
         "version": "unversioned"
       },
       "documents": [
@@ -4753,7 +4799,7 @@
                       "supportedReasoningTypes": [
                         "singleWithLevels"
                       ],
-                      "temperatureDisallowedWhenEnabled": true
+                      "temperatureDisallowedWhenEnabled": false
                     }
                   },
                   "defaults": {
@@ -4769,42 +4815,42 @@
                     "timeoutMS": 1800000
                   },
                   "displayName": "Gemini 4 Carbon",
-                  "name": "googlegemini-gemini-4-carbon",
+                  "name": "googlegeminiinteractions-gemini-4-carbon",
                   "provider": {
-                    "name": "googlegemini",
+                    "name": "googlegeminiinteractions",
                     "scope": "builtin"
                   },
                   "providerModelID": "gemini-4-carbon",
                   "type": "model"
                 },
-                "digest": "sha256:d09a40d6c1a39e14b4201d39e0f064b3f711cb2e816e59eb129d96833571e024",
+                "digest": "sha256:b6c2ac2ff63307036185b146b994b609fb545b38818dbed2c86cdd9489ef8844",
                 "displayName": "Gemini 4 Carbon",
                 "kind": "model",
-                "logicalName": "googlegemini-gemini-4-carbon",
+                "logicalName": "googlegeminiinteractions-gemini-4-carbon",
                 "schemaID": "artifact.model.v1",
                 "schemaVersion": "v1"
               }
             }
           ],
-          "digest": "sha256:052084f4fe28b21dc8955604e81e54d25e134a067036a61c4525c3f51b4271c6",
+          "digest": "sha256:2180cce80cda494b7a8693a21b7be35df0e5374942307a6298beb83e0b717c0e",
           "locator": "model.yaml"
         }
       ],
-      "embeddedRoot": "model/googlegemini-gemini-4-carbon/unversioned",
+      "embeddedRoot": "model/googlegeminiinteractions-gemini-4-carbon/unversioned",
       "files": [
         {
-          "content": "eyJjYXBhYmlsaXRpZXMiOnsicmVhc29uaW5nQ2FwYWJpbGl0aWVzIjp7InN1cHBvcnRlZFJlYXNvbmluZ0xldmVscyI6WyJsb3ciLCJtZWRpdW0iLCJoaWdoIl0sInN1cHBvcnRlZFJlYXNvbmluZ1R5cGVzIjpbInNpbmdsZVdpdGhMZXZlbHMiXSwidGVtcGVyYXR1cmVEaXNhbGxvd2VkV2hlbkVuYWJsZWQiOnRydWV9fSwiZGVmYXVsdHMiOnsibWF4T3V0cHV0VG9rZW5zIjo2NTUzNiwibWF4UHJvbXB0VG9rZW5zIjo5ODMwNDAsInJlYXNvbmluZyI6eyJsZXZlbCI6Im1lZGl1bSIsInRva2VucyI6MCwidHlwZSI6InNpbmdsZVdpdGhMZXZlbHMifSwic3RyZWFtIjp0cnVlLCJzeXN0ZW1Qcm9tcHQiOiIiLCJ0aW1lb3V0TVMiOjE4MDAwMDB9LCJkaXNwbGF5TmFtZSI6IkdlbWluaSA0IENhcmJvbiIsIm5hbWUiOiJnb29nbGVnZW1pbmktZ2VtaW5pLTQtY2FyYm9uIiwicHJvdmlkZXIiOnsibmFtZSI6Imdvb2dsZWdlbWluaSIsInNjb3BlIjoiYnVpbHRpbiJ9LCJwcm92aWRlck1vZGVsSUQiOiJnZW1pbmktNC1jYXJib24iLCJ0eXBlIjoibW9kZWwifQ==",
-          "digest": "sha256:052084f4fe28b21dc8955604e81e54d25e134a067036a61c4525c3f51b4271c6",
+          "content": "eyJjYXBhYmlsaXRpZXMiOnsicmVhc29uaW5nQ2FwYWJpbGl0aWVzIjp7InN1cHBvcnRlZFJlYXNvbmluZ0xldmVscyI6WyJsb3ciLCJtZWRpdW0iLCJoaWdoIl0sInN1cHBvcnRlZFJlYXNvbmluZ1R5cGVzIjpbInNpbmdsZVdpdGhMZXZlbHMiXSwidGVtcGVyYXR1cmVEaXNhbGxvd2VkV2hlbkVuYWJsZWQiOmZhbHNlfX0sImRlZmF1bHRzIjp7Im1heE91dHB1dFRva2VucyI6NjU1MzYsIm1heFByb21wdFRva2VucyI6OTgzMDQwLCJyZWFzb25pbmciOnsibGV2ZWwiOiJtZWRpdW0iLCJ0b2tlbnMiOjAsInR5cGUiOiJzaW5nbGVXaXRoTGV2ZWxzIn0sInN0cmVhbSI6dHJ1ZSwic3lzdGVtUHJvbXB0IjoiIiwidGltZW91dE1TIjoxODAwMDAwfSwiZGlzcGxheU5hbWUiOiJHZW1pbmkgNCBDYXJib24iLCJuYW1lIjoiZ29vZ2xlZ2VtaW5paW50ZXJhY3Rpb25zLWdlbWluaS00LWNhcmJvbiIsInByb3ZpZGVyIjp7Im5hbWUiOiJnb29nbGVnZW1pbmlpbnRlcmFjdGlvbnMiLCJzY29wZSI6ImJ1aWx0aW4ifSwicHJvdmlkZXJNb2RlbElEIjoiZ2VtaW5pLTQtY2FyYm9uIiwidHlwZSI6Im1vZGVsIn0=",
+          "digest": "sha256:2180cce80cda494b7a8693a21b7be35df0e5374942307a6298beb83e0b717c0e",
           "locator": "model.yaml",
-          "size": 538
+          "size": 563
         }
       ],
-      "fingerprint": "sha256:a21e2e156f7f75f4948a76fe206815b38512d3cb3461b56e771ca8813f0929cb"
+      "fingerprint": "sha256:dd4f579f1872b797d4898b05149806245976358797c28d2bb58c149edc51c6e9"
     },
     {
       "address": {
         "kind": "model",
-        "name": "googlegemini-gemini-4-hydrogen",
+        "name": "googlegeminiinteractions-gemini-4-hydrogen",
         "version": "unversioned"
       },
       "documents": [
@@ -4824,7 +4870,7 @@
                       "supportedReasoningTypes": [
                         "singleWithLevels"
                       ],
-                      "temperatureDisallowedWhenEnabled": true
+                      "temperatureDisallowedWhenEnabled": false
                     }
                   },
                   "defaults": {
@@ -4840,42 +4886,42 @@
                     "timeoutMS": 1800000
                   },
                   "displayName": "Gemini 4 Hydrogen",
-                  "name": "googlegemini-gemini-4-hydrogen",
+                  "name": "googlegeminiinteractions-gemini-4-hydrogen",
                   "provider": {
-                    "name": "googlegemini",
+                    "name": "googlegeminiinteractions",
                     "scope": "builtin"
                   },
                   "providerModelID": "gemini-4-hydrogen",
                   "type": "model"
                 },
-                "digest": "sha256:516cac8af38fc512e2845bb933c3e85641295022f97984ce722740a581cd6064",
+                "digest": "sha256:71c6f44981ba3ad3080f8cd061b7894399fcee7ba15a5ccf91fb993cf2f6c0cf",
                 "displayName": "Gemini 4 Hydrogen",
                 "kind": "model",
-                "logicalName": "googlegemini-gemini-4-hydrogen",
+                "logicalName": "googlegeminiinteractions-gemini-4-hydrogen",
                 "schemaID": "artifact.model.v1",
                 "schemaVersion": "v1"
               }
             }
           ],
-          "digest": "sha256:91254fd3ed31372fb023e6dd7f211101fc2172fd1a2bd4f11323cc5a0ebc498b",
+          "digest": "sha256:f50b67cfd486bc73bd838f363d6dde30c2e50d01fcd158611503dfd10c2727b8",
           "locator": "model.yaml"
         }
       ],
-      "embeddedRoot": "model/googlegemini-gemini-4-hydrogen/unversioned",
+      "embeddedRoot": "model/googlegeminiinteractions-gemini-4-hydrogen/unversioned",
       "files": [
         {
-          "content": "eyJjYXBhYmlsaXRpZXMiOnsicmVhc29uaW5nQ2FwYWJpbGl0aWVzIjp7InN1cHBvcnRlZFJlYXNvbmluZ0xldmVscyI6WyJsb3ciLCJtZWRpdW0iLCJoaWdoIiwieGhpZ2giXSwic3VwcG9ydGVkUmVhc29uaW5nVHlwZXMiOlsic2luZ2xlV2l0aExldmVscyJdLCJ0ZW1wZXJhdHVyZURpc2FsbG93ZWRXaGVuRW5hYmxlZCI6dHJ1ZX19LCJkZWZhdWx0cyI6eyJtYXhPdXRwdXRUb2tlbnMiOjY1NTM2LCJtYXhQcm9tcHRUb2tlbnMiOjk4MzA0MCwicmVhc29uaW5nIjp7ImxldmVsIjoibWVkaXVtIiwidG9rZW5zIjowLCJ0eXBlIjoic2luZ2xlV2l0aExldmVscyJ9LCJzdHJlYW0iOnRydWUsInN5c3RlbVByb21wdCI6IiIsInRpbWVvdXRNUyI6MTgwMDAwMH0sImRpc3BsYXlOYW1lIjoiR2VtaW5pIDQgSHlkcm9nZW4iLCJuYW1lIjoiZ29vZ2xlZ2VtaW5pLWdlbWluaS00LWh5ZHJvZ2VuIiwicHJvdmlkZXIiOnsibmFtZSI6Imdvb2dsZWdlbWluaSIsInNjb3BlIjoiYnVpbHRpbiJ9LCJwcm92aWRlck1vZGVsSUQiOiJnZW1pbmktNC1oeWRyb2dlbiIsInR5cGUiOiJtb2RlbCJ9",
-          "digest": "sha256:91254fd3ed31372fb023e6dd7f211101fc2172fd1a2bd4f11323cc5a0ebc498b",
+          "content": "eyJjYXBhYmlsaXRpZXMiOnsicmVhc29uaW5nQ2FwYWJpbGl0aWVzIjp7InN1cHBvcnRlZFJlYXNvbmluZ0xldmVscyI6WyJsb3ciLCJtZWRpdW0iLCJoaWdoIiwieGhpZ2giXSwic3VwcG9ydGVkUmVhc29uaW5nVHlwZXMiOlsic2luZ2xlV2l0aExldmVscyJdLCJ0ZW1wZXJhdHVyZURpc2FsbG93ZWRXaGVuRW5hYmxlZCI6ZmFsc2V9fSwiZGVmYXVsdHMiOnsibWF4T3V0cHV0VG9rZW5zIjo2NTUzNiwibWF4UHJvbXB0VG9rZW5zIjo5ODMwNDAsInJlYXNvbmluZyI6eyJsZXZlbCI6Im1lZGl1bSIsInRva2VucyI6MCwidHlwZSI6InNpbmdsZVdpdGhMZXZlbHMifSwic3RyZWFtIjp0cnVlLCJzeXN0ZW1Qcm9tcHQiOiIiLCJ0aW1lb3V0TVMiOjE4MDAwMDB9LCJkaXNwbGF5TmFtZSI6IkdlbWluaSA0IEh5ZHJvZ2VuIiwibmFtZSI6Imdvb2dsZWdlbWluaWludGVyYWN0aW9ucy1nZW1pbmktNC1oeWRyb2dlbiIsInByb3ZpZGVyIjp7Im5hbWUiOiJnb29nbGVnZW1pbmlpbnRlcmFjdGlvbnMiLCJzY29wZSI6ImJ1aWx0aW4ifSwicHJvdmlkZXJNb2RlbElEIjoiZ2VtaW5pLTQtaHlkcm9nZW4iLCJ0eXBlIjoibW9kZWwifQ==",
+          "digest": "sha256:f50b67cfd486bc73bd838f363d6dde30c2e50d01fcd158611503dfd10c2727b8",
           "locator": "model.yaml",
-          "size": 552
+          "size": 577
         }
       ],
-      "fingerprint": "sha256:3ffc9651f7baf8c0c948e20eea4a6f093f5a329198f92fa81ae578ebc3e93006"
+      "fingerprint": "sha256:238bbe26efa03c011b742583dcd119a0c0381b679adecdfa88db736ac610f49f"
     },
     {
       "address": {
         "kind": "model",
-        "name": "googlegemini-gemini-4-neon",
+        "name": "googlegeminiinteractions-gemini-4-neon",
         "version": "unversioned"
       },
       "documents": [
@@ -4895,7 +4941,7 @@
                       "supportedReasoningTypes": [
                         "singleWithLevels"
                       ],
-                      "temperatureDisallowedWhenEnabled": true
+                      "temperatureDisallowedWhenEnabled": false
                     }
                   },
                   "defaults": {
@@ -4911,37 +4957,37 @@
                     "timeoutMS": 1800000
                   },
                   "displayName": "Gemini 4 Neon",
-                  "name": "googlegemini-gemini-4-neon",
+                  "name": "googlegeminiinteractions-gemini-4-neon",
                   "provider": {
-                    "name": "googlegemini",
+                    "name": "googlegeminiinteractions",
                     "scope": "builtin"
                   },
                   "providerModelID": "gemini-4-neon",
                   "type": "model"
                 },
-                "digest": "sha256:0f1d58ea8ace89ea0393c3c54f03e72a817bee1a0a3ecc34d960a34267e062c2",
+                "digest": "sha256:d2c224ed7897376584fe36fdcf1f64bf36ef6e135e62e9cc781e86de0f9d2377",
                 "displayName": "Gemini 4 Neon",
                 "kind": "model",
-                "logicalName": "googlegemini-gemini-4-neon",
+                "logicalName": "googlegeminiinteractions-gemini-4-neon",
                 "schemaID": "artifact.model.v1",
                 "schemaVersion": "v1"
               }
             }
           ],
-          "digest": "sha256:1184d1fbeebd1530b9d65a8d680b285d6ebf0e1abd2a72812487d7c27d4c629b",
+          "digest": "sha256:2320f1b53d256ac5e48e8edfab0d69675fffcd26bb2e8d88ee4637f9f8e0d6e1",
           "locator": "model.yaml"
         }
       ],
-      "embeddedRoot": "model/googlegemini-gemini-4-neon/unversioned",
+      "embeddedRoot": "model/googlegeminiinteractions-gemini-4-neon/unversioned",
       "files": [
         {
-          "content": "eyJjYXBhYmlsaXRpZXMiOnsicmVhc29uaW5nQ2FwYWJpbGl0aWVzIjp7InN1cHBvcnRlZFJlYXNvbmluZ0xldmVscyI6WyJsb3ciLCJtZWRpdW0iLCJoaWdoIiwieGhpZ2giXSwic3VwcG9ydGVkUmVhc29uaW5nVHlwZXMiOlsic2luZ2xlV2l0aExldmVscyJdLCJ0ZW1wZXJhdHVyZURpc2FsbG93ZWRXaGVuRW5hYmxlZCI6dHJ1ZX19LCJkZWZhdWx0cyI6eyJtYXhPdXRwdXRUb2tlbnMiOjY1NTM2LCJtYXhQcm9tcHRUb2tlbnMiOjk4MzA0MCwicmVhc29uaW5nIjp7ImxldmVsIjoibWVkaXVtIiwidG9rZW5zIjowLCJ0eXBlIjoic2luZ2xlV2l0aExldmVscyJ9LCJzdHJlYW0iOnRydWUsInN5c3RlbVByb21wdCI6IiIsInRpbWVvdXRNUyI6MTgwMDAwMH0sImRpc3BsYXlOYW1lIjoiR2VtaW5pIDQgTmVvbiIsIm5hbWUiOiJnb29nbGVnZW1pbmktZ2VtaW5pLTQtbmVvbiIsInByb3ZpZGVyIjp7Im5hbWUiOiJnb29nbGVnZW1pbmkiLCJzY29wZSI6ImJ1aWx0aW4ifSwicHJvdmlkZXJNb2RlbElEIjoiZ2VtaW5pLTQtbmVvbiIsInR5cGUiOiJtb2RlbCJ9",
-          "digest": "sha256:1184d1fbeebd1530b9d65a8d680b285d6ebf0e1abd2a72812487d7c27d4c629b",
+          "content": "eyJjYXBhYmlsaXRpZXMiOnsicmVhc29uaW5nQ2FwYWJpbGl0aWVzIjp7InN1cHBvcnRlZFJlYXNvbmluZ0xldmVscyI6WyJsb3ciLCJtZWRpdW0iLCJoaWdoIiwieGhpZ2giXSwic3VwcG9ydGVkUmVhc29uaW5nVHlwZXMiOlsic2luZ2xlV2l0aExldmVscyJdLCJ0ZW1wZXJhdHVyZURpc2FsbG93ZWRXaGVuRW5hYmxlZCI6ZmFsc2V9fSwiZGVmYXVsdHMiOnsibWF4T3V0cHV0VG9rZW5zIjo2NTUzNiwibWF4UHJvbXB0VG9rZW5zIjo5ODMwNDAsInJlYXNvbmluZyI6eyJsZXZlbCI6Im1lZGl1bSIsInRva2VucyI6MCwidHlwZSI6InNpbmdsZVdpdGhMZXZlbHMifSwic3RyZWFtIjp0cnVlLCJzeXN0ZW1Qcm9tcHQiOiIiLCJ0aW1lb3V0TVMiOjE4MDAwMDB9LCJkaXNwbGF5TmFtZSI6IkdlbWluaSA0IE5lb24iLCJuYW1lIjoiZ29vZ2xlZ2VtaW5paW50ZXJhY3Rpb25zLWdlbWluaS00LW5lb24iLCJwcm92aWRlciI6eyJuYW1lIjoiZ29vZ2xlZ2VtaW5paW50ZXJhY3Rpb25zIiwic2NvcGUiOiJidWlsdGluIn0sInByb3ZpZGVyTW9kZWxJRCI6ImdlbWluaS00LW5lb24iLCJ0eXBlIjoibW9kZWwifQ==",
+          "digest": "sha256:2320f1b53d256ac5e48e8edfab0d69675fffcd26bb2e8d88ee4637f9f8e0d6e1",
           "locator": "model.yaml",
-          "size": 540
+          "size": 565
         }
       ],
-      "fingerprint": "sha256:0283404e82c0f82e0a318918e0f539109fa1eea5ba2bb62b853338f667c9b80c"
+      "fingerprint": "sha256:eba1957682b332b9c5558e8ae832ee80ca57c6df6cbc6b3580a0c2c9727f9e53"
     },
     {
       "address": {

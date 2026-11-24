@@ -5,56 +5,6 @@ import (
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
 
-const (
-	ProviderNameAnthropic       = string(modelpreset.ProviderAnthropic)
-	ProviderNameDeepSeek        = string(modelpreset.ProviderDeepSeek)
-	ProviderNameLocalAI         = string(modelpreset.ProviderLocalAI)
-	ProviderNameLMStudio        = string(modelpreset.ProviderLMStudio)
-	ProviderNameGoogleGemini    = string(modelpreset.ProviderGoogleGemini)
-	ProviderNameHuggingFace     = string(modelpreset.ProviderHuggingFace)
-	ProviderNameLlamaCPP        = string(modelpreset.ProviderLlamaCPP)
-	ProviderNameMeta            = string(modelpreset.ProviderMeta)
-	ProviderNameMiniMax         = string(modelpreset.ProviderMiniMax)
-	ProviderNameMistral         = string(modelpreset.ProviderMistral)
-	ProviderNameMoonshot        = string(modelpreset.ProviderMoonshot)
-	ProviderNameOllama          = string(modelpreset.ProviderOllama)
-	ProviderNameOpenAIChat      = string(modelpreset.ProviderOpenAIChat)
-	ProviderNameOpenAIResponses = string(modelpreset.ProviderOpenAIResponses)
-	ProviderNameOpenRouter      = string(modelpreset.ProviderOpenRouter)
-	ProviderNameQwen            = string(modelpreset.ProviderQwen)
-	ProviderNameSGLang          = string(modelpreset.ProviderSGLang)
-	ProviderNameVLLM            = string(modelpreset.ProviderVLLM)
-	ProviderNameXAI             = string(modelpreset.ProviderXAI)
-	ProviderNameXiaomi          = string(modelpreset.ProviderXiaomi)
-	ProviderNameZAI             = string(modelpreset.ProviderZAI)
-	ProviderNameZAICodingPlan   = string(modelpreset.ProviderZAICodingPlan)
-)
-
-var BuiltInProviderNames = []string{
-	ProviderNameAnthropic,
-	ProviderNameDeepSeek,
-	ProviderNameLocalAI,
-	ProviderNameLMStudio,
-	ProviderNameGoogleGemini,
-	ProviderNameHuggingFace,
-	ProviderNameLlamaCPP,
-	ProviderNameMeta,
-	ProviderNameMiniMax,
-	ProviderNameMistral,
-	ProviderNameMoonshot,
-	ProviderNameOllama,
-	ProviderNameOpenAIChat,
-	ProviderNameOpenAIResponses,
-	ProviderNameOpenRouter,
-	ProviderNameQwen,
-	ProviderNameSGLang,
-	ProviderNameVLLM,
-	ProviderNameXAI,
-	ProviderNameXiaomi,
-	ProviderNameZAI,
-	ProviderNameZAICodingPlan,
-}
-
 // defaultModelByProvider is application-owned selection policy copied out of
 // the legacy ModelPreset store. It is intentionally expressed using
 // inference-go catalog identities instead of importing legacy application
@@ -63,28 +13,29 @@ var BuiltInProviderNames = []string{
 // The generated Provider declaration uses the corresponding generated Model
 // Artifact logical name, never the legacy preset slug.
 var defaultModelByProvider = map[inferenceSpec.ProviderName]modelpreset.ModelPresetID{
-	modelpreset.ProviderAnthropic:       modelpreset.PresetClaudeSonnet5,
-	modelpreset.ProviderDeepSeek:        modelpreset.PresetDeepSeekV4Flash,
-	modelpreset.ProviderLocalAI:         modelpreset.PresetGemma426BA4B,
-	modelpreset.ProviderLMStudio:        modelpreset.PresetQwen3627B,
-	modelpreset.ProviderGoogleGemini:    modelpreset.PresetGemini4Hydrogen,
-	modelpreset.ProviderHuggingFace:     modelpreset.PresetGLM52FireworksAI,
-	modelpreset.ProviderLlamaCPP:        modelpreset.PresetQwen3635BA3B,
-	modelpreset.ProviderMeta:            modelpreset.PresetMuseSpark13,
-	modelpreset.ProviderMiniMax:         modelpreset.PresetMiniMaxM3,
-	modelpreset.ProviderMistral:         modelpreset.PresetMistralMedium35,
-	modelpreset.ProviderMoonshot:        modelpreset.PresetMoonshotKimiK3,
-	modelpreset.ProviderOllama:          modelpreset.PresetQwen3635B,
-	modelpreset.ProviderOpenAIChat:      modelpreset.PresetGPT41,
-	modelpreset.ProviderOpenAIResponses: modelpreset.PresetGPT56Terra,
-	modelpreset.ProviderOpenRouter:      modelpreset.PresetDeepSeekV4Flash,
-	modelpreset.ProviderQwen:            modelpreset.PresetQwen38Max,
-	modelpreset.ProviderSGLang:          modelpreset.PresetDeepSeekR18B,
-	modelpreset.ProviderVLLM:            modelpreset.PresetQwen3VL30BA3B,
-	modelpreset.ProviderXAI:             modelpreset.PresetGrok47,
-	modelpreset.ProviderXiaomi:          modelpreset.PresetMiMoV26Pro,
-	modelpreset.ProviderZAI:             modelpreset.PresetGLM53,
-	modelpreset.ProviderZAICodingPlan:   modelpreset.PresetGLM53,
+	modelpreset.ProviderAnthropic:                modelpreset.PresetClaudeSonnet5,
+	modelpreset.ProviderDeepSeek:                 modelpreset.PresetDeepSeekV4Flash,
+	modelpreset.ProviderLocalAI:                  modelpreset.PresetGemma426BA4B,
+	modelpreset.ProviderLMStudio:                 modelpreset.PresetQwen3627B,
+	modelpreset.ProviderGoogleGemini:             modelpreset.PresetGemini38Flash,
+	modelpreset.ProviderGoogleGeminiInteractions: modelpreset.PresetGemini4Hydrogen,
+	modelpreset.ProviderHuggingFace:              modelpreset.PresetGLM52FireworksAI,
+	modelpreset.ProviderLlamaCPP:                 modelpreset.PresetQwen3635BA3B,
+	modelpreset.ProviderMeta:                     modelpreset.PresetMuseSpark13,
+	modelpreset.ProviderMiniMax:                  modelpreset.PresetMiniMaxM3,
+	modelpreset.ProviderMistral:                  modelpreset.PresetMistralMedium35,
+	modelpreset.ProviderMoonshot:                 modelpreset.PresetMoonshotKimiK3,
+	modelpreset.ProviderOllama:                   modelpreset.PresetQwen3635B,
+	modelpreset.ProviderOpenAIChat:               modelpreset.PresetGPT41,
+	modelpreset.ProviderOpenAIResponses:          modelpreset.PresetGPT56Terra,
+	modelpreset.ProviderOpenRouter:               modelpreset.PresetDeepSeekV4Flash,
+	modelpreset.ProviderQwen:                     modelpreset.PresetQwen38Max,
+	modelpreset.ProviderSGLang:                   modelpreset.PresetDeepSeekR18B,
+	modelpreset.ProviderVLLM:                     modelpreset.PresetQwen3VL30BA3B,
+	modelpreset.ProviderXAI:                      modelpreset.PresetGrok47,
+	modelpreset.ProviderXiaomi:                   modelpreset.PresetMiMoV26Pro,
+	modelpreset.ProviderZAI:                      modelpreset.PresetGLM53,
+	modelpreset.ProviderZAICodingPlan:            modelpreset.PresetGLM53,
 }
 
 // disabledModelsByProvider is generated into Model declaration labels and
@@ -99,17 +50,16 @@ var disabledModelsByProvider = map[inferenceSpec.ProviderName]map[modelpreset.Mo
 		modelpreset.PresetClaudeHaiku45:  {},
 	},
 	modelpreset.ProviderGoogleGemini: {
-		modelpreset.PresetGemini38Flash:     {},
 		modelpreset.PresetGemini37Flash:     {},
 		modelpreset.PresetGemini36Flash:     {},
 		modelpreset.PresetGemini35Flash:     {},
-		modelpreset.PresetGemini35FlashLite: {},
 		modelpreset.PresetGemini31Pro:       {},
 		modelpreset.PresetGemini31FlashLite: {},
 		modelpreset.PresetGemini3Flash:      {},
 		modelpreset.PresetGemini25Flash:     {},
 		modelpreset.PresetGemini25FlashLite: {},
 	},
+	modelpreset.ProviderGoogleGeminiInteractions: {},
 	modelpreset.ProviderOpenAIChat: {
 		modelpreset.PresetGPT41Mini: {},
 		modelpreset.PresetGPT4o:     {},

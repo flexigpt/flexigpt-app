@@ -24,6 +24,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/modelpreferences"
 	modelAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model"
 	modelOverlay "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/overlay"
+	"github.com/flexigpt/inference-go/modelpreset"
 )
 
 func initModelWrappers(
@@ -132,7 +133,7 @@ func initModelWrappers(
 	aggregateWrapper.preferences = preferences
 	aggregateWrapper.writableRoot = storeWrapper.writableManagementRoot
 	aggregateWrapper.fallbackProvider = storeSpec.LogicalName(
-		modelcatalog.ProviderNameOpenAIResponses,
+		modelpreset.ProviderOpenAIResponses,
 	)
 
 	return installer, sourceResolver, nil

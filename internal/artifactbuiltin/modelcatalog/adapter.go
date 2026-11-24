@@ -29,6 +29,7 @@ const (
 	adapterOpenAIChatCompletions = "openai.chatCompletions"
 	adapterOpenAIResponses       = "openai.responses"
 	adapterGoogleGenerateContent = "google.generateContent"
+	adapterGoogleInteractions    = "google.interactions"
 )
 
 type preparedModel struct {
@@ -306,6 +307,8 @@ func adapterIDForSDKType(
 		return adapterOpenAIResponses, nil
 	case inferenceSpec.ProviderSDKTypeGoogleGenerateContent:
 		return adapterGoogleGenerateContent, nil
+	case inferenceSpec.ProviderSDKTypeGoogleInteractions:
+		return adapterGoogleInteractions, nil
 	default:
 		return "", fmt.Errorf(
 			"%w: unsupported inference Provider SDK type %q",

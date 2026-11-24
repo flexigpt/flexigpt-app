@@ -101,8 +101,8 @@ github.com/felixge/httpsnoop v1.1.0 h1:3YtUj32ZZkqZtt3sZZsClsymw/QDuVfpNhoA31zeO
 github.com/felixge/httpsnoop v1.1.0/go.mod h1:Zqxgdd+1Rkcz8euOqdr7lqgCRJztwr5hp9vDSi5UZCE=
 github.com/flexigpt/agentskills-go v0.22.2 h1:RdnQ2tICVm0FD1mpfhVFt87/ng/6AeFXYJ0itAXlMDc=
 github.com/flexigpt/agentskills-go v0.22.2/go.mod h1:y/HbxzPML7uLLheg40Tq5qQGWi9K78CmO7jIvWF0R6Y=
-github.com/flexigpt/inference-go v0.29.0 h1:Io92sq7rKcf55sb7S6UCGs+ZZLS5n/qChgP4x1FlDaU=
-github.com/flexigpt/inference-go v0.29.0/go.mod h1:EMANlt5sJXLhHljCCrlXJdmVRbdpddCr41E7083k+tE=
+github.com/flexigpt/inference-go v0.30.0 h1:VFB5BkAdw1IBwZ0qe9krYP7wmXueK5X2Vt41DL3bTaI=
+github.com/flexigpt/inference-go v0.30.0/go.mod h1:HgGGsPVRxDStwS4Ep4ZybJvUV4svwpPSxljDa0u7Ib8=
 github.com/flexigpt/llmtools-go v0.25.2 h1:HpmOnzpnZkJ3kWnP4AAZCWjj8lKzHmXg867Pt8ypzdU=
 github.com/flexigpt/llmtools-go v0.25.2/go.mod h1:iYMS0PS/h+s7NpTSRt+oUREPA0JlcyhuwI6OvODZdCE=
 github.com/flexigpt/mapstore-go v0.4.6 h1:IrJisfoFrnpHmNN8Q1sVmsSSllLXSHEsmg6S0TrUkx8=
