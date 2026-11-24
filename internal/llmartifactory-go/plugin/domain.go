@@ -540,14 +540,10 @@ func readPluginViewOf(
 	if err != nil {
 		return PluginView{}, err
 	}
-	for index, member := range ordered {
-		if err := membership.Allows(member); err != nil {
-			return PluginView{}, fmt.Errorf(
-				"plugin members[%d]: %w", index, err,
-			)
-		}
-	}
 	view := PluginView{
+		// Document was validated at admission or managed publication. This read
+		// path only projects its immutable membership facts and must not repeat
+		// the same membership-policy admission work.
 		Artifact:    record.Clone(),
 		Name:        storeSpec.LogicalName(document.Name),
 		DisplayName: displayName,

@@ -327,10 +327,16 @@ func (v ProviderDocument) ToDeclaration() (
 	return modelproviderv1.DecodeModelProviderJSON(raw)
 }
 
-func ProviderDocumentFromDeclaration(
+// ProviderDocumentFromAdmittedDeclaration projects an already admitted,
+// semantically validated Provider declaration. It deliberately does not run
+// source-document schema admission again.
+func ProviderDocumentFromAdmittedDeclaration(
 	value modelproviderv1.ProviderDocument,
 ) (ProviderDocument, error) {
-	raw, err := value.CanonicalJSON()
+	raw, err := jsonutil.MarshalCanonicalObject(
+		value,
+		storeSpec.MaxDefinitionBodyBytes,
+	)
 	if err != nil {
 		return ProviderDocument{}, err
 	}
@@ -338,14 +344,28 @@ func ProviderDocumentFromDeclaration(
 	var output ProviderDocument
 	if err := json.Unmarshal(raw, &output); err != nil {
 		return ProviderDocument{}, fmt.Errorf(
-			"decode typed Model Provider document: %w",
+			"decode admitted Model Provider document projection: %w",
 			err,
 		)
 	}
-	if err := output.Validate(); err != nil {
-		return ProviderDocument{}, err
+	if output.Type != DocumentTypeProvider ||
+		output.Name != storeSpec.LogicalName(value.Name) ||
+		output.Adapter != value.Adapter {
+		return ProviderDocument{}, fmt.Errorf(
+			"%w: admitted Model Provider projection differs from its declaration",
+			storeSpec.ErrInvalid,
+		)
 	}
 	return output, nil
+}
+
+func ProviderDocumentFromDeclaration(
+	value modelproviderv1.ProviderDocument,
+) (ProviderDocument, error) {
+	if err := value.Validate(); err != nil {
+		return ProviderDocument{}, err
+	}
+	return ProviderDocumentFromAdmittedDeclaration(value)
 }
 
 func (v ModelDocument) Validate() error {
@@ -364,10 +384,16 @@ func (v ModelDocument) ToDeclaration() (modelv1.ModelDocument, error) {
 	return modelv1.DecodeModelJSON(raw)
 }
 
-func ModelDocumentFromDeclaration(
+// ModelDocumentFromAdmittedDeclaration projects an already admitted,
+// semantically validated Model declaration. It deliberately does not run
+// source-document schema admission again.
+func ModelDocumentFromAdmittedDeclaration(
 	value modelv1.ModelDocument,
 ) (ModelDocument, error) {
-	raw, err := value.CanonicalJSON()
+	raw, err := jsonutil.MarshalCanonicalObject(
+		value,
+		storeSpec.MaxDefinitionBodyBytes,
+	)
 	if err != nil {
 		return ModelDocument{}, err
 	}
@@ -375,12 +401,27 @@ func ModelDocumentFromDeclaration(
 	var output ModelDocument
 	if err := json.Unmarshal(raw, &output); err != nil {
 		return ModelDocument{}, fmt.Errorf(
-			"decode typed Model document: %w",
+			"decode admitted Model document projection: %w",
 			err,
 		)
 	}
-	if err := output.Validate(); err != nil {
-		return ModelDocument{}, err
+	if output.Type != DocumentTypeModel ||
+		output.Name != storeSpec.LogicalName(value.Name) ||
+		output.Provider.ToDeclaration() != value.Provider ||
+		output.ProviderModelID != value.ProviderModelID {
+		return ModelDocument{}, fmt.Errorf(
+			"%w: admitted Model projection differs from its declaration",
+			storeSpec.ErrInvalid,
+		)
 	}
 	return output, nil
+}
+
+func ModelDocumentFromDeclaration(
+	value modelv1.ModelDocument,
+) (ModelDocument, error) {
+	if err := value.Validate(); err != nil {
+		return ModelDocument{}, err
+	}
+	return ModelDocumentFromAdmittedDeclaration(value)
 }

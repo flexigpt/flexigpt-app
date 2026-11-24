@@ -3,6 +3,7 @@ package workspace
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"path"
 	"slices"
@@ -507,20 +508,27 @@ func (a *Service) ListWorkspaceDirectories(ctx context.Context, request Workspac
 	for start < len(rootIDs) && rootIDs[start] <= cursor {
 		start++
 	}
-	end := min(start+limit, len(rootIDs))
 
 	output := WorkspacePage{
-		Items: make([]WorkspaceDirectoryListItem, 0, end-start),
+		Items: make([]WorkspaceDirectoryListItem, 0, limit),
 	}
-	for _, rootID := range rootIDs[start:end] {
+	for index := start; index < len(rootIDs); index++ {
+		rootID := rootIDs[index]
 		item, err := a.workspaceDirectoryListItem(ctx, rootID)
 		if err != nil {
+			if isRecoverableWorkspaceListingFailure(err) {
+				continue
+			}
 			return WorkspacePage{}, err
 		}
 		output.Items = append(output.Items, item)
-	}
-	if end < len(rootIDs) {
-		output.NextCursor = string(rootIDs[end-1])
+		if len(output.Items) != limit {
+			continue
+		}
+		if index+1 < len(rootIDs) {
+			output.NextCursor = string(rootID)
+		}
+		break
 	}
 	return output, nil
 }
@@ -712,7 +720,22 @@ func (a *Service) listPhysicalWorkspaces(
 	}
 	output, err := a.artifacts.GetMany(ctx, refs)
 	if err != nil {
-		return nil, err
+		if !isRecoverableWorkspaceListingFailure(err) {
+			return nil, err
+		}
+		output = make([]artifactModel.Artifact, 0, len(refs))
+		for _, ref := range refs {
+			record, getErr := a.artifacts.Get(ctx, ref)
+			if getErr != nil {
+				if isRecoverableWorkspaceListingFailure(getErr) {
+					continue
+				}
+				return nil, getErr
+			}
+			if record.State == artifactModel.StateAvailable {
+				output = append(output, record)
+			}
+		}
 	}
 	sort.Slice(output, func(i, j int) bool {
 		if output[i].LogicalName != output[j].LogicalName {
@@ -764,13 +787,32 @@ func (a *Service) effectiveWorkspaces(
 			record.Enabled {
 			workspace, err := a.workspaceForRef(ctx, record.Ref())
 			if err != nil {
+				if isRecoverableWorkspaceListingFailure(err) {
+					diagnostics = diagnostic.Append(
+						diagnostics,
+						workspaceListingDiagnostic(
+							record,
+							"workspace.default-invalid",
+							err,
+						),
+					)
+					return []WorkspaceDirectoryWorkspace{}, diagnostics, nil
+				}
 				return nil, nil, err
 			}
 			if cryptoutil.DigestBytes(workspace.Definition.Body) != a.policy.Digest {
-				return nil, nil, fmt.Errorf(
-					"%w: default Workspace Definition differs from the loaded policy",
-					storeSpec.ErrDigestMismatch,
+				diagnostics = diagnostic.Append(
+					diagnostics,
+					workspaceListingDiagnostic(
+						record,
+						"workspace.default-invalid",
+						fmt.Errorf(
+							"%w: default Workspace Definition differs from the loaded policy",
+							storeSpec.ErrDigestMismatch,
+						),
+					),
 				)
+				return []WorkspaceDirectoryWorkspace{}, diagnostics, nil
 			}
 			return []WorkspaceDirectoryWorkspace{{
 				Workspace: workspace.View(),
@@ -795,6 +837,17 @@ func (a *Service) effectiveWorkspaces(
 		}
 		workspace, err := a.workspaceForRef(ctx, record.Ref())
 		if err != nil {
+			if isRecoverableWorkspaceListingFailure(err) {
+				diagnostics = diagnostic.Append(
+					diagnostics,
+					workspaceListingDiagnostic(
+						record,
+						"workspace.manifest-invalid",
+						err,
+					),
+				)
+				continue
+			}
 			return nil, nil, err
 		}
 		if !workspace.Artifact.Enabled {
@@ -850,6 +903,39 @@ func invalidWorkspaceManifestDiagnostics(
 		})
 	}
 	return output
+}
+
+func isRecoverableWorkspaceListingFailure(err error) bool {
+	return errors.Is(err, workspaceDomain.ErrInvalidWorkspace) ||
+		errors.Is(err, workspaceDomain.ErrNotWorkspace) ||
+		errors.Is(err, workspaceDomain.ErrReferenceUnresolved) ||
+		errors.Is(err, storeSpec.ErrArtifactNotFound) ||
+		errors.Is(err, storeSpec.ErrDefinitionNotFound) ||
+		errors.Is(err, storeSpec.ErrSourceNotFound) ||
+		errors.Is(err, storeSpec.ErrSourceUnavailable) ||
+		errors.Is(err, storeSpec.ErrReferenceUnresolved) ||
+		errors.Is(err, storeSpec.ErrRefreshRequired) ||
+		errors.Is(err, storeSpec.ErrDigestMismatch) ||
+		errors.Is(err, storeSpec.ErrIdentityConflict) ||
+		errors.Is(err, storeSpec.ErrUnsupported) ||
+		errors.Is(err, storeSpec.ErrInvalid) ||
+		errors.Is(err, storeSpec.ErrNotFound)
+}
+
+func workspaceListingDiagnostic(
+	record artifactModel.Artifact,
+	code string,
+	err error,
+) diagnostic.Diagnostic {
+	return diagnostic.Diagnostic{
+		Severity: diagnostic.SeverityWarning,
+		Code:     code,
+		Message:  diagnostic.BoundedMessage(err.Error()),
+		Location: &diagnostic.Location{
+			Locator:            record.Binding.Locator,
+			SubresourceLocator: record.Binding.SubresourceLocator,
+		},
+	}
 }
 
 func (a *Service) buildDirectoryView(ctx context.Context, rootID rootModel.RootID) (WorkspaceDirectoryView, error) {

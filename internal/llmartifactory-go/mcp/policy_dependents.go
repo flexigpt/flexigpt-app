@@ -68,6 +68,13 @@ func (a *Service) listMCPServersReferencingPolicy(
 
 		material, err := a.resolveServerMaterial(ctx, record.Ref)
 		if err != nil {
+			if isRecoverableMCPListFailure(ctx, err) {
+				if _, found := seen[record.Ref]; !found {
+					seen[record.Ref] = struct{}{}
+					output = append(output, record.Ref)
+				}
+				continue
+			}
 			return nil, fmt.Errorf(
 				"inspect MCP server %q for policy dependency: %w",
 				record.Ref.ArtifactID,
@@ -91,6 +98,13 @@ func (a *Service) listMCPServersReferencingPolicy(
 			policyName,
 		)
 		if err != nil {
+			if isRecoverableMCPListFailure(ctx, err) {
+				if _, found := seen[record.Ref]; !found {
+					seen[record.Ref] = struct{}{}
+					output = append(output, record.Ref)
+				}
+				continue
+			}
 			return nil, err
 		}
 		if !referenced {

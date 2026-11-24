@@ -247,6 +247,14 @@ type DefaultModelResolution struct {
 	Source   DefaultModelSource
 }
 
+// EffectiveDefaultModelResolution is the best available Model selected from
+// an explicit Provider preference and then the built-in Provider fallback
+// pool. It is a runtime selection result, not a persisted preference.
+type EffectiveDefaultModelResolution struct {
+	Provider artifactModel.ArtifactRef `json:"provider"`
+	Model    DefaultModelResolution    `json:"model"`
+}
+
 type ManagedProviderCreateRequest struct {
 	RootID   rootModel.RootID             `json:"rootID"`
 	Document modelDomain.ProviderDocument `json:"document"`

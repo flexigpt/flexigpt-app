@@ -533,6 +533,9 @@ func (a *Service) workspaceDirectoryRootIDs(
 		}
 		sources, err := a.workspaceSources.load(ctx, value.ID)
 		if err != nil {
+			if isRecoverableWorkspaceListingFailure(err) {
+				continue
+			}
 			return nil, err
 		}
 

@@ -404,7 +404,7 @@ func (a *Service) providerView(
 	ctx context.Context,
 	value modelDomain.Provider,
 ) (ProviderView, error) {
-	document, err := modelDomain.ProviderDocumentFromDeclaration(
+	document, err := modelDomain.ProviderDocumentFromAdmittedDeclaration(
 		value.Document,
 	)
 	if err != nil {
@@ -436,7 +436,7 @@ func (a *Service) modelView(
 	ctx context.Context,
 	value modelDomain.Model,
 ) (ModelView, error) {
-	document, err := modelDomain.ModelDocumentFromDeclaration(
+	document, err := modelDomain.ModelDocumentFromAdmittedDeclaration(
 		value.Document,
 	)
 	if err != nil {

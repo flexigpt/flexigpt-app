@@ -271,7 +271,10 @@ func (a *Service) ResolveProviderDefaultModel(
 		provider.Artifact.Ref(),
 	)
 	if err != nil {
-		return DefaultModelResolution{}, err
+		if !bestEffortDefaultFailure(err) {
+			return DefaultModelResolution{}, err
+		}
+		found = false
 	}
 	if found && overlay.DefaultModel != nil {
 		source := DefaultModelSourceMutableArtifactData
@@ -316,6 +319,121 @@ func (a *Service) ResolveProviderDefaultModel(
 		Resolved: resolved,
 		Source:   DefaultModelSourceFirstEnabledModel,
 	}, nil
+}
+
+// ResolveEffectiveDefaultModel resolves a usable Model from the explicit
+// Provider preference and then from the built-in Provider fallback pool.
+//
+// SelectDefaultProvider intentionally remains metadata-only. Call this method
+// when the caller needs an actual resolvable Provider and Model pair.
+func (a *Service) ResolveEffectiveDefaultModel(
+	ctx context.Context,
+	preferred *artifactModel.ArtifactRef,
+	baseName storeSpec.LogicalName,
+) (EffectiveDefaultModelResolution, error) {
+	candidates, err := a.defaultProviderCandidates(
+		ctx,
+		preferred,
+		baseName,
+	)
+	if err != nil {
+		return EffectiveDefaultModelResolution{}, err
+	}
+
+	for _, providerRef := range candidates {
+		model, err := a.ResolveProviderDefaultModel(ctx, providerRef)
+		if err == nil {
+			return EffectiveDefaultModelResolution{
+				Provider: providerRef,
+				Model:    model,
+			}, nil
+		}
+		if !bestEffortDefaultFailure(err) {
+			return EffectiveDefaultModelResolution{}, err
+		}
+	}
+
+	return EffectiveDefaultModelResolution{}, fmt.Errorf(
+		"%w: no enabled Provider has a resolvable default Model",
+		storeSpec.ErrReferenceUnresolved,
+	)
+}
+
+func (a *Service) defaultProviderCandidates(
+	ctx context.Context,
+	preferred *artifactModel.ArtifactRef,
+	baseName storeSpec.LogicalName,
+) ([]artifactModel.ArtifactRef, error) {
+	if err := baseName.Validate(); err != nil {
+		return nil, err
+	}
+
+	output := make([]artifactModel.ArtifactRef, 0)
+	seen := make(map[artifactModel.ArtifactRef]struct{})
+	appendRef := func(ref artifactModel.ArtifactRef) {
+		if _, found := seen[ref]; found {
+			return
+		}
+		seen[ref] = struct{}{}
+		output = append(output, ref)
+	}
+
+	if preferred != nil {
+		if err := preferred.Validate(); err != nil {
+			return nil, err
+		}
+		record, err := a.artifacts.Get(ctx, *preferred)
+		switch {
+		case err == nil:
+			if record.Kind == modelDomain.ModelProviderArtifactKind &&
+				record.State == artifactModel.StateAvailable &&
+				record.Enabled {
+				appendRef(record.Ref())
+			}
+		case errors.Is(err, storeSpec.ErrArtifactNotFound),
+			errors.Is(err, storeSpec.ErrRootNotFound),
+			errors.Is(err, storeSpec.ErrRetired):
+		default:
+			return nil, err
+		}
+	}
+
+	enabled := true
+	options := catalogModel.ListOptions{
+		Kind:    modelDomain.ModelProviderArtifactKind,
+		Enabled: &enabled,
+	}
+	base, err := a.cat.FindByIdentity(
+		ctx,
+		a.builtinRoot,
+		modelDomain.ModelProviderArtifactKind,
+		baseName,
+		options,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if ref := firstAvailableProviderRef(base); ref != nil {
+		appendRef(*ref)
+	}
+
+	all, err := a.cat.ListByRoot(
+		ctx,
+		a.builtinRoot,
+		options,
+	)
+	if err != nil {
+		return nil, err
+	}
+	for _, entry := range all {
+		if entry.Kind != modelDomain.ModelProviderArtifactKind ||
+			entry.State != artifactModel.StateAvailable ||
+			!entry.Enabled {
+			continue
+		}
+		appendRef(entry.Ref())
+	}
+	return output, nil
 }
 
 func (a *Service) resolveNamedModelForProvider(
@@ -387,18 +505,22 @@ func (a *Service) firstEnabledModelForProvider(
 	ctx context.Context,
 	provider modelDomain.Provider,
 ) (ResolvedModel, error) {
-	items, err := a.ListModels(ctx, ListModelsRequest{
-		RootID: provider.Artifact.RootID,
-	})
+	entries, err := a.cat.ListByRoot(
+		ctx,
+		provider.Artifact.RootID,
+		catalogModel.ListOptions{
+			Kind: modelDomain.ModelArtifactKind,
+		},
+	)
 	if err != nil {
 		return ResolvedModel{}, err
 	}
 
-	for _, item := range items {
-		if item.State != artifactModel.StateAvailable || !item.Enabled {
+	for _, entry := range entries {
+		if entry.State != artifactModel.StateAvailable || !entry.Enabled {
 			continue
 		}
-		resolved, err := a.ResolveModel(ctx, item.Ref)
+		resolved, err := a.ResolveModel(ctx, entry.Ref())
 		if err != nil {
 			if bestEffortDefaultFailure(err) {
 				continue
@@ -423,7 +545,12 @@ func bestEffortDefaultFailure(err error) bool {
 		errors.Is(err, storeSpec.ErrArtifactNotFound) ||
 		errors.Is(err, storeSpec.ErrDefinitionNotFound) ||
 		errors.Is(err, storeSpec.ErrIdentityConflict) ||
-		errors.Is(err, storeSpec.ErrUnsupported)
+		errors.Is(err, storeSpec.ErrUnsupported) ||
+		errors.Is(err, storeSpec.ErrRefreshRequired) ||
+		errors.Is(err, storeSpec.ErrDigestMismatch) ||
+		errors.Is(err, storeSpec.ErrInvalid) ||
+		errors.Is(err, storeSpec.ErrSourceUnavailable) ||
+		errors.Is(err, storeSpec.ErrSourceNotFound)
 }
 
 type resolveModel struct {
