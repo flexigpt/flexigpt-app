@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 
@@ -119,7 +120,6 @@ func New(
 		sources,
 		discovery,
 		managedArtifacts,
-		definitions,
 		config.resolver,
 		config.support.PluginProfile,
 	)
@@ -316,15 +316,20 @@ func (a *Service) listMCPPluginServers(
 	for _, ref := range ordered {
 		material, err := a.resolveServerMaterial(ctx, ref)
 		if err != nil {
+			if isRecoverableMCPListFailure(ctx, err) {
+				continue
+			}
 			return nil, fmt.Errorf(
 				"load MCP Plugin server %q: %w",
 				ref.ArtifactID,
 				err,
 			)
 		}
-
 		read, err := a.serverReadFromMaterial(ctx, material)
 		if err != nil {
+			if isRecoverableMCPListFailure(ctx, err) {
+				continue
+			}
 			return nil, fmt.Errorf(
 				"resolve MCP Plugin server policy %q: %w",
 				ref.ArtifactID,
@@ -344,6 +349,27 @@ func (a *Service) listMCPPluginServers(
 		return leftArtifact.ID < rightArtifact.ID
 	})
 	return output, nil
+}
+
+func isRecoverableMCPListFailure(
+	ctx context.Context,
+	err error,
+) bool {
+	if err == nil || (ctx != nil && ctx.Err() != nil) {
+		return false
+	}
+	return errors.Is(err, storeSpec.ErrArtifactNotFound) ||
+		errors.Is(err, storeSpec.ErrDefinitionNotFound) ||
+		errors.Is(err, storeSpec.ErrSourceNotFound) ||
+		errors.Is(err, storeSpec.ErrSourceUnavailable) ||
+		errors.Is(err, storeSpec.ErrReferenceUnresolved) ||
+		errors.Is(err, storeSpec.ErrRefreshRequired) ||
+		errors.Is(err, storeSpec.ErrDigestMismatch) ||
+		errors.Is(err, storeSpec.ErrIdentityConflict) ||
+		errors.Is(err, storeSpec.ErrUnsupported) ||
+		errors.Is(err, storeSpec.ErrInvalid) ||
+		errors.Is(err, storeSpec.ErrConflict) ||
+		errors.Is(err, storeSpec.ErrNotFound)
 }
 
 func (a *Service) serverReadFromMaterial(
@@ -372,7 +398,6 @@ func (a *Service) serverReadFromMaterial(
 		ArtifactRevision     uint64                    `json:"artifactRevision"`
 		DefinitionDigest     cryptoutil.Digest         `json:"definitionDigest"`
 		SourceContentDigest  cryptoutil.Digest         `json:"sourceContentDigest"`
-		SourceGeneration     string                    `json:"sourceGeneration"`
 		InstallationRevision uint64                    `json:"installationRevision"`
 		PolicyDigest         cryptoutil.Digest         `json:"policyDigest"`
 	}{
@@ -380,7 +405,6 @@ func (a *Service) serverReadFromMaterial(
 		ArtifactRevision:     material.Resource.Artifact.Revision,
 		DefinitionDigest:     material.Resource.Definition.Digest,
 		SourceContentDigest:  *material.Resource.Artifact.SourceContentDigest,
-		SourceGeneration:     material.Resource.RefreshState.SourceGeneration,
 		InstallationRevision: material.InstallationRevision,
 		PolicyDigest:         policyValue.Digest,
 	})

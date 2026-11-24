@@ -47,6 +47,15 @@ func (c *Service) EnsureProtectedTopology(
 		if err != nil {
 			return installModel.Installed{}, err
 		}
+		if value.ID != draft.ID {
+			return installModel.Installed{}, fmt.Errorf(
+				"%w: protected topology Source storage key %q is bound to Source %q, expected %q",
+				storeSpec.ErrConflict,
+				draft.StorageKey,
+				value.ID,
+				draft.ID,
+			)
+		}
 
 		// The protected topology declaration owns the required Source
 		// baseline. Package installers may have additively prepared further

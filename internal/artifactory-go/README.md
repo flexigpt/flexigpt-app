@@ -409,6 +409,12 @@ A catalog read must not:
 
 This separation makes read latency predictable and prevents a management page from unexpectedly mutating the system.
 
+Optional immutable Definition attachment is list enrichment, not a global
+integrity gate. If one committed catalog row has a missing, mismatched, or
+invalid Definition, a list keeps the remaining metadata rows and marks that
+row as degraded. Direct Definition and selected Artifact reads remain strict
+and continue to return integrity errors.
+
 ### 4. Resolve and read verified material
 
 When source freshness matters, the application uses verified resource access.

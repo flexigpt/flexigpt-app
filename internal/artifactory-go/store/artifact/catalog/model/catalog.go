@@ -41,6 +41,22 @@ type DefinitionMetadata struct {
 	Description   string
 }
 
+// DocumentIssue reports why optional Definition attachment was unavailable for
+// one otherwise valid committed catalog row. It does not change the strict
+// Definition API contract.
+type DocumentIssue struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
+func (i *DocumentIssue) Clone() *DocumentIssue {
+	if i == nil {
+		return nil
+	}
+	output := *i
+	return &output
+}
+
 // SourceMetadata is the small Source projection needed by domain list
 // classification such as managed versus built-in.
 type SourceMetadata struct {
@@ -75,6 +91,10 @@ type Entry struct {
 	// Document is populated only when ListOptions.IncludeDocument is true.
 	// It is immutable Store data selected by Ref.RootID and Definition.Digest.
 	Document *definitionModel.Definition
+
+	// DocumentIssue is populated only when IncludeDocument was requested and
+	// this one row could not attach its immutable Definition.
+	DocumentIssue *DocumentIssue
 }
 
 func (e Entry) Ref() artifactModel.ArtifactRef {
@@ -94,5 +114,6 @@ func (e Entry) Clone() Entry {
 		value := e.Document.Clone()
 		output.Document = &value
 	}
+	output.DocumentIssue = e.DocumentIssue.Clone()
 	return output
 }

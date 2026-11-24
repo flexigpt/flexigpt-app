@@ -16,7 +16,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition"
 	managepackageFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managepackage"
 	managepackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managepackage/model"
 	refreshFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
@@ -37,7 +36,6 @@ type API struct {
 	cat              catalog.API
 	sources          source.API
 	discovery        refreshFlow.API
-	definitions      definition.API
 	managedArtifacts managepackageFlow.API
 
 	domain   *Profile
@@ -53,7 +51,6 @@ func New(
 	sources source.API,
 	discovery refreshFlow.API,
 	managedArtifacts managepackageFlow.API,
-	definitions definition.API,
 	resolver *composition.Resolver,
 	profile Profile,
 ) (*API, error) {
@@ -61,7 +58,6 @@ func New(
 		cat == nil ||
 		sources == nil ||
 		discovery == nil ||
-		definitions == nil ||
 		managedArtifacts == nil {
 		return nil, fmt.Errorf(
 			"%w: managed Plugin dependencies are incomplete",
@@ -83,7 +79,6 @@ func New(
 		sources:          sources,
 		discovery:        discovery,
 		managedArtifacts: managedArtifacts,
-		definitions:      definitions,
 		resolver:         resolver,
 	}
 	profile.MembershipPolicy.AllowedTypes = append(

@@ -103,7 +103,6 @@ func New(
 		sources,
 		discovery,
 		managedArtifacts,
-		definitions,
 		graphResolver,
 		config.support.PluginProfile,
 	)
@@ -759,7 +758,7 @@ func (a *Service) getManagedSkillDocument(
 		)
 	}
 
-	resolved, err := a.resources.ResolveArtifact(
+	_, err = a.resources.ResolveArtifact(
 		ctx,
 		ref,
 		resourceModel.ResolveOptions{},
@@ -778,9 +777,7 @@ func (a *Service) getManagedSkillDocument(
 		return skillSource.ManagedSkillDocument{}, err
 	}
 	if value.SourceContentDigest == nil ||
-		entry.Digest != *value.SourceContentDigest ||
-		entry.SourceGeneration !=
-			resolved.RefreshState.SourceGeneration {
+		entry.Digest != *value.SourceContentDigest {
 		return skillSource.ManagedSkillDocument{}, fmt.Errorf(
 			"%w: Skill Source changed while reading managed document",
 			storeSpec.ErrRefreshRequired,

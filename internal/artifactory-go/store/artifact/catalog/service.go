@@ -2,6 +2,7 @@ package catalog
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
@@ -101,6 +102,8 @@ func (s *Service) attachDocuments(
 	output := make([]catalogModel.Entry, len(values))
 	for index, value := range values {
 		output[index] = value.Clone()
+		output[index].Document = nil
+		output[index].DocumentIssue = nil
 	}
 	if !include {
 		return output, nil
@@ -121,30 +124,128 @@ func (s *Service) attachDocuments(
 	if len(keys) == 0 {
 		return output, nil
 	}
-	documents, err := s.definitions.GetDefinitions(ctx, keys)
-	if err != nil {
+
+	attached := make(
+		map[definitionModel.Key]definitionModel.Definition,
+		len(keys),
+	)
+	issues := make(
+		map[definitionModel.Key]catalogModel.DocumentIssue,
+	)
+	if err := s.attachAvailableDocuments(
+		ctx,
+		keys,
+		attached,
+		issues,
+	); err != nil {
 		return nil, err
 	}
-	if len(documents) != len(keys) {
-		return nil, fmt.Errorf("%w: Definition attachment cardinality mismatch", storeSpec.ErrInvalid)
-	}
-	byKey := make(map[definitionModel.Key]definitionModel.Definition, len(documents))
-	for index, value := range documents {
-		byKey[keys[index]] = value
-	}
+
 	for index := range output {
 		if output[index].Definition == nil {
 			continue
 		}
-		key := definitionModel.Key{RootID: output[index].RootID, Digest: output[index].Definition.Digest}
-		value, found := byKey[key]
-		if !found {
-			return nil, fmt.Errorf("%w: listed Artifact Definition is unavailable", storeSpec.ErrDefinitionNotFound)
+		key := definitionModel.Key{
+			RootID: output[index].RootID,
+			Digest: output[index].Definition.Digest,
 		}
-		copyValue := value.Clone()
-		output[index].Document = &copyValue
+		if value, found := attached[key]; found {
+			copyValue := value.Clone()
+			output[index].Document = &copyValue
+			continue
+		}
+		if issue, found := issues[key]; found {
+			copyIssue := issue
+			output[index].DocumentIssue = &copyIssue
+		}
 	}
 	return output, nil
+}
+
+// attachAvailableDocuments uses one bulk Definition read on the healthy path.
+// If one historical or damaged Definition is unavailable, it bisects only the
+// failed batch. This preserves useful list rows without weakening the strict
+// direct Definition lookup contract.
+func (s *Service) attachAvailableDocuments(
+	ctx context.Context,
+	keys []definitionModel.Key,
+	attached map[definitionModel.Key]definitionModel.Definition,
+	issues map[definitionModel.Key]catalogModel.DocumentIssue,
+) error {
+	values, err := s.definitions.GetDefinitions(ctx, keys)
+	if err == nil {
+		complete := len(values) == len(keys)
+		if complete {
+			for index, value := range values {
+				if value.Digest != keys[index].Digest {
+					complete = false
+					break
+				}
+			}
+		}
+		if complete {
+			for index, value := range values {
+				attached[keys[index]] = value.Clone()
+			}
+			return nil
+		}
+		err = fmt.Errorf(
+			"%w: Definition attachment did not preserve requested keys",
+			storeSpec.ErrInvalid,
+		)
+	}
+
+	if !isDegradableDefinitionAttachmentFailure(err) {
+		return err
+	}
+	if len(keys) == 1 {
+		issues[keys[0]] = definitionAttachmentIssue(err)
+		return nil
+	}
+
+	middle := len(keys) / 2
+	if err := s.attachAvailableDocuments(
+		ctx,
+		keys[:middle],
+		attached,
+		issues,
+	); err != nil {
+		return err
+	}
+	return s.attachAvailableDocuments(
+		ctx,
+		keys[middle:],
+		attached,
+		issues,
+	)
+}
+
+func isDegradableDefinitionAttachmentFailure(err error) bool {
+	return errors.Is(err, storeSpec.ErrDefinitionNotFound) ||
+		errors.Is(err, storeSpec.ErrNotFound) ||
+		errors.Is(err, storeSpec.ErrDigestMismatch) ||
+		errors.Is(err, storeSpec.ErrInvalid)
+}
+
+func definitionAttachmentIssue(err error) catalogModel.DocumentIssue {
+	switch {
+	case errors.Is(err, storeSpec.ErrDefinitionNotFound),
+		errors.Is(err, storeSpec.ErrNotFound):
+		return catalogModel.DocumentIssue{
+			Code:    "artifact.definition-unavailable",
+			Message: "the Artifact Definition is no longer available",
+		}
+	case errors.Is(err, storeSpec.ErrDigestMismatch):
+		return catalogModel.DocumentIssue{
+			Code:    "artifact.definition-mismatch",
+			Message: "the Artifact Definition does not match committed evidence",
+		}
+	default:
+		return catalogModel.DocumentIssue{
+			Code:    "artifact.definition-invalid",
+			Message: "the Artifact Definition cannot be used for list enrichment",
+		}
+	}
 }
 
 func validateListOptions(options catalogModel.ListOptions) error {

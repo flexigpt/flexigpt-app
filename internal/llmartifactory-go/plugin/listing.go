@@ -69,13 +69,11 @@ func (a *API) listPlugins(
 	entries, err := a.cat.ListByRoot(
 		ctx,
 		request.RootID,
-		catalogModel.ListOptions{Kind: artifactModel.ArtifactKind(pluginv1.PluginType)},
+		catalogModel.ListOptions{
+			Kind:            artifactModel.ArtifactKind(pluginv1.PluginType),
+			IncludeDocument: true,
+		},
 	)
-	if err != nil {
-		return nil, err
-	}
-
-	documents, err := a.pluginDocuments(ctx, entries)
 	if err != nil {
 		return nil, err
 	}
@@ -89,18 +87,12 @@ func (a *API) listPlugins(
 			continue
 		}
 
-		key := definitionModel.Key{
-			RootID: entry.RootID,
-			Digest: entry.Definition.Digest,
-		}
-		var document *definitionModel.Definition
-		if value, found := documents[key]; found {
-			copyValue := value.Clone()
-			document = &copyValue
-		}
-		projection, err := a.pluginProjectionFor(entry, document)
+		projection, err := a.pluginProjectionFor(entry)
 		if err != nil {
-			return nil, err
+			// A domain list is a best-effort projection of committed catalog
+			// state. One missing or malformed historic Plugin Definition must
+			// not hide healthy Plugin rows.
+			continue
 		}
 		if domainOnly {
 			visible, err := a.pluginVisibleInList(
@@ -108,7 +100,7 @@ func (a *API) listPlugins(
 				projection,
 			)
 			if err != nil {
-				return nil, err
+				continue
 			}
 			if !visible {
 				continue
@@ -118,12 +110,12 @@ func (a *API) listPlugins(
 		if a.domain != nil && a.domain.ValidateDocument != nil {
 			document, err := projection.document.Clone()
 			if err != nil {
-				return nil, err
+				continue
 			}
 			if err := a.domain.ValidateDocument(
 				document,
 			); err != nil {
-				return nil, err
+				continue
 			}
 		}
 
@@ -165,57 +157,8 @@ func (a *API) listPlugins(
 	return output, nil
 }
 
-func (a *API) pluginDocuments(
-	ctx context.Context,
-	entries []catalogModel.Entry,
-) (map[definitionModel.Key]definitionModel.Definition, error) {
-	keys := make([]definitionModel.Key, 0)
-	for _, entry := range entries {
-		if entry.State != artifactModel.StateAvailable ||
-			entry.Binding.SubresourceLocator != "" ||
-			entry.Definition == nil {
-			continue
-		}
-		key := definitionModel.Key{
-			RootID: entry.RootID,
-			Digest: entry.Definition.Digest,
-		}
-		if _, found := a.catalogProjections.Get(key); found {
-			continue
-		}
-		keys = append(keys, key)
-	}
-	if len(keys) == 0 {
-		return map[definitionModel.Key]definitionModel.Definition{}, nil
-	}
-
-	values, err := a.definitions.GetDefinitions(ctx, keys)
-	if err != nil {
-		return nil, err
-	}
-	if len(values) != len(keys) {
-		return nil, fmt.Errorf(
-			"%w: Plugin Definition batch is incomplete",
-			storeSpec.ErrDefinitionNotFound,
-		)
-	}
-
-	output := make(map[definitionModel.Key]definitionModel.Definition, len(values))
-	for index, value := range values {
-		if value.Digest != keys[index].Digest {
-			return nil, fmt.Errorf(
-				"%w: Plugin Definition batch returned another digest",
-				storeSpec.ErrDigestMismatch,
-			)
-		}
-		output[keys[index]] = value.Clone()
-	}
-	return output, nil
-}
-
 func (a *API) pluginProjectionFor(
 	entry catalogModel.Entry,
-	loaded *definitionModel.Definition,
 ) (pluginProjection, error) {
 	if entry.Definition == nil {
 		return pluginProjection{}, fmt.Errorf(
@@ -237,18 +180,26 @@ func (a *API) pluginProjectionFor(
 		}
 		return cached, nil
 	}
-	if loaded == nil {
+	if entry.Document == nil {
 		return pluginProjection{}, fmt.Errorf(
-			"%w: Plugin listing requires an admitted Definition document",
+			"%w: Plugin listing Definition is unavailable",
 			storeSpec.ErrDefinitionNotFound,
+		)
+	}
+	if entry.Document.Digest != entry.Definition.Digest {
+		return pluginProjection{}, fmt.Errorf(
+			"%w: Plugin listing Definition digest differs from catalog metadata",
+			storeSpec.ErrDigestMismatch,
 		)
 	}
 
 	return a.catalogProjections.GetOrLoad(
 		key,
-		len(loaded.Body),
+		len(entry.Document.Body),
 		func() (pluginProjection, error) {
-			document, err := pluginv1.FromDefinition(*loaded)
+			document, err := pluginv1.FromDefinition(
+				entry.Document.Clone(),
+			)
 			if err != nil {
 				return pluginProjection{}, err
 			}

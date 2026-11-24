@@ -73,7 +73,6 @@ func New(
 		sources,
 		discovery,
 		managedArtifacts,
-		definitions,
 		resolver,
 		ownedBuiltin.PluginProfile,
 	)

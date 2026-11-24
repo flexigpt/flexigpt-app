@@ -101,6 +101,13 @@ func (r ListModelsByProviderRequest) Validate() error {
 	return r.Provider.Validate()
 }
 
+// DefinitionListIssue describes a non-fatal Definition attachment or typed
+// reconstruction failure for one list row.
+type DefinitionListIssue struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
 type ProviderListItem struct {
 	Ref artifactModel.ArtifactRef `json:"ref"`
 
@@ -113,6 +120,8 @@ type ProviderListItem struct {
 	Enabled  bool                `json:"enabled"`
 	Revision uint64              `json:"revision"`
 	BuiltIn  bool                `json:"builtIn"`
+
+	DefinitionIssue *DefinitionListIssue `json:"definitionIssue,omitempty"`
 }
 
 type ModelListItem struct {
@@ -128,6 +137,8 @@ type ModelListItem struct {
 	Enabled  bool                `json:"enabled"`
 	Revision uint64              `json:"revision"`
 	BuiltIn  bool                `json:"builtIn"`
+
+	DefinitionIssue *DefinitionListIssue `json:"definitionIssue,omitempty"`
 }
 
 // These aliases preserve the consumer API names while making the public

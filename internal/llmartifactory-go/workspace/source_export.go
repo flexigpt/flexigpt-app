@@ -120,8 +120,7 @@ func (a *Service) exportWorkspaceSource(
 	if err != nil {
 		return WorkspaceSourceExport{}, err
 	}
-	if entry.SourceGeneration != resolved.RefreshState.SourceGeneration ||
-		entry.Digest != *resolved.Artifact.SourceContentDigest {
+	if entry.Digest != *resolved.Artifact.SourceContentDigest {
 		return WorkspaceSourceExport{}, fmt.Errorf(
 			"%w: Workspace source changed during export",
 			storeSpec.ErrRefreshRequired,

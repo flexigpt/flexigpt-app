@@ -132,23 +132,19 @@ func (a *Service) ListProviders(
 			Revision:    entry.Revision,
 			BuiltIn:     a.protection.IsProtectedRoot(entry.RootID),
 		}
-
 		if entry.Definition != nil {
 			item.Description = entry.Definition.Description
 		}
+		item.DefinitionIssue = listDefinitionIssue(entry)
 		if entry.Document != nil {
 			document, err := modelproviderv1.DecodeAdmittedModelProviderJSON(
 				entry.Document.Body,
 			)
 			if err != nil {
-				return nil, fmt.Errorf(
-					"decode listed Model Provider %q: %w",
-					entry.ID,
-					err,
-				)
+				item.DefinitionIssue = invalidDefinitionListIssue()
+			} else {
+				item.Adapter = document.Adapter
 			}
-			item.Adapter = document.Adapter
-
 		}
 		output = append(output, item)
 	}
@@ -194,20 +190,18 @@ func (a *Service) ListModels(
 		if entry.Definition != nil {
 			item.Description = entry.Definition.Description
 		}
+		item.DefinitionIssue = listDefinitionIssue(entry)
 		if entry.Document != nil {
 			document, err := modelv1.DecodeAdmittedModelJSON(entry.Document.Body)
 			if err != nil {
-				return nil, fmt.Errorf(
-					"decode listed Model %q: %w",
-					entry.ID,
-					err,
+				item.DefinitionIssue = invalidDefinitionListIssue()
+			} else {
+				provider := modelDomain.ArtifactNameReferenceFromDeclaration(
+					document.Provider,
 				)
+				item.Provider = &provider
+				item.ProviderModelID = document.ProviderModelID
 			}
-			provider := modelDomain.ArtifactNameReferenceFromDeclaration(
-				document.Provider,
-			)
-			item.Provider = &provider
-			item.ProviderModelID = document.ProviderModelID
 		}
 		output = append(output, item)
 	}
@@ -220,6 +214,32 @@ func (a *Service) ListModels(
 			output[right].Ref.ArtifactID
 	})
 	return output, nil
+}
+
+func listDefinitionIssue(
+	entry catalogModel.Entry,
+) *DefinitionListIssue {
+	if entry.DocumentIssue != nil {
+		return &DefinitionListIssue{
+			Code:    entry.DocumentIssue.Code,
+			Message: entry.DocumentIssue.Message,
+		}
+	}
+	if entry.State == artifactModel.StateAvailable &&
+		entry.Document == nil {
+		return &DefinitionListIssue{
+			Code:    "artifact.definition-unavailable",
+			Message: "the Artifact Definition is unavailable for list enrichment",
+		}
+	}
+	return nil
+}
+
+func invalidDefinitionListIssue() *DefinitionListIssue {
+	return &DefinitionListIssue{
+		Code:    "artifact.definition-invalid",
+		Message: "the Artifact Definition cannot be decoded as its listed family",
+	}
 }
 
 func (a *Service) ListModelsByProvider(

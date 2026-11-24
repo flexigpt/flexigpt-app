@@ -56,7 +56,7 @@ func (a *API) ResolveDirectMembers(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 ) (DirectMembership, error) {
-	if a.resolver == nil || a.artifacts == nil {
+	if a.resolver == nil {
 		return DirectMembership{}, storeSpec.ErrClosed
 	}
 	if err := ref.Validate(); err != nil {
@@ -86,19 +86,28 @@ func (a *API) ResolveDirectMembers(
 	if err != nil {
 		return DirectMembership{}, err
 	}
-	definitionValue, err := a.artifacts.GetDefinition(ctx, pluginRef)
-	if err != nil {
-		return DirectMembership{}, err
-	}
-	if view.Artifact.ResolvedDefinition == nil ||
-		*view.Artifact.ResolvedDefinition != definitionValue.Digest {
+	if resolved.Artifact == nil ||
+		resolved.Definition == nil ||
+		resolved.Artifact.Ref() != pluginRef ||
+		resolved.Artifact.Revision != view.Artifact.Revision ||
+		view.Artifact.ResolvedDefinition == nil ||
+		*view.Artifact.ResolvedDefinition != resolved.Definition.Digest {
 		return DirectMembership{}, fmt.Errorf(
 			"%w: Plugin Definition changed during direct membership resolution",
 			storeSpec.ErrRefreshRequired,
 		)
 	}
 
-	document, err := pluginv1.FromDefinition(definitionValue)
+	admitted, found := resolved.AdmittedEntry()
+	if !found {
+		return DirectMembership{}, fmt.Errorf(
+			"%w: Plugin direct membership has no admitted declaration",
+			storeSpec.ErrReferenceUnresolved,
+		)
+	}
+	document, err := pluginv1.DecodeAdmittedPluginEntry(
+		admitted,
+	)
 	if err != nil {
 		return DirectMembership{}, err
 	}

@@ -166,7 +166,7 @@ func (a *Adapter) ResolveWithContentSource(
 	if err != nil {
 		return Document{}, err
 	}
-	content, sourceLocators, err := materializeSourceEntries(entries, nil)
+	content, sourceLocators, err := materializeSourceEntries(entries)
 	if err != nil {
 		return Document{}, err
 	}
@@ -219,46 +219,19 @@ func (a *Adapter) contentForDocument(
 		return "", nil, err
 	}
 
-	return materializeSourceEntries(
-		entries,
-		&sourceEntriesExpectation{
-			generation: resolved.RefreshState.SourceGeneration,
-		},
-	)
-}
-
-type sourceEntriesExpectation struct {
-	generation string
+	// ReadSourceTree already uses one verified Source snapshot. A source-wide
+	// refresh generation changes for unrelated files and is not evidence that
+	// this Text selection changed.
+	return materializeSourceEntries(entries)
 }
 
 func materializeSourceEntries(
 	entries []resourceModel.VerifiedEntry,
-	expected *sourceEntriesExpectation,
 ) (string, []storeSpec.Locator, error) {
 	var output strings.Builder
 	locators := make([]storeSpec.Locator, 0, len(entries))
-	var generation string
 
 	for index, entry := range entries {
-		switch {
-		case expected != nil &&
-			entry.SourceGeneration != expected.generation:
-			return "", nil, fmt.Errorf(
-				"%w: Text Source changed during materialization",
-				storeSpec.ErrRefreshRequired,
-			)
-
-		case expected == nil && index == 0:
-			generation = entry.SourceGeneration
-
-		case expected == nil &&
-			entry.SourceGeneration != generation:
-			return "", nil, fmt.Errorf(
-				"%w: Text Source changed during materialization",
-				storeSpec.ErrRefreshRequired,
-			)
-		}
-
 		if !utf8.Valid(entry.Content) || bytes.ContainsRune(entry.Content, 0) {
 			return "", nil, fmt.Errorf(
 				"%w: Text source %q is not valid UTF-8 text",

@@ -184,7 +184,6 @@ func New(
 		sources,
 		discovery,
 		managedArtifacts,
-		definitions,
 		config.resolver,
 		config.support.PluginProfile,
 	)

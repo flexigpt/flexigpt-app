@@ -225,7 +225,6 @@ func resolve(
 
 	versionInput := string(resolved.Definition.Digest) + "\x00" +
 		string(sourceEntry.Digest) + "\x00" +
-		resolved.RefreshState.SourceGeneration + "\x00" +
 		strconv.FormatUint(resolved.Artifact.Revision, 10)
 
 	return ResolvedSkill{
