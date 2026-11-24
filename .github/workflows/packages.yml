@@ -61,7 +61,8 @@ jobs:
 
       - uses: ./.github/actions/bootstrap
         with:
-          setup_go: "false"
+          # Go is needed by task to check version etc.
+          setup_go: "true"
           setup_pnpm: "false"
       - name: Validate package request and selected source
         id: source
