@@ -358,10 +358,18 @@ func (a *Service) loadProvider(
 	if err != nil {
 		return modelDomain.Provider{}, err
 	}
+	if record.State != artifactModel.StateAvailable {
+		return modelDomain.Provider{}, fmt.Errorf(
+			"%w: Model Provider Artifact %q is unavailable",
+			storeSpec.ErrReferenceUnresolved,
+			record.ID,
+		)
+	}
 	definitionValue, err := a.artifacts.GetDefinition(ctx, ref)
 	if err != nil {
 		return modelDomain.Provider{}, err
 	}
+
 	return modelDomain.DecodeProvider(record, definitionValue)
 }
 
@@ -377,10 +385,18 @@ func (a *Service) loadModel(
 	if err != nil {
 		return modelDomain.Model{}, err
 	}
+	if record.State != artifactModel.StateAvailable {
+		return modelDomain.Model{}, fmt.Errorf(
+			"%w: Model Artifact %q is unavailable",
+			storeSpec.ErrReferenceUnresolved,
+			record.ID,
+		)
+	}
 	definitionValue, err := a.artifacts.GetDefinition(ctx, ref)
 	if err != nil {
 		return modelDomain.Model{}, err
 	}
+
 	return modelDomain.DecodeModel(record, definitionValue)
 }
 
