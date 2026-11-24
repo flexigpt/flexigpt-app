@@ -127,6 +127,30 @@ func mutableBudgetScope(
 	return nil
 }
 
+func budgetScopeChain(
+	execution *Execution,
+	id string,
+) ([]*ExecutionBudgetScope, error) {
+	if execution == nil || id == "" {
+		return nil, nil
+	}
+	output := make([]*ExecutionBudgetScope, 0)
+	seen := make(map[string]struct{})
+	for id != "" {
+		if _, duplicate := seen[id]; duplicate {
+			return nil, errors.New("execution budget scope parent cycle is invalid")
+		}
+		seen[id] = struct{}{}
+		scope := mutableBudgetScope(execution, id)
+		if scope == nil {
+			return nil, errors.New("budget record scope owner is unavailable")
+		}
+		output = append(output, scope)
+		id = scope.ParentID
+	}
+	return output, nil
+}
+
 // reserveScopedBudgetLocked applies each metric atomically to the shared
 // Execution budget, every enclosing ProgramFrame budget, and an optional
 // WorkItem budget. Attached frames therefore share execution aggregate usage
@@ -162,7 +186,7 @@ func (r *Runtime) reserveScopedBudgetForOwnerLocked(
 		return errors.New("execution budget owner is unavailable")
 	}
 
-	var scope *ExecutionBudgetScope
+	var scopes []*ExecutionBudgetScope
 	if item != nil && item.BudgetScopeID != "" {
 		if budgetScopeID != "" &&
 			budgetScopeID != item.BudgetScopeID {
@@ -180,9 +204,10 @@ func (r *Runtime) reserveScopedBudgetForOwnerLocked(
 		budgetScopeID = frame.BudgetScopeID
 	}
 	if budgetScopeID != "" {
-		scope = mutableBudgetScope(execution, budgetScopeID)
-		if scope == nil {
-			return errors.New("budget record scope owner is unavailable")
+		var err error
+		scopes, err = budgetScopeChain(execution, budgetScopeID)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -213,7 +238,7 @@ func (r *Runtime) reserveScopedBudgetForOwnerLocked(
 				Label:     request.Label,
 			})
 		}
-		if scope != nil {
+		for _, scope := range scopes {
 			counters = append(counters, budgetCounter{
 				Limit:     budgetLimit(scope.Budget, request.Metric),
 				Current:   budgetUsagePointer(&scope.Usage, request.Metric),

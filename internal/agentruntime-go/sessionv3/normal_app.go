@@ -423,6 +423,8 @@ func (r *Runtime) StageAppContext(
 	)
 	execution.Continuation.Revision++
 	execution.Continuation.UpdatedAt = r.now()
+	// Keep the original App execution as provenance. SubmitMessage and
+	// ContinueExecution route this retained context through the active owner.
 	r.touchExecutionLocked(session, execution)
 
 	receipt := CommandReceipt{

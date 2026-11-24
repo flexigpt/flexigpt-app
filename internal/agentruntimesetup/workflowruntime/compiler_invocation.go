@@ -364,6 +364,12 @@ func prepareWorkflowLLMInvocations(
 	if program == nil {
 		return errors.New("workflow program is unavailable")
 	}
+	callPreparer, hasCallPreparer := invocations.(WorkflowCallInvocationTargetAdapter)
+	if invocations == nil || !hasCallPreparer {
+		return errors.New(
+			"workflow model and agent invocation preparation is unavailable",
+		)
+	}
 	for _, callSite := range inventory.Calls {
 		requiresTypedInvocation := false
 		for _, use := range callSite.TargetUses {
@@ -404,65 +410,50 @@ func prepareWorkflowLLMInvocations(
 		invocation.PreparedTargets = make(
 			map[string]sessionv3Runtime.WorkflowPreparedInvocation,
 		)
-		callPreparer, hasCallPreparer := invocations.(WorkflowCallInvocationTargetAdapter)
 		for _, use := range callSite.TargetUses {
 			target, found := program.Targets[use.Name]
 			if !found {
 				continue
 			}
-			if invocation.Defaults != nil && hasCallPreparer {
-				var (
-					prepared   sessionv3Runtime.WorkflowPreparedInvocation
-					prepareErr error
-					handled    bool
-				)
-				switch target.Kind {
-				case sessionv3Runtime.WorkflowTargetModel:
-					if target.Artifact != nil {
-						prepared, prepareErr = callPreparer.PrepareWorkflowModelCallInvocation(
-							ctx,
-							*target.Artifact,
-							invocation.Defaults,
-						)
-						handled = true
-					}
-				case sessionv3Runtime.WorkflowTargetAgent:
-					if target.Artifact != nil {
-						prepared, prepareErr = callPreparer.PrepareWorkflowAgentCallInvocation(
-							ctx,
-							*target.Artifact,
-							invocation.Defaults,
-						)
-						handled = true
-					}
-				case sessionv3Runtime.WorkflowTargetProviderTool:
-					if target.ProviderTool != nil {
-						prepared, prepareErr = callPreparer.PrepareWorkflowModelCallInvocation(
-							ctx,
-							target.ProviderTool.OwnerModel,
-							invocation.Defaults,
-						)
-						handled = true
-					}
-				default:
-				}
-				if prepareErr != nil {
-					return fmt.Errorf(
-						"workflow call %q target %q defaults preparation: %w",
-						callSite.Path,
-						use.Name,
-						prepareErr,
+			var (
+				prepared sessionv3Runtime.WorkflowPreparedInvocation
+				err      error
+				handled  bool
+			)
+			switch target.Kind {
+			case sessionv3Runtime.WorkflowTargetModel:
+				if target.Artifact != nil {
+					prepared, err = callPreparer.PrepareWorkflowModelCallInvocation(
+						ctx, *target.Artifact, invocation.Defaults,
 					)
+					handled = true
 				}
-				if handled {
-					invocation.PreparedTargets[use.Name] = jsonutil.CloneJSONInValue(prepared)
-					continue
+			case sessionv3Runtime.WorkflowTargetAgent:
+				if target.Artifact != nil {
+					prepared, err = callPreparer.PrepareWorkflowAgentCallInvocation(
+						ctx, *target.Artifact, invocation.Defaults,
+					)
+					handled = true
 				}
+			case sessionv3Runtime.WorkflowTargetProviderTool:
+				if target.ProviderTool != nil {
+					prepared, err = callPreparer.PrepareWorkflowModelCallInvocation(
+						ctx, target.ProviderTool.OwnerModel, invocation.Defaults,
+					)
+					handled = true
+				}
+			default:
 			}
-			if target.Invocation == nil {
+			if !handled {
 				continue
 			}
-			invocation.PreparedTargets[use.Name] = jsonutil.CloneJSONInValue(*target.Invocation)
+			if err != nil {
+				return fmt.Errorf(
+					"workflow call %q target %q contribution preparation: %w",
+					callSite.Path, use.Name, err,
+				)
+			}
+			invocation.PreparedTargets[use.Name] = jsonutil.CloneJSONInValue(prepared)
 		}
 		if len(invocation.PreparedTargets) == 0 {
 			invocation.PreparedTargets = nil

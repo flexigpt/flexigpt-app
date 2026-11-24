@@ -31,11 +31,24 @@ func (b *Binder) applyPreparedContributionPlan(
 		return err
 	}
 
+	modelSelectedFromPreparedPlan := false
+	modelOwner := sessionv3Runtime.ConfigurationOwner("")
 	if value.Model != nil {
 		selection := value.Model.Selection()
 		if plan.model == nil {
 			plan.model = &selection
 			plan.defaults.Model = &selection
+			modelSelectedFromPreparedPlan = true
+			for _, order := range value.ContributionOrder {
+				if order.Kind == sessionv3Runtime.PreparedContributionKindModel &&
+					order.Key == sessionv3Runtime.PreparedContributionKey(
+						sessionv3Runtime.PreparedContributionKindModel,
+						*value.Model,
+					) {
+					modelOwner = order.Owner
+					break
+				}
+			}
 		}
 		if err := plan.addArtifact(*value.Model); err != nil {
 			return err
@@ -55,7 +68,10 @@ func (b *Binder) applyPreparedContributionPlan(
 			return err
 		}
 	}
-	plan.agentModelIncludeSystemPrompt = cloneBool(value.IncludeModelSystemPrompt)
+	if modelSelectedFromPreparedPlan &&
+		modelOwner == sessionv3Runtime.ConfigurationOwnerAgent {
+		plan.agentModelIncludeSystemPrompt = cloneBool(value.IncludeModelSystemPrompt)
+	}
 
 	if value.Workspace != nil && !value.WorkspacePromptPrepared {
 		return errors.New(
@@ -144,8 +160,13 @@ func (b *Binder) applyPreparedContributionPlan(
 				Insert:   prepared.Insert,
 				Content:  prepared.Content,
 			})
+			workspacePromptOwnsInstructions :=
+				value.WorkspacePromptPrepared &&
+					prepared.Owner ==
+						sessionv3Runtime.ConfigurationOwnerWorkspace
 			if prepared.Insert ==
-				sessionv3Runtime.TextDispatchInsertInstructions {
+				sessionv3Runtime.TextDispatchInsertInstructions &&
+				!workspacePromptOwnsInstructions {
 				plan.addInstruction(sessionv3Runtime.Instruction{
 					ID: preparedTextInstrPrefix + prepared.Artifact.RootID + preparedIDSeparator +
 						prepared.Artifact.ArtifactID,

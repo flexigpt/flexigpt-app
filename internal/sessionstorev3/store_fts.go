@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -78,20 +79,24 @@ func (s *Store) ftsListener() mapstore.FileListener {
 				doc, err := decodeStoreDocument(event.Data)
 				if err != nil {
 					slog.Error("sessionstorev3 FTS adaptation failed", "error", err)
+					s.requestDerivedRepair()
 					return
 				}
 				if doc.Kind == sessionDocumentKindDeleted {
 					if err := s.fts.Delete(context.Background(), event.File); err != nil {
 						slog.Error("sessionstorev3 FTS deletion failed", "error", err)
+						s.requestDerivedRepair()
 					}
 					return
 				}
 				if doc.Session == nil {
+					s.requestDerivedRepair()
 					return
 				}
 				mtime, err := storeDocumentMTime(context.Background(), event.File)
 				if err != nil {
 					slog.Error("sessionstorev3 FTS file observation failed", "error", err)
+					s.requestDerivedRepair()
 					return
 				}
 				if err := s.fts.Upsert(
@@ -100,15 +105,37 @@ func (s *Store) ftsListener() mapstore.FileListener {
 					sessionFTSValues(*doc.Session, mtime),
 				); err != nil {
 					slog.Error("sessionstorev3 FTS upsert failed", "error", err)
+					s.requestDerivedRepair()
 				}
 			case mapstore.OpDeleteFile:
 				if err := s.fts.Delete(context.Background(), event.File); err != nil {
 					slog.Error("sessionstorev3 FTS file removal failed", "error", err)
+					s.requestDerivedRepair()
 				}
 			case mapstore.OpSetKey, mapstore.OpDeleteKey:
 			}
 		}, nil)
 	}
+}
+
+func (s *Store) reconcileFTS(ctx context.Context) error {
+	if s == nil {
+		return ErrStoreClosed
+	}
+	s.ftsMu.Lock()
+	defer s.ftsMu.Unlock()
+	if s.fts == nil {
+		return ErrStoreClosed
+	}
+	_, err := ftsengine.SyncDirToFTS(
+		ctx,
+		s.fts,
+		filepath.Join(s.baseDir, documentDirectory),
+		"mtime",
+		1000,
+		s.syncDocumentToFTS,
+	)
+	return err
 }
 
 func (s *Store) syncDocumentToFTS(

@@ -20,6 +20,7 @@ const (
 	checkpointReasonWorkflowStarted          CheckpointReason = "workflowStarted"
 	checkpointReasonWorkBinding              CheckpointReason = "workBinding"
 	checkpointReasonWorkBindingReverted      CheckpointReason = "workBindingReverted"
+	checkpointReasonWorkDispatchReverted     CheckpointReason = "workDispatchReverted"
 	checkpointReasonWorkDispatched           CheckpointReason = "workDispatched"
 	checkpointReasonWorkFinished             CheckpointReason = "workFinished"
 	checkpointReasonWorkBindingInvalid       CheckpointReason = "workBindingInvalid"
@@ -186,10 +187,7 @@ func (r *Runtime) frameHasLiveOwnedWorkLocked(
 	return false
 }
 
-func executionTerminalReadyLocked(
-	session *Session,
-	execution Execution,
-) bool {
+func executionLocalTerminalReady(execution Execution) bool {
 	for _, item := range execution.WorkItems {
 		if !item.State.Terminal() {
 			return false
@@ -211,6 +209,16 @@ func executionTerminalReadyLocked(
 			return false
 		default:
 		}
+	}
+	return true
+}
+
+func executionTerminalReadyLocked(
+	session *Session,
+	execution Execution,
+) bool {
+	if !executionLocalTerminalReady(execution) {
+		return false
 	}
 	for _, childID := range execution.ChildExecutionIDs {
 		child := mutableSessionExecution(session, childID)
@@ -363,6 +371,15 @@ func (r *Runtime) finalizeExecutionSettlementLocked(
 		execution = mutableSessionExecution(session, executionID)
 		if execution == nil {
 			return nil, ErrExecutionNotFound
+		}
+
+		r.retireInactiveSagaCompensationsLocked(execution)
+		execution = mutableSessionExecution(session, executionID)
+		if execution == nil {
+			return nil, ErrExecutionNotFound
+		}
+		if r.finishResumableCleanupLocked(execution) {
+			execution.UpdatedAt = r.now()
 		}
 
 		if err := r.settlePendingFrameCancellationsLocked(session, execution); err != nil {

@@ -1674,6 +1674,13 @@ func (i *WorkflowInterpreter) settleSingleStructuredChild(
 	if pending.MergeState {
 		state.State = result.State.Clone()
 	}
+	if result.Exit == WorkflowExitReturnWorkflow ||
+		result.Exit == WorkflowExitBreak ||
+		result.Exit == WorkflowExitContinue {
+		if err := recordStructuredExitOutcome(state, program, pending, result.Value); err != nil {
+			return err
+		}
+	}
 	switch result.Exit {
 	case WorkflowExitReturnWorkflow,
 		WorkflowExitBreak,
@@ -2391,8 +2398,21 @@ func (i *WorkflowInterpreter) settleRepeatChild(
 	if err != nil || step.Repeat == nil {
 		return errors.New("Workflow repeat step is unavailable")
 	}
+	setWorkflowCausalEffectWorkItemIDs(state, mergeWorkflowCausalEffectWorkItemIDs(
+		workflowCausalEffectWorkItemIDs(*state),
+		child.CausalEffectWorkItemIDs,
+	))
+	if step.Repeat.Do.State == nil {
+		progress.State = result.State.Clone()
+	}
 	switch result.Exit {
 	case WorkflowExitReturnWorkflow:
+		if !progress.LocalState {
+			state.State = progress.State.Clone()
+		}
+		if err := recordStructuredExitOutcome(state, program, pending, result.Value); err != nil {
+			return err
+		}
 		state.Exit = WorkflowExitReturnWorkflow
 		state.ExitValue = result.Value.Clone()
 		state.Pending = nil
@@ -2416,20 +2436,8 @@ func (i *WorkflowInterpreter) settleRepeatChild(
 		return errors.New("Workflow repeat child returned an invalid control value")
 	}
 
-	setWorkflowCausalEffectWorkItemIDs(state, mergeWorkflowCausalEffectWorkItemIDs(
-		workflowCausalEffectWorkItemIDs(*state),
-		child.CausalEffectWorkItemIDs,
-	))
 	progress.Result = result.Value.Clone()
 	progress.Iterations++
-
-	if step.Repeat.Do.State == nil {
-		// The body inherits the repeat carried state when it has no local
-		// state declaration. Its completed state is the next iteration's
-		// durable carried state, even when Repeat itself owns a local state
-		// scope relative to its parent.
-		progress.State = result.State.Clone()
-	}
 
 	if step.Repeat.Until != nil {
 		evaluationState := *state
@@ -2931,6 +2939,27 @@ func workflowReleasePendingClaims(
 		return
 	}
 	state.ReleaseFrameClaims = true
+}
+
+func recordStructuredExitOutcome(
+	state *WorkflowState,
+	program WorkflowProgram,
+	pending *WorkflowPending,
+	value jsonutil.CanonicalValue,
+) error {
+	if state == nil || pending == nil {
+		return errors.New("workflow structured exit has no pending owner")
+	}
+	step, err := workflowStepForPath(program.Root, pending.Path)
+	if err != nil {
+		return err
+	}
+	return state.recordOutcome(WorkflowStepOutcome{
+		ID:              step.ID,
+		Status:          WorkflowStepOutcomeSucceeded,
+		Output:          value.Clone(),
+		DeclarationPath: state.PendingDeclarationPath,
+	})
 }
 
 // WalkWorkflowBlock visits a lowered WorkflowBlock tree in deterministic

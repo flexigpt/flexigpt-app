@@ -1126,6 +1126,15 @@ func (r *Runtime) startTriggerExecutionLocked(
 			}),
 		},
 	})
+	if err := r.reserveActivityBudgetLocked(
+		current,
+		session.Timeline[len(session.Timeline)-1],
+	); err != nil {
+		session.Executions = session.Executions[:len(session.Executions)-1]
+		occurrence.ExecutionID = ""
+		occurrence.State = triggerOccurrenceStateFailed
+		return err
+	}
 	if err := r.advanceFrameLocked(
 		session,
 		current,
@@ -1158,6 +1167,18 @@ func (r *Runtime) signalTriggerExecutionLocked(
 			return nil
 		}
 	}
+	ownerFrameID := ProgramFrameID("")
+	if len(execution.ProgramFrames) != 0 {
+		ownerFrameID = execution.ProgramFrames[0].ID
+	}
+	if err := r.reserveEventBudgetForOwnerLocked(
+		execution,
+		"",
+		ownerFrameID,
+		len(event.Data)+len(event.Correlation),
+	); err != nil {
+		return err
+	}
 	signal := ExecutionSignal{
 		ID:          event.ID,
 		Name:        event.Type,
@@ -1176,7 +1197,20 @@ func (r *Runtime) signalTriggerExecutionLocked(
 	if err := r.wakeEventWaitsLocked(session, execution, signal); err != nil {
 		return err
 	}
+	executionID := execution.ID
+	frameIDs := make([]ProgramFrameID, 0, len(execution.ProgramFrames))
 	for _, frame := range execution.ProgramFrames {
+		frameIDs = append(frameIDs, frame.ID)
+	}
+	for _, frameID := range frameIDs {
+		execution = mutableSessionExecution(session, executionID)
+		if execution == nil || execution.State.Terminal() {
+			break
+		}
+		frame := mutableFrame(execution, frameID)
+		if frame == nil {
+			continue
+		}
 		if frame.Status.Terminal() {
 			continue
 		}
@@ -1203,7 +1237,9 @@ func (r *Runtime) signalTriggerExecutionLocked(
 				}),
 			},
 		}
-		session.Timeline = append(session.Timeline, activity)
+		if err := r.appendBudgetedActivityLocked(session, execution, activity); err != nil {
+			return err
+		}
 		if err := r.advanceFrameLocked(
 			session,
 			execution,
@@ -1215,6 +1251,10 @@ func (r *Runtime) signalTriggerExecutionLocked(
 		); err != nil {
 			return err
 		}
+	}
+	execution = mutableSessionExecution(session, executionID)
+	if execution == nil {
+		return ErrExecutionNotFound
 	}
 	r.touchExecutionLocked(session, execution)
 	return nil

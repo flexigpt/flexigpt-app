@@ -87,10 +87,7 @@ func (b *Binder) prepareLLMPlan(
 	defaults.ActiveSkills = nil
 	defaults.MCP = nil
 
-	plan := llmExecutionPlan{
-		model:    cloneLLMArtifactSelection(defaults.Model),
-		defaults: defaults,
-	}
+	plan := llmExecutionPlan{defaults: defaults}
 	workflowInstructions := append(
 		[]sessionv3Runtime.Instruction(nil),
 		payload.SystemInstructions...,

@@ -24,7 +24,7 @@ const (
 	agentLoopSkillWorkPrefix    = "skill-lifecycle:"
 	agentLoopLLMPathFormat      = "llm/%d"
 	singleModelWorkPath         = "model"
-	actionKindTool              = "tool"
+	actionKindTool              = ActionKindTool
 	providerManagedToolSummary  = "Provider managed tool observed."
 	errAgentLoopInputRequired   = "agent-loop input activity is required"
 	errSingleModelInputRequired = "single-model input activity is required"

@@ -1085,6 +1085,11 @@ func finalizeWorkflowTarget(
 			}
 		}
 		target.Effect = requested
+		if target.KeyedCapable {
+			target.Effect.Kind = sessionv3Runtime.EffectKindNonIdempotent
+			target.Effect.IdempotencyKey = ""
+			target.Effect.KeyedNative = false
+		}
 	}
 
 	if target.Effect.Kind == "" {
@@ -1096,6 +1101,11 @@ func finalizeWorkflowTarget(
 		if err != nil {
 			return sessionv3Runtime.WorkflowTarget{}, err
 		}
+	}
+	if target.KeyedCapable {
+		target.Effect.Kind = sessionv3Runtime.EffectKindNonIdempotent
+		target.Effect.IdempotencyKey = ""
+		target.Effect.KeyedNative = false
 	}
 	return target, nil
 }

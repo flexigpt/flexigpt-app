@@ -631,3 +631,41 @@ func compensationReceipt(
 		EffectState: EffectStateCompensated,
 	}
 }
+
+// retireInactiveSagaCompensationsLocked retires records only after the
+// durable Saga scope no longer exists. Confirmed original effects remain
+// preserved. This prevents successful Saga completion, excluded outcomes, and
+// stop-policy completion from holding an Execution open indefinitely.
+func (r *Runtime) retireInactiveSagaCompensationsLocked(
+	execution *Execution,
+) {
+	if execution == nil {
+		return
+	}
+	active := make(map[string]struct{})
+	for _, frame := range execution.ProgramFrames {
+		if frame.Status.Terminal() ||
+			frame.Program.InterpreterID != WorkflowInterpreterID {
+			continue
+		}
+		_, state, err := decodeWorkflowProgram(frame)
+		if err != nil ||
+			state.Pending == nil ||
+			state.Pending.Kind != WorkflowPendingSaga ||
+			state.Pending.Saga == nil {
+			continue
+		}
+		active[state.Pending.Saga.ID] = struct{}{}
+	}
+	for index := range execution.Effects {
+		record := &execution.Effects[index]
+		if record.State != CompensationStatePending {
+			continue
+		}
+		if _, found := active[record.SagaID]; found {
+			continue
+		}
+		record.State = CompensationStateSkipped
+		record.Error = nil
+	}
+}

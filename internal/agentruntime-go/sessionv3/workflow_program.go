@@ -3336,9 +3336,9 @@ func (t WorkflowTarget) Validate() error {
 		return err
 	}
 	if t.KeyedCapable {
-		if t.Effect.Kind != EffectKindIdempotent {
+		if t.Effect.Kind != EffectKindNonIdempotent {
 			return errors.New(
-				"workflow target keying capability requires an idempotent base effect",
+				"workflow target keying capability requires a non-idempotent base effect",
 			)
 		}
 		if t.Effect.IdempotencyKey != "" {

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	sessionv3Runtime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/sessionv3"
+	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/attachmentruntime"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
@@ -20,7 +21,6 @@ const (
 	runtimeContextIDFormat     = "runtime-context:%s:%d"
 	unavailableOutputIDFormat  = "runtime-unavailable-output:%d"
 	unavailableOutputTextFmt   = "[Provider output kind %q is not available in replay.]"
-	attachmentFileEnvelopeFmt  = "<<<FILE name=%q>>>\n%s\n<<<END FILE>>>"
 )
 
 func (b *Binder) buildInputs(
@@ -356,8 +356,7 @@ func completedSemanticToolOutput(item sessionv3Runtime.WorkItem) bool {
 	default:
 		return false
 	}
-	return item.EffectState != sessionv3Runtime.EffectStateUncertain &&
-		item.Output != nil &&
+	return item.Output != nil &&
 		item.Output.Tool != nil
 }
 
@@ -582,7 +581,7 @@ func activityToInput(a sessionv3Runtime.Activity) inferenceSpec.InputUnion {
 	}
 	if a.Message != nil {
 		for _, att := range a.Message.Attachments {
-			if item, ok := attachmentToContentItem(att); ok {
+			if item, ok := attachmentruntime.ProviderContentItem(att); ok {
 				contents = append(contents, item)
 			}
 		}
@@ -699,91 +698,6 @@ func injectedContextInput(
 			}},
 		},
 	}
-}
-
-func attachmentToContentItem(a sessionv3Runtime.Attachment) (inferenceSpec.InputOutputContentItemUnion, bool) {
-	switch a.Kind {
-	case sessionv3Runtime.AttachmentKindText:
-		if strings.TrimSpace(a.Text) == "" {
-			return inferenceSpec.InputOutputContentItemUnion{}, false
-		}
-		return inferenceSpec.InputOutputContentItemUnion{
-			Kind:     inferenceSpec.ContentItemKindText,
-			TextItem: &inferenceSpec.ContentItemText{Text: attachmentTextForProvider(a)},
-		}, true
-	case sessionv3Runtime.AttachmentKindImage:
-		image := &inferenceSpec.ContentItemImage{ImageMIME: defaultImageMIMEType}
-		if strings.TrimSpace(a.Label) != "" {
-			image.ImageName = a.Label
-		}
-		if a.MIMEType != "" {
-			image.ImageMIME = a.MIMEType
-		}
-		if a.Base64Data != "" {
-			image.ImageData = a.Base64Data
-		}
-		if a.URL != "" {
-			image.ImageURL = a.URL
-		}
-		if image.ImageData == "" && image.ImageURL == "" {
-			return inferenceSpec.InputOutputContentItemUnion{}, false
-		}
-		return inferenceSpec.InputOutputContentItemUnion{
-			Kind:      inferenceSpec.ContentItemKindImage,
-			ImageItem: image,
-		}, true
-	case sessionv3Runtime.AttachmentKindFile:
-		file := &inferenceSpec.ContentItemFile{FileMIME: defaultFileMIMEType}
-		if a.MIMEType != "" {
-			file.FileMIME = a.MIMEType
-		}
-		if a.Label != "" {
-			file.FileName = a.Label
-		}
-		if a.Base64Data != "" {
-			file.FileData = a.Base64Data
-		}
-		if a.URL != "" {
-			file.FileURL = a.URL
-		}
-		if file.FileData == "" && file.FileURL == "" && strings.TrimSpace(a.Text) != "" {
-			return inferenceSpec.InputOutputContentItemUnion{
-				Kind:     inferenceSpec.ContentItemKindText,
-				TextItem: &inferenceSpec.ContentItemText{Text: a.Text},
-			}, true
-		}
-		if file.FileData == "" && file.FileURL == "" {
-			return inferenceSpec.InputOutputContentItemUnion{}, false
-		}
-		return inferenceSpec.InputOutputContentItemUnion{Kind: inferenceSpec.ContentItemKindFile, FileItem: file}, true
-	case sessionv3Runtime.AttachmentKindURL:
-		if strings.TrimSpace(a.URL) == "" && strings.TrimSpace(a.Text) == "" {
-			return inferenceSpec.InputOutputContentItemUnion{}, false
-		}
-		text := strings.TrimSpace(a.URL)
-		if text == "" {
-			text = a.Text
-		}
-		return inferenceSpec.InputOutputContentItemUnion{
-			Kind:     inferenceSpec.ContentItemKindText,
-			TextItem: &inferenceSpec.ContentItemText{Text: text},
-		}, true
-	default:
-		return inferenceSpec.InputOutputContentItemUnion{}, false
-	}
-}
-
-func attachmentTextForProvider(
-	attachment sessionv3Runtime.Attachment,
-) string {
-	if strings.TrimSpace(attachment.Label) == "" {
-		return attachment.Text
-	}
-	return fmt.Sprintf(
-		attachmentFileEnvelopeFmt,
-		attachment.Label,
-		attachment.Text,
-	)
 }
 
 func toolResultToInput(item sessionv3Runtime.WorkItem) inferenceSpec.InputUnion {

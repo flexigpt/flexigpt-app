@@ -644,9 +644,10 @@ func (i *WorkflowInterpreter) finishWorkflowTerminal(
 	case ProgramFrameStateCompleted:
 		if program.Scope.Child {
 			result := WorkflowBlockResult{
-				Exit:  terminal.Exit,
-				Value: terminal.Value.Clone(),
-				State: state.State.Clone(),
+				Exit:                    terminal.Exit,
+				Value:                   terminal.Value.Clone(),
+				State:                   state.State.Clone(),
+				CausalEffectWorkItemIDs: workflowCausalEffectWorkItemIDs(state),
 			}
 			if err := result.Validate(); err != nil {
 				return ProgramTransition{}, err

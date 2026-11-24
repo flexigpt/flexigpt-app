@@ -9,9 +9,9 @@ ignore build
 require (
 	cel.dev/cel-go v0.33.4
 	github.com/adrg/xdg v0.5.3
-	github.com/flexigpt/agentskills-go v0.22.1
-	github.com/flexigpt/inference-go v0.28.9
-	github.com/flexigpt/llmtools-go v0.25.1
+	github.com/flexigpt/agentskills-go v0.22.2
+	github.com/flexigpt/inference-go v0.29.0
+	github.com/flexigpt/llmtools-go v0.25.2
 	github.com/flexigpt/mapstore-go v0.4.6
 	github.com/glebarez/go-sqlite v1.23.0
 	github.com/modelcontextprotocol/go-sdk v1.8.0
@@ -32,7 +32,7 @@ require (
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/ProtonMail/go-crypto v1.4.1 // indirect
 	github.com/andybalholm/cascadia v1.3.5 // indirect
-	github.com/anthropics/anthropic-sdk-go v1.84.0 // indirect
+	github.com/anthropics/anthropic-sdk-go/v2 v2.14.0 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/buger/jsonparser v1.1.2 // indirect
@@ -76,7 +76,7 @@ require (
 	github.com/mattn/go-colorable v0.1.15 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
-	github.com/openai/openai-go/v3 v3.105.0 // indirect
+	github.com/openai/openai-go/v3 v3.106.0 // indirect
 	github.com/pb33f/ordered-map/v2 v2.3.1 // indirect
 	github.com/pjbgf/sha1cd v0.7.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
@@ -105,13 +105,13 @@ require (
 	go.opentelemetry.io/otel/metric v1.47.0 // indirect
 	go.opentelemetry.io/otel/trace v1.47.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
-	golang.org/x/crypto v0.58.0 // indirect
+	golang.org/x/crypto v0.59.0 // indirect
 	golang.org/x/exp v0.0.0-20260908205506-85c1c2202aba // indirect
-	golang.org/x/net v0.62.0 // indirect
-	golang.org/x/sync v0.24.0 // indirect
+	golang.org/x/net v0.63.0 // indirect
+	golang.org/x/sync v0.25.0 // indirect
 	golang.org/x/sys v0.50.0 // indirect
-	golang.org/x/term v0.47.0 // indirect
-	golang.org/x/text v0.43.0 // indirect
+	golang.org/x/term v0.48.0 // indirect
+	golang.org/x/text v0.44.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
 	google.golang.org/api v0.278.0 // indirect
 	google.golang.org/genai v1.79.1 // indirect

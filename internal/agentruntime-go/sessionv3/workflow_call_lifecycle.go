@@ -146,6 +146,17 @@ func (i *WorkflowInterpreter) startCall(
 		}
 		childEffect.Key = &key
 	}
+	childOutputSchema := jsonutil.CanonicalValue(nil)
+	for _, contract := range []*WorkflowCallableInterface{
+		target.Contract,
+		call.Contract,
+		call.SetContract,
+	} {
+		if contract != nil && len(contract.OutputSchema) != 0 {
+			childOutputSchema = contract.OutputSchema.Clone()
+			break
+		}
+	}
 	childStep := WorkflowStep{
 		ID:              "invoke",
 		DeclarationPath: step.DeclarationPath,
@@ -154,7 +165,7 @@ func (i *WorkflowInterpreter) startCall(
 		Effect:          childEffect,
 		Claims:          append([]WorkflowResourceClaim(nil), step.Claims...),
 		Limits:          cloneBudget(step.Limits),
-		OutputSchema:    step.OutputSchema.Clone(),
+		OutputSchema:    childOutputSchema,
 		Call:            &childCall,
 	}
 	childBlock := WorkflowBlock{
@@ -252,11 +263,11 @@ func (i *WorkflowInterpreter) startCall(
 		Path:            path + "/started",
 		DeclarationPath: declarationPath,
 		Program:         childProgram,
-		Deadline:        cloneTime(frame.Deadline),
+		Deadline:        cloneTime(state.Deadline),
 		Budget:          cloneBudget(budget),
 		Lifetime:        intentLifetime,
-		Cleanup:         program.Scope.Cleanup || workflowProgramRunsCleanup(childProgram),
-		WorkflowNesting: childProgram.InterpreterID == WorkflowInterpreterID,
+		Cleanup:         frame.Cleanup || program.Scope.Cleanup || workflowProgramRunsCleanup(childProgram),
+		WorkflowNesting: false,
 		Ownership:       &ownership,
 		Ports:           clonePortPlans(ports),
 		PortInputs:      clonePortInputs(call.PortInputs),

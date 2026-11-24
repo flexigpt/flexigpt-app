@@ -284,8 +284,8 @@ func (p WorkflowMachineProgress) Validate() error {
 	}
 	for _, wait := range p.Waits {
 		if strings.TrimSpace(wait.Key) == "" ||
-			wait.WorkItemID == "" ||
-			len(wait.TransitionIndexes) == 0 {
+			len(wait.TransitionIndexes) == 0 ||
+			(!wait.Ready && wait.WorkItemID == "") {
 			return errors.New("workflow machine wait is invalid")
 		}
 		switch workflowMachineWaitKind(wait) {
@@ -873,6 +873,17 @@ func (i *WorkflowInterpreter) armMachineWaits(
 	intents := make([]WorkItemIntent, 0, len(events)+len(timerIndexes))
 	for _, name := range events {
 		key := "event-" + name
+		if candidate, found := bufferedMachineEventCandidate(
+			execution,
+			state,
+			frame.ID,
+			name,
+			eventGroups[name],
+			key,
+		); found {
+			progress.Waits = append(progress.Waits, candidate)
+			continue
+		}
 		if _, found := activeByKey[key]; found {
 			continue
 		}
@@ -1205,6 +1216,46 @@ func workflowMachineWaitKind(
 	return WorkflowMachineWaitKindTimer
 }
 
+// bufferedMachineEventCandidate creates a durable candidate from a signal
+// already accepted by the matching subscription. It avoids a due timer
+// winning only because its sibling event Wait had not bound yet.
+func bufferedMachineEventCandidate(
+	execution Execution,
+	state WorkflowState,
+	frameID ProgramFrameID,
+	subscriptionName string,
+	indexes []int,
+	key string,
+) (WorkflowMachineWait, bool) {
+	for _, subscription := range state.Subscriptions {
+		if subscription.Name != subscriptionName {
+			continue
+		}
+		owner := workflowSubscriptionIdentity(
+			ProgramFrameID(firstText(string(subscription.OwnerFrameID), string(frameID))),
+			subscription.Name,
+		)
+		for _, accepted := range subscription.Accepted {
+			for _, signal := range execution.Signals {
+				if signal.Source != accepted.Source || signal.ID != accepted.ID ||
+					signalConsumedBySubscription(signal, owner) {
+					continue
+				}
+				at := signal.CreatedAt.UTC()
+				return WorkflowMachineWait{
+					Key:               key,
+					Kind:              WorkflowMachineWaitKindEvent,
+					TransitionIndexes: append([]int(nil), indexes...),
+					Ready:             true,
+					Value:             jsonutil.MustCanonicalValue(workflowEventWaitOutput(signal)),
+					ReadyAt:           &at,
+				}, true
+			}
+		}
+	}
+	return WorkflowMachineWait{}, false
+}
+
 func machineTimerElapsed(
 	progress WorkflowMachineProgress,
 	index int,
@@ -1268,10 +1319,12 @@ func selectMachineTransition(
 	}
 
 	for _, wait := range progress.Waits {
-		state.CancelWorkItemIDs = append(
-			state.CancelWorkItemIDs,
-			wait.WorkItemID,
-		)
+		if wait.WorkItemID != "" {
+			state.CancelWorkItemIDs = append(
+				state.CancelWorkItemIDs,
+				wait.WorkItemID,
+			)
+		}
 	}
 	progress.Waits = nil
 	return nil
@@ -1321,6 +1374,16 @@ func (i *WorkflowInterpreter) settleMachineChild(
 	))
 	if progress.ChildMergesState {
 		progress.State = result.State.Clone()
+	}
+	if result.Exit == WorkflowExitReturnWorkflow ||
+		result.Exit == WorkflowExitBreak ||
+		result.Exit == WorkflowExitContinue {
+		if !progress.LocalState {
+			state.State = progress.State.Clone()
+		}
+		if err := recordStructuredExitOutcome(state, program, pending, result.Value); err != nil {
+			return err
+		}
 	}
 	switch result.Exit {
 	case WorkflowExitNormal,

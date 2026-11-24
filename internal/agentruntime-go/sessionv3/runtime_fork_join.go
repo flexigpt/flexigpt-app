@@ -82,36 +82,72 @@ func (r *Runtime) deferFrameForkLocked(
 		}
 	}
 
-	scopeID := ""
-	var scopeBudget *ExecutionBudget
+	scopeRequired := frame.BudgetScopeID != ""
 	for _, intent := range prepared {
-		if intent.Budget == nil {
-			continue
+		if intent.Budget != nil {
+			scopeRequired = true
+			break
 		}
-		if scopeBudget == nil {
-			value := cloneExecutionBudget(*intent.Budget)
-			scopeBudget = &value
-			continue
-		}
-		value, err := narrowExecutionBudget(*scopeBudget, *intent.Budget)
-		if err != nil {
-			return err
-		}
-		scopeBudget = &value
+	}
+	if frame.Program.InterpreterID == WorkflowInterpreterID ||
+		frame.Program.InterpreterID == BuiltinRetryBoundaryInterpreterID {
+		scopeRequired = true
 	}
 
-	workID := WorkItemID(r.newID())
-	if scopeBudget != nil {
-		scopeID = "scope:" + string(workID)
-		execution.BudgetScopes = append(execution.BudgetScopes, ExecutionBudgetScope{
-			ID:           scopeID,
-			OwnerFrameID: frame.ID,
-			Budget:       *scopeBudget,
-		})
+	scopeID := ""
+	if scopeRequired {
+		scopeID = stableForkBudgetScopeID(*frame)
+		if scopeID == "" {
+			scopeID = "scope:" + string(frame.ID)
+		}
+
+		if mutableBudgetScope(execution, scopeID) == nil {
+			var scopeBudget *ExecutionBudget
+			for _, intent := range prepared {
+				value, err := narrowProgramFrameBudget(
+					effectiveProgramFrameBudget(*execution, *frame),
+					intent,
+				)
+				if err != nil {
+					return err
+				}
+				if scopeBudget == nil {
+					copyValue := cloneExecutionBudget(value)
+					scopeBudget = &copyValue
+					continue
+				}
+				narrowed, err := narrowExecutionBudget(*scopeBudget, value)
+				if err != nil {
+					return err
+				}
+				scopeBudget = &narrowed
+			}
+			if scopeBudget == nil {
+				value := effectiveProgramFrameBudget(*execution, *frame)
+				scopeBudget = &value
+			}
+			execution.BudgetScopes = append(
+				execution.BudgetScopes,
+				ExecutionBudgetScope{
+					ID:           scopeID,
+					OwnerFrameID: frame.ID,
+					ParentID:     frame.BudgetScopeID,
+					Budget:       *scopeBudget,
+				},
+			)
+		}
 		for index := range prepared {
 			prepared[index].BudgetScopeID = scopeID
 		}
+	} else {
+		for index := range prepared {
+			prepared[index].BudgetScopeID = firstText(
+				prepared[index].BudgetScopeID,
+				frame.BudgetScopeID,
+			)
+		}
 	}
+	workID := WorkItemID(r.newID())
 	now := r.now()
 	work := WorkItem{
 		ID:                     workID,
@@ -148,6 +184,20 @@ func (r *Runtime) deferFrameForkLocked(
 	frame.WorkItemIDs = append(frame.WorkItemIDs, workID)
 	execution.WorkItems = append(execution.WorkItems, work)
 	return nil
+}
+
+func stableForkBudgetScopeID(frame ProgramFrame) string {
+	switch frame.Program.InterpreterID {
+	case WorkflowInterpreterID:
+		_, state, err := decodeWorkflowProgram(frame)
+		if err == nil && state.Pending != nil && state.Pending.Path != "" {
+			return "scope:" + string(frame.ID) + ":" + state.Pending.Path
+		}
+	case BuiltinRetryBoundaryInterpreterID:
+		return "scope:" + string(frame.ID) + ":retry"
+	default:
+	}
+	return ""
 }
 
 func cloneForkIntent(value ProgramFrameIntent) (ProgramFrameIntent, error) {

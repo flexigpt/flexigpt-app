@@ -247,10 +247,12 @@ func (i retryBoundaryInterpreter) startChild(
 		State:  encodeRetryProgramState(state),
 		Status: &status,
 		Frames: []ProgramFrameIntent{{
-			ID:       childID,
-			Path:     "attempt/" + strconv.Itoa(state.Attempt),
-			Program:  child,
-			Deadline: deadline,
+			ID:            childID,
+			Path:          "attempt/" + strconv.Itoa(state.Attempt),
+			Program:       child,
+			Deadline:      deadline,
+			BudgetScopeID: frame.BudgetScopeID,
+			Cleanup:       workflowProgramRunsCleanup(child),
 		}},
 	}, nil
 }
@@ -347,11 +349,12 @@ func (i retryBoundaryInterpreter) scheduleBackoff(
 		State:  encodeRetryProgramState(state),
 		Status: &status,
 		WorkItems: []WorkItemIntent{{
-			ID:          workID,
-			ProgramPath: "retry/backoff/" + strconv.Itoa(state.Attempt+1),
-			Type:        WorkItemTypeWait,
-			Automatic:   true,
-			Effect:      EffectContract{Kind: EffectKindRead},
+			ID:            workID,
+			ProgramPath:   "retry/backoff/" + strconv.Itoa(state.Attempt+1),
+			Type:          WorkItemTypeWait,
+			Automatic:     true,
+			BudgetScopeID: frame.BudgetScopeID,
+			Effect:        EffectContract{Kind: EffectKindRead},
 			Input: WorkItemPayload{
 				Wait: &WaitWork{
 					Request: WaitRequest{

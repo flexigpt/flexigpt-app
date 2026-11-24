@@ -163,7 +163,6 @@ func applyRuntimeDefaults(
 			}
 			existing, _ := defaults[key].(map[string]any)
 			defaults[key] = mergeRuntimeDefaultObject(existing, child)
-
 		case "stopSequences":
 			values, ok := value.([]any)
 			if !ok {

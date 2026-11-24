@@ -17,6 +17,7 @@ func resolveSessionInvocationDefaults(
 	if override == nil {
 		return output, nil
 	}
+	policiesSupplied := override.CollectionPolicies != nil
 	if override.CollectionPolicies != nil {
 		output.CollectionPolicies = cloneSessionCollectionPolicies(
 			*override.CollectionPolicies,
@@ -46,14 +47,20 @@ func resolveSessionInvocationDefaults(
 			[]Instruction(nil),
 			(*override.SystemInstructions)...,
 		)
-		output.CollectionPolicies.SystemInstructions.Mode = CollectionOverrideReplace
+		preserveSuppliedCollectionPolicy(
+			&output.CollectionPolicies.SystemInstructions,
+			policiesSupplied,
+		)
 	}
 	if override.InstructionArtifacts != nil {
 		output.InstructionArtifacts = append(
 			[]ArtifactSelection(nil),
 			(*override.InstructionArtifacts)...,
 		)
-		output.CollectionPolicies.InstructionArtifacts.Mode = CollectionOverrideReplace
+		preserveSuppliedCollectionPolicy(
+			&output.CollectionPolicies.InstructionArtifacts,
+			policiesSupplied,
+		)
 	}
 	if override.Temperature != nil {
 		value := *override.Temperature
@@ -70,27 +77,39 @@ func resolveSessionInvocationDefaults(
 		output.ToolSelections = cloneToolSelections(
 			*override.ToolSelections,
 		)
-		output.CollectionPolicies.ToolSelections.Mode = CollectionOverrideReplace
+		preserveSuppliedCollectionPolicy(
+			&output.CollectionPolicies.ToolSelections,
+			policiesSupplied,
+		)
 	}
 	if override.Skills != nil {
 		output.Skills = append(
 			[]ArtifactSelection(nil),
 			(*override.Skills)...,
 		)
-		output.CollectionPolicies.Skills.Mode = CollectionOverrideReplace
+		preserveSuppliedCollectionPolicy(
+			&output.CollectionPolicies.Skills,
+			policiesSupplied,
+		)
 	}
 	if override.ActiveSkills != nil {
 		output.ActiveSkills = append(
 			[]ArtifactSelection(nil),
 			(*override.ActiveSkills)...,
 		)
-		output.CollectionPolicies.ActiveSkills.Mode = CollectionOverrideReplace
+		preserveSuppliedCollectionPolicy(
+			&output.CollectionPolicies.ActiveSkills,
+			policiesSupplied,
+		)
 	}
 	if override.MCP != nil {
 		output.MCP = cloneSessionDefaults(SessionDefaults{
 			MCP: *override.MCP,
 		}).MCP
-		output.CollectionPolicies.MCP.Mode = CollectionOverrideReplace
+		preserveSuppliedCollectionPolicy(
+			&output.CollectionPolicies.MCP,
+			policiesSupplied,
+		)
 	}
 
 	for _, field := range override.Clear {
@@ -145,6 +164,23 @@ func resolveSessionInvocationDefaults(
 		return SessionDefaults{}, err
 	}
 	return output, nil
+}
+
+// preserveSuppliedCollectionPolicy keeps an explicitly supplied policy. When
+// a caller supplies a collection without a policy, replacement remains the
+// backward-compatible default. This preserves explicit empty replacement,
+// additive collection intent, removals, and inheritance intent separately.
+func preserveSuppliedCollectionPolicy(
+	policy *CollectionPolicy,
+	policiesSupplied bool,
+) {
+	if policy == nil {
+		return
+	}
+	if !policiesSupplied ||
+		(policy.Mode == "" && len(policy.Removed) == 0) {
+		policy.Mode = CollectionOverrideReplace
+	}
 }
 
 // EffectiveToolSelections returns the one canonical typed Tool collection.

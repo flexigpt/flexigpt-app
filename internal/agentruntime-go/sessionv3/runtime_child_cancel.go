@@ -150,6 +150,8 @@ func (r *Runtime) cancelFrameTreeLocked(
 		return nil
 	}
 	frame.CancellationRequested = true
+	released := r.releaseFrameResourcesLocked(execution, frame.ID)
+	r.wakeResourceWaitersLocked(execution, released)
 
 	children := append([]ProgramFrameID(nil), frame.ChildFrameIDs...)
 	for _, childID := range children {
@@ -311,7 +313,7 @@ func (r *Runtime) cancelIndependentExecutionLocked(
 	now := r.now()
 	execution.Controls.CancellationRequested = true
 	execution.State = ExecutionStateCancelling
-	r.beginCleanupLocked(
+	r.beginStoppingCleanupLocked(
 		execution,
 		&SanitizedError{
 			Code:     "execution_cancelled",

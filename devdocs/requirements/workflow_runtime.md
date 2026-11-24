@@ -2394,7 +2394,7 @@ existing exclusions and no version changes.
 
 #### `WF-PREPARE-005` Freeze complete Workflow Model and Agent contribution meaning
 
-- Status: Partial.
+- Status: Implemented.
 - Completion evidence:
   - `S/contributionruntime/prepared.go:Preparer` coordinates Skill-domain
     instruction rendering (`InstructionSkillRenderer`) and MCP-domain
@@ -2409,8 +2409,13 @@ existing exclusions and no version changes.
   - The single MCP choice loop and optional MCP skip branch exist.
   - Remaining effective invocation preparation is specified by subtasks
     `WF-PREPARE-005.c` through `WF-PREPARE-005.f` below.
-  - Shared preparation is not proof of owning-domain separation. Complete
-    native contribution ownership under `ARC-CLEAN-006`.
+  - `S/workflowruntime/compiler_invocation.go:prepareWorkflowLLMInvocations`
+    prepares each effective Model, Agent, and provider-managed Tool owner
+    exactly once at the call site after typed defaults are known.
+  - `S/contributionruntime/prepared.go:Prepare` resolves explicit Workspace
+    clearing, collection replacement, removals, optional capabilities, Model
+    prompt provenance, and contribution ordering before live preparation.
+  - Native-domain consolidation is completed under `ARC-CLEAN-006`.
 
 ##### `WF-PREPARE-005.a` Capture instruction Skill output
 
@@ -2499,16 +2504,31 @@ existing exclusions and no version changes.
 
 #### `V3-TOOL-006` Complete normal conversation Tool error settlement and manual Tool guards
 
-- Status: Partial.
+- Status: Implemented.
 - Completion evidence:
-  - Runtime read-only failure settlement, normal Go and Skill error-output
-    branches, manual current-batch controls, and handoff Tool routing exist.
+  - `S/mcpruntime/v3.go:V3Executor.Execute` preserves MCP returned error
+    content, structured output, and durable provider-call identity as a
+    consumable Tool observation.
+  - `R/runtime.go:workflowMutatingToolObservationIsUncertain` keeps a
+    mutating Workflow Tool error uncertain while normal conversation Agent
+    loops retain the completed Tool observation for explicit continuation.
+  - `R/normal_session.go:normalToolBatchDispatchAllowed` provides the single
+    Runtime-owned sequential Tool-batch selection rule for automatic and
+    explicitly requested subsets.
 - Functional subtasks:
-  - `V3-TOOL-006.a`, Status: Not implemented. Complete consumable MCP conversation error output for returned error responses and terminated invocation failures. Preserve available rich output and provider call identity.
-  - `V3-TOOL-006.b`, Status: Partial. Separate completed Tool observation from business-effect certainty across Go, MCP, and Skill. An error alone must not manufacture confirmed non-application. Preserve mutating Workflow uncertainty, reconciliation, and retry eligibility from actual domain evidence.
-  - `V3-TOOL-006.c`, Status: Partial. Make confirmed conversation error observations available to explicit continuation without automatically retrying uncertain effects or automatically continuing unsuccessful batches.
-  - `V3-TOOL-006.d`, Status: Not implemented. Preserve supported sequential automatic Tool-batch execution and explicit requested-subset behavior. Runtime owns ordering; native domains must not add orchestration locks or schedulers.
-- Completion evidence after implementation: Pending for each open subtask.
+  - `V3-TOOL-006.a`, Status: Implemented.
+    Source evidence: `S/mcpruntime/v3.go:V3Executor.Execute`,
+    `v3MCPToolErrorOutput`, and `R/WorkItemOutput.Tool`.
+  - `V3-TOOL-006.b`, Status: Implemented.
+    Source evidence: `R/runtime.go:workflowMutatingToolObservationIsUncertain`,
+    `S/toolruntime/v3.go:ExecuteGo`, `S/skillruntime/v3.go:Execute`, and
+    `S/mcpruntime/v3.go:Execute`.
+  - `V3-TOOL-006.c`, Status: Implemented.
+    Source evidence: `S/sessionv3runtime/inputs.go:completedSemanticToolOutput`
+    and `R/program.go:startAgentLLM`.
+  - `V3-TOOL-006.d`, Status: Implemented.
+    Source evidence: `R/normal_session.go:normalToolBatchDispatchAllowed`,
+    `R/runtime.go:readyWorkLocked`, and `R/runtime.go:dispatchOne`.
 
 #### `V3-APP-006` Consume staged MCP App context on `SubmitMessage`
 
@@ -2519,172 +2539,323 @@ existing exclusions and no version changes.
 
 #### `ARC-CLEAN-006` Consolidate owning-domain code and Runtime algorithms
 
-- Status: Partial.
-- Completion evidence: Shared pinning helpers, `ArtifactPin.Selection()`, projection builders, and lowered-tree traversal exist. The supplied compatibility wrapper and Store projection duplication remain.
+- Status: Implemented.
+- Completion evidence:
+  - `S/attachmentruntime/provider_content.go` owns immutable Attachment to
+    provider-content conversion, and `S/sessionv3runtime/inputs.go` consumes
+    that owner API.
+  - `S/modelruntime/completion.go:InterpretCompletion` owns provider response
+    interpretation. Session setup retains only Tool binding association.
+  - `R/projection.go`, `sessionstorev3/store.go:ReadConversation`, and
+    `ReadActivities` use the shared Runtime projection builders.
+  - `S/sessionv3runtime/workflow_invocation.go:applyPreparedContributionPlan`
+    uses the Workspace prompt as the one Workspace instruction route while
+    retaining Text dispatch provenance.
 - Functional subtasks:
-  - `ARC-CLEAN-006.a`, Status: Not implemented. Remove the redundant Session attachment delegate and unused directory-limit field after callers use Attachment setup directly. Put immutable attachment-to-provider conversion and text-envelope construction in Attachment setup, not Session or Workflow orchestration.
-  - `ARC-CLEAN-006.b`, Status: Partial. Agent and Workspace setup must own their contribution interpretation. `contributionruntime` composes neutral prepared facts and cross-domain precedence; it must not remain a second implementation of Agent or Workspace semantics.
-  - `ARC-CLEAN-006.c`, Status: Partial. Model setup owns native Model-default adaptation and native completion interpretation. Session setup selects semantic messages and orchestrates domain results without owning another native Model grammar.
-  - `ARC-CLEAN-006.d`, Status: Partial. Reuse Runtime conversation and Activity builders in Store v3. Consolidate repeated recursive error clones, retry/catch matching, expression evaluation, operation-input extraction, outcome-to-CEL projection, retention calculations, and equivalent snapshot-copy algorithms within their owning boundaries.
-  - `ARC-CLEAN-006.e`, Status: Not implemented. Remove the consecutive duplicate provider-header clone in `S/sessionv3runtime/llm.go:bindLLM` and equivalent repeated execution preparation. Preserve distinct transport DTOs and exact provider-input capture where they serve different contracts.
-  - `ARC-CLEAN-006.f`, Status: Partial. Establish one Workspace instruction injection route. Retain per-Text pins and provenance without injecting content again when the owning Workspace prompt already contains it. Inspect the Workspace prompt producer to settle the provisional payload-overlap finding.
-  - `ARC-CLEAN-006.g`, Status: Partial. Use existing constants and typed enums for closed vocabularies, including remaining MCP policy and action-kind fields. Use lowercase implementation-owned error strings. Preserve user data, protocol identifiers, and domain payload meaning.
-- Validation work remains excluded. Ownership consolidation must remove equivalent repeated checks in touched paths where ownership is already established, without creating new checking, strictness, reports, or a separate validation task.
-- Completion evidence after implementation: Pending for each open subtask.
+  - `ARC-CLEAN-006.a`, Status: Implemented.
+    Source evidence: `S/attachmentruntime/sessionv3_admission.go`,
+    `S/attachmentruntime/provider_content.go`, and direct Binder wiring.
+  - `ARC-CLEAN-006.b`, Status: Implemented.
+    Source evidence: `S/contributionruntime/prepared.go` consumes source-pinned
+    Agent and Workspace API facts and performs only cross-domain precedence.
+  - `ARC-CLEAN-006.c`, Status: Implemented.
+    Source evidence: `S/modelruntime/runtime_adapter.go`,
+    `S/modelruntime/completion.go`, and `S/sessionv3runtime/llm.go`.
+  - `ARC-CLEAN-006.d`, Status: Implemented.
+    Source evidence: `R/projection.go`, `sessionstorev3/store.go`,
+    `R/budget_scope.go`, and `R/workflow_structured.go`.
+  - `ARC-CLEAN-006.e`, Status: Implemented.
+    Source evidence: `S/sessionv3runtime/llm.go:bindLLM` has one header clone
+    and `S/workflowruntime/compiler_invocation.go` has one effective
+    call-target preparation path.
+  - `ARC-CLEAN-006.f`, Status: Implemented.
+    Source evidence: `S/sessionv3runtime/workflow_invocation.go` suppresses
+    duplicate Workspace Text instruction injection after applying the durable
+    Workspace prompt contribution.
+  - `ARC-CLEAN-006.g`, Status: Implemented.
+    Source evidence: `R/types.go:ActionKind`, Runtime typed error propagation,
+    and existing domain-owned MCP policy enums.
 
 #### `WF-PREPARE-005.c` Prepare complete Model and provider-managed Tool call defaults
 
-- Status: Not implemented.
-- Source evidence: `S/workflowruntime/model_agent_adapter.go:PrepareWorkflowModelCallInvocation` receives but ignores `defaults`; Runtime subsequently replaces contribution selections from that incomplete prepared plan.
-- Functional work:
-  - Prepare Workspace, Workspace overrides, explicit clears, instruction Artifacts, Tool selections and arguments, Skills, active Skills, and MCP selections for Model calls through the common owning-domain preparation path.
-  - Apply the same complete call-default preparation to the owner Model of a provider-managed Tool target.
-  - Retain the selected target and complete effective contribution plan in `PreparedTargets`; consume it without replacing omitted facts with current Session defaults.
-- Completion evidence after implementation: Pending.
+- Status: Implemented.
+- Source evidence:
+  - `S/workflowruntime/model_agent_adapter.go:PrepareWorkflowModelCallInvocation`
+    calls `contributionruntime.Preparer.Prepare` with the selected Model and
+    typed call defaults.
+  - `S/workflowruntime/compiler_invocation.go:prepareWorkflowLLMInvocations`
+    prepares Model, Agent, and provider-managed Tool owner plans at each
+    actual call site.
+  - `R/workflow_invocation.go:prepareWorkflowLLMInvocation` consumes the
+    captured `PreparedTargets` plan without reading current Session defaults.
 
 #### `WF-PREPARE-005.d` Resolve effective exclusions, clears, and optional contributions before live preparation
 
-- Status: Partial.
-- Source evidence: `S/contributionruntime/prepared.go:Prepare` restores `inheritedWorkspace` after explicit clearing; `prepareAgent` pins occurrences before collection exclusions and does not retain optional Tool or runtime Skill preparation semantics through final domain preparation.
-- Functional work:
-  - Preserve explicit Workspace clearing without fallback to the Agent Workspace.
-  - Apply collection replacement, removals, and selected contribution precedence before preparing capabilities that the effective invocation excludes.
-  - Make `InstructionArtifacts` replacement suppress the applicable inherited instruction Text contributions.
-  - Retain required versus optional contribution meaning until owning-domain preparation finishes. Skip unavailable optional capabilities without losing required or explicitly selected capability failures.
-- Completion evidence after implementation: Pending.
+- Status: Implemented.
+- Source evidence:
+  - `S/contributionruntime/prepared.go:Prepare` retains explicit Workspace
+    clearing and does not restore an inherited Agent Workspace.
+  - `prepareAgent` applies exclusion policy before it pins or prepares an
+    excluded capability.
+  - `prepareWorkspace` suppresses inherited instruction Text when
+    `InstructionArtifacts` replaces that collection.
+  - Required unavailable selections still fail at their owning preparation
+    boundary; unavailable optional Agent capabilities are skipped.
 
 #### `WF-PREPARE-005.e` Preserve selected Model prompt policy and effective contribution provenance
 
-- Status: Partial.
-- Source evidence: `prepareAgent` assigns `IncludeModelSystemPrompt` for Model occurrences independently from final Model selection; replacement helpers can change contribution values without updating their effective owner or order.
-- Functional work:
-  - Apply Agent Model prompt inclusion only to the Model capability actually selected from that Agent.
-  - Preserve explicit Session or invocation Model precedence and explicit system-prompt precedence.
-  - Update owner, source key, and deterministic contribution order when a more-specific selection replaces an inherited contribution.
-  - Preserve one authoritative Workspace prompt contribution as specified by `ARC-CLEAN-006.f`.
-- Completion evidence after implementation: Pending.
+- Status: Implemented.
+- Source evidence:
+  - `S/contributionruntime/prepared.go:prepareAgent` records
+    `IncludeModelSystemPrompt` only when that Agent Model becomes the effective
+    Model.
+  - `S/sessionv3runtime/workflow_invocation.go:applyPreparedContributionPlan`
+    applies prompt policy only for the selected prepared Agent Model.
+  - `replaceContributionOrder` updates owner and deterministic order when a
+    more-specific Tool, Skill, Text, or MCP contribution replaces an inherited
+    contribution.
 
 #### `WF-PREPARE-005.f` Prepare effective call targets without repeated baseline preparation
 
-- Status: Partial.
-- Source evidence: Agent admission prepares baseline contributions, `prepareBoundTarget` prepares them again, and call-site preparation can prepare them again with different effective exclusions.
-- Functional work:
-  - Separate target identity and callable transport facts from complete effective call contribution preparation.
-  - Prepare each applicable effective call-target plan once after its defaults and exclusions are known.
-  - Prevent unused baseline contributions from failing a call that explicitly excludes them. Keep explicit root requirements independent.
-- Completion evidence after implementation: Pending.
+- Status: Implemented.
+- Source evidence:
+  - `S/workflowruntime/target_preparation.go:prepareBoundTarget` retains
+    target identity and transport facts only.
+  - `S/workflowruntime/compiler_invocation.go:prepareWorkflowLLMInvocations`
+    performs the one complete preparation after call defaults and exclusions
+    are known.
+  - `S/workflowruntime/target_preparation.go:prepareRequirement` remains
+    independent from callable target preparation.
 
 #### `RT-OWNER-007` Retain authoritative Session-owned mutation targets
 
-- Status: Partial.
+- Status: Implemented.
 - Affected entries: `RT-SETTLE-003.a`, `RT-SETTLE-003.b`, and `RT-RECOVERY-003.b`.
-- Source evidence: `SignalExecution`, `signalTriggerExecutionLocked`, restore wait resolution, Fork materialization, and reconciliation delivery retain objects across nested settlement that can drain triggers and append Session Executions.
+- Source evidence:
+  - `R/runtime.go:SignalExecution` and
+    `R/runtime_triggers.go:signalTriggerExecutionLocked` capture frame IDs,
+    re-acquire durable Execution and frame owners after wait settlement, and
+    account emitted Activities through their re-acquired owner.
+  - `R/runtime.go:dispatchOne` commits dispatch-start failure reversion to
+    `Ready` through `checkpointReasonWorkDispatchReverted`.
 - Functional subtasks:
-  - `RT-OWNER-007.a`, Status: Partial. Capture durable identities before nested transitions and reacquire Execution, frame, WorkItem, Wait, and signal owners before subsequent mutations in every listed path.
-  - `RT-OWNER-007.b`, Status: Partial. Iterate dependency-ready frame, Execution, and Wait identities rather than stale slice-backed objects during restore, signal delivery, and child materialization.
-  - `RT-OWNER-007.c`, Status: Not implemented. Commit the dispatch-start failure transition back to `Ready` in `dispatchOne`; the existing binding-abort revert is already implemented and is not this task.
-- Completion evidence after implementation: Pending for each open subtask.
+  - `RT-OWNER-007.a`, Status: Implemented.
+    Source evidence: `R/runtime.go:SignalExecution`,
+    `R/runtime_triggers.go:signalTriggerExecutionLocked`, and
+    `R/coordination.go` durable identity re-acquisition.
+  - `RT-OWNER-007.b`, Status: Implemented.
+    Source evidence: `R/runtime_durability.go:resumeRestoredWork`,
+    `R/runtime_fork_join.go:materializeForkFramesLocked`, and
+    `R/runtime_children.go:wakeCompletionExecutionWaitsLocked`.
+  - `RT-OWNER-007.c`, Status: Implemented.
+    Source evidence: `R/runtime.go:dispatchOne` and
+    `checkpointReasonWorkDispatchReverted`.
 
 #### `RT-CLEANUP-007` Complete cleanup classification and terminal obligations
 
-- Status: Partial.
+- Status: Implemented.
 - Affected entries: `RT-CLEANUP-003.a`, `RT-CLEANUP-003.c`, and `RT-SETTLE-003.b`.
-- Source evidence: `advanceFrameLocked` propagates cleanup to WorkItems only inside its child-frame branch; retained frame leases can prevent cancellation delivery; frame-derived and explicit Execution completion use different outstanding-obligation rules.
+- Source evidence:
+  - `R/runtime.go:advanceFrameLocked` propagates cleanup classification and
+    effective cleanup deadlines independently to every emitted frame and work
+    item.
+  - `R/budget.go:CleanupState.Stopping`,
+    `beginStoppingCleanupLocked`, and `finishResumableCleanupLocked`
+    distinguish bounded inner reconciliation cleanup from Execution shutdown.
+  - `R/runtime_child_cancel.go:cancelFrameTreeLocked` releases retained frame
+    claims at the cancellation boundary.
+  - `R/runtime_lifecycle.go:executionLocalTerminalReady` is the shared local
+    terminal-obligation predicate.
 - Functional subtasks:
-  - `RT-CLEANUP-007.a`, Status: Partial. Propagate owning cleanup classification to all emitted WorkItems and frames independently, including Agent, Model, retry, target-resolver, Machine, and other synthetic work.
-  - `RT-CLEANUP-007.b`, Status: Partial. Permit eligible cleanup retries and retain narrowed cleanup operation or Attempt timeouts within the enclosing cleanup allowance, without inheriting an expired ordinary deadline.
-  - `RT-CLEANUP-007.c`, Status: Not implemented. Distinguish resumable operation reconciliation from whole-Execution shutdown cleanup. A confirmed reconciliation or recovered inner scope must permit its authorized subsequent normal work when the Execution is not stopping.
-  - `RT-CLEANUP-007.d`, Status: Partial. Release retained frame claims at the correct cancellation boundary so a frame does not wait on its own lease before it can receive cancellation and finalization.
-  - `RT-CLEANUP-007.e`, Status: Partial. Use one semantic terminal-obligation decision for frame-derived and explicit Execution settlement, preserving required cleanup, compensation, completion delivery, and owned-child cancellation obligations.
-  - `RT-CLEANUP-007.f`, Status: Not implemented. Retire compensation records that are no longer eligible after successful Saga completion, excluded compensation outcomes, or stop-policy completion. Retain confirmed original effects and primary failure or cancellation.
-- Completion evidence after implementation: Pending for each open subtask. `RT-CLEANUP-006` remains implemented.
+  - `RT-CLEANUP-007.a`, Status: Implemented.
+    Source evidence: `R/runtime.go:advanceFrameLocked`,
+    `R/retry_program.go:startChild`, and `R/runtime_fork_join.go`.
+  - `RT-CLEANUP-007.b`, Status: Implemented.
+    Source evidence: `R/budget.go:cleanupOperationDeadlineLocked`,
+    `R/runtime_children.go:childFrameDeadlineInputs`, and
+    `R/retry.go:prepareRetryLocked`.
+  - `RT-CLEANUP-007.c`, Status: Implemented.
+    Source evidence: `R/budget.go:CleanupState.Stopping`,
+    `cleanupDispatchAllowedLocked`, and `finishResumableCleanupLocked`.
+  - `RT-CLEANUP-007.d`, Status: Implemented.
+    Source evidence: `R/runtime_child_cancel.go:cancelFrameTreeLocked`.
+  - `RT-CLEANUP-007.e`, Status: Implemented.
+    Source evidence: `R/runtime.go:refreshExecutionStateLocked`,
+    `R/runtime_lifecycle.go:executionLocalTerminalReady`, and
+    `executionTerminalReadyLocked`.
+  - `RT-CLEANUP-007.f`, Status: Implemented.
+    Source evidence: `R/compensation.go:retireInactiveSagaCompensationsLocked`.
+    `RT-CLEANUP-006` remains implemented.
 
 #### `RT-BUDGET-007` Complete stable structured aggregates and retained-record accounting
 
-- Status: Partial.
+- Status: Implemented.
 - Affected entries: `RT-BUDGET-003.b` and `RT-BUDGET-003.d`.
-- Source evidence: `deferFrameForkLocked` allocates a new scope per Fork; trigger signals and several direct Timeline append paths bypass semantic-owner reservations; `startCall` classifies its synthetic wrapper as Workflow nesting.
+- Source evidence:
+  - `R/runtime_fork_join.go:stableForkBudgetScopeID` retains one structured
+    aggregate across Foreach waves, Repeat iterations, retry descendants, and
+    nested fork work.
+  - `R/budget_scope.go:budgetScopeChain` accounts outer and inner aggregates
+    once through parent-linked `ExecutionBudgetScope` values.
+  - `R/budget.go:appendBudgetedActivityLocked`,
+    `R/runtime.go:SignalExecution`, and `R/runtime_triggers.go` charge
+    retained signal and Activity records to their durable owners.
+  - `R/workflow_call_lifecycle.go:startCall` no longer counts the synthetic
+    started-call wrapper as Workflow nesting.
 - Functional subtasks:
-  - `RT-BUDGET-007.a`, Status: Partial. Retain one controlling aggregate for the complete structured operation across Foreach launch waves, Repeat iterations, retry children, and descendant Fork or Join work.
-  - `RT-BUDGET-007.b`, Status: Partial. Preserve enclosing structured aggregate ownership when nested operations create narrower scopes. Charge each applicable aggregate once, without replacing or losing the enclosing scope.
-  - `RT-BUDGET-007.c`, Status: Partial. Account retained trigger signals and message, action, wait, recovery, interrupted-assistant, Workflow, and trigger Activities through their durable semantic owners.
-  - `RT-BUDGET-007.d`, Status: Not implemented. Count Workflow depth only at actual nested Workflow invocation boundaries, not started-call wrappers or other synthetic frames.
-- Completion evidence after implementation: Pending for each open subtask. Cost metering remains excluded.
+  - `RT-BUDGET-007.a`, Status: Implemented.
+    Source evidence: `R/runtime_fork_join.go:stableForkBudgetScopeID`.
+  - `RT-BUDGET-007.b`, Status: Implemented.
+    Source evidence: `R/types.go:ExecutionBudgetScope.ParentID` and
+    `R/budget_scope.go:budgetScopeChain`.
+  - `RT-BUDGET-007.c`, Status: Implemented.
+    Source evidence: `R/budget.go:appendBudgetedActivityLocked`,
+    `R/runtime.go`, `R/runtime_triggers.go`, and `R/ports_runtime.go`.
+  - `RT-BUDGET-007.d`, Status: Implemented.
+    Source evidence: `R/workflow_call_lifecycle.go:startCall` and
+    `R/workflow_program.go:startWorkflowChildCall`.
+    Cost metering remains excluded.
 
 #### `RT-COMMAND-007` Persist and resume wait-resolution command intent
 
-- Status: Partial.
+- Status: Implemented.
 - Affected entries: `RT-COMMAND-003` and `RT-RECOVERY-003`.
-- Source evidence: `R/runtime.go:ResolveWait` persists a resolving Wait before recording the command receipt and final resolution data, then calls the domain resolver outside Runtime-owned asynchronous execution.
+- Source evidence:
+  - `R/types.go:WaitResolutionIntent` persists the original command identity,
+    actor, response, accepted receipt, and requested resolution under the
+    existing Session root.
+  - `R/wait_resolution.go:acceptWaitResolution` records the receipt and
+    intent before it checkpoints the resolving Wait.
+  - `R/wait_resolution.go:resolveAcceptedWaitResolution` is Runtime-owned,
+    tracked asynchronous resolution and reuses the ordinary settlement
+    lifecycle.
 - Functional subtasks:
-  - `RT-COMMAND-007.a`, Status: Not implemented. Persist the accepted resolution intent, actor, response, original command identity, and replay receipt before domain resolution starts, using the existing Session durable root.
-  - `RT-COMMAND-007.b`, Status: Not implemented. Return the same accepted command meaning for duplicate resolution commands while work is pending and after restart, without inserting another command record or losing the requested resolution.
-  - `RT-COMMAND-007.c`, Status: Partial. Resume domain resolution through the owning binding and settle the original Wait and WorkItem through the common committed lifecycle.
-  - `RT-COMMAND-007.d`, Status: Not implemented. Make resolution execution subject to Runtime lifecycle cancellation and tracked shutdown so close cannot finish while an owned resolver can still mutate or checkpoint Session state.
-- Completion evidence after implementation: Pending for each open subtask.
+  - `RT-COMMAND-007.a`, Status: Implemented.
+    Source evidence: `R/wait_resolution.go:acceptWaitResolution`.
+  - `RT-COMMAND-007.b`, Status: Implemented.
+    Source evidence: durable `Session.Commands`, retained
+    `WaitResolutionIntent.Receipt`, and `R/FindCommandReceipt`.
+  - `RT-COMMAND-007.c`, Status: Implemented.
+    Source evidence: `R/wait_resolution.go:resolveAcceptedWaitResolution`,
+    `R/runtime.go:finishWorkLocked`, and
+    `R/runtime_lifecycle.go:commitTerminalMutationLocked`.
+  - `RT-COMMAND-007.d`, Status: Implemented.
+    Source evidence: `R/Runtime.waitResolutionCancels`,
+    `R/Runtime.Close`, and `R/cancelWaitResolutionLocked`.
 
 #### `WF-CONTROL-007` Preserve complete structured exits and captured started-call meaning
 
-- Status: Partial.
+- Status: Implemented.
 - Affected entries: `WF-CONTROL-003.d`, `WF-OUTCOME-003.a`, and `WF-PREPARE-003`.
-- Source evidence: Repeat, Machine, and Saga nonlocal exits bypass parts of normal state transfer; `finishWorkflowTerminal` omits causal IDs from rebuilt block results; `startCall` reuses frame deadline and start-output schema for internal invocation.
+- Source evidence:
+  - `R/workflow_structured.go`, `workflow_machine.go`, and `workflow_saga.go`
+    transfer carried state and causal frontier facts before nonlocal exits.
+  - `R/workflow_handlers.go:finishWorkflowTerminal` includes causal effect IDs
+    in reconstructed child block results.
+  - `R/workflow_call_lifecycle.go:startCall` preserves the captured step
+    deadline and uses the target invoke-output schema instead of the public
+    start-handle schema.
 - Functional subtasks:
-  - `WF-CONTROL-007.a`, Status: Partial. Transfer inherited or carried state and causal effect frontiers before Repeat break or Workflow return, Machine nonlocal exit, and Saga Workflow return. Preserve local-state isolation.
-  - `WF-CONTROL-007.b`, Status: Partial. Retain causal effect IDs through catch, finally, and reconstructed child block results, including effects completed by handler and finalization blocks.
-  - `WF-CONTROL-007.c`, Status: Partial. Record the enclosing structured step outcome before pending state is cleared by return, break, continue, cancellation, or Saga terminal handling.
-  - `WF-CONTROL-007.d`, Status: Partial. Apply immediate, accepted-event, and due-timer transition priority from durable candidate facts before Machine selection. A buffered accepted event must not lose solely because its wait binds after a due timer.
-  - `WF-CONTROL-007.e`, Status: Not implemented. Retain the captured call deadline through started-call wrappers and delayed child creation. Keep the start handle schema separate from the internal invoke output schema.
-- Completion evidence after implementation: Pending for each open subtask.
+  - `WF-CONTROL-007.a`, Status: Implemented.
+    Source evidence: `R/workflow_structured.go:settleRepeatChild`,
+    `R/workflow_machine.go:settleMachineChild`, and
+    `R/workflow_saga.go:settleSagaBodySuccess`.
+  - `WF-CONTROL-007.b`, Status: Implemented.
+    Source evidence: `R/workflow_handlers.go:finishWorkflowTerminal`.
+  - `WF-CONTROL-007.c`, Status: Implemented.
+    Source evidence: `R/workflow_structured.go:recordStructuredExitOutcome`
+    and `R/workflow_saga.go:finishSaga`.
+  - `WF-CONTROL-007.d`, Status: Implemented.
+    Source evidence: `R/workflow_machine.go:bufferedMachineEventCandidate`
+    and `selectReadyMachineTransition`.
+  - `WF-CONTROL-007.e`, Status: Implemented.
+    Source evidence: `R/workflow_call_lifecycle.go:startCall`.
 
 #### `V3-CONTINUE-007` Consume staged input through the active conversation owner
 
-- Status: Partial.
+- Status: Implemented.
 - Affected entry: `V3-CONTINUE-003.a`.
-- Source evidence: `consumeContinuationLocked` excludes non-normal-conversation Executions even when `UpdateContinuationInput` routed input to their active handoff Agent.
+- Source evidence:
+  - `R/normal_session.go:consumeContinuationLocked` resolves the active
+    Agent-loop frame for normal and handoff Executions.
+  - `R/normal_session.go:stagedConversationAppContextLocked` and
+    `clearConsumedAppContextLocked` preserve App provenance while routing
+    one unconsumed context set through the actual next-message owner.
 - Functional subtasks:
-  - `V3-CONTINUE-007.a`, Status: Not implemented. Consume staged text, attachments, defaults, budget, metadata, and App context through the active conversation frame in either a normal or handoff Execution.
-  - `V3-CONTINUE-007.b`, Status: Partial. Preserve one next-message App-context consumption route when App provenance and active conversation ownership belong to different retained Executions. Keep original App provenance and prevent duplicate injection.
-- Completion evidence after implementation: Pending for each open subtask.
+  - `V3-CONTINUE-007.a`, Status: Implemented.
+    Source evidence: `R/normal_session.go:consumeContinuationLocked` and
+    `submitNormalMessageToFrameWithDefaultsLocked`.
+  - `V3-CONTINUE-007.b`, Status: Implemented.
+    Source evidence: `R/runtime.go:SubmitMessage` and
+    `R/normal_session.go:stagedConversationAppContextLocked`.
 
 #### `V3-CONFIG-007` Preserve explicit collection and nested Model patch intent
 
-- Status: Partial.
+- Status: Implemented.
 - Affected entries: `V3-CONFIG-003.a`, `V3-CONFIG-003.b`, and `V3-CONFIG-003.c`.
-- Source evidence: `resolveSessionInvocationDefaults` overwrites supplied collection modes; `MergeModelDefaultsOverride` replaces nested patches; Model setup ignores an empty stop-sequence array.
+- Source evidence:
+  - `R/normal_configuration.go:preserveSuppliedCollectionPolicy` retains an
+    explicit collection mode and defaults an unqualified supplied collection
+    to replacement.
+  - `R/normal_model_defaults.go:MergeModelDefaultsOverride` merges nested
+    typed patches by field presence and preserves explicit clears.
+  - `S/modelruntime/runtime_request_patch.go:applyRuntimeDefaults` preserves
+    explicit empty stop-sequence replacement.
 - Functional subtasks:
-  - `V3-CONFIG-007.a`, Status: Not implemented. Preserve explicit collection policy when a collection is supplied. Use default replacement only when no explicit policy establishes another supported meaning.
-  - `V3-CONFIG-007.b`, Status: Partial. Merge nested typed Model patches according to field presence, retain unspecified inherited fields, and apply explicit clears and empty collection replacement consistently.
-  - `V3-CONFIG-007.c`, Status: Partial. Reuse the effective contribution precedence, selected Model prompt policy, and provenance behavior from `WF-PREPARE-005` for normal conversation and Workflow calls.
-- Completion evidence after implementation: Pending for each open subtask.
+  - `V3-CONFIG-007.a`, Status: Implemented.
+    Source evidence: `R/normal_configuration.go:preserveSuppliedCollectionPolicy`.
+  - `V3-CONFIG-007.b`, Status: Implemented.
+    Source evidence: `R/normal_model_defaults.go` nested merge helpers and
+    `S/modelruntime/runtime_request_patch.go`.
+  - `V3-CONFIG-007.c`, Status: Implemented.
+    Source evidence: `S/contributionruntime/prepared.go`,
+    `S/sessionv3runtime/workflow_invocation.go`, and
+    `S/sessionv3runtime/llm_plan.go`.
 
 #### `V3-ERROR-007` Retain owning-domain failure classification
 
-- Status: Partial.
+- Status: Implemented.
 - Affected entries: `WF-RETRY-003.c` and `WF-OUTCOME-003`.
-- Source evidence: common Model execution and Runtime bind or execute error paths retain only code and message even when an owning domain can supply typed error facts.
+- Source evidence:
+  - `R/error_classification.go:ClassifyDomainError` preserves typed domain
+    category, retryability, effect, details, and causes.
+  - `R/runtime.go:dispatchOne` and `executeOne` retain classified bind and
+    execution failures through child settlement, retry, catch, and projection.
+  - `S/sessionv3runtime/llm.go`, `S/toolruntime/v3.go`,
+    `S/skillruntime/v3.go`, and `S/mcpruntime/v3.go` classify only their own
+    available context cancellation and timeout facts without string matching.
 - Functional subtasks:
-  - `V3-ERROR-007.a`, Status: Partial. Preserve supplied category, retryability, effect, details, and causes through Model, Agent, registered-binding, bind, execute, child settlement, retry, catch, and projection paths.
-  - `V3-ERROR-007.b`, Status: Not implemented. Let the owning domain classify available native cancellation, timeout, transient, and authorization failures. Runtime must not infer domain meaning by matching human-readable error strings.
-- Completion evidence after implementation: Pending for each open subtask.
+  - `V3-ERROR-007.a`, Status: Implemented.
+    Source evidence: `R/error_classification.go`, `R/finishWorkLocked`, and
+    existing deep `SanitizedError` clone paths.
+  - `V3-ERROR-007.b`, Status: Implemented.
+    Source evidence: `R/DomainFailure` and setup-domain execution adapters.
 
 #### `WF-EFFECT-007` Complete keyed-native registered-target preparation
 
-- Status: Partial.
+- Status: Implemented.
 - Affected entry: `WF-EFFECT-003.d`.
-- Source evidence: `compileWorkflowEffect` lowers a keyed target to a non-idempotent base while the Runtime keyed-capability representation expects a different base classification.
-- Functional work:
-  - Use one consistent typed representation for a keyed-only target, separate from unconditional idempotence.
-  - Prepare admitted keyed-native Service and Activity targets, capture one key per logical operation, and deliver it only through `workbinding.Request.IdempotencyKey`.
-  - Preserve that key through retry, wait, recovery, and reconciliation without adding metadata to another domain's native argument grammar.
-- Completion evidence after implementation: Pending.
+- Source evidence:
+  - `R/workflow_target_facts.go:WorkflowTarget.Validate` represents a
+    keyed-native capability as a non-idempotent base guarantee until a
+    captured call key creates `EffectKindKeyed`.
+  - `S/workflowruntime/target_preparation.go:prepareBoundTarget` enables
+    keyed Service and Activity capability only when the registered binding
+    implements `workbinding.KeyedEffectCapability`.
+  - `R/workbinding/contracts.go:Request.IdempotencyKey`,
+    `R/workflow_program.go:workflowCallEffect`, retry capture, recovery, and
+    reconciliation retain and deliver the one durable key.
 
 #### `V3-STORE-007` Repair FTS from authoritative Session documents
 
-- Status: Partial.
+- Status: Implemented.
 - Affected entry: `V3-STORE-004.a`.
-- Source evidence: `store_fts.go:ftsListener` logs failed FTS mutations; `store.go:rebuildDerivedLocked` repairs index files only.
-- Functional work:
-  - Route failed FTS upsert and deletion into the existing Store maintenance owner.
-  - Reconcile live Session documents and tombstones into FTS so failed notifications do not leave search stale until restart.
-  - Keep derived search repair separate from semantic checkpoint commitment, with no Runtime scheduler or Artifact Store dependency.
-- Completion evidence after implementation: Pending.
+- Source evidence:
+  - `sessionstorev3/store_fts.go:ftsListener` sends failed upsert, deletion,
+    adaptation, and document-observation events to
+    `Store.requestDerivedRepair`.
+  - `sessionstorev3/store.go:scheduleDerivedRepairLocked` invokes
+    `reconcileFTS`, which reconciles authoritative live Session documents and
+    tombstones through `syncDocumentToFTS`.
+  - Repair remains Store-owned derived maintenance and does not affect
+    semantic checkpoint commitment or create a Runtime scheduler.

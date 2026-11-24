@@ -126,20 +126,7 @@ func New(baseDir string) (*Store, error) {
 	maintenanceCtx, cancel := context.WithCancel(context.Background())
 	s.maintenanceCancel = cancel
 	backgroundutil.Launch(&s.maintenanceWG, "SessionStoreV3 FTS reconciliation", func() {
-		s.ftsMu.Lock()
-		defer s.ftsMu.Unlock()
-
-		if s.fts == nil {
-			return
-		}
-		if _, err := ftsengine.SyncDirToFTS(
-			maintenanceCtx,
-			s.fts,
-			filepath.Join(s.baseDir, documentDirectory),
-			"mtime",
-			1000,
-			s.syncDocumentToFTS,
-		); err != nil {
+		if err := s.reconcileFTS(maintenanceCtx); err != nil {
 			slog.Error("sessionstorev3 FTS reconciliation failed", "error", err)
 		}
 	}, nil)
@@ -351,19 +338,7 @@ func (s *Store) ReadConversation(id sessionv3Runtime.SessionID) (sessionv3Runtim
 	if err != nil {
 		return sessionv3Runtime.ConversationProjection{}, err
 	}
-	messages := []sessionv3Runtime.Activity{}
-	for _, a := range session.Timeline {
-		if a.Kind == sessionv3Runtime.ActivityKindMessage && a.Visibility != sessionv3Runtime.ActivityVisibilityAudit {
-			messages = append(messages, a)
-		}
-	}
-	return sessionv3Runtime.ConversationProjection{
-		SchemaVersion:   sessionv3Runtime.SchemaVersion,
-		SessionID:       session.ID,
-		SessionRevision: session.Revision,
-		Title:           session.Title,
-		Messages:        messages,
-	}, nil
+	return sessionv3Runtime.BuildConversationProjection(session), nil
 }
 
 func (s *Store) ReadActivities(id sessionv3Runtime.SessionID) (sessionv3Runtime.ActivityProjection, error) {
@@ -371,12 +346,7 @@ func (s *Store) ReadActivities(id sessionv3Runtime.SessionID) (sessionv3Runtime.
 	if err != nil {
 		return sessionv3Runtime.ActivityProjection{}, err
 	}
-	return sessionv3Runtime.ActivityProjection{
-		SchemaVersion:   sessionv3Runtime.SchemaVersion,
-		SessionID:       session.ID,
-		SessionRevision: session.Revision,
-		Activities:      append([]sessionv3Runtime.Activity(nil), session.Timeline...),
-	}, nil
+	return sessionv3Runtime.BuildActivityProjection(session), nil
 }
 
 // ReadSessionRuntimeProjection returns normal Session Runtime v3 facts from
@@ -594,6 +564,12 @@ func (s *Store) scheduleDerivedRepairLocked() {
 					err,
 				)
 			}
+			if err := s.reconcileFTS(context.Background()); err != nil {
+				slog.Error(
+					"sessionstorev3 FTS reconciliation failed",
+					"error", err,
+				)
+			}
 		},
 		nil,
 	)
@@ -641,4 +617,17 @@ func (s *Store) rebuildDerivedLocked(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+// requestDerivedRepair avoids taking Store.mu from the mapstore listener,
+// which can run during a document write that already owns that lock.
+func (s *Store) requestDerivedRepair() {
+	backgroundutil.Launch(&s.maintenanceWG, "SessionStoreV3 derived repair request", func() {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		if s.closed {
+			return
+		}
+		s.scheduleDerivedRepairLocked()
+	}, nil)
 }

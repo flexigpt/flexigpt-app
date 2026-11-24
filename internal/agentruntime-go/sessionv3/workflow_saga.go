@@ -738,6 +738,13 @@ func (i *WorkflowInterpreter) settleSagaBodySuccess(
 		return transition
 
 	case WorkflowExitReturnWorkflow:
+		if pending.MergeState {
+			state.State = result.State.Clone()
+		}
+		if err := recordStructuredExitOutcome(&state, program, pending, result.Value); err != nil {
+			transition, _ := workflowFailure(state, "workflow_saga_invalid", err.Error())
+			return transition
+		}
 		state.Exit = result.Exit
 		state.ExitValue = result.Value.Clone()
 		state.Pending = nil
@@ -869,7 +876,7 @@ func (i *WorkflowInterpreter) settleSagaCompensationFailure(
 
 func (i *WorkflowInterpreter) finishSaga(
 	_ ProgramFrame,
-	_ WorkflowProgram,
+	program WorkflowProgram,
 	state WorkflowState,
 ) ProgramTransition {
 	if state.Pending == nil || state.Pending.Saga == nil {
@@ -885,6 +892,20 @@ func (i *WorkflowInterpreter) finishSaga(
 	status := progress.PrimaryStatus
 	if status == "" {
 		status = ProgramFrameStateFailed
+	}
+	pending := state.Pending
+	outcomeStatus := WorkflowStepOutcomeFailed
+	if status == ProgramFrameStateCancelled {
+		outcomeStatus = WorkflowStepOutcomeCancelled
+	}
+	if err := recordStructuredExitOutcome(&state, program, pending, nil); err == nil {
+		for index := range state.Outcomes {
+			if state.Outcomes[index].ID == pending.StepID {
+				state.Outcomes[index].Status = outcomeStatus
+				state.Outcomes[index].Error = cloneWorkflowSanitizedError(primary)
+				state.Outcomes[index].Output = nil
+			}
+		}
 	}
 	state.Pending = nil
 	state.PendingPath = ""

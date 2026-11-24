@@ -298,37 +298,23 @@ func (b *Binder) executeLLM(
 		}, nil
 	}
 	out := resp.Body.InferenceResponse
-	protocolOutputs, protocolErr := canonicalProviderOutputs(out.Outputs)
-	if protocolErr != nil {
+	facts, factsErr := modelruntime.InterpretCompletion(out)
+	if factsErr != nil {
 		return sessionv3Runtime.WorkExecutionResult{
 			Error: &sessionv3Runtime.SanitizedError{
 				Code:    providerOutputInvalidCode,
-				Message: strings.ToLower(protocolErr.Error()),
+				Message: strings.ToLower(factsErr.Error()),
 			},
 		}, nil
 	}
-	debugDetails, debugErr := canonicalProviderDebugDetails(out.DebugDetails)
-	if debugErr != nil {
-		return sessionv3Runtime.WorkExecutionResult{
-			Error: &sessionv3Runtime.SanitizedError{
-				Code:    providerDebugInvalidCode,
-				Message: strings.ToLower(debugErr.Error()),
-			},
-		}, nil
-	}
-	var usage *inferenceSpec.Usage
-	if out.Usage != nil {
-		value := *out.Usage
-		usage = &value
-	}
-	text, thinking, calls := b.decodeProviderOutputs(out.Outputs, private.Bindings)
+	calls := b.decodeProviderToolCalls(out.Outputs, private.Bindings)
 	llmOutput := &sessionv3Runtime.LLMOutput{
-		Text:            text,
-		Thinking:        thinking,
+		Text:            facts.Text,
+		Thinking:        facts.Thinking,
 		ToolCalls:       calls,
-		Usage:           usage,
-		ProtocolOutputs: protocolOutputs,
-		DebugDetails:    debugDetails,
+		Usage:           facts.Usage,
+		ProtocolOutputs: facts.ProtocolOutputs,
+		DebugDetails:    facts.DebugDetails,
 	}
 	value := jsonutil.MustCanonicalValue(llmOutput)
 	output := &sessionv3Runtime.WorkItemOutput{
@@ -350,16 +336,15 @@ func (b *Binder) executeLLM(
 			Confirmed: true,
 		}, nil
 	}
-	confirmed := strings.TrimSpace(text) != "" ||
+	confirmed := strings.TrimSpace(facts.Text) != "" ||
 		len(calls) != 0 ||
-		len(protocolOutputs) != 0
+		len(facts.ProtocolOutputs) != 0
 	if err != nil {
 		return sessionv3Runtime.WorkExecutionResult{
 			Output: output,
-			Error: &sessionv3Runtime.SanitizedError{
-				Code:    completionFailedCode,
-				Message: strings.ToLower(err.Error()),
-			},
+			Error: sessionv3Runtime.ClassifyDomainError(
+				err, completionFailedCode, sessionv3Runtime.ErrorCategoryExecution,
+			),
 			Confirmed: confirmed,
 		}, nil
 	}
@@ -378,59 +363,12 @@ func (b *Binder) executeLLM(
 	}, nil
 }
 
-func canonicalProviderOutputs(
-	values []inferenceSpec.OutputUnion,
-) ([]jsonutil.CanonicalValue, error) {
-	output := make(
-		[]jsonutil.CanonicalValue,
-		0,
-		len(values),
-	)
-	for index := range values {
-		raw, err := jsonutil.EncodeToJSONRaw(values[index])
-		if err != nil {
-			return nil, err
-		}
-		value, err := jsonutil.CanonicalValueFrom(raw)
-		if err != nil {
-			return nil, err
-		}
-		output = append(output, value)
-	}
-	return output, nil
-}
-
-func canonicalProviderDebugDetails(
-	value any,
-) (jsonutil.CanonicalValue, error) {
-	if value == nil {
-		return nil, nil
-	}
-	raw, err := jsonutil.EncodeToJSONRaw(value)
-	if err != nil {
-		return nil, err
-	}
-	return jsonutil.CanonicalValueFrom(raw)
-}
-
-func (b *Binder) decodeProviderOutputs(
+func (b *Binder) decodeProviderToolCalls(
 	outputs []inferenceSpec.OutputUnion,
 	bindings map[string]sessionv3Runtime.ToolCall,
-) (t, th string, c []sessionv3Runtime.ToolCall) {
-	var text strings.Builder
-	var thinking strings.Builder
-	calls := []sessionv3Runtime.ToolCall{}
+) []sessionv3Runtime.ToolCall {
+	calls := make([]sessionv3Runtime.ToolCall, 0)
 	for _, o := range outputs {
-		if o.OutputMessage != nil {
-			for _, c := range o.OutputMessage.Contents {
-				if c.Kind == inferenceSpec.ContentItemKindText && c.TextItem != nil {
-					text.WriteString(c.TextItem.Text)
-				}
-			}
-		}
-		if o.ReasoningMessage != nil {
-			thinking.WriteString(strings.Join(o.ReasoningMessage.Thinking, ""))
-		}
 		call := o.FunctionToolCall
 		if call == nil {
 			call = o.CustomToolCall
@@ -484,7 +422,7 @@ func (b *Binder) decodeProviderOutputs(
 		next.Arguments = arguments
 		calls = append(calls, next)
 	}
-	return text.String(), thinking.String(), calls
+	return calls
 }
 
 func unresolvedProviderToolCall(

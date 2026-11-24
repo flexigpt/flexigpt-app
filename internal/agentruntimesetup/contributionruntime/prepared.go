@@ -257,9 +257,20 @@ func (p *Preparer) Prepare(
 		specificMCPByKey[contributionSelectionKey(normalized.Server)] = normalized
 	}
 
+	selectedModel := request.Model
+	if selectedModel == nil && specific.Model != nil {
+		value := *specific.Model
+		selectedModel = &value
+	}
+	selectedAgent := request.Agent
+	if selectedAgent == nil && specific.Agent != nil {
+		value := *specific.Agent
+		selectedAgent = &value
+	}
+
 	output := sessionv3Runtime.PreparedContributionPlan{}
-	if request.Model != nil {
-		modelPin, modelErr := p.pinSelection(ctx, *request.Model)
+	if selectedModel != nil {
+		modelPin, modelErr := p.pinSelection(ctx, *selectedModel)
 		if modelErr != nil {
 			return sessionv3Runtime.PreparedContributionPlan{}, modelErr
 		}
@@ -276,15 +287,19 @@ func (p *Preparer) Prepare(
 	}
 
 	var inheritedWorkspace *sessionv3Runtime.ArtifactSelection
-	if request.Agent != nil {
+	allowInheritedWorkspace := !workspaceCleared &&
+		request.Workspace == nil &&
+		specific.Workspace == nil
+	if selectedAgent != nil {
 		workspace, err := p.prepareAgent(
 			ctx,
 			&output,
-			*request.Agent,
+			*selectedAgent,
 			specific.CollectionPolicies,
 			specificMCPByKey,
 			handledSpecificMCP,
 			specificOwner,
+			allowInheritedWorkspace,
 		)
 		if err != nil {
 			return sessionv3Runtime.PreparedContributionPlan{}, err
@@ -307,9 +322,6 @@ func (p *Preparer) Prepare(
 	workspaceOverrides := request.WorkspaceOverrides
 	if hasSpecific {
 		workspaceOverrides = specific.WorkspaceOverrides
-	}
-	if workspace == nil {
-		workspace = inheritedWorkspace
 	}
 	if workspace != nil {
 		if err := p.prepareWorkspace(
@@ -359,6 +371,7 @@ func (p *Preparer) prepareAgent(
 	specificMCPByKey map[string]sessionv3Runtime.MCPServerSelection,
 	handledSpecificMCP map[string]struct{},
 	specificOwner sessionv3Runtime.ConfigurationOwner,
+	allowInheritedWorkspace bool,
 ) (*sessionv3Runtime.ArtifactSelection, error) {
 	pin, err := p.pinSelection(ctx, selection)
 	if err != nil {
@@ -388,6 +401,19 @@ func (p *Preparer) prepareAgent(
 
 	var workspace *sessionv3Runtime.ArtifactSelection
 	for _, occurrence := range resolved.Capabilities.Occurrences {
+		if occurrence.Type == declaration.TypeModel && output.Model != nil {
+			continue
+		}
+		if occurrence.Type == declaration.TypeWorkspace &&
+			!allowInheritedWorkspace {
+			continue
+		}
+		if preparedAgentOccurrenceExcluded(
+			occurrence,
+			policies,
+		) {
+			continue
+		}
 		if occurrence.Status != composition.ResolutionAvailable ||
 			occurrence.Target == nil {
 			if occurrence.Required {
@@ -407,19 +433,17 @@ func (p *Preparer) prepareAgent(
 
 		switch occurrence.Type {
 		case declaration.TypeModel:
-			if output.Model == nil {
-				value := targetPin
-				output.Model = &value
-				appendContributionOrder(
-					output,
+			value := targetPin
+			output.Model = &value
+			appendContributionOrder(
+				output,
+				sessionv3Runtime.PreparedContributionKindModel,
+				sessionv3Runtime.PreparedContributionKey(
 					sessionv3Runtime.PreparedContributionKindModel,
-					sessionv3Runtime.PreparedContributionKey(
-						sessionv3Runtime.PreparedContributionKindModel,
-						targetPin,
-					),
-					sessionv3Runtime.ConfigurationOwnerAgent,
-				)
-			}
+					targetPin,
+				),
+				sessionv3Runtime.ConfigurationOwnerAgent,
+			)
 			if occurrence.IncludeSystemPrompt != nil {
 				value := *occurrence.IncludeSystemPrompt
 				output.IncludeModelSystemPrompt = &value
@@ -995,6 +1019,7 @@ func (p *Preparer) appendText(
 	included bool,
 	requireInstructionsInsert bool,
 ) error {
+	replaceIndex := -1
 	for index := range output.Texts {
 		current := &output.Texts[index]
 		if current.Artifact.RootID == pin.RootID &&
@@ -1009,7 +1034,11 @@ func (p *Preparer) appendText(
 					pin.ArtifactID,
 				)
 			}
-			if included && !current.Included {
+			if included &&
+				(!current.Included ||
+					contributionOwnerRank(owner) >
+						contributionOwnerRank(current.Owner)) {
+				replaceIndex = index
 				break
 			}
 			return nil
@@ -1051,12 +1080,11 @@ func (p *Preparer) appendText(
 	} else {
 		value.Insert = sessionv3Runtime.TextDispatchInsertInstructions
 	}
-	for index := range output.Texts {
-		if output.Texts[index].Artifact.RootID == pin.RootID &&
-			output.Texts[index].Artifact.ArtifactID == pin.ArtifactID {
-			output.Texts[index] = value
-			return nil
-		}
+	if replaceIndex >= 0 {
+		output.Texts[replaceIndex] = value
+		replaceContributionOrder(output, sessionv3Runtime.PreparedContributionKindText,
+			sessionv3Runtime.PreparedContributionKey(sessionv3Runtime.PreparedContributionKindText, pin), owner)
+		return nil
 	}
 	output.Texts = append(output.Texts, value)
 	appendContributionOrder(
@@ -1102,6 +1130,15 @@ func appendPreparedTool(
 	for _, current := range output.Tools {
 		if current.Artifact.RootID == pin.RootID &&
 			current.Artifact.ArtifactID == pin.ArtifactID {
+			if contributionOwnerRank(owner) > contributionOwnerRank(current.Owner) {
+				replaceOrAppendPreparedTool(
+					output,
+					pin,
+					userArguments,
+					autoExecute,
+					owner,
+				)
+			}
 			return
 		}
 	}
@@ -1148,6 +1185,12 @@ func replaceOrAppendPreparedTool(
 				AutoExecute:   automatic,
 				Owner:         owner,
 			}
+			replaceContributionOrder(
+				output,
+				sessionv3Runtime.PreparedContributionKindTool,
+				sessionv3Runtime.PreparedContributionKey(sessionv3Runtime.PreparedContributionKindTool, pin),
+				owner,
+			)
 			return
 		}
 	}
@@ -1166,6 +1209,12 @@ func appendPreparedSkill(
 	for _, current := range output.Skills {
 		if current.Artifact.RootID == pin.RootID &&
 			current.Artifact.ArtifactID == pin.ArtifactID {
+			if contributionOwnerRank(owner) > contributionOwnerRank(current.Owner) {
+				enableOrAppendPreparedSkill(output, pin, owner)
+				output.Skills[len(output.Skills)-1].Instructions = instructions
+				output.Skills[len(output.Skills)-1].InstructionContent = instructionContent
+				output.Skills[len(output.Skills)-1].Active = active
+			}
 			return
 		}
 	}
@@ -1194,12 +1243,20 @@ func enableOrAppendPreparedSkill(
 	owner sessionv3Runtime.ConfigurationOwner,
 ) {
 	for index := range output.Skills {
-		if output.Skills[index].Artifact.RootID == pin.RootID &&
-			output.Skills[index].Artifact.ArtifactID == pin.ArtifactID {
-			output.Skills[index].Artifact = pin
-			output.Skills[index].Enabled = true
-			return
+		if output.Skills[index].Artifact.RootID != pin.RootID ||
+			output.Skills[index].Artifact.ArtifactID != pin.ArtifactID {
+			continue
 		}
+		output.Skills[index].Artifact = pin
+		output.Skills[index].Enabled = true
+		output.Skills[index].Owner = owner
+		replaceContributionOrder(
+			output,
+			sessionv3Runtime.PreparedContributionKindSkill,
+			sessionv3Runtime.PreparedContributionKey(sessionv3Runtime.PreparedContributionKindSkill, pin),
+			owner,
+		)
+		return
 	}
 	appendPreparedSkill(output, pin, true, false, false, "", owner)
 }
@@ -1227,10 +1284,15 @@ func (p *Preparer) appendMCP(
 	selection sessionv3Runtime.MCPServerSelection,
 	owner sessionv3Runtime.ConfigurationOwner,
 ) error {
-	for _, current := range output.MCP {
+	replaceIndex := -1
+	for index, current := range output.MCP {
 		if current.Server.RootID == pin.RootID &&
 			current.Server.ArtifactID == pin.ArtifactID {
-			return nil
+			if contributionOwnerRank(owner) <= contributionOwnerRank(current.Owner) {
+				return nil
+			}
+			replaceIndex = index
+			break
 		}
 	}
 	if p == nil || p.mcpPreparer == nil {
@@ -1245,7 +1307,17 @@ func (p *Preparer) appendMCP(
 	if err != nil {
 		return err
 	}
-	output.MCP = append(output.MCP, prepared)
+	if replaceIndex >= 0 {
+		output.MCP[replaceIndex] = prepared
+		replaceContributionOrder(
+			output,
+			sessionv3Runtime.PreparedContributionKindMCP,
+			sessionv3Runtime.PreparedContributionKey(sessionv3Runtime.PreparedContributionKindMCP, pin),
+			owner,
+		)
+	} else {
+		output.MCP = append(output.MCP, prepared)
+	}
 	appendContributionOrder(
 		output,
 		sessionv3Runtime.PreparedContributionKindMCP,
@@ -1256,6 +1328,44 @@ func (p *Preparer) appendMCP(
 		owner,
 	)
 	return nil
+}
+
+func contributionOwnerRank(value sessionv3Runtime.ConfigurationOwner) int {
+	switch value {
+	case sessionv3Runtime.ConfigurationOwnerInvocation:
+		return 5
+	case sessionv3Runtime.ConfigurationOwnerSession:
+		return 4
+	case sessionv3Runtime.ConfigurationOwnerWorkspace:
+		return 3
+	case sessionv3Runtime.ConfigurationOwnerAgent:
+		return 2
+	case sessionv3Runtime.ConfigurationOwnerModel:
+		return 1
+	default:
+		return 0
+	}
+}
+
+func replaceContributionOrder(
+	output *sessionv3Runtime.PreparedContributionPlan,
+	kind sessionv3Runtime.PreparedContributionKind,
+	key string,
+	owner sessionv3Runtime.ConfigurationOwner,
+) {
+	for index := range output.ContributionOrder {
+		if output.ContributionOrder[index].Kind != kind ||
+			output.ContributionOrder[index].Key != key {
+			continue
+		}
+		output.ContributionOrder = append(
+			output.ContributionOrder[:index],
+			output.ContributionOrder[index+1:]...,
+		)
+		break
+	}
+	output.ContributionOrder = append(output.ContributionOrder,
+		sessionv3Runtime.PreparedContributionOrder{Kind: kind, Key: key, Owner: owner})
 }
 
 func appendContributionOrder(
@@ -1272,14 +1382,62 @@ func appendContributionOrder(
 			return
 		}
 	}
-	output.ContributionOrder = append(
-		output.ContributionOrder,
-		sessionv3Runtime.PreparedContributionOrder{
-			Kind:  kind,
-			Key:   key,
-			Owner: owner,
-		},
-	)
+	replaceContributionOrder(output, kind, key, owner)
+}
+
+func preparedAgentOccurrenceExcluded(
+	occurrence agentAPI.AgentCapabilityOccurrence,
+	policies sessionv3Runtime.SessionCollectionPolicies,
+) bool {
+	if occurrence.Target == nil ||
+		occurrence.Target.Form != composition.TargetFormArtifact ||
+		occurrence.Target.Artifact == nil {
+		return false
+	}
+	rootID := string(occurrence.Target.Artifact.RootID)
+	artifactID := string(occurrence.Target.Artifact.ArtifactID)
+	switch occurrence.Type {
+	case declaration.TypeText:
+		return policies.SystemInstructions.Mode == sessionv3Runtime.CollectionOverrideReplace ||
+			policies.InstructionArtifacts.Mode == sessionv3Runtime.CollectionOverrideReplace ||
+			isArtifactRemoved(
+				policies.SystemInstructions,
+				sessionv3Runtime.PreparedContributionKindText,
+				rootID,
+				artifactID,
+			) ||
+			isArtifactRemoved(
+				policies.InstructionArtifacts,
+				sessionv3Runtime.PreparedContributionKindText,
+				rootID,
+				artifactID,
+			)
+	case declaration.TypeTool:
+		return policies.ToolSelections.Mode == sessionv3Runtime.CollectionOverrideReplace ||
+			isArtifactRemoved(
+				policies.ToolSelections,
+				sessionv3Runtime.PreparedContributionKindTool,
+				rootID,
+				artifactID,
+			)
+	case declaration.TypeSkill:
+		if occurrence.SkillUseMode == agentAPI.AgentSkillUseModeInstructions {
+			return policies.SystemInstructions.Mode == sessionv3Runtime.CollectionOverrideReplace ||
+				isArtifactRemoved(
+					policies.SystemInstructions,
+					sessionv3Runtime.PreparedContributionKindSkill,
+					rootID,
+					artifactID,
+				)
+		}
+		return policies.Skills.Mode == sessionv3Runtime.CollectionOverrideReplace ||
+			isArtifactRemoved(policies.Skills, sessionv3Runtime.PreparedContributionKindSkill, rootID, artifactID)
+	case declaration.TypeMCP:
+		return policies.MCP.Mode == sessionv3Runtime.CollectionOverrideReplace ||
+			isArtifactRemoved(policies.MCP, sessionv3Runtime.PreparedContributionKindMCP, rootID, artifactID)
+	default:
+		return false
+	}
 }
 
 func capabilitySelections(

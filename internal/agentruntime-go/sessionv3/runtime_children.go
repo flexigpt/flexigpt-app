@@ -136,8 +136,14 @@ func childFrameDeadlineInputs(
 	intent ProgramFrameIntent,
 ) (parentDeadline, intentDeadline *time.Time) {
 	if workflowFrameIntentRunsCleanup(intent) &&
-		execution.Cleanup.Active {
-		return cloneTime(execution.Cleanup.Deadline), nil
+		execution.Cleanup.Active &&
+		execution.Cleanup.Deadline != nil {
+		if intent.Deadline != nil &&
+			execution.Cleanup.StartedAt != nil &&
+			intent.Deadline.Before(*execution.Cleanup.StartedAt) {
+			intent.Deadline = nil
+		}
+		return cloneTime(execution.Cleanup.Deadline), cloneTime(intent.Deadline)
 	}
 	return cloneTime(parent.Deadline), cloneTime(intent.Deadline)
 }

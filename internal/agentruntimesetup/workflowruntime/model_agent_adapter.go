@@ -9,6 +9,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/agentruntimesetup/modelruntime"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	agentAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/agent"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/composition"
+	"github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/core/declaration"
 	textAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/text"
 	workspaceAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/workspace"
 )
@@ -24,6 +26,8 @@ const (
 // domain request contract.
 type ModelAgentInvocationAdapter struct {
 	models        *modelruntime.SourceResolver
+	agents        *agentAPI.Service
+	artifacts     artifact.API
 	contributions *contributionruntime.Preparer
 }
 
@@ -76,6 +80,8 @@ func NewModelAgentInvocationAdapter(
 	}
 	return &ModelAgentInvocationAdapter{
 		models:        models,
+		agents:        agents,
+		artifacts:     artifacts,
 		contributions: contributions,
 	}, nil
 }
@@ -160,19 +166,51 @@ func (a *ModelAgentInvocationAdapter) ResolveWorkflowAgentOwnerModel(
 	ctx context.Context,
 	pin sessionv3Runtime.ArtifactPin,
 ) (sessionv3Runtime.ArtifactPin, error) {
-	invocation, err := a.PrepareWorkflowAgentInvocation(ctx, pin)
+	if a == nil || a.agents == nil || a.artifacts == nil {
+		return sessionv3Runtime.ArtifactPin{}, errors.New(
+			"workflow agent owner model resolver is unavailable",
+		)
+	}
+	ref := contributionruntime.ArtifactRefForPin(pin)
+	resolved, err := a.agents.ResolveAgent(ctx, ref)
 	if err != nil {
 		return sessionv3Runtime.ArtifactPin{}, err
 	}
-	if invocation.Model == nil {
+	if resolved.Agent.Ref != ref ||
+		resolved.Agent.Revision != pin.Revision ||
+		string(resolved.Agent.DefinitionDigest) != pin.Digest {
 		return sessionv3Runtime.ArtifactPin{}, errors.New(
-			"workflow agent target has no prepared model contribution",
+			"workflow agent changed during owner model resolution",
 		)
 	}
-	if err := a.AdmitWorkflowModelTarget(ctx, *invocation.Model); err != nil {
-		return sessionv3Runtime.ArtifactPin{}, err
+	for _, occurrence := range resolved.Capabilities.Occurrences {
+		if occurrence.Type != declaration.TypeModel {
+			continue
+		}
+		if occurrence.Status != composition.ResolutionAvailable ||
+			occurrence.Target == nil ||
+			occurrence.Target.Form != composition.TargetFormArtifact ||
+			occurrence.Target.Artifact == nil {
+			if occurrence.Required {
+				return sessionv3Runtime.ArtifactPin{}, errors.New(
+					"workflow agent required model contribution is unavailable",
+				)
+			}
+			continue
+		}
+		model, pinErr := contributionruntime.PinArtifactRef(
+			ctx,
+			a.artifacts,
+			*occurrence.Target.Artifact,
+		)
+		if pinErr != nil {
+			return sessionv3Runtime.ArtifactPin{}, pinErr
+		}
+		return model, nil
 	}
-	return *invocation.Model, nil
+	return sessionv3Runtime.ArtifactPin{}, errors.New(
+		"workflow agent target has no selected model capability",
+	)
 }
 
 func (a *ModelAgentInvocationAdapter) PrepareWorkflowModelInvocation(
@@ -190,17 +228,24 @@ func (a *ModelAgentInvocationAdapter) PrepareWorkflowModelCallInvocation(
 	if err := a.AdmitWorkflowModelTarget(ctx, model); err != nil {
 		return sessionv3Runtime.WorkflowPreparedInvocation{}, err
 	}
-
-	value := sessionv3Runtime.WorkflowPreparedInvocation{
-		Model:           &model,
-		OwnerProvenance: sessionv3Runtime.ConfigurationOwnerModel,
-		ContributionOrder: []sessionv3Runtime.PreparedContributionOrder{{
-			Kind:  sessionv3Runtime.PreparedContributionKindModel,
-			Key:   sessionv3Runtime.PreparedContributionKey(sessionv3Runtime.PreparedContributionKindModel, model),
-			Owner: sessionv3Runtime.ConfigurationOwnerModel,
-		}},
+	selection := model.Selection()
+	value, err := a.contributions.Prepare(
+		ctx,
+		contributionruntime.Request{
+			Model:            &selection,
+			DefaultsOverride: defaults,
+			SpecificOwner:    sessionv3Runtime.ConfigurationOwnerInvocation,
+		},
+	)
+	if err != nil {
+		return sessionv3Runtime.WorkflowPreparedInvocation{}, err
 	}
-	return value, value.Validate()
+	if value.Model == nil || *value.Model != model {
+		return sessionv3Runtime.WorkflowPreparedInvocation{}, errors.New(
+			"workflow model contribution facts differ from the selected model",
+		)
+	}
+	return value, nil
 }
 
 func (a *ModelAgentInvocationAdapter) PrepareWorkflowAgentInvocation(

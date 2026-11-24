@@ -220,17 +220,9 @@ func (a *Admission) prepareBoundTarget(
 				targetPlan.Name,
 			)
 		}
-		invocation, err := a.invocations.PrepareWorkflowModelInvocation(
-			ctx,
-			*target.Artifact,
-		)
-		if err != nil {
-			return sessionv3Runtime.WorkflowTarget{}, err
-		}
 		target.Transport = invocationTransport(
 			a.invocations.ModelInvocationCapabilities(),
 		)
-		target.Invocation = &invocation
 
 	case sessionv3Runtime.WorkflowTargetAgent:
 		if a.invocations == nil || target.Artifact == nil {
@@ -240,17 +232,10 @@ func (a *Admission) prepareBoundTarget(
 				targetPlan.Name,
 			)
 		}
-		invocation, err := a.invocations.PrepareWorkflowAgentInvocation(
-			ctx,
-			*target.Artifact,
-		)
-		if err != nil {
-			return sessionv3Runtime.WorkflowTarget{}, err
-		}
+
 		target.Transport = invocationTransport(
 			a.invocations.AgentInvocationCapabilities(),
 		)
-		target.Invocation = &invocation
 
 	case sessionv3Runtime.WorkflowTargetTool,
 		sessionv3Runtime.WorkflowTargetMCPTool:
@@ -265,17 +250,9 @@ func (a *Admission) prepareBoundTarget(
 				targetPlan.Name,
 			)
 		}
-		invocation, err := a.invocations.PrepareWorkflowModelInvocation(
-			ctx,
-			target.ProviderTool.OwnerModel,
-		)
-		if err != nil {
-			return sessionv3Runtime.WorkflowTarget{}, err
-		}
 		target.Transport = invocationTransport(
 			a.invocations.ModelInvocationCapabilities(),
 		)
-		target.Invocation = &invocation
 
 	case sessionv3Runtime.WorkflowTargetService:
 		binding, found := a.bindings.Service(target.ServiceID)
@@ -288,6 +265,11 @@ func (a *Admission) prepareBoundTarget(
 			)
 		}
 		target.KeyedCapable = target.KeyedCapable && workbinding.SupportsNativeIdempotencyKeying(binding)
+		if target.KeyedCapable {
+			target.Effect.Kind = sessionv3Runtime.EffectKindNonIdempotent
+			target.Effect.IdempotencyKey = ""
+			target.Effect.KeyedNative = false
+		}
 		target.Transport = externalBindingTransport(binding)
 
 	case sessionv3Runtime.WorkflowTargetActivity:
@@ -301,6 +283,11 @@ func (a *Admission) prepareBoundTarget(
 			)
 		}
 		target.KeyedCapable = target.KeyedCapable && workbinding.SupportsNativeIdempotencyKeying(binding)
+		if target.KeyedCapable {
+			target.Effect.Kind = sessionv3Runtime.EffectKindNonIdempotent
+			target.Effect.IdempotencyKey = ""
+			target.Effect.KeyedNative = false
+		}
 		target.Transport = externalBindingTransport(binding)
 
 	case sessionv3Runtime.WorkflowTargetWorkflow:

@@ -392,7 +392,7 @@ func (e *V3Executor) ExecuteGo(
 			},
 		}
 		if v3GoConversationSource(payload.Call.Source) && ctx.Err() == nil {
-			effect := sessionv3Runtime.EffectStateConfirmedNotApplied
+			effect := sessionv3Runtime.EffectStateUncertain
 			return sessionv3Runtime.WorkExecutionResult{
 				Output:      errorOutput,
 				Confirmed:   true,
@@ -400,25 +400,21 @@ func (e *V3Executor) ExecuteGo(
 			}, nil
 		}
 		if effectKind == sessionv3Runtime.EffectKindRead && ctx.Err() == nil {
+			effect := sessionv3Runtime.EffectStateNotApplicable
 			return sessionv3Runtime.WorkExecutionResult{
-				Output: errorOutput,
-				Error: &sessionv3Runtime.SanitizedError{
-					Code:     goToolFailedCode,
-					Category: sessionv3Runtime.ErrorCategoryExecution,
-					Message:  strings.ToLower(invokeErr.Error()),
-				},
-				Confirmed: true,
+				Output:      errorOutput,
+				Confirmed:   true,
+				EffectState: &effect,
 			}, nil
 		}
 		effect := sessionv3Runtime.EffectStateUncertain
 		return sessionv3Runtime.WorkExecutionResult{
 			Output: errorOutput,
-			Error: &sessionv3Runtime.SanitizedError{
-				Code:     goToolFailedCode,
-				Category: sessionv3Runtime.ErrorCategoryUncertainty,
-				Effect:   effect,
-				Message:  strings.ToLower(invokeErr.Error()),
-			},
+			Error: sessionv3Runtime.ClassifyDomainError(
+				invokeErr,
+				goToolFailedCode,
+				sessionv3Runtime.ErrorCategoryUncertainty,
+			),
 			Confirmed:   false,
 			EffectState: &effect,
 		}, nil

@@ -38,6 +38,7 @@ type CleanupState struct {
 	Active    bool            `json:"active"`
 	StartedAt *time.Time      `json:"startedAt,omitempty"`
 	Deadline  *time.Time      `json:"deadline,omitempty"`
+	Stopping  bool            `json:"stopping,omitempty"`
 	Expired   bool            `json:"expired,omitempty"`
 	Primary   *SanitizedError `json:"primary,omitempty"`
 }
@@ -65,7 +66,7 @@ func (u ExecutionBudgetUsage) Validate() error {
 func (c CleanupState) Validate() error {
 	if !c.Active {
 		if c.StartedAt != nil || c.Deadline != nil ||
-			c.Expired || c.Primary != nil {
+			c.Stopping || c.Expired || c.Primary != nil {
 			return errors.New("inactive cleanup state has durable facts")
 		}
 		return nil
@@ -305,14 +306,15 @@ func (r *Runtime) checkDispatchBudgetLocked(
 		}
 	}
 	if execution.Cleanup.Active {
-		if !item.Cleanup {
+		if execution.Cleanup.Stopping && !item.Cleanup {
 			return &SanitizedError{
 				Code:     budgetErrorCode,
 				Category: ErrorCategoryCancellation,
 				Message:  "normal work is not allowed during cleanup",
 			}
 		}
-		if execution.Cleanup.Deadline != nil &&
+		if item.Cleanup &&
+			execution.Cleanup.Deadline != nil &&
 			!r.now().Before(execution.Cleanup.Deadline.UTC()) {
 			return &SanitizedError{
 				Code:     budgetCleanupExpiredErrorCode,
@@ -445,6 +447,21 @@ func (r *Runtime) reserveActivityBudgetLocked(
 	)
 }
 
+func (r *Runtime) appendBudgetedActivityLocked(
+	session *Session,
+	execution *Execution,
+	activity Activity,
+) error {
+	if session == nil || execution == nil {
+		return errors.New("activity budget owner is unavailable")
+	}
+	if err := r.reserveActivityBudgetLocked(execution, activity); err != nil {
+		return err
+	}
+	session.Timeline = append(session.Timeline, activity)
+	return nil
+}
+
 func activityBudgetBytes(activity Activity) (int, error) {
 	raw, err := json.Marshal(activity)
 	if err != nil {
@@ -543,6 +560,20 @@ func (r *Runtime) beginCleanupLocked(
 	r.rebaseCleanupDeadlinesLocked(execution)
 }
 
+// beginStoppingCleanupLocked is reserved for whole-Execution cancellation and
+// deadline shutdown. Reconciliation and inner-scope cleanup remain resumable
+// when the enclosing Execution is not stopping.
+func (r *Runtime) beginStoppingCleanupLocked(
+	execution *Execution,
+	primary *SanitizedError,
+) {
+	if execution == nil {
+		return
+	}
+	execution.Cleanup.Stopping = true
+	r.beginCleanupLocked(execution, primary)
+}
+
 func (r *Runtime) rebaseCleanupDeadlinesLocked(
 	execution *Execution,
 ) {
@@ -569,13 +600,31 @@ func (r *Runtime) cleanupDispatchAllowedLocked(
 	if !execution.Cleanup.Active {
 		return !execution.Controls.CancellationRequested
 	}
-	if !item.Cleanup {
+	if execution.Cleanup.Expired {
 		return false
 	}
-	if execution.Cleanup.Deadline == nil {
+	if item.Cleanup &&
+		execution.Cleanup.Deadline != nil &&
+		!r.now().Before(execution.Cleanup.Deadline.UTC()) {
 		return false
 	}
-	return r.now().Before(execution.Cleanup.Deadline.UTC())
+	if !execution.Cleanup.Stopping {
+		return true
+	}
+	return item.Cleanup
+}
+
+func (r *Runtime) cleanupOperationDeadlineLocked(
+	execution Execution,
+	candidate *time.Time,
+) *time.Time {
+	if !execution.Cleanup.Active {
+		return cloneTime(candidate)
+	}
+	if candidate != nil && !r.now().Before(candidate.UTC()) {
+		candidate = nil
+	}
+	return earlierDeadline(candidate, execution.Cleanup.Deadline)
 }
 
 func (r *Runtime) armExecutionDeadlineLocked(
@@ -726,7 +775,7 @@ func (r *Runtime) expireExecutionCleanupLocked(
 		return
 	}
 	if !execution.Cleanup.Active {
-		r.beginCleanupLocked(execution, expired)
+		r.beginStoppingCleanupLocked(execution, expired)
 	}
 	execution.Cleanup.Expired = true
 	execution.Cleanup.Primary = appendCleanupCause(
@@ -904,6 +953,20 @@ func hasOutstandingCleanup(execution Execution) bool {
 	return false
 }
 
+func (r *Runtime) finishResumableCleanupLocked(
+	execution *Execution,
+) bool {
+	if execution == nil ||
+		!execution.Cleanup.Active ||
+		execution.Cleanup.Stopping ||
+		hasOutstandingCleanup(*execution) {
+		return false
+	}
+	r.cancelCleanupDeadlineLocked(execution.ID)
+	execution.Cleanup = CleanupState{}
+	return true
+}
+
 func (r *Runtime) waitForExecutionDeadline(
 	ctx context.Context,
 	persistContext context.Context,
@@ -942,7 +1005,7 @@ func (r *Runtime) waitForExecutionDeadline(
 		Category: ErrorCategoryTimeout,
 		Message:  executionDeadlineElapsedMessage,
 	}
-	r.beginCleanupLocked(execution, primary)
+	r.beginStoppingCleanupLocked(execution, primary)
 	r.cancelOwnedChildExecutionsLocked(
 		persistContext,
 		session,

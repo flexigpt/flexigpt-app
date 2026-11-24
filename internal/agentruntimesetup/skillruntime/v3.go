@@ -319,7 +319,7 @@ func (e *V3Executor) Execute(
 			if stateErr != nil {
 				activeState = cloneV3SkillState(runtimeSession.state)
 			}
-			effect := sessionv3Runtime.EffectStateConfirmedNotApplied
+			effect := sessionv3Runtime.EffectStateUncertain
 			return sessionv3Runtime.WorkExecutionResult{
 				Output:      v3SkillToolErrorOutput(err.Error(), &activeState),
 				Confirmed:   true,
@@ -328,12 +328,9 @@ func (e *V3Executor) Execute(
 		}
 		effect := sessionv3Runtime.EffectStateUncertain
 		return sessionv3Runtime.WorkExecutionResult{
-			Error: &sessionv3Runtime.SanitizedError{
-				Code:     v3SkillFailedCode,
-				Category: sessionv3Runtime.ErrorCategoryUncertainty,
-				Effect:   effect,
-				Message:  strings.ToLower(err.Error()),
-			},
+			Error: sessionv3Runtime.ClassifyDomainError(
+				err, v3SkillFailedCode, sessionv3Runtime.ErrorCategoryUncertainty,
+			),
 			Confirmed:   false,
 			EffectState: &effect,
 		}, true, nil
@@ -409,7 +406,7 @@ func (e *V3Executor) Execute(
 		return result, true, nil
 	}
 	if v3SkillConversationSource(payload.Call.Source) && ctx.Err() == nil {
-		effect := sessionv3Runtime.EffectStateConfirmedNotApplied
+		effect := sessionv3Runtime.EffectStateUncertain
 		result.Confirmed = true
 		result.EffectState = &effect
 		return result, true, nil
@@ -429,12 +426,7 @@ func (e *V3Executor) Execute(
 	effect := sessionv3Runtime.EffectStateConfirmedNotApplied
 	result.Confirmed = true
 	result.EffectState = &effect
-	result.Error = &sessionv3Runtime.SanitizedError{
-		Code:     v3SkillToolErrorCode,
-		Category: sessionv3Runtime.ErrorCategoryExecution,
-		Effect:   effect,
-		Message:  strings.ToLower(errorText),
-	}
+	result.Error = nil
 	return result, true, nil
 }
 

@@ -202,6 +202,7 @@ func (r *Runtime) resumeRestoredWork(ctx context.Context) {
 				execution.ID,
 				*execution,
 			)
+			r.resumeAcceptedWaitResolutionsLocked(ctx, session, execution)
 		}
 	}
 }
@@ -422,6 +423,7 @@ func (r *Runtime) settleUndispatchedWorkLocked(
 	}
 	delete(r.privateBindings, item.ID)
 	r.cancelRetryLocked(item.ID)
+	r.cancelWaitResolutionLocked(item.WaitID)
 	r.cancelResourceWaitLocked(item.ID)
 
 	if item.WaitID != "" {

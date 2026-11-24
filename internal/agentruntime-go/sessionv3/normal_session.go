@@ -721,7 +721,6 @@ func (r *Runtime) consumeContinuationLocked(
 	execution *Execution,
 ) ([]ActivityID, bool, error) {
 	if session == nil || execution == nil ||
-		!isNormalConversationExecution(*execution) ||
 		!hasContinuationInput(execution.Continuation) {
 		return nil, false, nil
 	}
@@ -733,31 +732,31 @@ func (r *Runtime) consumeContinuationLocked(
 		Metadata:         staged.Metadata.Clone(),
 		InvocationBudget: cloneBudget(staged.InvocationBudget),
 	}
+	appContext, appSources := stagedConversationAppContextLocked(
+		session,
+		*execution,
+	)
 	frame := activeConversationAgentFrame(execution)
+	if frame == nil {
+		frame = liveConversationAgentFrame(session, *execution)
+	}
+	if frame == nil {
+		return nil, false, errors.New(errConversationFrameUnavailable)
+	}
 	var (
 		activity Activity
 		err      error
 	)
-	if frame != nil {
-		activity, err = r.submitNormalMessageToFrameWithDefaultsLocked(
-			session,
-			execution,
-			frame,
-			input,
-			nil,
-			staged.InvocationDefaults,
-			staged.AppContext,
-		)
-	} else {
-		activity, err = r.submitNormalMessageWithDefaultsLocked(
-			session,
-			execution,
-			input,
-			nil,
-			staged.InvocationDefaults,
-			staged.AppContext,
-		)
-	}
+
+	activity, err = r.submitNormalMessageToFrameWithDefaultsLocked(
+		session,
+		execution,
+		frame,
+		input,
+		nil,
+		staged.InvocationDefaults,
+		appContext,
+	)
 	if err != nil {
 		return nil, false, err
 	}
@@ -774,6 +773,7 @@ func (r *Runtime) consumeContinuationLocked(
 	execution.Continuation.InvocationDefaults = nil
 	execution.Continuation.InvocationBudget = nil
 	execution.Continuation.UpdatedAt = r.now()
+	clearConsumedAppContextLocked(session, execution.ID, appSources)
 	r.touchExecutionLocked(session, execution)
 	return []ActivityID{activity.ID}, true, nil
 }
@@ -1269,6 +1269,65 @@ func readyCurrentBatchToolIDs(
 	return uniqueNormalWorkItemIDs(output)
 }
 
+// normalToolBatchDispatchAllowed keeps automatic Agent-loop Tool batches
+// sequential. Explicitly requested work uses the same durable batch order,
+// but only selected Tool WorkItems participate.
+func normalToolBatchDispatchAllowed(
+	execution Execution,
+	item WorkItem,
+) bool {
+	if item.Type != WorkItemTypeTool {
+		return true
+	}
+	frame := mutableFrame(&execution, item.FrameID)
+	if frame == nil ||
+		frame.Program.InterpreterID != BuiltinAgentLoopInterpreterID {
+		return true
+	}
+	var state agentLoopProgramState
+	if json.Unmarshal(frame.State.Data, &state) != nil ||
+		len(state.PendingToolIDs) == 0 {
+		return true
+	}
+
+	requested := false
+	for _, id := range state.PendingToolIDs {
+		candidate := executionWorkItem(execution, id)
+		if candidate != nil && candidate.Requested && !candidate.State.Terminal() {
+			requested = true
+			break
+		}
+	}
+	for _, id := range state.PendingToolIDs {
+		candidate := executionWorkItem(execution, id)
+		if candidate == nil || candidate.State.Terminal() {
+			if !requested &&
+				candidate != nil &&
+				(candidate.Output == nil ||
+					candidate.Output.Tool == nil ||
+					candidate.Output.Tool.Kind != ToolOutputKindSuccess) {
+				return false
+			}
+			continue
+		}
+		if requested {
+			if !candidate.Requested {
+				continue
+			}
+			return candidate.ID == item.ID
+		}
+		if !candidate.Automatic ||
+			automationHoldApplies(
+				execution.Controls.AutomaticTools,
+				candidate.OriginWorkItemID,
+			) {
+			return false
+		}
+		return candidate.ID == item.ID
+	}
+	return false
+}
+
 func isNormalConversationExecution(execution Execution) bool {
 	return normalConversationFrame(&execution) != nil
 }
@@ -1411,6 +1470,66 @@ func manualToolRetryAllowed(item WorkItem) bool {
 		return true
 	}
 	return item.EffectState == EffectStateConfirmedNotApplied
+}
+
+type stagedAppContextSource struct {
+	ExecutionID ExecutionID
+	Revision    Revision
+}
+
+func stagedConversationAppContextLocked(
+	session *Session,
+	owner Execution,
+) ([]AppContextUpdate, []stagedAppContextSource) {
+	if session == nil {
+		return nil, nil
+	}
+	values := make([]AppContextUpdate, 0)
+	sources := make([]stagedAppContextSource, 0)
+	seen := make(map[string]struct{})
+	for _, execution := range session.Executions {
+		if execution.Continuation.Revision <= execution.Continuation.ConsumedRevision ||
+			len(execution.Continuation.AppContext) == 0 {
+			continue
+		}
+		for _, update := range execution.Continuation.AppContext {
+			key := string(jsonutil.MustCanonicalValue(update))
+			if _, duplicate := seen[key]; duplicate {
+				continue
+			}
+			seen[key] = struct{}{}
+			values = append(values, cloneAppContextUpdate(update))
+		}
+		sources = append(sources, stagedAppContextSource{
+			ExecutionID: execution.ID,
+			Revision:    execution.Continuation.Revision,
+		})
+	}
+	return values, sources
+}
+
+func clearConsumedAppContextLocked(
+	session *Session,
+	owner ExecutionID,
+	sources []stagedAppContextSource,
+) {
+	if session == nil {
+		return
+	}
+	for _, source := range sources {
+		execution := mutableSessionExecution(session, source.ExecutionID)
+		if execution == nil ||
+			execution.Continuation.Revision != source.Revision {
+			continue
+		}
+		execution.Continuation.AppContext = nil
+		execution.Continuation.UpdatedAt = time.Now().UTC()
+		if execution.ID != owner &&
+			strings.TrimSpace(execution.Continuation.Text) == "" &&
+			len(execution.Continuation.Attachments) == 0 {
+			execution.Continuation.ConsumedRevision = execution.Continuation.Revision
+		}
+	}
 }
 
 func undispatchedEffectState(effect EffectContract) EffectState {

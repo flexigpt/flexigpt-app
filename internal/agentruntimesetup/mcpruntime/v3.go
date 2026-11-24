@@ -753,25 +753,28 @@ func (e *V3Executor) Execute(
 
 	response, err := e.bridge.InvokeMapped(ctx, mapping, invokeRequest)
 	if err != nil {
+		output := v3MCPToolErrorOutput(firstNonBlank(
+			err.Error(),
+			defaultMCPToolErrorMessage,
+		))
 		if request.WorkItem.Effect.Kind == sessionv3Runtime.EffectKindRead {
+			effect := sessionv3Runtime.EffectStateNotApplicable
 			return sessionv3Runtime.WorkExecutionResult{
-				Error: &sessionv3Runtime.SanitizedError{
-					Code:     mcpFailedCode,
-					Category: sessionv3Runtime.ErrorCategoryExecution,
-					Message:  strings.ToLower(err.Error()),
-				},
-				Confirmed: ctx.Err() == nil,
+				Output:      output,
+				Confirmed:   ctx.Err() == nil,
+				EffectState: &effect,
 			}, true, nil
 		}
 		effect := sessionv3Runtime.EffectStateUncertain
 		return sessionv3Runtime.WorkExecutionResult{
-			Error: &sessionv3Runtime.SanitizedError{
-				Code:     mcpFailedCode,
-				Category: sessionv3Runtime.ErrorCategoryUncertainty,
-				Effect:   effect,
-				Message:  strings.ToLower(err.Error()),
-			},
-			Confirmed:   false,
+			Output: output,
+			Error: sessionv3Runtime.ClassifyDomainError(
+				err,
+				mcpFailedCode,
+				sessionv3Runtime.ErrorCategoryUncertainty,
+			),
+			Confirmed: ctx.Err() == nil &&
+				request.WorkItem.Effect.Kind != sessionv3Runtime.EffectKindRead,
 			EffectState: &effect,
 		}, true, nil
 	}
@@ -853,15 +856,15 @@ func (e *V3Executor) Execute(
 		return result, true, nil
 	}
 
-	effect := sessionv3Runtime.EffectStateUncertain
-	result.Confirmed = false
-	result.EffectState = &effect
-	result.Error = &sessionv3Runtime.SanitizedError{
-		Code:     "mcp_tool_error",
-		Category: sessionv3Runtime.ErrorCategoryUncertainty,
-		Effect:   effect,
-		Message:  errorText,
+	if request.WorkItem.Effect.Kind == sessionv3Runtime.EffectKindRead {
+		effect := sessionv3Runtime.EffectStateNotApplicable
+		result.EffectState = &effect
+		return result, true, nil
 	}
+	effect := sessionv3Runtime.EffectStateUncertain
+	result.Confirmed = true
+	result.EffectState = &effect
+	result.Error = nil
 	return result, true, nil
 }
 

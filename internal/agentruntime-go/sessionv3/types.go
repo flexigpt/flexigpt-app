@@ -440,10 +440,16 @@ type AppContextUpdate struct {
 	StructuredContentLabel string `json:"structuredContentLabel,omitempty"`
 }
 
+type ActionKind string
+
+const (
+	ActionKindTool ActionKind = "tool"
+)
+
 type ActionActivity struct {
 	Title      string                  `json:"title"`
 	Summary    string                  `json:"summary,omitempty"`
-	ActionKind string                  `json:"actionKind,omitempty"`
+	ActionKind ActionKind              `json:"actionKind,omitempty"`
 	Outcome    string                  `json:"outcome,omitempty"`
 	Output     jsonutil.CanonicalValue `json:"output,omitempty"`
 	Error      *SanitizedError         `json:"error,omitempty"`
@@ -536,6 +542,7 @@ type ExecutionBudgetCost struct {
 type ExecutionBudgetScope struct {
 	ID           string               `json:"id"`
 	OwnerFrameID ProgramFrameID       `json:"ownerFrameID"`
+	ParentID     string               `json:"parentID,omitempty"`
 	Budget       ExecutionBudget      `json:"budget"`
 	Usage        ExecutionBudgetUsage `json:"usage"`
 }
@@ -1577,6 +1584,20 @@ const (
 	WaitResolutionSignal        WaitResolution = "signal"
 )
 
+// WaitResolutionIntent is the accepted durable command meaning. It remains
+// attached to its Wait until the owner settles the requested resolution.
+type WaitResolutionIntent struct {
+	Meta        CommandMeta             `json:"meta"`
+	SessionID   SessionID               `json:"sessionID"`
+	ExecutionID ExecutionID             `json:"executionID"`
+	WaitID      WaitID                  `json:"waitID"`
+	Resolution  WaitResolution          `json:"resolution"`
+	Response    jsonutil.CanonicalValue `json:"response,omitempty"`
+	Actor       *HumanActor             `json:"actor,omitempty"`
+	Receipt     CommandReceipt          `json:"receipt"`
+	RequestedAt time.Time               `json:"requestedAt"`
+}
+
 type WaitRequest struct {
 	Kind               WaitKind                `json:"kind"`
 	Summary            jsonutil.CanonicalValue `json:"summary,omitempty"`
@@ -1610,16 +1631,17 @@ type WaitAssignees struct {
 }
 
 type Wait struct {
-	ID         WaitID                  `json:"id"`
-	WorkItemID WorkItemID              `json:"workItemID"`
-	Status     WaitStatus              `json:"status"`
-	Request    WaitRequest             `json:"request"`
-	Resolution WaitResolution          `json:"resolution,omitempty"`
-	Response   jsonutil.CanonicalValue `json:"response,omitempty"`
-	CreatedAt  time.Time               `json:"createdAt"`
-	UpdatedAt  time.Time               `json:"updatedAt"`
-	ResolvedBy *HumanActor             `json:"resolvedBy,omitempty"`
-	Error      *SanitizedError         `json:"error,omitempty"`
+	ID               WaitID                  `json:"id"`
+	WorkItemID       WorkItemID              `json:"workItemID"`
+	Status           WaitStatus              `json:"status"`
+	Request          WaitRequest             `json:"request"`
+	Resolution       WaitResolution          `json:"resolution,omitempty"`
+	Response         jsonutil.CanonicalValue `json:"response,omitempty"`
+	CreatedAt        time.Time               `json:"createdAt"`
+	UpdatedAt        time.Time               `json:"updatedAt"`
+	ResolvedBy       *HumanActor             `json:"resolvedBy,omitempty"`
+	Error            *SanitizedError         `json:"error,omitempty"`
+	ResolutionIntent *WaitResolutionIntent   `json:"resolutionIntent,omitempty"`
 }
 
 type SanitizedError struct {
