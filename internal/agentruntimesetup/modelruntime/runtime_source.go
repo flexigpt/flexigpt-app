@@ -17,8 +17,8 @@ import (
 )
 
 // SourceResolver owns source-backed Model and Provider resolution. It is
-// constructed after Model Store receives RuntimeAdapter as its adapter lookup
-// capability, so no late BindModelStore mutation is required.
+// constructed after Model Store and RuntimeAdapter, so no late
+// BindModelStore mutation is required.
 type SourceResolver struct {
 	store   *modelAPI.Service
 	runtime *RuntimeAdapter

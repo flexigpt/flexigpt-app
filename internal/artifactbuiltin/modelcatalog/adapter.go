@@ -32,6 +32,68 @@ const (
 	adapterGoogleInteractions    = "google.interactions"
 )
 
+func defaultAdapterDefinitions() []AdapterDefinition {
+	return []AdapterDefinition{
+		{
+			ID:              adapterAnthropicMessages,
+			Version:         "v1",
+			SDKType:         inferenceSpec.ProviderSDKTypeAnthropic,
+			Origin:          inferenceSpec.DefaultAnthropicOrigin,
+			Path:            inferenceSpec.DefaultAnthropicChatCompletionPrefix,
+			APIKeyHeaderKey: inferenceSpec.DefaultAnthropicAuthorizationHeaderKey,
+			DefaultHeaders: map[string]string{
+				inferenceSpec.DefaultContentTypeHeaderKey:      inferenceSpec.DefaultContentTypeHeader,
+				inferenceSpec.DefaultAcceptHeaderKey:           inferenceSpec.DefaultContentTypeHeader,
+				inferenceSpec.DefaultAnthropicVersionHeaderKey: inferenceSpec.DefaultAnthropicVersionHeader,
+			},
+		},
+		{
+			ID:              adapterOpenAIChatCompletions,
+			Version:         "v1",
+			SDKType:         inferenceSpec.ProviderSDKTypeOpenAIChatCompletions,
+			Origin:          inferenceSpec.DefaultOpenAIOrigin,
+			Path:            inferenceSpec.DefaultOpenAIChatCompletionsPrefix,
+			APIKeyHeaderKey: inferenceSpec.DefaultAuthorizationHeaderKey,
+			DefaultHeaders: map[string]string{
+				inferenceSpec.DefaultContentTypeHeaderKey: inferenceSpec.DefaultContentTypeHeader,
+			},
+		},
+		{
+			ID:              adapterOpenAIResponses,
+			Version:         "v1",
+			SDKType:         inferenceSpec.ProviderSDKTypeOpenAIResponses,
+			Origin:          inferenceSpec.DefaultOpenAIOrigin,
+			Path:            inferenceSpec.DefaultOpenAIResponsesPrefix,
+			APIKeyHeaderKey: inferenceSpec.DefaultAuthorizationHeaderKey,
+			DefaultHeaders: map[string]string{
+				inferenceSpec.DefaultContentTypeHeaderKey: inferenceSpec.DefaultContentTypeHeader,
+			},
+		},
+		{
+			ID:              adapterGoogleGenerateContent,
+			Version:         "v1",
+			SDKType:         inferenceSpec.ProviderSDKTypeGoogleGenerateContent,
+			Origin:          inferenceSpec.DefaultGoogleGenerateContentOrigin,
+			Path:            inferenceSpec.DefaultGoogleGenerateContentPrefix,
+			APIKeyHeaderKey: inferenceSpec.DefaultGoogleGenerateContentAPIKeyHeaderKey,
+			DefaultHeaders: map[string]string{
+				inferenceSpec.DefaultContentTypeHeaderKey: inferenceSpec.DefaultContentTypeHeader,
+			},
+		},
+		{
+			ID:              adapterGoogleInteractions,
+			Version:         "v1",
+			SDKType:         inferenceSpec.ProviderSDKTypeGoogleInteractions,
+			Origin:          inferenceSpec.DefaultGoogleInteractionsOrigin,
+			Path:            inferenceSpec.DefaultGoogleInteractionsPrefix,
+			APIKeyHeaderKey: inferenceSpec.DefaultGoogleInteractionsAPIKeyHeaderKey,
+			DefaultHeaders: map[string]string{
+				inferenceSpec.DefaultContentTypeHeaderKey: inferenceSpec.DefaultContentTypeHeader,
+			},
+		},
+	}
+}
+
 type preparedModel struct {
 	presetID modelpreset.ModelPresetID
 	name     storeSpec.LogicalName

@@ -3,7 +3,14 @@ package modelcatalog
 import (
 	"github.com/flexigpt/inference-go/modelpreset"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
+
+	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
+
+// FallbackProviderName returns the application fallback Provider.
+func FallbackProviderName() storeSpec.LogicalName {
+	return storeSpec.LogicalName(modelpreset.ProviderOpenAIResponses)
+}
 
 // defaultModelByProvider is application-owned selection policy copied out of
 // the legacy ModelPreset store. It is intentionally expressed using

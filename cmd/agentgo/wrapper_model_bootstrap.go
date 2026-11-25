@@ -24,7 +24,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactsetup/modelpreferences"
 	modelAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model"
 	modelOverlay "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/overlay"
-	"github.com/flexigpt/inference-go/modelpreset"
 )
 
 func initModelWrappers(
@@ -78,8 +77,10 @@ func initModelWrappers(
 	if err != nil {
 		return nil, nil, err
 	}
+	adapters := modelcatalog.DefaultAdapterRegistry()
 	runtimeAdapter, err := modelruntime.NewRuntimeAdapter(
 		credentials,
+		runtimeAdapterDefinitions(adapters.Definitions()),
 	)
 	if err != nil {
 		return nil, nil, err
@@ -95,7 +96,7 @@ func initModelWrappers(
 		ManagedArtifacts: managedArtifacts,
 		Protection:       protection,
 		Overlays:         overlays,
-		Adapters:         runtimeAdapter,
+		Adapters:         adapters,
 		Support:          modelSupport,
 	})
 	if err != nil {
@@ -132,11 +133,27 @@ func initModelWrappers(
 	aggregateWrapper.runtime = sourceResolver
 	aggregateWrapper.preferences = preferences
 	aggregateWrapper.writableRoot = storeWrapper.writableManagementRoot
-	aggregateWrapper.fallbackProvider = storeSpec.LogicalName(
-		modelpreset.ProviderOpenAIResponses,
-	)
+	aggregateWrapper.fallbackProvider = modelcatalog.FallbackProviderName()
 
 	return installer, sourceResolver, nil
+}
+
+func runtimeAdapterDefinitions(
+	definitions []modelcatalog.AdapterDefinition,
+) []modelruntime.AdapterDefinition {
+	output := make([]modelruntime.AdapterDefinition, len(definitions))
+	for index, definition := range definitions {
+		output[index] = modelruntime.AdapterDefinition{
+			ID:              definition.ID,
+			Version:         definition.Version,
+			SDKType:         definition.SDKType,
+			Origin:          definition.Origin,
+			Path:            definition.Path,
+			APIKeyHeaderKey: definition.APIKeyHeaderKey,
+			DefaultHeaders:  definition.DefaultHeaders,
+		}
+	}
+	return output
 }
 
 // initModelProviderRuntime selects active management Roots after hydration.

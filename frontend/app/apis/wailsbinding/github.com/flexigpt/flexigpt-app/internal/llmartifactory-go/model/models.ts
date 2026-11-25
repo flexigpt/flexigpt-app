@@ -29,6 +29,15 @@ export enum DefaultModelSource {
     DefaultModelSourceFirstEnabledModel = "firstEnabledLinkedModel",
 };
 
+/**
+ * DefinitionListIssue describes a non-fatal Definition attachment or typed
+ * reconstruction failure for one list row.
+ */
+export interface DefinitionListIssue {
+    "code": string;
+    "message": string;
+}
+
 export interface ManagedModelCreateRequest {
     "rootID": model$0.RootID;
     "document": domain$0.ModelDocument;
@@ -86,6 +95,7 @@ export interface ModelListItem {
     "enabled": boolean;
     "revision": number;
     "builtIn": boolean;
+    "definitionIssue"?: DefinitionListIssue | null;
 }
 
 /**
@@ -122,6 +132,7 @@ export interface ProviderListItem {
     "enabled": boolean;
     "revision": number;
     "builtIn": boolean;
+    "definitionIssue"?: DefinitionListIssue | null;
 }
 
 /**

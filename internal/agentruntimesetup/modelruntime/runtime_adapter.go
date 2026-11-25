@@ -11,12 +11,14 @@ import (
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
 	inferenceRuntime "github.com/flexigpt/flexigpt-app/internal/agentruntime-go/inference"
+
 	secretModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
 	storeSpec "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
-	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
-	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	modelAPI "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model"
 	modelDomain "github.com/flexigpt/flexigpt-app/internal/llmartifactory-go/model/domain"
+
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 const apiKeyHeaderStr = "apiKeyHeader"
@@ -153,16 +155,19 @@ type RuntimeAdapter struct {
 
 func NewRuntimeAdapter(
 	credentials CredentialResolver,
-	definitions ...AdapterDefinition,
+	definitions []AdapterDefinition,
 ) (*RuntimeAdapter, error) {
 	if credentials == nil {
 		return nil, fmt.Errorf(
-			"%w: Model credential resolver is required",
+			"%w: model credential resolver is required",
 			storeSpec.ErrInvalid,
 		)
 	}
 	if len(definitions) == 0 {
-		definitions = DefaultAdapterDefinitions()
+		return nil, fmt.Errorf(
+			"%w: model adapter definitions are required",
+			storeSpec.ErrInvalid,
+		)
 	}
 
 	output := &RuntimeAdapter{
@@ -191,71 +196,6 @@ func NewRuntimeAdapter(
 		output.adapters[definition.ID] = definition
 	}
 	return output, nil
-}
-
-func DefaultAdapterDefinitions() []AdapterDefinition {
-	return []AdapterDefinition{
-		{
-			ID:              "anthropic.messages",
-			Version:         "v1",
-			SDKType:         inferenceSpec.ProviderSDKTypeAnthropic,
-			Origin:          inferenceSpec.DefaultAnthropicOrigin,
-			Path:            inferenceSpec.DefaultAnthropicChatCompletionPrefix,
-			APIKeyHeaderKey: inferenceSpec.DefaultAnthropicAuthorizationHeaderKey,
-			DefaultHeaders: map[string]string{
-				inferenceSpec.DefaultContentTypeHeaderKey:      inferenceSpec.DefaultContentTypeHeader,
-				inferenceSpec.DefaultAcceptHeaderKey:           inferenceSpec.DefaultContentTypeHeader,
-				inferenceSpec.DefaultAnthropicVersionHeaderKey: inferenceSpec.DefaultAnthropicVersionHeader,
-			},
-		},
-		{
-			ID:              "openai.chatCompletions",
-			Version:         "v1",
-			SDKType:         inferenceSpec.ProviderSDKTypeOpenAIChatCompletions,
-			Origin:          inferenceSpec.DefaultOpenAIOrigin,
-			Path:            inferenceSpec.DefaultOpenAIChatCompletionsPrefix,
-			APIKeyHeaderKey: inferenceSpec.DefaultAuthorizationHeaderKey,
-			DefaultHeaders: map[string]string{
-				inferenceSpec.DefaultContentTypeHeaderKey: inferenceSpec.DefaultContentTypeHeader,
-			},
-		},
-		{
-			ID:              "openai.responses",
-			Version:         "v1",
-			SDKType:         inferenceSpec.ProviderSDKTypeOpenAIResponses,
-			Origin:          inferenceSpec.DefaultOpenAIOrigin,
-			Path:            inferenceSpec.DefaultOpenAIResponsesPrefix,
-			APIKeyHeaderKey: inferenceSpec.DefaultAuthorizationHeaderKey,
-			DefaultHeaders: map[string]string{
-				inferenceSpec.DefaultContentTypeHeaderKey: inferenceSpec.DefaultContentTypeHeader,
-			},
-		},
-		{
-			ID:              "google.generateContent",
-			Version:         "v1",
-			SDKType:         inferenceSpec.ProviderSDKTypeGoogleGenerateContent,
-			Origin:          inferenceSpec.DefaultGoogleGenerateContentOrigin,
-			Path:            inferenceSpec.DefaultGoogleGenerateContentPrefix,
-			APIKeyHeaderKey: inferenceSpec.DefaultGoogleGenerateContentAPIKeyHeaderKey,
-			DefaultHeaders: map[string]string{
-				inferenceSpec.DefaultContentTypeHeaderKey: inferenceSpec.DefaultContentTypeHeader,
-			},
-		},
-	}
-}
-
-func (a *RuntimeAdapter) LookupModelAdapter(
-	ctx context.Context,
-	adapter string,
-) (modelAPI.AdapterDescriptor, bool, error) {
-	value, found := a.adapters[adapter]
-	if !found {
-		return modelAPI.AdapterDescriptor{}, false, nil
-	}
-	return modelAPI.AdapterDescriptor{
-		ID:      value.ID,
-		Version: value.Version,
-	}, true, nil
 }
 
 // Resolve converts one already-resolved Model into ordinary inference-go
