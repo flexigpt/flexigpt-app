@@ -6,6 +6,8 @@ import type { ConversationMessage } from '@/spec/session';
 import type { ToolSelectionIssue, ToolStoreChoice } from '@/spec/tool';
 import { RoleEnum, Status } from '@/spec/inference';
 
+import { MessageDiffScope } from '@/components/markdown/message_diff_scope';
+
 import type { ToolDetailsState } from '@/chats/composer/tools/tool_details_modal';
 import type { MessageStreamSource } from '@/chats/messages/message_content_card';
 import type { AssistantResponseTiming } from '@/chats/messages/message_footer';
@@ -336,175 +338,184 @@ export const ChatMessage = memo(function ChatMessage({
 		(isBusy && (hasStreamedText || hasStreamedThinking));
 	const showBodyWithMedia = showBody || outputMedia.length > 0;
 	return (
-		<div className="grid grid-cols-12 p-1" style={{ fontSize: 14 }}>
-			{/* Row 1 ── icon + message bubble (only when showCardRow) */}
-			{showBodyWithMedia && (
-				<>
-					<div className={`${leftColSpan} flex justify-end`}>
-						{isUser && (
-							<div className="my-0 mr-2 ml-0 flex size-8 items-center justify-center self-end">
-								<FiUser size={24} />
-							</div>
-						)}
-					</div>
-
-					<div
-						className={`bg-base-100 col-span-10 mt-1 min-w-0 overflow-x-hidden rounded-2xl p-0 lg:col-span-9 ${bubbleExtra}`}
-					>
-						{!isUser && (hasAnyReasoning || (isBusy && streamSource)) && (
-							<MessageThinkingSection
-								isBusy={isBusy}
-								reasoningContents={message.uiReasoningContents}
-								streamedThinking={streamSnapshot.thinking}
-								openWhenComplete={hasError}
-							/>
-						)}
-						<div className="px-4 py-2">
-							<MessageContentCard
-								messageID={message.id}
-								content={baseContent}
-								isBusy={isBusy}
-								align={align}
-								renderAsMarkdown={renderMarkdown}
-								deferRichRendering={deferRichRendering}
-								diffCandidatePaths={diffCandidatePaths}
-								streamingText={isBusy ? streamSnapshot.text : undefined}
-								diffCandidatePathsReady={diffCandidatePathsReady}
-							/>
-							<MessageMediaContent items={outputMedia} />
-							{!hasAnyContent && hasError && !terminalState && !isBusy ? (
-								<div className="text-error text-sm opacity-80">
-									{message.error?.message || 'An error occurred while processing this request.'}
+		<MessageDiffScope
+			messageID={message.id}
+			source={baseContent}
+			isBusy={isBusy}
+			candidatePaths={diffCandidatePaths}
+			candidatePathsReady={diffCandidatePathsReady}
+		>
+			<div className="grid grid-cols-12 p-1" style={{ fontSize: 14 }}>
+				{/* Row 1 ── icon + message bubble (only when showCardRow) */}
+				{showBodyWithMedia && (
+					<>
+						<div className={`${leftColSpan} flex justify-end`}>
+							{isUser && (
+								<div className="my-0 mr-2 ml-0 flex size-8 items-center justify-center self-end">
+									<FiUser size={24} />
 								</div>
-							) : null}
-							{!isUser && terminalState ? (
-								<div
-									className={`mt-2 flex items-start gap-2 rounded-xl px-2 py-1 text-xs ${
-										message.status === Status.Incomplete
-											? 'bg-warning/10 text-warning-content'
-											: 'bg-error/10 text-error'
-									}`}
-									role={message.status === Status.Incomplete ? 'status' : 'alert'}
-								>
-									<FiAlertTriangle className="mt-0.5 shrink-0" size={13} aria-hidden="true" />
-									<span className="italic">{terminalState}</span>
-								</div>
-							) : null}
+							)}
 						</div>
-						{/* MCP Apps row. One sandboxed iframe per app-capable MCP tool output. */}
-						{mcpAppViews.length > 0 && (
-							<div className="border-base-300 border-t px-4 py-3">
-								<div className="space-y-2">
-									{mcpAppViews.map(({ instance, call, output }) => {
-										const content = getMCPAppToolResultContent(output);
-										const structuredContent = getMCPAppToolResultStructuredContent(output);
 
-										return (
-											<MCPAppView
-												key={instance.instanceID}
-												instance={instance}
-												toolInput={call?.arguments}
-												toolResult={{
-													content,
-													structuredContent,
-													isError: output.mcpApp?.isError ?? output.isError,
-												}}
-											/>
-										);
-									})}
+						<div
+							className={`bg-base-100 col-span-10 mt-1 min-w-0 overflow-x-hidden rounded-2xl p-0 lg:col-span-9 ${bubbleExtra}`}
+						>
+							{!isUser && (hasAnyReasoning || (isBusy && streamSource)) && (
+								<MessageThinkingSection
+									isBusy={isBusy}
+									reasoningContents={message.uiReasoningContents}
+									streamedThinking={streamSnapshot.thinking}
+									openWhenComplete={hasError}
+								/>
+							)}
+							<div className="px-4 py-2">
+								<MessageContentCard
+									messageID={message.id}
+									content={baseContent}
+									isBusy={isBusy}
+									align={align}
+									renderAsMarkdown={renderMarkdown}
+									deferRichRendering={deferRichRendering}
+									diffCandidatePaths={diffCandidatePaths}
+									streamingText={isBusy ? streamSnapshot.text : undefined}
+									diffCandidatePathsReady={diffCandidatePathsReady}
+									enableMessageDiffs={!isUser}
+								/>
+								<MessageMediaContent items={outputMedia} />
+								{!hasAnyContent && hasError && !terminalState && !isBusy ? (
+									<div className="text-error text-sm opacity-80">
+										{message.error?.message || 'An error occurred while processing this request.'}
+									</div>
+								) : null}
+								{!isUser && terminalState ? (
+									<div
+										className={`mt-2 flex items-start gap-2 rounded-xl px-2 py-1 text-xs ${
+											message.status === Status.Incomplete
+												? 'bg-warning/10 text-warning-content'
+												: 'bg-error/10 text-error'
+										}`}
+										role={message.status === Status.Incomplete ? 'status' : 'alert'}
+									>
+										<FiAlertTriangle className="mt-0.5 shrink-0" size={13} aria-hidden="true" />
+										<span className="italic">{terminalState}</span>
+									</div>
+								) : null}
+							</div>
+							{/* MCP Apps row. One sandboxed iframe per app-capable MCP tool output. */}
+							{mcpAppViews.length > 0 && (
+								<div className="border-base-300 border-t px-4 py-3">
+									<div className="space-y-2">
+										{mcpAppViews.map(({ instance, call, output }) => {
+											const content = getMCPAppToolResultContent(output);
+											const structuredContent = getMCPAppToolResultStructuredContent(output);
+
+											return (
+												<MCPAppView
+													key={instance.instanceID}
+													instance={instance}
+													toolInput={call?.arguments}
+													toolResult={{
+														content,
+														structuredContent,
+														isError: output.mcpApp?.isError ?? output.isError,
+													}}
+												/>
+											);
+										})}
+									</div>
 								</div>
-							</div>
-						)}
-						{hasCitations && (
-							<div className="border-base-300 border-t p-1">
-								<MessageCitationsBar citations={message.uiCitations} />{' '}
-							</div>
-						)}
-					</div>
+							)}
+							{hasCitations && (
+								<div className="border-base-300 border-t p-1">
+									<MessageCitationsBar citations={message.uiCitations} />{' '}
+								</div>
+							)}
+						</div>
 
-					<div className={`${rightColSpan} flex justify-start`}>
-						{!isUser && (
-							<div className="my-0 mr-0 ml-2 flex size-8 items-center justify-center self-end">
-								<FiZap size={24} />
-							</div>
-						)}
-					</div>
-				</>
-			)}
-
-			{/* Row 2 ── footer bar */}
-			<div className={`${leftColSpan} flex justify-end`}>
-				{/* If the card row is hidden, keep the avatar aligned with the footer row */}
-				{!showBodyWithMedia && isUser && (
-					<div className="my-0 mr-2 ml-0 flex size-8 items-center justify-center">
-						<FiUser size={24} />
-					</div>
+						<div className={`${rightColSpan} flex justify-start`}>
+							{!isUser && (
+								<div className="my-0 mr-0 ml-2 flex size-8 items-center justify-center self-end">
+									<FiZap size={24} />
+								</div>
+							)}
+						</div>
+					</>
 				)}
-			</div>
-			<div className="col-span-10 min-w-0 lg:col-span-9">
-				<div
-					className={`flex min-w-0 items-center gap-2 overflow-x-auto overscroll-contain px-2 ${showBodyWithMedia ? 'pt-1' : isUser ? 'justify-start' : 'justify-end'}`}
-				>
-					{hasAttachmentsBar && (
-						<div className="flex min-w-0 items-center justify-start overflow-x-hidden px-1 py-0">
-							<MessageAttachmentsBar
-								isUser={isUser}
-								attachments={message.attachments}
-								toolChoices={toolChoices}
-								toolSelectionIssues={toolSelectionIssues}
-								onToolSelectionIssueDetails={handleToolSelectionIssueDetails}
-								operationResolution={operationResolution}
-								appContextUpdates={appContextUpdates}
-								toolCalls={message.uiToolCalls}
-								toolOutputs={toolOutputs}
-								onToolChoiceDetails={handleToolChoiceDetails}
-								onToolCallDetails={handleToolCallDetails}
-								onToolOutputDetails={handleToolOutputDetails}
-							/>
+
+				{/* Row 2 ── footer bar */}
+				<div className={`${leftColSpan} flex justify-end`}>
+					{/* If the card row is hidden, keep the avatar aligned with the footer row */}
+					{!showBodyWithMedia && isUser && (
+						<div className="my-0 mr-2 ml-0 flex size-8 items-center justify-center">
+							<FiUser size={24} />
 						</div>
 					)}
-
+				</div>
+				<div className="col-span-10 min-w-0 lg:col-span-9">
 					<div
-						className={`flex min-w-0 flex-1 items-center px-1 py-0 ${!showBodyWithMedia ? (isUser ? 'justify-start' : 'justify-end') : ''}`}
+						className={`flex min-w-0 items-center gap-2 overflow-x-auto overscroll-contain px-2 ${showBodyWithMedia ? 'pt-1' : isUser ? 'justify-start' : 'justify-end'}`}
 					>
-						<MessageFooterArea
-							messageID={message.id}
-							isUser={isUser}
-							cardCopyContent={message.uiContent}
-							onEdit={onEdit}
-							reasoningContents={message.uiReasoningContents}
-							isBusy={isBusy}
-							bodyPresent={showBodyWithMedia}
-							streamText={streamSnapshot.text || baseContent}
-							streamThinking={streamSnapshot.thinking || (hasAnyReasoning ? ' ' : '')}
-							disableMarkdown={!renderMarkdown}
-							onDisableMarkdownChange={handleDisableMarkdownChange}
-							usage={message.usage}
-							debugDetails={message.debugDetails}
-							debugDetailsError={message.debugDetailsError}
-							errorDetails={message.error}
-							responseTiming={responseTiming}
-						/>
+						{hasAttachmentsBar && (
+							<div className="flex min-w-0 items-center justify-start overflow-x-hidden px-1 py-0">
+								<MessageAttachmentsBar
+									isUser={isUser}
+									attachments={message.attachments}
+									toolChoices={toolChoices}
+									toolSelectionIssues={toolSelectionIssues}
+									onToolSelectionIssueDetails={handleToolSelectionIssueDetails}
+									operationResolution={operationResolution}
+									appContextUpdates={appContextUpdates}
+									toolCalls={message.uiToolCalls}
+									toolOutputs={toolOutputs}
+									onToolChoiceDetails={handleToolChoiceDetails}
+									onToolCallDetails={handleToolCallDetails}
+									onToolOutputDetails={handleToolOutputDetails}
+								/>
+							</div>
+						)}
+
+						<div
+							className={`flex min-w-0 flex-1 items-center px-1 py-0 ${!showBodyWithMedia ? (isUser ? 'justify-start' : 'justify-end') : ''}`}
+						>
+							<MessageFooterArea
+								messageID={message.id}
+								isUser={isUser}
+								cardCopyContent={message.uiContent}
+								onEdit={onEdit}
+								reasoningContents={message.uiReasoningContents}
+								isBusy={isBusy}
+								bodyPresent={showBodyWithMedia}
+								streamText={streamSnapshot.text || baseContent}
+								streamThinking={streamSnapshot.thinking || (hasAnyReasoning ? ' ' : '')}
+								disableMarkdown={!renderMarkdown}
+								onDisableMarkdownChange={handleDisableMarkdownChange}
+								usage={message.usage}
+								debugDetails={message.debugDetails}
+								debugDetailsError={message.debugDetailsError}
+								errorDetails={message.error}
+								responseTiming={responseTiming}
+							/>
+						</div>
 					</div>
 				</div>
+				<div className={`${rightColSpan} flex justify-start`}>
+					{/* If the card row is hidden, keep the assistant icon aligned with the footer row */}
+					{!showBodyWithMedia && !isUser && (
+						<div className="my-0 mr-0 ml-2 flex size-8 items-center justify-center">
+							<FiZap size={24} />
+						</div>
+					)}
+				</div>
+				{/* Tool choice/call/output details (JSON) */}
+				{toolDetailsState ? (
+					<ToolDetailsModal
+						state={toolDetailsState}
+						onClose={() => {
+							setToolDetailsState(null);
+						}}
+					/>
+				) : null}
 			</div>
-			<div className={`${rightColSpan} flex justify-start`}>
-				{/* If the card row is hidden, keep the assistant icon aligned with the footer row */}
-				{!showBodyWithMedia && !isUser && (
-					<div className="my-0 mr-0 ml-2 flex size-8 items-center justify-center">
-						<FiZap size={24} />
-					</div>
-				)}
-			</div>
-			{/* Tool choice/call/output details (JSON) */}
-			{toolDetailsState ? (
-				<ToolDetailsModal
-					state={toolDetailsState}
-					onClose={() => {
-						setToolDetailsState(null);
-					}}
-				/>
-			) : null}
-		</div>
+		</MessageDiffScope>
 	);
 }, propsAreEqual);

@@ -1,6 +1,7 @@
 import { memo, useEffect, useState, useSyncExternalStore } from 'react';
 
 import { BoundedMarkdown, PlainMessageText } from '@/components/markdown/bounded_markdown';
+import { MarkdownDiffInventory } from '@/components/markdown/markdown_enhanced';
 
 const MAX_INITIAL_RICH_RENDER_DELAY_MS = 150;
 
@@ -60,6 +61,7 @@ interface MessageContentCardProps {
 	diffCandidatePathsReady?: boolean;
 	streamingText?: string;
 	defaultCodeBlockExpanded?: boolean;
+	enableMessageDiffs?: boolean;
 }
 
 function stringArraysEqual(left?: string[], right?: string[]): boolean {
@@ -84,6 +86,7 @@ function areEqual(prev: MessageContentCardProps, next: MessageContentCardProps) 
 		stringArraysEqual(prev.diffCandidatePaths, next.diffCandidatePaths) &&
 		prev.diffCandidatePathsReady === next.diffCandidatePathsReady &&
 		prev.streamingText === next.streamingText &&
+		prev.enableMessageDiffs === next.enableMessageDiffs &&
 		prev.defaultCodeBlockExpanded === next.defaultCodeBlockExpanded
 	);
 }
@@ -99,6 +102,7 @@ export const MessageContentCard = memo(function MessageContentCard({
 	diffCandidatePathsReady = true,
 	streamingText,
 	defaultCodeBlockExpanded = true,
+	enableMessageDiffs = false,
 }: MessageContentCardProps) {
 	const [richRenderingReady, setRichRenderingReady] = useState(!deferRichRendering);
 
@@ -126,7 +130,14 @@ export const MessageContentCard = memo(function MessageContentCard({
 
 	// Deferral is an initial scheduling hint, not a permanent veto on final Markdown.
 	if (!renderAsMarkdown || (deferRichRendering && !isBusy && !richRenderingReady)) {
-		return <PlainMessageText text={textToRender} align={align} />;
+		return (
+			<>
+				<PlainMessageText text={textToRender} align={align} />
+				{enableMessageDiffs && !isBusy && (!deferRichRendering || richRenderingReady) ? (
+					<MarkdownDiffInventory text={textToRender} />
+				) : null}
+			</>
+		);
 	}
 
 	return (
@@ -139,6 +150,7 @@ export const MessageContentCard = memo(function MessageContentCard({
 				diffCandidatePaths={diffCandidatePaths}
 				defaultCodeBlockExpanded={defaultCodeBlockExpanded}
 				diffCandidatePathsReady={diffCandidatePathsReady}
+				enableMessageDiffs={enableMessageDiffs}
 			/>
 		</div>
 	);

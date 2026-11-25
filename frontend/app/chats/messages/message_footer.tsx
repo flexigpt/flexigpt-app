@@ -6,6 +6,7 @@ import type { InferenceUsage, ReasoningContent } from '@/spec/inference';
 import { CopyButton } from '@/components/copy_button';
 import { HoverTip } from '@/components/hover_tip';
 import { stripCustomMDFences } from '@/components/markdown/custom_md_utils';
+import { MessageDiffActions } from '@/components/markdown/message_diff_actions';
 
 import { getDebugDetailsMarkdown } from '@/chats/conversation/completion_helper';
 import { MessageDetailsModal } from '@/chats/messages/message_details_modal';
@@ -215,7 +216,7 @@ export const MessageFooterArea = memo(function MessageFooterArea({
 	return (
 		<div className={bodyPresent ? 'min-w-0 grow' : 'min-w-0'}>
 			<div
-				className={`flex min-w-0 items-center gap-3 ${bodyPresent ? 'justify-between' : isUser ? 'justify-start' : 'justify-end'}`}
+				className={`flex min-w-0 flex-wrap items-center gap-3 ${bodyPresent ? 'justify-between' : isUser ? 'justify-start' : 'justify-end'}`}
 			>
 				<div className="flex min-w-0 items-center gap-3">
 					{isBusy ? (
@@ -235,7 +236,11 @@ export const MessageFooterArea = memo(function MessageFooterArea({
 					{!isUser ? <AssistantResponseTimingLabel timing={responseTiming} isBusy={isBusy} /> : null}
 				</div>
 
-				<div className={`flex items-center justify-end space-x-6 ${!isBusy && !hasUsage ? 'w-full' : ''}`}>
+				<div
+					className={`flex flex-wrap items-center justify-end gap-x-3 gap-y-1 ${!isBusy && !hasUsage ? 'w-full' : ''}`}
+				>
+					{!isUser && !isBusy ? <MessageDiffActions /> : null}
+
 					{hasContent && !isBusy && (
 						<label className="ml-1 flex h-full items-center space-x-2 truncate p-1" title="Disable Markdown">
 							<input

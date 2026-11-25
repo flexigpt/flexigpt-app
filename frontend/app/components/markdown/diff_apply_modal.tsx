@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { FiChevronRight, FiGitPullRequest, FiX } from 'react-icons/fi';
 
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
@@ -22,6 +22,7 @@ interface DiffApplyModalProps {
 	isOpen: boolean;
 	onClose: () => void;
 	controller: DiffApplyController;
+	focusFileID?: string;
 }
 
 interface LazyPanelProps {
@@ -292,8 +293,29 @@ function HunkPanel({ view, controller }: { view: DiffApplyFileView; controller: 
 	);
 }
 
-function FileCard({ view, controller }: { view: DiffApplyFileView; controller: DiffApplyController }) {
+function FileCard({
+	view,
+	controller,
+	focusOnMount = false,
+}: {
+	view: DiffApplyFileView;
+	controller: DiffApplyController;
+	focusOnMount?: boolean;
+}) {
 	const { file } = view;
+	const sectionRef = useRef<HTMLElement | null>(null);
+	useEffect(() => {
+		if (!focusOnMount) {
+			return;
+		}
+		const frame = window.requestAnimationFrame(() => {
+			sectionRef.current?.focus({ preventScroll: true });
+			sectionRef.current?.scrollIntoView({ block: 'nearest' });
+		});
+		return () => {
+			window.cancelAnimationFrame(frame);
+		};
+	}, [focusOnMount]);
 	const autoHunkReviewFingerprintRef = useRef<string | null>(null);
 	const [targetPickerVersion, setTargetPickerVersion] = useState(0);
 	const inputID = useId();
@@ -341,7 +363,12 @@ function FileCard({ view, controller }: { view: DiffApplyFileView; controller: D
 	};
 
 	return (
-		<section className="border-base-300 bg-base-100 rounded-xl border p-4 shadow-sm" aria-busy={isActive}>
+		<section
+			ref={sectionRef}
+			tabIndex={-1}
+			className="border-base-300 bg-base-100 focus-visible:outline-primary rounded-xl border p-4 shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2"
+			aria-busy={isActive}
+		>
 			<div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
 				<div className="min-w-0 flex-1">
 					<div className="flex flex-wrap items-center gap-2">
@@ -547,7 +574,7 @@ function FileCard({ view, controller }: { view: DiffApplyFileView; controller: D
 	);
 }
 
-function DiffApplyModalContent({ controller }: { controller: DiffApplyController }) {
+function DiffApplyModalContent({ controller, focusFileID }: { controller: DiffApplyController; focusFileID?: string }) {
 	const { requestClose } = useModalDialogController();
 
 	const busyLabel = controller.busy
@@ -674,7 +701,12 @@ function DiffApplyModalContent({ controller }: { controller: DiffApplyController
 					) : null}
 
 					{controller.files.map(view => (
-						<FileCard key={view.file.id} view={view} controller={controller} />
+						<FileCard
+							key={view.file.id}
+							view={view}
+							controller={controller}
+							focusOnMount={view.file.id === focusFileID}
+						/>
 					))}
 
 					{renderDiagnosticsPanel({
@@ -690,14 +722,14 @@ function DiffApplyModalContent({ controller }: { controller: DiffApplyController
 	);
 }
 
-export function DiffApplyModal({ isOpen, onClose, controller }: DiffApplyModalProps) {
+export function DiffApplyModal({ isOpen, onClose, controller, focusFileID }: DiffApplyModalProps) {
 	if (!isOpen) {
 		return null;
 	}
 
 	return (
 		<ModalDialog isOpen={isOpen} onClose={onClose} data-disable-chat-shortcuts="true">
-			<DiffApplyModalContent controller={controller} />
+			<DiffApplyModalContent key={focusFileID ?? 'all-files'} controller={controller} focusFileID={focusFileID} />
 		</ModalDialog>
 	);
 }

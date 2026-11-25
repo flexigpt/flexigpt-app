@@ -79,6 +79,10 @@ export type DiffApplyPhase = 'dry-run' | 'apply';
 
 export type DiffApplyOutcomeStatus = 'ready' | 'needs-info' | 'blocked' | 'applied' | 'already-applied' | 'partial';
 
+export function isDiffApplyOutcomeComplete(status: DiffApplyOutcomeStatus | 'pending'): boolean {
+	return status === 'applied' || status === 'already-applied';
+}
+
 export interface DiffApplyOutcome {
 	phase: DiffApplyPhase;
 	status: DiffApplyOutcomeStatus;

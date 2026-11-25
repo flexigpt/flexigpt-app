@@ -19,6 +19,7 @@ import {
 	createDiffApplyOutcome,
 	inferInteractiveDiffTargets,
 	interpretScopedApplyResult,
+	isDiffApplyOutcomeComplete,
 	MAX_INTERACTIVE_HUNK_PROBES,
 	normalizeInteractiveTargetPaths,
 } from '@/components/markdown/diff_apply_model';
@@ -606,7 +607,7 @@ export function useDiffApplyController(
 		async (fileIDs?: string[]): Promise<void> => {
 			const selected = fileIDs
 				? filesRef.current.filter(file => fileIDs.includes(file.file.id) && file.canApply)
-				: filesRef.current.filter(file => file.canApply);
+				: filesRef.current.filter(file => file.canApply && !isDiffApplyOutcomeComplete(file.status));
 
 			if (selected.length === 0) {
 				return;
@@ -977,7 +978,7 @@ export function useDiffApplyController(
 				next.reviewed += 1;
 			}
 
-			if (file.canApply) {
+			if (file.canApply && !isDiffApplyOutcomeComplete(file.status)) {
 				next.submittable += 1;
 			}
 

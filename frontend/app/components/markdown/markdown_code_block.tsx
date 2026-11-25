@@ -21,6 +21,7 @@ interface CodeProps {
 	diffCandidatePathsReady?: boolean;
 	defaultExpanded?: boolean;
 	disableControls?: boolean;
+	messageDiffID?: string;
 }
 
 interface MermaidResultState {
@@ -136,6 +137,7 @@ export const CodeBlock = memo(function CodeBlock({
 	diffCandidatePathsReady = true,
 	defaultExpanded = true,
 	disableControls = false,
+	messageDiffID,
 }: CodeProps) {
 	const codeBodyId = useId();
 
@@ -243,6 +245,7 @@ export const CodeBlock = memo(function CodeBlock({
 								candidatePaths={diffCandidatePaths}
 								workspaceRoots={diffWorkspaceRoots}
 								candidatePathsReady={diffCandidatePathsReady}
+								messageDiffID={messageDiffID}
 							/>
 						) : null}
 					</div>

@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { FiGitPullRequest, FiInfo, FiLoader } from 'react-icons/fi';
 
 import type { ParsedInteractiveDiff } from '@/components/markdown/diff_apply_model';
+import { DiffApplyActions, getDiffBlockPresentation } from '@/components/markdown/diff_apply_actions';
 import { useDiffApplyController } from '@/components/markdown/diff_apply_controller';
 import { DiffApplyModal } from '@/components/markdown/diff_apply_modal';
 import { parseInteractiveDiff } from '@/components/markdown/diff_apply_model';
+import { useMessageDiffScope, useMessageDiffSnapshot } from '@/components/markdown/message_diff_scope';
 
 interface DiffApplyControlProps {
 	language: string;
@@ -13,41 +14,31 @@ interface DiffApplyControlProps {
 	candidatePaths?: string[];
 	candidatePathsReady?: boolean;
 	workspaceRoots?: string[];
-}
-
-type ButtonTone = 'neutral' | 'success' | 'warning' | 'error' | 'info';
-
-function getButtonClassName(tone: ButtonTone = 'neutral'): string {
-	const toneClassName = {
-		neutral: 'app-text-code',
-		success: 'text-success',
-		warning: 'text-warning',
-		error: 'text-error',
-		info: 'text-info',
-	}[tone];
-
-	return `inline-flex h-6 items-center gap-1 rounded-full border border-base-300 px-2 font-mono text-[11px] font-medium leading-none whitespace-nowrap tabular-nums transition-colors hover:opacity-60 disabled:cursor-not-allowed disabled:opacity-50 ${toneClassName}`;
+	messageDiffID?: string;
 }
 
 interface DiffApplySessionProps {
 	parsed: ParsedInteractiveDiff;
 	candidatePaths?: string[];
 	workspaceRoots?: string[];
+	openInitially: boolean;
 	consumeInitialReview: (parsed: ParsedInteractiveDiff) => boolean;
 }
 
-function DiffApplySession({ parsed, candidatePaths, workspaceRoots, consumeInitialReview }: DiffApplySessionProps) {
-	// The explicitly created session owns parsed object identity.
+function DiffApplySession({
+	parsed,
+	candidatePaths,
+	workspaceRoots,
+	openInitially,
+	consumeInitialReview,
+}: DiffApplySessionProps) {
 	const controller = useDiffApplyController(parsed, candidatePaths, workspaceRoots);
-
-	const [isDetailsOpen, setIsDetailsOpen] = useState(false);
-
+	const [isDetailsOpen, setIsDetailsOpen] = useState(openInitially);
 	const { reviewAll } = controller;
+
 	useEffect(() => {
 		let cancelled = false;
 
-		// Defer consumption until after effect setup/replay. A Strict Mode
-		// cleanup must not consume an intent for a request it then cancels.
 		queueMicrotask(() => {
 			if (!cancelled && consumeInitialReview(parsed)) {
 				void reviewAll();
@@ -59,78 +50,31 @@ function DiffApplySession({ parsed, candidatePaths, workspaceRoots, consumeIniti
 		};
 	}, [consumeInitialReview, parsed, reviewAll]);
 
-	const startReview = (): void => {
-		/*
-		 * reviewAll synchronously claims the controller operation slot before
-		 * its first await. controller.busy is the sole reviewing-state source.
-		 */
-		void controller.reviewAll();
-	};
+	const presentation = getDiffBlockPresentation(controller);
+	const busy = controller.busy !== null;
+	const total = controller.files.length;
 
-	const controllerBusy = controller.busy !== null;
-	const reviewInProgress = controller.busy?.kind === 'review';
-	const applyInProgress = controller.busy?.kind === 'apply';
-	const canInspect = controller.files.length > 0 || controller.patchDiagnostics.length > 0;
-	const completedCount = controller.appliedFileCount + controller.alreadyAppliedFileCount;
-	const detailsTone: ButtonTone =
-		controller.blockedFileCount > 0
-			? 'error'
-			: controller.needsInfoFileCount > 0 || controller.partialFileCount > 0
-				? 'warning'
-				: controller.readyFileCount > 0 || completedCount > 0
-					? 'success'
-					: 'info';
-	const detailsLabel =
-		completedCount > 0
-			? `${completedCount} completed`
-			: controller.hasReviewResult
-				? `${controller.reviewedFileCount} reviewed`
-				: controller.files.length > 0
-					? 'Details / targets'
-					: 'Patch notes';
 	return (
 		<>
-			<div className="app-text-code flex min-w-0 flex-wrap items-center gap-1">
-				<button
-					type="button"
-					className={getButtonClassName()}
-					disabled={controller.files.length === 0 || controllerBusy}
-					onClick={startReview}
-					title="Run a fresh backend dry-run review for every file section."
-				>
-					{reviewInProgress ? <FiLoader size={12} className="animate-spin" /> : <FiGitPullRequest size={12} />}
-					{reviewInProgress ? 'Reviewing' : 'Review'}
-				</button>
-
-				{canInspect ? (
-					<button
-						type="button"
-						className={getButtonClassName(detailsTone)}
-						onClick={() => {
-							setIsDetailsOpen(true);
-						}}
-						title="Inspect targets, source hunks, backend results, and parser notes."
-					>
-						<FiInfo size={12} />
-						{detailsLabel}
-					</button>
-				) : null}
-
-				{controller.submittableFileCount > 0 || applyInProgress ? (
-					<button
-						type="button"
-						className={getButtonClassName('success')}
-						disabled={controllerBusy}
-						onClick={() => {
-							void controller.applyReady();
-						}}
-						title="Submit files with explicit targets or successful backend reviews."
-					>
-						{applyInProgress ? <FiLoader size={12} className="animate-spin" /> : <FiGitPullRequest size={12} />}
-						{applyInProgress ? 'Applying' : `Apply ${controller.submittableFileCount}`}
-					</button>
-				) : null}
-			</div>
+			<DiffApplyActions
+				className="app-text-code font-mono"
+				onReview={() => {
+					void controller.reviewAll();
+				}}
+				onDetails={() => {
+					setIsDetailsOpen(true);
+				}}
+				onApply={() => {
+					void controller.applyReady();
+				}}
+				reviewDisabled={busy || total === 0}
+				applyDisabled={busy || controller.submittableFileCount === 0}
+				reviewing={controller.busy?.kind === 'review'}
+				applying={controller.busy?.kind === 'apply'}
+				detailsLabel={presentation.label}
+				detailsTone={presentation.tone}
+				applyLabel={total === 1 ? 'Apply' : `Apply ${controller.submittableFileCount}/${total}`}
+			/>
 
 			<DiffApplyModal
 				isOpen={isDetailsOpen}
@@ -143,10 +87,9 @@ function DiffApplySession({ parsed, candidatePaths, workspaceRoots, consumeIniti
 	);
 }
 
-export function DiffApplyControl({
+function StandaloneDiffApplyControl({
 	language,
 	diffText,
-	isBusy,
 	candidatePaths,
 	candidatePathsReady = true,
 	workspaceRoots,
@@ -155,6 +98,7 @@ export function DiffApplyControl({
 		language: string;
 		diffText: string;
 		parsed: ParsedInteractiveDiff;
+		openInitially: boolean;
 	} | null>(null);
 
 	const pendingInitialReviewRef = useRef<ParsedInteractiveDiff | null>(null);
@@ -166,43 +110,112 @@ export function DiffApplyControl({
 		return true;
 	}, []);
 
-	if (isBusy) {
-		return null;
-	}
-
 	if (!session || session.language !== language || session.diffText !== diffText) {
+		const initialize = (review: boolean): void => {
+			const parsed = parseInteractiveDiff(diffText, language);
+			pendingInitialReviewRef.current = review ? parsed : null;
+			setSession({
+				language,
+				diffText,
+				parsed,
+				openInitially: !review,
+			});
+		};
+
 		return (
-			<button
-				type="button"
-				disabled={!candidatePathsReady}
-				className={getButtonClassName()}
-				title={
+			<DiffApplyActions
+				className="app-text-code font-mono"
+				onReview={() => {
+					initialize(true);
+				}}
+				onDetails={() => {
+					initialize(false);
+				}}
+				onApply={() => {}}
+				reviewDisabled={!candidatePathsReady}
+				detailsDisabled={!candidatePathsReady}
+				applyDisabled
+				reviewTitle={
 					candidatePathsReady
 						? 'Parse this patch and run a backend dry-run review. No files are changed.'
 						: 'Preparing trusted target path suggestions for this patch.'
 				}
-				onClick={() => {
-					const parsed = parseInteractiveDiff(diffText, language);
-					pendingInitialReviewRef.current = parsed;
-					setSession({
-						language,
-						diffText,
-						parsed,
-					});
-				}}
-			>
-				{candidatePathsReady ? <FiGitPullRequest size={12} /> : <FiLoader size={12} className="animate-spin" />}
-				{candidatePathsReady ? 'Review' : 'Preparing targets'}
-			</button>
+			/>
 		);
 	}
 
 	return (
 		<DiffApplySession
+			key={`${session.language}\u0000${session.diffText}`}
 			parsed={session.parsed}
 			candidatePaths={candidatePaths}
 			workspaceRoots={workspaceRoots}
+			openInitially={session.openInitially}
 			consumeInitialReview={consumeInitialReview}
 		/>
 	);
+}
+
+function MessageOwnedDiffApplyControl({ messageDiffID }: { messageDiffID: string }) {
+	const store = useMessageDiffScope();
+	const snapshot = useMessageDiffSnapshot(store);
+
+	if (!store) {
+		return null;
+	}
+
+	const block = snapshot.blocks.find(candidate => candidate.id === messageDiffID);
+	const controller = store.getControllerForUI(messageDiffID);
+	const rawController = snapshot.controllers.get(messageDiffID);
+	const total = block?.parsed.files.length ?? 0;
+	const eligible = controller?.submittableFileCount ?? 0;
+	const presentation = controller
+		? getDiffBlockPresentation(controller)
+		: { label: 'Details / targets', tone: 'neutral' as const };
+
+	const operation = snapshot.operation;
+	const active = operation?.activeBlockID === messageDiffID;
+	const disabled = !snapshot.targetsReady || snapshot.isBusy || Boolean(operation);
+
+	return (
+		<DiffApplyActions
+			className="app-text-code font-mono"
+			onReview={() => {
+				void store.reviewBlock(messageDiffID);
+			}}
+			onDetails={() => {
+				store.openDetails(messageDiffID);
+			}}
+			onApply={() => {
+				void store.applyBlock(messageDiffID);
+			}}
+			reviewDisabled={disabled || total === 0}
+			detailsDisabled={!snapshot.targetsReady}
+			applyDisabled={disabled || eligible === 0}
+			reviewing={active && operation?.kind.startsWith('review')}
+			applying={active && operation?.kind.startsWith('apply')}
+			detailsLabel={presentation.label}
+			detailsTone={presentation.tone}
+			applyLabel={total === 1 ? 'Apply' : `Apply ${eligible}/${total}`}
+			applyTitle={
+				rawController?.files.some(file => file.targetPath)
+					? 'Submit eligible unfinished changes. Explicit targets can permit submission without review.'
+					: 'Submit eligible unfinished changes with successful backend reviews.'
+			}
+		/>
+	);
+}
+
+export function DiffApplyControl(props: DiffApplyControlProps) {
+	const store = useMessageDiffScope();
+
+	if (props.isBusy) {
+		return null;
+	}
+
+	if (store && props.messageDiffID) {
+		return <MessageOwnedDiffApplyControl messageDiffID={props.messageDiffID} />;
+	}
+
+	return <StandaloneDiffApplyControl {...props} />;
 }

@@ -40,8 +40,9 @@ function getTextContent(children: ReactNode): string {
 	return parts.join('');
 }
 
-export function MarkdownPreRenderer({ node: _node, children, ...props }: HTMLAttributes<HTMLPreElement> & ExtraProps) {
+export function MarkdownPreRenderer({ node, children, ...props }: HTMLAttributes<HTMLPreElement> & ExtraProps) {
 	const settings = useContext(MarkdownCodeRendererContext);
+	const messageDiffID = Reflect.get(node?.data ?? {}, 'messageDiffID');
 	const child = Children.toArray(children).find(value => isValidElement(value));
 
 	if (!isValidElement<{ className?: string; children?: ReactNode }>(child)) {
@@ -88,6 +89,7 @@ export function MarkdownPreRenderer({ node: _node, children, ...props }: HTMLAtt
 			diffCandidatePathsReady={settings.diffCandidatePathsReady}
 			defaultExpanded={settings.defaultCodeBlockExpanded}
 			disableControls={settings.isBusy}
+			messageDiffID={typeof messageDiffID === 'string' ? messageDiffID : undefined}
 		/>
 	);
 }

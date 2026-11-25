@@ -1,6 +1,6 @@
 // oxlint-disable unicorn/consistent-function-scoping func-name-matching
 import type { AnchorHTMLAttributes, HTMLAttributes, MouseEvent as ReactMouseEvent, ReactNode } from 'react';
-import { memo, useContext, useMemo } from 'react';
+import { memo, useContext, useLayoutEffect, useMemo, useRef } from 'react';
 import { FiExternalLink } from 'react-icons/fi';
 
 // oxlint-disable-next-line import/no-unassigned-import
@@ -21,12 +21,15 @@ import supersub from 'remark-supersub';
 
 import { backendAPI } from '@/apis/baseapi';
 
+import type { MessageDiffBlockSource } from '@/components/markdown/message_diff_inventory';
 import { remarkInlineCodeMath, sanitizeLaTeXOutsideFences } from '@/components/markdown/latex_utils';
 import { MarkdownCodeRenderer, MarkdownPreRenderer } from '@/components/markdown/markdown_code_renderer';
 import { MarkdownCodeRendererContext } from '@/components/markdown/markdown_code_renderer_context';
 import { MdErrorBoundary } from '@/components/markdown/markdown_error_boundary';
 import { MarkdownPresentationContext } from '@/components/markdown/markdown_presentation_context';
 import { MarkdownTable } from '@/components/markdown/markdown_table';
+import { createMessageDiffInventoryPlugin } from '@/components/markdown/message_diff_inventory';
+import { useMessageDiffScope } from '@/components/markdown/message_diff_scope';
 
 const strictSchema = {
 	...defaultSchema,
@@ -76,6 +79,7 @@ interface EnhancedMarkdownProps {
 	diffWorkspaceRoots?: string[];
 	diffCandidatePathsReady?: boolean;
 	defaultCodeBlockExpanded?: boolean;
+	enableMessageDiffs?: boolean;
 	onLinkClick?: (href: string, event: ReactMouseEvent<HTMLAnchorElement>) => boolean;
 }
 
@@ -222,16 +226,61 @@ function createMarkdownComponents(): Components {
 
 const markdownComponents = createMarkdownComponents();
 
-const MarkdownDocument = memo(function MarkdownDocument({ text, isBusy }: { text: string; isBusy: boolean }) {
+const MarkdownDocument = memo(function MarkdownDocument({
+	text,
+	isBusy,
+	enableMessageDiffs = false,
+	inventoryOnly = false,
+}: {
+	text: string;
+	isBusy: boolean;
+	enableMessageDiffs?: boolean;
+	inventoryOnly?: boolean;
+}) {
+	const messageScope = useMessageDiffScope();
+	const scope = enableMessageDiffs && !isBusy ? messageScope : null;
+	const inventoryRef = useRef<MessageDiffBlockSource[] | null>(null);
+	const rehypePlugins = useMemo<PluggableList>(() => {
+		const base = isBusy ? streamingRehypePlugins : richRehypePlugins;
+		if (!scope) {
+			return base;
+		}
+		return [
+			...base,
+			createMessageDiffInventoryPlugin(sources => {
+				inventoryRef.current = sources;
+			}),
+		];
+	}, [isBusy, scope]);
+
+	useLayoutEffect(() => {
+		if (scope && inventoryRef.current) {
+			scope.setSources(inventoryRef.current);
+		}
+	}, [inventoryOnly, scope, text]);
+
 	return (
 		<Markdown
 			remarkPlugins={isBusy ? streamingRemarkPlugins : richRemarkPlugins}
-			rehypePlugins={isBusy ? streamingRehypePlugins : richRehypePlugins}
+			rehypePlugins={rehypePlugins}
 			components={markdownComponents}
+			allowedElements={inventoryOnly ? [] : undefined}
 			skipHtml={false}
 		>
 			{text}
 		</Markdown>
+	);
+});
+
+export const MarkdownDiffInventory = memo(function MarkdownDiffInventory({ text }: { text: string }) {
+	const processedText = useMemo(() => sanitizeLaTeXOutsideFences(text), [text]);
+
+	return (
+		<div hidden aria-hidden="true">
+			<MdErrorBoundary source={text}>
+				<MarkdownDocument text={processedText} isBusy={false} enableMessageDiffs inventoryOnly />
+			</MdErrorBoundary>
+		</div>
 	);
 });
 
@@ -245,6 +294,7 @@ export const EnhancedMarkdown = memo(function EnhancedMarkdown({
 	diffWorkspaceRoots,
 	diffCandidatePathsReady = true,
 	defaultCodeBlockExpanded = true,
+	enableMessageDiffs = false,
 	onLinkClick,
 }: EnhancedMarkdownProps) {
 	const processedText = useMemo(() => (isBusy ? text : sanitizeLaTeXOutsideFences(text)), [isBusy, text]);
@@ -265,7 +315,7 @@ export const EnhancedMarkdown = memo(function EnhancedMarkdown({
 		<MdErrorBoundary source={text} resetKey={isBusy}>
 			<MarkdownPresentationContext.Provider value={presentation}>
 				<MarkdownCodeRendererContext.Provider value={codeRendererSettings}>
-					<MarkdownDocument text={processedText} isBusy={isBusy} />
+					<MarkdownDocument text={processedText} isBusy={isBusy} enableMessageDiffs={enableMessageDiffs} />
 				</MarkdownCodeRendererContext.Provider>
 			</MarkdownPresentationContext.Provider>
 		</MdErrorBoundary>
