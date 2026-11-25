@@ -39,7 +39,7 @@ func (w *ModelStoreWrapper) ListProviders(
 		if err != nil {
 			return nil, err
 		}
-		output = append(output, values...)
+		output = appendAvailableProviderItems(output, values)
 	}
 	return output, nil
 }
@@ -65,11 +65,14 @@ func (w *ModelStoreWrapper) ListModels(
 		if err != nil {
 			return nil, err
 		}
-		output = append(output, values...)
+		output = appendAvailableModelItems(output, values)
 	}
 	return output, nil
 }
 
+// GetProvider is a strict selected-item read. Use ListProviders for ordinary
+// page inventory because moved or removed Artifacts are intentionally absent
+// from the aggregate current catalog.
 func (w *ModelStoreWrapper) GetProvider(
 	ref artifactModel.ArtifactRef,
 ) (modelAPI.ProviderView, error) {
@@ -79,6 +82,8 @@ func (w *ModelStoreWrapper) GetProvider(
 	return w.api.GetProvider(context.Background(), ref)
 }
 
+// GetModel is a strict selected-item read. A moved Model Artifact is expected
+// to fail here after its old source origin becomes missing.
 func (w *ModelStoreWrapper) GetModel(
 	ref artifactModel.ArtifactRef,
 ) (modelAPI.ModelView, error) {
@@ -86,6 +91,32 @@ func (w *ModelStoreWrapper) GetModel(
 		return modelAPI.ModelView{}, storeSpec.ErrClosed
 	}
 	return w.api.GetModel(context.Background(), ref)
+}
+
+func appendAvailableProviderItems(
+	output []modelAPI.ProviderListItem,
+	values []modelAPI.ProviderListItem,
+) []modelAPI.ProviderListItem {
+	for _, value := range values {
+		if value.State != artifactModel.StateAvailable {
+			continue
+		}
+		output = append(output, value)
+	}
+	return output
+}
+
+func appendAvailableModelItems(
+	output []modelAPI.ModelListItem,
+	values []modelAPI.ModelListItem,
+) []modelAPI.ModelListItem {
+	for _, value := range values {
+		if value.State != artifactModel.StateAvailable {
+			continue
+		}
+		output = append(output, value)
+	}
+	return output
 }
 
 func (w *ModelStoreWrapper) SaveModelSettings(

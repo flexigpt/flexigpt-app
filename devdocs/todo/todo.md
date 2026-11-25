@@ -13,7 +13,8 @@
 
 - [ ] need the composer to collapse as needed or auto when reading or some better ux.
 - [ ] apply all diffs in convo is also needed in some way.
-- [ ] anthropic released sdk v2 - temperature is not there in sdk, most probably cannot use current api version with new sdk.
+- [x] anthropic released sdk v2 - temperature is not there in sdk, most probably cannot use current api version with new sdk.
+- [ ] artifacts store enabled disabled in artifact directly and not overlay. at some point this shoudl change so that builtin artifacts have everything from builtin and user preferences are in overay for builtin.
 
 ## M-n
 

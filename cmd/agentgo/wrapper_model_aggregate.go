@@ -70,7 +70,13 @@ func (w *ModelAggregateWrapper) GetDefaultProvider() (
 	defer w.mu.Unlock()
 
 	ctx := context.Background()
-	return w.defaultProvider(ctx)
+	resolution, err := w.effectiveDefaultModel(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	provider := resolution.Provider
+	return &provider, nil
 }
 
 // GetDefaultModel resolves the existing per-Provider defaultModel selection
@@ -85,23 +91,15 @@ func (w *ModelAggregateWrapper) GetDefaultModel() (
 	defer w.mu.Unlock()
 
 	ctx := context.Background()
-	provider, err := w.defaultProvider(ctx)
-	if err != nil {
-		return DefaultModelSelection{}, err
-	}
-
-	resolution, err := w.store.ResolveProviderDefaultModel(
-		ctx,
-		*provider,
-	)
+	resolution, err := w.effectiveDefaultModel(ctx)
 	if err != nil {
 		return DefaultModelSelection{}, err
 	}
 
 	return DefaultModelSelection{
-		Provider: *provider,
-		Model:    resolution.Resolved.Model.Artifact.Ref(),
-		Source:   resolution.Source,
+		Provider: resolution.Provider,
+		Model:    resolution.Model.Resolved.Model.Artifact.Ref(),
+		Source:   resolution.Model.Source,
 	}, nil
 }
 
@@ -309,30 +307,25 @@ func (w *ModelAggregateWrapper) SetProviderEnabled(
 	)
 }
 
-func (w *ModelAggregateWrapper) defaultProvider(
+func (w *ModelAggregateWrapper) effectiveDefaultModel(
 	ctx context.Context,
-) (*artifactModel.ArtifactRef, error) {
+) (modelAPI.EffectiveDefaultModelResolution, error) {
 	preference, err := w.preferences.GetDefaultProvider(ctx)
 	if err != nil {
-		return nil, err
+		return modelAPI.EffectiveDefaultModelResolution{}, err
 	}
-	selected, err := w.store.SelectDefaultProvider(
+	resolution, err := w.store.ResolveEffectiveDefaultModel(
 		ctx,
 		preference,
 		w.fallbackProvider,
 	)
 	if err != nil {
-		return nil, err
-	}
-	if selected == nil {
-		return nil, fmt.Errorf(
-			"%w: no enabled default Model Provider is available",
-			storeSpec.ErrReferenceUnresolved,
+		return modelAPI.EffectiveDefaultModelResolution{}, fmt.Errorf(
+			"resolve effective default Model: %w",
+			err,
 		)
 	}
-
-	output := *selected
-	return &output, nil
+	return resolution, nil
 }
 
 // mutateModelProvider serializes API-owned provider lifecycle changes:

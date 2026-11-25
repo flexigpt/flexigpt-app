@@ -23,10 +23,19 @@ export function DeleteModel(ref: model$1.ArtifactRef, expectedRevision: number):
     return $Call.ByName("main.ModelStoreWrapper.DeleteModel", ref, expectedRevision);
 }
 
+/**
+ * GetModel is a strict selected-item read. A moved Model Artifact is expected
+ * to fail here after its old source origin becomes missing.
+ */
 export function GetModel(ref: model$1.ArtifactRef): $CancellablePromise<model$0.ModelView> {
     return $Call.ByName("main.ModelStoreWrapper.GetModel", ref);
 }
 
+/**
+ * GetProvider is a strict selected-item read. Use ListProviders for ordinary
+ * page inventory because moved or removed Artifacts are intentionally absent
+ * from the aggregate current catalog.
+ */
 export function GetProvider(ref: model$1.ArtifactRef): $CancellablePromise<model$0.ProviderView> {
     return $Call.ByName("main.ModelStoreWrapper.GetProvider", ref);
 }
