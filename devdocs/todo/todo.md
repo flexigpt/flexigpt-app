@@ -9,12 +9,13 @@
   - [ ] test workspace
   - [ ] test all management pages again properly
 
-- [ ] even if all files are attached larger models tend to just call tools if they are present for arbitrary things without actually seeing if analysis is to be done with current already present context or not. this is even with that skill we have related to use context. see if the skill needs more better wording.
+- [ ] even if all files are attached; larger models tend to just call tools if they are present for arbitrary things without actually seeing if analysis is to be done with current already present context or not. This is even with that skill we have related to use context. see if the skill needs more better wording.
 
 - [ ] need the composer to collapse as needed or auto when reading or some better ux.
 - [ ] apply all diffs in convo is also needed in some way.
 - [x] anthropic released sdk v2 - temperature is not there in sdk, most probably cannot use current api version with new sdk.
 - [ ] artifacts store enabled disabled in artifact directly and not overlay. at some point this shoudl change so that builtin artifacts have everything from builtin and user preferences are in overay for builtin.
+- [ ] be careful when adding something to disabled internally for models etc. main issue stems from the enabled universal state. doing a disable to enable of a mdoel doesnt really have any effect as of now if it was previously disabled at hydration time.
 
 ## M-n
 
