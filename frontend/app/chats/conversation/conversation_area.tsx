@@ -1428,15 +1428,14 @@ function ConversationAreaInner(
 						<ButtonScrollToTop
 							onScrollToTop={scrollActiveToTop}
 							iconSize={32}
-							show={!isAtTop}
-							className="btn btn-md border-none bg-transparent shadow-none"
+							show
+							disabled={isAtTop}
+							className="btn btn-md border-none bg-transparent shadow-none disabled:opacity-40"
 						/>
 						<button
 							type="button"
 							disabled={!canJumpToPreviousMessage}
-							className={`btn btn-md border-none bg-transparent shadow-none transition-opacity duration-150 ${
-								canJumpToPreviousMessage ? 'visible opacity-100' : 'pointer-events-none invisible opacity-0'
-							}`}
+							className="btn btn-md border-none bg-transparent shadow-none disabled:opacity-40"
 							onClick={scrollActiveToPreviousMessage}
 							aria-label="Jump to previous message"
 							title="Jump to previous message"
@@ -1447,9 +1446,7 @@ function ConversationAreaInner(
 						<button
 							type="button"
 							disabled={!canJumpToNextMessage}
-							className={`btn btn-md border-none bg-transparent shadow-none transition-opacity duration-150 ${
-								canJumpToNextMessage ? 'visible opacity-100' : 'pointer-events-none invisible opacity-0'
-							}`}
+							className="btn btn-md border-none bg-transparent shadow-none disabled:opacity-40"
 							onClick={scrollActiveToNextMessage}
 							aria-label="Jump to next message"
 							title="Jump to next message"
@@ -1459,8 +1456,9 @@ function ConversationAreaInner(
 						<ButtonScrollToBottom
 							onScrollToBottom={scrollActiveToBottom}
 							iconSize={32}
-							show={!isAtBottom}
-							className="btn btn-md border-none bg-transparent shadow-none"
+							show
+							disabled={isAtBottom}
+							className="btn btn-md border-none bg-transparent shadow-none disabled:opacity-40"
 						/>
 					</div>
 				</div>
