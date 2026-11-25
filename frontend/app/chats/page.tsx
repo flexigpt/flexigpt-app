@@ -125,7 +125,7 @@ export default function ChatsPage() {
 
 	return (
 		<PageFrame contentScrollable={false}>
-			<div className="grid size-full grid-rows-[auto_1fr_auto] overflow-hidden">
+			<div className="grid size-full grid-rows-[auto_1fr] overflow-hidden">
 				<div className="relative row-start-1 row-end-2 min-h-0 min-w-0 p-0">
 					<ChatTabsBar
 						store={tabStore}

@@ -371,8 +371,6 @@ export function useInputRegistry({ tabExists }: UseInputRegistryArgs) {
 	const openSkillsMenu = useCallback((tabId: string) => inputRefs.current.get(tabId)?.openSkillsMenu(), []);
 	const openMCPMenu = useCallback((tabId: string) => inputRefs.current.get(tabId)?.openMCPMenu(), []);
 	const openWorkspaceMenu = useCallback((tabId: string) => inputRefs.current.get(tabId)?.openWorkspaceMenu(), []);
-	const requestStopResponse = useCallback((tabId: string) => inputRefs.current.get(tabId)?.requestStopResponse(), []);
-
 	const disposeInputRuntime = useCallback((tabId: string) => {
 		inputRefs.current.delete(tabId);
 		pendingWorkflowStartersRef.current.delete(tabId);
@@ -401,7 +399,6 @@ export function useInputRegistry({ tabExists }: UseInputRegistryArgs) {
 		openSkillsMenu,
 		openMCPMenu,
 		openWorkspaceMenu,
-		requestStopResponse,
 		disposeInputRuntime,
 		applyWorkflowStarterToComposer,
 	};

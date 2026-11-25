@@ -868,11 +868,8 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 			}
 
 			selectTab(nextId);
-			requestAnimationFrame(() => {
-				conversationAreaRef.current?.focusInput(nextId);
-			});
 		},
-		[conversationAreaRef, selectTab]
+		[selectTab]
 	);
 
 	const selectNextTab = useCallback(() => {
@@ -947,6 +944,8 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 	const loadConversationIntoTab = useCallback(
 		async (tabId: string, item: SessionSearchItem) => {
 			const loadVersion = beginTabLoad(tabId);
+			conversationAreaRef.current?.hideComposer(tabId);
+
 			updateTab(tabId, tab => ({
 				...tab,
 				isHydrating: true,
@@ -1036,12 +1035,8 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 
 			selectTab(targetId);
 			await loadConversationIntoTab(targetId, item);
-
-			requestAnimationFrame(() => {
-				conversationAreaRef.current?.focusInput(targetId);
-			});
 		},
-		[conversationAreaRef, ensureTabLoaded, loadConversationIntoTab, selectTab]
+		[ensureTabLoaded, loadConversationIntoTab, selectTab]
 	);
 
 	const openSessionForMCPAppMessage = useCallback(

@@ -1,5 +1,5 @@
 import { memo, useCallback, useMemo, useState } from 'react';
-import { FiAlertTriangle, FiUser, FiZap } from 'react-icons/fi';
+import { FiAlertTriangle, FiCpu, FiUser } from 'react-icons/fi';
 
 import type { UIToolCall, UIToolOutput } from '@/spec/inference';
 import type { ConversationMessage } from '@/spec/session';
@@ -435,7 +435,7 @@ export const ChatMessage = memo(function ChatMessage({
 						<div className={`${rightColSpan} flex justify-start`}>
 							{!isUser && (
 								<div className="my-0 mr-0 ml-2 flex size-8 items-center justify-center self-end">
-									<FiZap size={24} />
+									<FiCpu size={24} />
 								</div>
 							)}
 						</div>
@@ -502,7 +502,7 @@ export const ChatMessage = memo(function ChatMessage({
 					{/* If the card row is hidden, keep the assistant icon aligned with the footer row */}
 					{!showBodyWithMedia && !isUser && (
 						<div className="my-0 mr-0 ml-2 flex size-8 items-center justify-center">
-							<FiZap size={24} />
+							<FiCpu size={24} />
 						</div>
 					)}
 				</div>

@@ -13,6 +13,7 @@ import { ComposerBox } from '@/chats/composer/composer_box';
 function TabInputPaneInner(props: {
 	tabId: string;
 	active: boolean;
+	visible: boolean;
 	isBusy: boolean;
 	isGenerating: boolean;
 	isHydrating: boolean;
@@ -33,10 +34,7 @@ function TabInputPaneInner(props: {
 		options: UIModelOption
 	) => Promise<SessionConfiguration | undefined>;
 	cancelEditing: (tabId: string) => void;
-	cancelRun: (tabId: string) => Promise<void>;
-	showAutomationControl: boolean;
-	automationHoldEnabled: boolean;
-	onToggleAutomationHold: () => void;
+	onSubmissionAccepted: (tabId: string) => void;
 	showPendingToolControls: boolean;
 	canContinueWithoutDraft: boolean;
 	onRunPendingTools: (continueRun: boolean) => void;
@@ -51,6 +49,7 @@ function TabInputPaneInner(props: {
 	const {
 		tabId,
 		active,
+		visible,
 		isBusy,
 		isGenerating,
 		isHydrating,
@@ -62,10 +61,7 @@ function TabInputPaneInner(props: {
 		sendMessage,
 		sendContinuation,
 		cancelEditing,
-		cancelRun,
-		showAutomationControl,
-		automationHoldEnabled,
-		onToggleAutomationHold,
+		onSubmissionAccepted,
 		showPendingToolControls,
 		canContinueWithoutDraft,
 		onRunPendingTools,
@@ -81,20 +77,34 @@ function TabInputPaneInner(props: {
 	const composerRef = useMemo(() => setInputRef(tabId), [setInputRef, tabId]);
 
 	const onSend = useCallback(
-		(payload: EditorSubmitPayload, options: UIModelOption) =>
-			allowContinuationInput ? sendContinuation(tabId, payload, options) : sendMessage(tabId, payload, options),
-		[allowContinuationInput, sendContinuation, sendMessage, tabId]
+		async (payload: EditorSubmitPayload, options: UIModelOption) => {
+			const configuration = allowContinuationInput
+				? await sendContinuation(tabId, payload, options)
+				: await sendMessage(tabId, payload, options);
+
+			// Continuation input can be accepted for staging even when the
+			// subsequent ContinueRun command fails. Keep the Composer visible
+			// for continuation flows so its retry and recovery controls remain
+			// available in that case.
+			if (configuration && !allowContinuationInput) {
+				onSubmissionAccepted(tabId);
+			}
+
+			return configuration;
+		},
+		[allowContinuationInput, onSubmissionAccepted, sendContinuation, sendMessage, tabId]
 	);
 	const onCancelEditing = useCallback(() => {
 		cancelEditing(tabId);
 	}, [cancelEditing, tabId]);
 
 	return (
-		<div className={active ? 'block' : 'hidden'}>
+		<div className={active && visible ? 'block' : 'hidden'}>
 			<ComposerBox
 				ref={composerRef}
 				onSend={onSend}
 				isActive={active}
+				isVisible={visible}
 				isBusy={isBusy}
 				isGenerating={isGenerating}
 				isHydrating={isHydrating}
@@ -103,12 +113,6 @@ function TabInputPaneInner(props: {
 				shortcutConfig={shortcutConfig}
 				editingMessageId={editingMessageId}
 				onCancelEditing={onCancelEditing}
-				onCancelRun={() => {
-					return cancelRun(tabId);
-				}}
-				showAutomationControl={showAutomationControl}
-				automationHoldEnabled={automationHoldEnabled}
-				onToggleAutomationHold={onToggleAutomationHold}
 				showPendingToolControls={showPendingToolControls}
 				canContinueWithoutDraft={canContinueWithoutDraft}
 				onRunPendingTools={onRunPendingTools}
@@ -125,7 +129,7 @@ function TabInputPaneInner(props: {
 }
 
 export const TabInputPane = memo(TabInputPaneInner, (previous, next) => {
-	if (previous.tabId !== next.tabId || previous.active !== next.active) {
+	if (previous.tabId !== next.tabId || previous.active !== next.active || previous.visible !== next.visible) {
 		return false;
 	}
 
@@ -145,8 +149,7 @@ export const TabInputPane = memo(TabInputPaneInner, (previous, next) => {
 		previous.editingMessageId === next.editingMessageId &&
 		previous.runtimeStateUpdatedAt === next.runtimeStateUpdatedAt &&
 		previous.shortcutConfig === next.shortcutConfig &&
-		previous.showAutomationControl === next.showAutomationControl &&
-		previous.automationHoldEnabled === next.automationHoldEnabled &&
+		previous.onSubmissionAccepted === next.onSubmissionAccepted &&
 		previous.showPendingToolControls === next.showPendingToolControls &&
 		previous.canContinueWithoutDraft === next.canContinueWithoutDraft &&
 		previous.sessionToolCalls === next.sessionToolCalls &&

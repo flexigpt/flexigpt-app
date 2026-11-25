@@ -1,4 +1,4 @@
-import { forwardRef, memo, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import { forwardRef, memo, useCallback, useImperativeHandle, useRef } from 'react';
 
 import type { AttachmentsDroppedPayload } from '@/spec/attachment';
 import type { UIToolCall, UIToolOutput } from '@/spec/inference';
@@ -12,8 +12,6 @@ import { SkillSessionSyncMode } from '@/spec/skill';
 import type { ShortcutConfig } from '@/lib/keyboard_shortcuts';
 
 import { normalizeSkillRefs } from '@/apis/skill_management';
-
-import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
 
 import type { EditorAreaHandle } from '@/chats/composer/editor/editor_area';
 import type { EditorExternalMessage, EditorSubmitPayload } from '@/chats/composer/editor/editor_types';
@@ -38,7 +36,6 @@ export interface ComposerBoxHandle {
 	openSkillsMenu(): void;
 	openMCPMenu(): void;
 	openWorkspaceMenu(): void;
-	requestStopResponse(): void;
 	loadWorkflowStarter(starter: ChatWorkflowStarter): Promise<boolean>;
 	loadExternalMessage(message: EditorExternalMessage): void;
 	setConversationToolsFromChoices(tools: ToolStoreChoice[]): void;
@@ -61,6 +58,7 @@ interface ComposerBoxProps {
 	onSend: (message: EditorSubmitPayload, options: UIModelOption) => Promise<SessionConfiguration | undefined>;
 	isActive: boolean;
 	isBusy: boolean;
+	isVisible: boolean;
 	isGenerating: boolean;
 	allowContinuationInput?: boolean;
 	continuationCanContinue?: boolean;
@@ -68,10 +66,6 @@ interface ComposerBoxProps {
 	shortcutConfig: ShortcutConfig;
 	editingMessageId: string | null;
 	onCancelEditing: () => void;
-	onCancelRun: () => Promise<void>;
-	showAutomationControl: boolean;
-	automationHoldEnabled: boolean;
-	onToggleAutomationHold: () => void;
 	showPendingToolControls: boolean;
 	canContinueWithoutDraft: boolean;
 	onRunPendingTools: (continueRun: boolean) => void;
@@ -90,6 +84,7 @@ export const ComposerBox = memo(
 			onSend,
 			isBusy,
 			isActive,
+			isVisible,
 			isGenerating,
 			allowContinuationInput = false,
 			continuationCanContinue = false,
@@ -97,10 +92,6 @@ export const ComposerBox = memo(
 			shortcutConfig,
 			editingMessageId,
 			onCancelEditing,
-			onCancelRun,
-			showAutomationControl,
-			automationHoldEnabled,
-			onToggleAutomationHold,
 			showPendingToolControls,
 			canContinueWithoutDraft,
 			onRunPendingTools,
@@ -114,7 +105,6 @@ export const ComposerBox = memo(
 		},
 		ref
 	) {
-		const [abortConfirmationRequested, setAbortConfirmationRequested] = useState(false);
 		const editorAreaRef = useRef<EditorAreaHandle>(null);
 		const sessionConfigurationBaselineRef = useRef<SessionConfiguration | undefined>(undefined);
 		const preEditConfigurationRef = useRef<SessionConfiguration | undefined>(undefined);
@@ -124,12 +114,6 @@ export const ComposerBox = memo(
 			modelDefaultPrompt: composerContext.selectedModel.systemPrompt,
 			modelOptionsLoaded: composerContext.modelOptionsLoaded,
 		});
-
-		useEffect(() => {
-			if (!isActive || !isBusy) {
-				setAbortConfirmationRequested(false);
-			}
-		}, [isActive, isBusy]);
 
 		const applyAgentUserMessageStarter = useCallback((text: string): boolean => {
 			return editorAreaRef.current?.setDraftTextIfEmpty(text) ?? false;
@@ -205,7 +189,6 @@ export const ComposerBox = memo(
 		}, [onCancelEditing, restoreComposerConfiguration]);
 
 		const resetComposerState = useCallback(() => {
-			setAbortConfirmationRequested(false);
 			restoreGuardRef.current.invalidate();
 			preEditConfigurationRef.current = undefined;
 			agent.clearAgentTracking();
@@ -234,7 +217,6 @@ export const ComposerBox = memo(
 
 		const handleSubmit = useCallback(
 			async (payload: EditorSubmitPayload): Promise<void> => {
-				setAbortConfirmationRequested(false);
 				if (!composerContext.hasRunnableModel) {
 					throw new Error('Select an available model before sending.');
 				}
@@ -325,7 +307,6 @@ export const ComposerBox = memo(
 				openSkillsMenu: () => editorAreaRef.current?.openSkillsMenu(),
 				openMCPMenu: () => editorAreaRef.current?.openMCPMenu(),
 				openWorkspaceMenu: () => editorAreaRef.current?.openWorkspaceMenu(),
-				requestStopResponse: () => editorAreaRef.current?.requestStopResponse(),
 				loadWorkflowStarter: async starter => {
 					resetComposerState();
 					editorAreaRef.current?.setDraftText(starter.draft ?? '');
@@ -349,7 +330,6 @@ export const ComposerBox = memo(
 				setSkillStateFromMessage: (enabled, active, options) =>
 					editorAreaRef.current?.setSkillStateFromMessage(enabled, active, options),
 				restoreConversationContext: context => {
-					setAbortConfirmationRequested(false);
 					agent.clearAgentTracking();
 					restoreGuardRef.current.invalidate();
 					preEditConfigurationRef.current = undefined;
@@ -374,7 +354,6 @@ export const ComposerBox = memo(
 					void agent.trackDefaultAgentWithoutApplying();
 				},
 				restoreSessionConfiguration: async configuration => {
-					setAbortConfirmationRequested(false);
 					editorAreaRef.current?.resetEditor();
 					sessionConfigurationBaselineRef.current = structuredClone(configuration);
 					preEditConfigurationRef.current = undefined;
@@ -403,25 +382,11 @@ export const ComposerBox = memo(
 					<ContextBar context={composerContext} agent={agent} />
 				</div>
 
-				<DeleteConfirmationModal
-					isOpen={isActive && isBusy && abortConfirmationRequested}
-					onClose={() => {
-						setAbortConfirmationRequested(false);
-					}}
-					onConfirm={() => {
-						setAbortConfirmationRequested(false);
-						void onCancelRun().catch(console.error);
-					}}
-					title="Abort generation?"
-					message="Partial output already received remains in the conversation. Stop the request?"
-					confirmButtonText="Abort"
-				/>
-
 				<EditorArea
 					ref={editorAreaRef}
 					isGenerating={isGenerating}
 					isActive={isActive}
-					isRunActive={isBusy}
+					isVisible={isVisible}
 					agentManager={agent}
 					submissionMode={allowContinuationInput ? 'continuation' : 'message'}
 					continuationCanContinue={continuationCanContinue}
@@ -429,17 +394,9 @@ export const ComposerBox = memo(
 					currentProviderSDKType={composerContext.modelOptions.providerSDKType}
 					shortcutConfig={shortcutConfig}
 					onSubmit={handleSubmit}
-					onRequestStop={() => {
-						if (isBusy) {
-							setAbortConfirmationRequested(true);
-						}
-					}}
 					editingMessageId={editingMessageId}
 					cancelEditing={cancelEditingAndRestoreComposer}
 					systemPrompt={systemPrompt}
-					showAutomationControl={showAutomationControl}
-					automationHoldEnabled={automationHoldEnabled}
-					onToggleAutomationHold={onToggleAutomationHold}
 					showPendingToolControls={showPendingToolControls}
 					canContinueWithoutDraft={canContinueWithoutDraft}
 					onRunPendingTools={onRunPendingTools}

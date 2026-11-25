@@ -1,17 +1,6 @@
 import type { KeyboardEvent as ReactKeyboardEvent, SubmitEventHandler } from 'react';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
-import {
-	FiAlertTriangle,
-	FiEdit2,
-	FiFastForward,
-	FiPlay,
-	FiSend,
-	FiSquare,
-	FiTool,
-	FiTrash2,
-	FiX,
-	FiZapOff,
-} from 'react-icons/fi';
+import { FiAlertTriangle, FiEdit2, FiFastForward, FiPlay, FiSend, FiTool, FiTrash2, FiX } from 'react-icons/fi';
 
 import { useMenuStore, useStoreState } from '@ariakit/react';
 import { Plate, PlateContent } from 'platejs/react';
@@ -28,7 +17,6 @@ import { SkillSessionSyncMode } from '@/spec/skill';
 import { ToolImplType } from '@/spec/tool';
 
 import type { ShortcutConfig } from '@/lib/keyboard_shortcuts';
-import { formatShortcut } from '@/lib/keyboard_shortcuts';
 
 import { useEnterSubmit } from '@/hooks/use_enter_submit';
 import { useTools } from '@/hooks/use_tool';
@@ -95,7 +83,6 @@ export interface EditorAreaHandle {
 	openMCPMenu: () => void;
 	openWorkspaceMenu: () => void;
 	clearWorkspace: () => void;
-	requestStopResponse: () => void;
 	loadExternalMessage: (msg: EditorExternalMessage) => void;
 	setDraftText: (text: string) => void;
 	setDraftTextIfEmpty: (text: string) => boolean;
@@ -117,21 +104,17 @@ export interface EditorAreaHandle {
 interface EditorAreaProps {
 	isGenerating: boolean;
 	isActive: boolean;
+	isVisible: boolean;
 	agentManager?: AgentManagerState;
 	isInputLocked: boolean;
-	isRunActive: boolean;
 	submissionMode?: 'message' | 'continuation';
 	continuationCanContinue?: boolean;
 	currentProviderSDKType: ProviderSDKType;
 	shortcutConfig: ShortcutConfig;
 	onSubmit: (payload: EditorSubmitPayload) => Promise<void>;
-	onRequestStop: () => void;
 	editingMessageId: string | null;
 	cancelEditing: () => void;
 	systemPrompt: AgentSystemPromptController;
-	showAutomationControl: boolean;
-	automationHoldEnabled: boolean;
-	onToggleAutomationHold: () => void;
 	showPendingToolControls: boolean;
 	canContinueWithoutDraft: boolean;
 	onRunPendingTools: (continueRun: boolean) => void;
@@ -165,19 +148,15 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		agentManager,
 		isInputLocked: inputLocked,
 		isActive,
-		isRunActive,
+		isVisible,
 		submissionMode = 'message',
 		continuationCanContinue = false,
 		currentProviderSDKType,
 		shortcutConfig,
 		onSubmit,
-		onRequestStop,
 		editingMessageId,
 		cancelEditing,
 		systemPrompt,
-		showAutomationControl,
-		automationHoldEnabled,
-		onToggleAutomationHold,
 		showPendingToolControls,
 		canContinueWithoutDraft,
 		onRunPendingTools,
@@ -556,10 +535,10 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	}, [attachmentMenu, mcpMenu, skillsMenu, templateMenu, toolMenu, workspaceMenu]);
 
 	useEffect(() => {
-		if (!isActive) {
+		if (!isActive || !isVisible) {
 			closeAllMenus();
 		}
-	}, [closeAllMenus, isActive]);
+	}, [closeAllMenus, isActive, isVisible]);
 
 	useEffect(() => {
 		if (!templateMenuOpen) {
@@ -1430,11 +1409,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			clearWorkspace: () => {
 				void workspace.detachWorkspace(false);
 			},
-			requestStopResponse: () => {
-				if (isRunActive) {
-					onRequestStop();
-				}
-			},
 			loadExternalMessage,
 			setDraftText,
 			setDraftTextIfEmpty,
@@ -1493,8 +1467,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			focusEditorAtEnd,
 			loadExternalMessage,
 			mcp,
-			onRequestStop,
-			isRunActive,
 			openAttachmentPicker,
 			openMCPPicker,
 			openSkillsPicker,
@@ -1515,7 +1487,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		cancelEditing();
 	}, [cancelEditing, resetEditor, restorePreEditContext]);
 
-	const stopResponseShortcut = formatShortcut(shortcutConfig.stopResponse);
 	const sendActionText =
 		submissionMode === 'continuation'
 			? continuationCanContinue
@@ -1628,15 +1599,15 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 								</div>
 							) : null}
 
-							<div className="flex min-h-24 min-w-0 grow gap-2 overflow-hidden p-1">
+							<div className="flex min-h-18 min-w-0 grow gap-2 overflow-hidden p-1">
 								<PlateContent
 									ref={contentRef}
 									placeholder="Type message..."
 									spellCheck={false}
 									autoCorrect="off"
 									autoCapitalize="off"
-									readOnly={isInputLocked || !isActive}
-									tabIndex={isActive ? 0 : -1}
+									readOnly={isInputLocked || !isActive || !isVisible}
+									tabIndex={isActive && isVisible ? 0 : -1}
 									onKeyDown={handleEditorKeyDown}
 									onPaste={onEditorPaste}
 									scrollSelectionIntoView={scrollSelectionIntoEditorView}
@@ -1646,7 +1617,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 										lineHeight: 1.5,
 										whiteSpace: 'break-spaces',
 										tabSize: 2,
-										minHeight: '4rem',
+										minHeight: '4.5rem',
 										boxSizing: 'border-box',
 										overflowAnchor: 'none',
 										overscrollBehavior: 'contain',
@@ -1737,28 +1708,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 								</>
 							) : null}
 
-							{showAutomationControl ? (
-								<HoverTip
-									content={
-										automationHoldEnabled
-											? 'Resume automatic tools and continuation'
-											: 'Hold the next automatic tool and continuation batch'
-									}
-									placement="left"
-								>
-									<button
-										type="button"
-										className={`btn btn-circle btn-sm shrink-0 ${
-											automationHoldEnabled ? 'btn-warning' : 'btn-neutral'
-										}`}
-										onClick={onToggleAutomationHold}
-										aria-label={automationHoldEnabled ? 'Resume automatic tools' : 'Hold automatic tools'}
-									>
-										<FiZapOff size={18} />
-									</button>
-								</HoverTip>
-							) : null}
-
 							{stagedAppContextUpdateCount > 0 ? (
 								<HoverTip
 									content={`Discard ${stagedAppContextUpdateCount} staged MCP App context update${
@@ -1777,53 +1726,22 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 								</HoverTip>
 							) : null}
 
-							{!isGenerating && isRunActive ? (
-								<HoverTip content="Cancel active run" placement="left">
-									<button
-										type="button"
-										className="btn btn-circle btn-warning btn-sm shrink-0"
-										onClick={onRequestStop}
-										aria-label="Cancel active run"
-									>
-										<FiSquare size={18} />
-									</button>
-								</HoverTip>
-							) : null}
-
-							{isGenerating ? (
-								<HoverTip
-									content={stopResponseShortcut ? `Stop response (${stopResponseShortcut})` : 'Stop response'}
-									placement="left"
+							<HoverTip content={sendActionText} placement="left">
+								<button
+									type="button"
+									className={`btn btn-circle btn-neutral btn-sm shrink-0 ${!isSendButtonEnabled ? 'btn-disabled' : ''}`}
+									disabled={!isSendButtonEnabled}
+									onClick={() => {
+										if (!isSendButtonEnabled) {
+											return;
+										}
+										void doSubmit();
+									}}
+									aria-label={sendActionText}
 								>
-									<button
-										type="button"
-										className="btn btn-circle btn-neutral btn-sm shrink-0"
-										onClick={onRequestStop}
-										aria-label="Stop response"
-									>
-										<FiSquare size={20} />
-									</button>
-								</HoverTip>
-							) : (
-								<HoverTip content={sendActionText} placement="left">
-									<button
-										type="button"
-										className={`btn btn-circle btn-neutral btn-sm shrink-0 ${
-											!isSendButtonEnabled ? 'btn-disabled' : ''
-										}`}
-										disabled={!isSendButtonEnabled}
-										onClick={() => {
-											if (!isSendButtonEnabled) {
-												return;
-											}
-											void doSubmit();
-										}}
-										aria-label={sendActionText}
-									>
-										<FiSend size={18} />
-									</button>
-								</HoverTip>
-							)}
+									<FiSend size={18} />
+								</button>
+							</HoverTip>
 						</div>
 					</div>
 

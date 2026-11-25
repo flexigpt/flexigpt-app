@@ -11,13 +11,14 @@ import {
 	useRef,
 	useState,
 } from 'react';
-import { FiChevronDown, FiChevronUp } from 'react-icons/fi';
+import { FiChevronDown, FiChevronUp, FiEdit, FiMinimize2, FiPause, FiPlay, FiSquare } from 'react-icons/fi';
 
 import type { Attachment } from '@/spec/attachment';
 import type { UIToolCall } from '@/spec/inference';
 import type { Conversation, ConversationMessage, SessionConfiguration, SessionRun } from '@/spec/session';
 import type { SessionOpaqueJSON, SessionWaitingRequest, SessionWaitResolution } from '@/spec/session_base';
 import { RoleEnum, UIToolCallStatus } from '@/spec/inference';
+import { MCPExecutionMode } from '@/spec/mcp';
 import { SessionAutomationHoldScope, SessionOperationState } from '@/spec/session_base';
 import { ToolOutputKind } from '@/spec/tool';
 
@@ -26,7 +27,10 @@ import type { ShortcutConfig } from '@/lib/keyboard_shortcuts';
 import { sessionManagementAPI } from '@/apis/baseapi';
 
 import { ButtonScrollToBottom, ButtonScrollToTop } from '@/components/button_scroll_top_bottom';
+import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
+import { HoverTip } from '@/components/hover_tip';
 
+import type { ComposerBoxHandle } from '@/chats/composer/composer_box';
 import type { ChatWorkflowStarter } from '@/chats/conversation/starter_intent';
 import type { MCPAppModelContextUpdateEventDetail, MCPAppUIMessageEventDetail } from '@/chats/mcpapps/mcp_app_events';
 import type { AssistantResponseTiming } from '@/chats/messages/message_footer';
@@ -49,11 +53,13 @@ import { SessionWaitModal } from '@/chats/session/session_wait_modal';
 
 const EMPTY_MESSAGES: ConversationMessage[] = [];
 const EMPTY_DIFF_CANDIDATE_PATHS = new Map<string, string[]>();
+const EMPTY_TOOL_CALLS: UIToolCall[] = [];
 const MAX_DIFF_CANDIDATE_PATHS = 1024;
 const RICH_RENDER_DEFER_MESSAGE_COUNT = 4;
 const RICH_RENDER_DEFER_TEXT_LENGTH = 4_000;
 const RICH_RENDER_BATCH_SIZE = 1;
 const RICH_RENDER_IDLE_TIMEOUT_MS = 250;
+const FLOATING_COMPOSER_SCROLL_CLEARANCE = 24;
 
 const DIFF_MARKDOWN_SIGNAL_PATTERN =
 	/```(?:diff|patch|udiff)\b|^diff --git\s|^Index:\s+|^@@|^\*\*\*\s+(?:Begin Patch|(?:Add|Update|Delete)\s+File:)\s*$|^---\s+.+\n\+\+\+\s+/im;
@@ -108,6 +114,21 @@ function runHasGeneratingModelOperation(run: SessionRun | undefined): boolean {
 		operation?.state === SessionOperationState.Queued ||
 		operation?.state === SessionOperationState.Preparing ||
 		operation?.state === SessionOperationState.Running
+	);
+}
+
+function runHasAutomaticToolConfiguration(run: SessionRun | undefined): boolean {
+	return (
+		run?.modelOperations?.some(operation => {
+			const configuration = operation.request.configuration;
+			const hasAutomaticTool = configuration.tools?.some(override => override.value?.autoExecute === true) ?? false;
+			const hasAutomaticMCPTool =
+				configuration.mcp?.some(override => {
+					return override.value?.selectedTools?.some(tool => tool.executionMode === MCPExecutionMode.Auto) ?? false;
+				}) ?? false;
+
+			return hasAutomaticTool || hasAutomaticMCPTool;
+		}) ?? false
 	);
 }
 
@@ -692,6 +713,7 @@ export interface ConversationAreaHandle {
 	disposeTabRuntime: (tabId: string) => void;
 	syncComposerFromConversation: (tabId: string, conv: Conversation) => void;
 	resetComposerForNewConversation: (tabId: string) => Promise<void>;
+	hideComposer: (tabId: string) => void;
 	restoreComposerFromSessionConfiguration: (tabId: string, configuration: SessionConfiguration) => Promise<void>;
 
 	focusInput: (tabId: string) => void;
@@ -731,6 +753,26 @@ interface WaitResolutionState {
 interface SessionActionErrorState {
 	tabId: string;
 	message: string;
+}
+
+interface RunCancellationConfirmation {
+	tabId: string;
+	runID: string;
+}
+
+function isCurrentRunCancellationConfirmation(
+	confirmation: RunCancellationConfirmation | null,
+	tabs: ChatTabState[]
+): boolean {
+	if (!confirmation) {
+		return false;
+	}
+
+	const tab = tabs.find(candidate => candidate.tabId === confirmation.tabId);
+	const snapshot = tab?.sessionSnapshot;
+	const run = snapshot ? selectedSessionRun(snapshot, tab?.activeRunID) : undefined;
+
+	return run?.id === confirmation.runID && getSessionRunComposerState(run).isActive;
 }
 
 function ConversationAreaInner(
@@ -782,7 +824,29 @@ function ConversationAreaInner(
 		activeRun,
 		(activeSessionToolActivity?.outputs.length ?? 0) > 0
 	);
+	const { pendingWait, pendingExecutableToolCallIDs, canRunPendingToolCalls } = activeRunComposerState;
+	const hasAutomaticToolCalls = activeRun?.toolCalls?.some(call => call.automatic === true) ?? false;
+	const hasAutomaticToolConfiguration = runHasAutomaticToolConfiguration(activeRun);
+	const automationHoldEnabled =
+		activeRun?.controls.automaticTools.enabled === true || activeRun?.controls.automaticContinuation.enabled === true;
 	const activeConversationContentIsHydrating = activeTabIsHydrating && messageCount === 0;
+	const activeSessionToolCalls = activeSessionToolActivity?.calls ?? EMPTY_TOOL_CALLS;
+	const [composerVisibilityByTab, setComposerVisibilityByTab] = useState<Record<string, boolean>>({});
+	const [composerPanelElement, setComposerPanelElement] = useState<HTMLDivElement | null>(null);
+	const [composerPanelHeight, setComposerPanelHeight] = useState(0);
+	const [runCancellationConfirmation, setRunCancellationConfirmation] = useState<RunCancellationConfirmation | null>(
+		null
+	);
+	const [dismissedManualComposerRequirementKeyByTab, setDismissedManualComposerRequirementKeyByTab] = useState<
+		Record<string, string>
+	>({});
+	const composerToggleButtonRef = useRef<HTMLButtonElement | null>(null);
+	const runCancellationConfirmationOpen = isCurrentRunCancellationConfirmation(runCancellationConfirmation, tabs);
+
+	const activeTabStartsInWritingMode =
+		activeTab !== undefined && !activeTab.sessionID && !activeTab.isHydrating && messageCount === 0;
+	const composerVisibilityOverride = activeTabId ? composerVisibilityByTab[activeTabId] : undefined;
+	const defaultComposerVisible = activeTabStartsInWritingMode;
 
 	useLayoutEffect(() => {
 		tabsRef.current = tabs;
@@ -792,6 +856,143 @@ function ConversationAreaInner(
 	useLayoutEffect(() => {
 		selectedTabIdRef.current = selectedTabId;
 	}, [selectedTabId]);
+
+	useLayoutEffect(() => {
+		if (!composerPanelElement || typeof ResizeObserver === 'undefined') {
+			return;
+		}
+
+		const observer = new ResizeObserver(() => {
+			const nextHeight = Math.ceil(composerPanelElement.getBoundingClientRect().height);
+			setComposerPanelHeight(current => (current === nextHeight ? current : nextHeight));
+		});
+
+		observer.observe(composerPanelElement);
+
+		return () => {
+			observer.disconnect();
+		};
+	}, [composerPanelElement]);
+
+	const manualToolActionCalls = useMemo(() => {
+		if (activeTabIsHydrating || activeEditingMessageId || !activeRunComposerState.isActive) {
+			return EMPTY_TOOL_CALLS;
+		}
+
+		return activeSessionToolCalls.filter(call => {
+			if (call.status === UIToolCallStatus.Failed) {
+				return !activeTabIsGenerating;
+			}
+
+			return (
+				activeRunComposerState.canRunPendingToolCalls &&
+				call.status === UIToolCallStatus.Pending &&
+				(!call.automatic || automationHoldEnabled)
+			);
+		});
+	}, [
+		activeEditingMessageId,
+		activeRunComposerState.canRunPendingToolCalls,
+		activeRunComposerState.isActive,
+		activeSessionToolCalls,
+		activeTabIsGenerating,
+		activeTabIsHydrating,
+		automationHoldEnabled,
+	]);
+
+	const hasContinuationAction =
+		!activeTabIsHydrating &&
+		!activeEditingMessageId &&
+		!activeTabIsGenerating &&
+		activeRunComposerState.canContinueWithoutDraft;
+
+	const activeManualComposerRequirementKey = useMemo(() => {
+		const requirements = manualToolActionCalls.map(call => `tool:${call.id}:${call.status}`);
+
+		if (hasContinuationAction) {
+			requirements.push(`continue:${activeRun?.continuation.revision ?? ''}`);
+		}
+
+		return requirements.length > 0 ? `${activeRun?.id ?? ''}:${requirements.join('|')}` : undefined;
+	}, [activeRun, hasContinuationAction, manualToolActionCalls]);
+
+	const dismissedManualComposerRequirementKey = activeTabId
+		? dismissedManualComposerRequirementKeyByTab[activeTabId]
+		: undefined;
+	const shouldAutoRevealComposer =
+		activeManualComposerRequirementKey !== undefined &&
+		dismissedManualComposerRequirementKey !== activeManualComposerRequirementKey;
+
+	const composerVisible =
+		activeTab !== undefined &&
+		(composerVisibilityOverride === true ||
+			(composerVisibilityOverride === undefined && defaultComposerVisible) ||
+			shouldAutoRevealComposer);
+
+	const setComposerVisibleForTab = useCallback(
+		(tabId: string, visible: boolean) => {
+			if (!tabId) {
+				return;
+			}
+
+			if (!visible && tabId === activeTabId && activeManualComposerRequirementKey) {
+				setDismissedManualComposerRequirementKeyByTab(previous => {
+					if (previous[tabId] === activeManualComposerRequirementKey) {
+						return previous;
+					}
+
+					return {
+						...previous,
+						[tabId]: activeManualComposerRequirementKey,
+					};
+				});
+			}
+
+			setComposerVisibilityByTab(previous => {
+				if (previous[tabId] === visible) {
+					return previous;
+				}
+
+				return {
+					...previous,
+					[tabId]: visible,
+				};
+			});
+		},
+		[activeManualComposerRequirementKey, activeTabId]
+	);
+
+	const hideComposerAfterSubmission = useCallback(
+		(tabId: string) => {
+			setComposerVisibleForTab(tabId, false);
+		},
+		[setComposerVisibleForTab]
+	);
+
+	const activeToolActivityCount = useMemo(
+		() =>
+			activeSessionToolCalls.filter(
+				call =>
+					call.status === UIToolCallStatus.Running ||
+					(call.status === UIToolCallStatus.Pending && call.automatic === true)
+			).length,
+		[activeSessionToolCalls]
+	);
+
+	const showStopRunControl = !activeTabIsHydrating && !activeEditingMessageId && activeRunComposerState.isActive;
+	const showAutomationRunControl =
+		showStopRunControl && (hasAutomaticToolCalls || hasAutomaticToolConfiguration || automationHoldEnabled);
+	const sideRunStatus =
+		!composerVisible && activeManualComposerRequirementKey
+			? manualToolActionCalls.length > 0
+				? 'Tools need attention'
+				: hasContinuationAction
+					? 'Ready to continue'
+					: undefined
+			: !composerVisible && activeToolActivityCount > 0
+				? `Running ${activeToolActivityCount} tool${activeToolActivityCount === 1 ? '' : 's'}`
+				: undefined;
+	const sideActionButtonClass = 'btn btn-sm btn-circle btn-ghost border-none bg-transparent shadow-none';
 
 	const tabExists = useCallback((tabId: string) => tabIDSetRef.current.has(tabId), []);
 
@@ -805,23 +1006,66 @@ function ConversationAreaInner(
 		loadExternalMessageForTab,
 		resetComposerForNewConversation,
 		restoreSessionConfiguration,
-		focusInput,
-		openTemplateMenu,
-		openToolMenu,
-		openAttachmentMenu,
-		openSystemPromptMenu,
-		openSkillsMenu,
-		openMCPMenu,
-		openWorkspaceMenu,
-		requestStopResponse,
 		disposeInputRuntime,
 		applyWorkflowStarterToComposer,
 	} = useInputRegistry({ tabExists });
 
+	const revealComposerAndInvoke = useCallback(
+		(tabId: string, action: (input: ComposerBoxHandle) => void) => {
+			if (!tabId) {
+				return;
+			}
+
+			setComposerVisibleForTab(tabId, true);
+			const invokeWhenMounted = (remainingFrames: number): void => {
+				if (selectedTabIdRef.current !== tabId) {
+					return;
+				}
+
+				const input = inputRefs.current.get(tabId);
+				if (input) {
+					action(input);
+					return;
+				}
+
+				if (remainingFrames > 0) {
+					window.requestAnimationFrame(() => {
+						invokeWhenMounted(remainingFrames - 1);
+					});
+				}
+			};
+
+			window.requestAnimationFrame(() => {
+				invokeWhenMounted(1);
+			});
+		},
+		[inputRefs, selectedTabIdRef, setComposerVisibleForTab]
+	);
+
+	const focusComposerForTab = useCallback(
+		(tabId: string) => {
+			revealComposerAndInvoke(tabId, input => {
+				input.focus();
+			});
+		},
+		[revealComposerAndInvoke]
+	);
+
+	const tryApplyDropAndRevealComposer = useCallback(
+		(tabId: string, payload: Parameters<typeof tryApplyDropToTab>[1]) => {
+			const applied = tryApplyDropToTab(tabId, payload);
+			if (applied) {
+				setComposerVisibleForTab(tabId, true);
+			}
+			return applied;
+		},
+		[setComposerVisibleForTab, tryApplyDropToTab]
+	);
+
 	useAttachmentsDropTarget({
 		selectedTabIdRef,
 		tabExists,
-		tryApplyDropToTab,
+		tryApplyDropToTab: tryApplyDropAndRevealComposer,
 		queuePendingDrop,
 		flushPendingDrops,
 	});
@@ -854,7 +1098,7 @@ function ConversationAreaInner(
 					loadExternalMessageForTab(tabId, { text });
 
 					if (selectedTabIdRef.current === tabId) {
-						inputRefs.current.get(tabId)?.focus();
+						focusComposerForTab(tabId);
 					}
 				})
 				.catch((error: unknown) => {
@@ -879,7 +1123,7 @@ function ConversationAreaInner(
 					inputRefs.current.get(tabId)?.appendMCPAppContextUpdate(detail.update);
 
 					if (selectedTabIdRef.current === tabId) {
-						inputRefs.current.get(tabId)?.focus();
+						focusComposerForTab(tabId);
 					}
 				})
 				.catch((error: unknown) => {
@@ -894,7 +1138,14 @@ function ConversationAreaInner(
 			window.removeEventListener(MCP_APP_UI_MESSAGE_EVENT, handleUIMessage);
 			window.removeEventListener(MCP_APP_MODEL_CONTEXT_UPDATE_EVENT, handleModelContextUpdate);
 		};
-	}, [inputRefs, loadExternalMessageForTab, openSessionForMCPAppMessage, selectedTabIdRef, tabExists]);
+	}, [
+		focusComposerForTab,
+		inputRefs,
+		loadExternalMessageForTab,
+		openSessionForMCPAppMessage,
+		selectedTabIdRef,
+		tabExists,
+	]);
 
 	const {
 		setScrollContainerRef,
@@ -930,6 +1181,17 @@ function ConversationAreaInner(
 		tabExists,
 		inputRefs,
 	});
+
+	const beginEditMessageAndShowComposer = useCallback(
+		(tabId: string, messageID: string) => {
+			if (!beginEditMessageForTab(tabId, messageID)) {
+				return;
+			}
+
+			focusComposerForTab(tabId);
+		},
+		[beginEditMessageForTab, focusComposerForTab]
+	);
 
 	const runCommand = useCallback(
 		async (
@@ -1062,14 +1324,10 @@ function ConversationAreaInner(
 		[runCommandForToolCall]
 	);
 
-	const { pendingWait, pendingExecutableToolCallIDs, canRunPendingToolCalls } = activeRunComposerState;
 	const stagedAppContextUpdateCount =
 		!activeEditingMessageId && activeRunComposerState.hasStagedContinuation
 			? (activeRun?.continuation.mcpAppContext?.length ?? 0)
 			: 0;
-	const hasAutomaticToolCalls = activeRun?.toolCalls?.some(call => call.automatic === true) ?? false;
-	const automationHoldEnabled =
-		activeRun?.controls.automaticTools.enabled === true || activeRun?.controls.automaticContinuation.enabled === true;
 
 	const executePendingSessionToolCalls = useCallback(
 		(continueRun: boolean) =>
@@ -1165,13 +1423,19 @@ function ConversationAreaInner(
 		[activeTabId, setSessionActionErrorState]
 	);
 
-	const cancelRunForTab = useCallback(async (tabId: string) => {
+	const cancelRunForTab = useCallback(async (tabId: string, expectedRunID?: string) => {
 		const tab = tabsRef.current.find(candidate => candidate.tabId === tabId);
 		const snapshot = tab?.sessionSnapshot;
 		const run = snapshot ? selectedSessionRun(snapshot, tab?.activeRunID) : undefined;
 
-		if (!tab?.sessionID || !snapshot || !run) {
-			throw new Error('The selected Run snapshot is unavailable.');
+		if (
+			!tab?.sessionID ||
+			!snapshot ||
+			!run ||
+			!getSessionRunComposerState(run).isActive ||
+			(expectedRunID !== undefined && run.id !== expectedRunID)
+		) {
+			return;
 		}
 
 		// Cancellation is intentionally best-effort. Streaming changes Session
@@ -1191,6 +1455,37 @@ function ConversationAreaInner(
 
 		requireAcceptedSessionCommand(receipt, 'Cancel Run');
 	}, []);
+
+	const requestStopResponseForTab = useCallback((tabId: string) => {
+		const tab = tabsRef.current.find(candidate => candidate.tabId === tabId);
+		const snapshot = tab?.sessionSnapshot;
+		const run = snapshot ? selectedSessionRun(snapshot, tab?.activeRunID) : undefined;
+
+		if (!run || !getSessionRunComposerState(run).isActive) {
+			return;
+		}
+
+		setRunCancellationConfirmation({
+			tabId,
+			runID: run.id,
+		});
+	}, []);
+
+	const confirmCancelRun = useCallback(() => {
+		const confirmation = runCancellationConfirmation;
+		setRunCancellationConfirmation(null);
+
+		if (!confirmation) {
+			return;
+		}
+
+		void cancelRunForTab(confirmation.tabId, confirmation.runID).catch((error: unknown) => {
+			setSessionActionErrorState({
+				tabId: confirmation.tabId,
+				message: sessionActionErrorMessage(error),
+			});
+		});
+	}, [cancelRunForTab, runCancellationConfirmation]);
 
 	const resolveWait = useCallback(
 		async (wait: SessionWaitingRequest, resolution: SessionWaitResolution, input?: SessionOpaqueJSON) => {
@@ -1236,23 +1531,83 @@ function ConversationAreaInner(
 		[disposeInputRuntime, disposeScrollRuntime]
 	);
 
+	const openTemplateMenuForTab = useCallback(
+		(tabId: string) => {
+			revealComposerAndInvoke(tabId, input => {
+				input.openTemplateMenu();
+			});
+		},
+		[revealComposerAndInvoke]
+	);
+	const openToolMenuForTab = useCallback(
+		(tabId: string) => {
+			revealComposerAndInvoke(tabId, input => {
+				input.openToolMenu();
+			});
+		},
+		[revealComposerAndInvoke]
+	);
+	const openAttachmentMenuForTab = useCallback(
+		(tabId: string) => {
+			revealComposerAndInvoke(tabId, input => {
+				input.openAttachmentMenu();
+			});
+		},
+		[revealComposerAndInvoke]
+	);
+	const openSystemPromptMenuForTab = useCallback(
+		(tabId: string) => {
+			revealComposerAndInvoke(tabId, input => {
+				input.openSystemPromptMenu();
+			});
+		},
+		[revealComposerAndInvoke]
+	);
+	const openSkillsMenuForTab = useCallback(
+		(tabId: string) => {
+			revealComposerAndInvoke(tabId, input => {
+				input.openSkillsMenu();
+			});
+		},
+		[revealComposerAndInvoke]
+	);
+	const openMCPMenuForTab = useCallback(
+		(tabId: string) => {
+			revealComposerAndInvoke(tabId, input => {
+				input.openMCPMenu();
+			});
+		},
+		[revealComposerAndInvoke]
+	);
+	const openWorkspaceMenuForTab = useCallback(
+		(tabId: string) => {
+			revealComposerAndInvoke(tabId, input => {
+				input.openWorkspaceMenu();
+			});
+		},
+		[revealComposerAndInvoke]
+	);
+
 	useImperativeHandle(
 		ref,
 		() => ({
 			disposeTabRuntime,
 			syncComposerFromConversation,
 			resetComposerForNewConversation,
+			hideComposer: tabId => {
+				setComposerVisibleForTab(tabId, false);
+			},
 			restoreComposerFromSessionConfiguration: restoreSessionConfiguration,
 			applyWorkflowStarter: applyWorkflowStarterToComposer,
-			focusInput,
-			openTemplateMenu,
-			openToolMenu,
-			openAttachmentMenu,
-			openSystemPromptMenu,
-			openSkillsMenu,
-			openMCPMenu,
-			openWorkspaceMenu,
-			requestStopResponse,
+			focusInput: focusComposerForTab,
+			openTemplateMenu: openTemplateMenuForTab,
+			openToolMenu: openToolMenuForTab,
+			openAttachmentMenu: openAttachmentMenuForTab,
+			openSystemPromptMenu: openSystemPromptMenuForTab,
+			openSkillsMenu: openSkillsMenuForTab,
+			openMCPMenu: openMCPMenuForTab,
+			openWorkspaceMenu: openWorkspaceMenuForTab,
+			requestStopResponse: requestStopResponseForTab,
 			setScrollTopForTab,
 			resetScrollToTop,
 			getScrollTopByTabSnapshot,
@@ -1260,19 +1615,20 @@ function ConversationAreaInner(
 		[
 			applyWorkflowStarterToComposer,
 			disposeTabRuntime,
-			focusInput,
+			focusComposerForTab,
 			getScrollTopByTabSnapshot,
-			openAttachmentMenu,
-			openSystemPromptMenu,
-			openSkillsMenu,
-			openMCPMenu,
-			openWorkspaceMenu,
-			requestStopResponse,
-			openTemplateMenu,
-			openToolMenu,
+			openAttachmentMenuForTab,
+			openSystemPromptMenuForTab,
+			openSkillsMenuForTab,
+			openMCPMenuForTab,
+			openWorkspaceMenuForTab,
+			openTemplateMenuForTab,
+			openToolMenuForTab,
+			requestStopResponseForTab,
 			restoreSessionConfiguration,
 			resetComposerForNewConversation,
 			resetScrollToTop,
+			setComposerVisibleForTab,
 			setScrollTopForTab,
 			syncComposerFromConversation,
 		]
@@ -1299,7 +1655,7 @@ function ConversationAreaInner(
 						isEditing={activeEditingMessageId === message.id}
 						deferRichRendering={deferRichRendering}
 						tabId={activeTabId}
-						onEditMessage={beginEditMessageForTab}
+						onEditMessage={beginEditMessageAndShowComposer}
 						diffCandidatePaths={diffCandidatePaths}
 						diffCandidatePathsReady={diffCandidatePathsReady}
 						responseTiming={responseTiming}
@@ -1314,7 +1670,7 @@ function ConversationAreaInner(
 					isEditing={activeEditingMessageId === message.id}
 					deferRichRendering={deferRichRendering}
 					tabId={activeTabId}
-					onEditMessage={beginEditMessageForTab}
+					onEditMessage={beginEditMessageAndShowComposer}
 					diffCandidatePaths={diffCandidatePaths}
 					diffCandidatePathsReady={diffCandidatePathsReady}
 					responseTiming={responseTiming}
@@ -1325,7 +1681,7 @@ function ConversationAreaInner(
 			activeEditingMessageId,
 			activeTabId,
 			activeTabIsGenerating,
-			beginEditMessageForTab,
+			beginEditMessageAndShowComposer,
 			messageCount,
 			responseTimingByMessageID,
 		]
@@ -1389,7 +1745,7 @@ function ConversationAreaInner(
 					className="size-full overscroll-contain py-1"
 					style={{ scrollbarGutter: 'stable both-edges', overflowAnchor: 'none', overflowY: 'auto' }}
 				>
-					<div ref={setScrollContentRef} className="mx-auto w-11/12 xl:w-5/6">
+					<div ref={setScrollContentRef} className="mx-auto w-11/12 pb-4 xl:w-5/6">
 						{activeTab?.runtimeError ? (
 							<div className="alert alert-error mb-2 rounded-2xl text-sm" role="alert">
 								<span>{activeTab.runtimeError}</span>
@@ -1419,129 +1775,243 @@ function ConversationAreaInner(
 								deferRichWork={activeTabIsHydrating}
 							/>
 						)}
+						{composerVisible && composerPanelHeight > 0 ? (
+							<div aria-hidden="true" style={{ height: composerPanelHeight + FLOATING_COMPOSER_SCROLL_CLEARANCE }} />
+						) : null}
 						<div ref={setScrollFooterRef} className="h-px w-full" data-chat-scroll-footer aria-hidden="true" />
 					</div>
 				</div>
 
-				<div className="pointer-events-none absolute right-4 bottom-4 z-30 xl:right-24">
-					<div className="pointer-events-auto flex flex-col items-center gap-2">
-						<ButtonScrollToTop
-							onScrollToTop={scrollActiveToTop}
-							iconSize={32}
-							show
-							disabled={isAtTop}
-							className="btn btn-md border-none bg-transparent shadow-none disabled:opacity-40"
-						/>
-						<button
-							type="button"
-							disabled={!canJumpToPreviousMessage}
-							className="btn btn-md border-none bg-transparent shadow-none disabled:opacity-40"
-							onClick={scrollActiveToPreviousMessage}
-							aria-label="Jump to previous message"
-							title="Jump to previous message"
-						>
-							<FiChevronUp size={32} />
-						</button>
+				<div className="pointer-events-none absolute top-16 right-4 z-30 xl:right-24">
+					<nav className="pointer-events-auto flex flex-col items-center gap-1" aria-label="Conversation navigation">
+						<HoverTip content="Scroll to top" placement="left">
+							<ButtonScrollToTop
+								onScrollToTop={scrollActiveToTop}
+								iconSize={24}
+								show
+								disabled={isAtTop}
+								className="btn btn-sm btn-circle btn-ghost border-none bg-transparent shadow-none disabled:opacity-40"
+							/>
+						</HoverTip>
+						<HoverTip content="Previous message" placement="left">
+							<button
+								type="button"
+								disabled={!canJumpToPreviousMessage}
+								className="btn btn-sm btn-circle btn-ghost border-none bg-transparent shadow-none disabled:opacity-40"
+								onClick={scrollActiveToPreviousMessage}
+								aria-label="Jump to previous message"
+							>
+								<FiChevronUp size={24} />
+							</button>
+						</HoverTip>
+						<HoverTip content="Next message" placement="left">
+							<button
+								type="button"
+								disabled={!canJumpToNextMessage}
+								className="btn btn-sm btn-circle btn-ghost border-none bg-transparent shadow-none disabled:opacity-40"
+								onClick={scrollActiveToNextMessage}
+								aria-label="Jump to next message"
+							>
+								<FiChevronDown size={24} />
+							</button>
+						</HoverTip>
+						<HoverTip content="Scroll to bottom" placement="left">
+							<ButtonScrollToBottom
+								onScrollToBottom={scrollActiveToBottom}
+								iconSize={24}
+								show
+								disabled={isAtBottom}
+								className="btn btn-sm btn-circle btn-ghost border-none bg-transparent shadow-none disabled:opacity-40"
+							/>
+						</HoverTip>
+					</nav>
+				</div>
 
-						<button
-							type="button"
-							disabled={!canJumpToNextMessage}
-							className="btn btn-md border-none bg-transparent shadow-none disabled:opacity-40"
-							onClick={scrollActiveToNextMessage}
-							aria-label="Jump to next message"
-							title="Jump to next message"
-						>
-							<FiChevronDown size={32} />
-						</button>
-						<ButtonScrollToBottom
-							onScrollToBottom={scrollActiveToBottom}
-							iconSize={32}
-							show
-							disabled={isAtBottom}
-							className="btn btn-md border-none bg-transparent shadow-none disabled:opacity-40"
-						/>
+				<div
+					className="pointer-events-none absolute right-4 bottom-16 z-30 xl:right-24"
+					style={
+						composerVisible ? { bottom: `${composerPanelHeight + FLOATING_COMPOSER_SCROLL_CLEARANCE}px` } : undefined
+					}
+				>
+					<section className="pointer-events-auto flex flex-col items-center gap-2" aria-label="Conversation actions">
+						{sideRunStatus ? (
+							<output className="text-base-content/70 max-w-32 text-center text-xs">{sideRunStatus}</output>
+						) : null}
+
+						{showStopRunControl ? (
+							<HoverTip content={activeTabIsGenerating ? 'Stop response' : 'Cancel active run'} placement="left">
+								<button
+									type="button"
+									className={`${sideActionButtonClass} ${
+										activeTabIsGenerating ? 'text-base-content hover:bg-base-200' : 'text-warning hover:bg-warning/10'
+									}`}
+									onClick={() => {
+										requestStopResponseForTab(activeTabId);
+									}}
+									aria-label={activeTabIsGenerating ? 'Stop response' : 'Cancel active run'}
+								>
+									<FiSquare size={24} />
+								</button>
+							</HoverTip>
+						) : null}
+
+						{showAutomationRunControl ? (
+							<HoverTip
+								content={
+									automationHoldEnabled
+										? 'Resume automatic tools and continuation'
+										: 'Hold the next automatic tool and continuation batch'
+								}
+								placement="left"
+							>
+								<button
+									type="button"
+									className={`${sideActionButtonClass} ${
+										automationHoldEnabled
+											? 'text-warning hover:bg-warning/10'
+											: 'text-base-content/80 hover:bg-base-200'
+									}`}
+									onClick={() => {
+										runSessionAction(toggleAutomationHold);
+									}}
+									aria-label={automationHoldEnabled ? 'Resume automation' : 'Hold automation'}
+									aria-pressed={automationHoldEnabled}
+								>
+									{automationHoldEnabled ? <FiPlay size={24} /> : <FiPause size={24} />}
+								</button>
+							</HoverTip>
+						) : null}
+
+						<HoverTip content={composerVisible ? 'Disable composer' : 'Enable composer'} placement="left">
+							<button
+								ref={composerToggleButtonRef}
+								type="button"
+								className={`${sideActionButtonClass} ${
+									composerVisible ? 'text-base-content/70 hover:bg-base-200' : 'text-base-content hover:bg-base-200'
+								}`}
+								onClick={() => {
+									if (!activeTabId) {
+										return;
+									}
+
+									if (composerVisible) {
+										setComposerVisibleForTab(activeTabId, false);
+										window.requestAnimationFrame(() => {
+											composerToggleButtonRef.current?.focus({ preventScroll: true });
+										});
+										return;
+									}
+
+									focusComposerForTab(activeTabId);
+								}}
+								aria-label={composerVisible ? 'Disable composer' : 'Enable composer'}
+								aria-pressed={composerVisible}
+							>
+								{composerVisible ? <FiMinimize2 size={24} /> : <FiEdit size={24} />}
+							</button>
+						</HoverTip>
+					</section>
+				</div>
+
+				<div className="pointer-events-none absolute inset-x-0 inset-y-3 z-20 flex items-end justify-center">
+					<div
+						ref={setComposerPanelElement}
+						role={composerVisible ? 'region' : undefined}
+						aria-label={composerVisible ? 'Message composer' : undefined}
+						aria-hidden={composerVisible ? undefined : true}
+						className={[
+							'pointer-events-auto max-h-full w-11/12 min-w-0 xl:w-5/6',
+							composerVisible
+								? 'app-scrollbar-thin border-base-300 bg-base-100/95 ring-base-100/30 overflow-y-auto rounded-3xl border shadow-xl ring-1 backdrop-blur'
+								: 'overflow-hidden',
+						].join(' ')}
+					>
+						{mountedInputTabs.map(tab =>
+							(() => {
+								const tabRun = tab.sessionSnapshot
+									? selectedSessionRun(tab.sessionSnapshot, tab.activeRunID)
+									: undefined;
+								const suppressRuntimeActivity =
+									Boolean(tab.editingMessageId) || tab.isHydrating || !(tab.isLoaded ?? true);
+								const activity = suppressRuntimeActivity
+									? undefined
+									: tab.tabId === activeTabId
+										? activeSessionToolActivity
+										: tab.sessionSnapshot
+											? projectSessionRunToolActivity(tab.sessionSnapshot, tabRun)
+											: undefined;
+								const composerState = getSessionRunComposerState(tabRun, (activity?.outputs.length ?? 0) > 0);
+								const allowContinuationInput = !suppressRuntimeActivity && composerState.canStageContinuationInput;
+								const continuationCanContinue = !suppressRuntimeActivity && composerState.canComposeContinuationInput;
+								const showRuntimeControls =
+									tab.tabId === activeTabId && !suppressRuntimeActivity && composerState.isActive;
+
+								return (
+									<TabInputPane
+										key={tab.tabId}
+										tabId={tab.tabId}
+										active={tab.tabId === selectedTabId}
+										visible={tab.tabId === selectedTabId && composerVisible}
+										isBusy={tab.isBusy}
+										isGenerating={runHasGeneratingModelOperation(tabRun)}
+										isHydrating={tab.isHydrating || !(tab.isLoaded ?? true)}
+										allowContinuationInput={allowContinuationInput}
+										continuationCanContinue={continuationCanContinue}
+										editingMessageId={tab.editingMessageId}
+										runtimeStateUpdatedAt={tabRun?.updatedAt}
+										setInputRef={setInputRef}
+										shortcutConfig={shortcutConfig}
+										sendMessage={sendMessageForTab}
+										sendContinuation={stageContinuationForTab}
+										cancelEditing={cancelEditingForTab}
+										onSubmissionAccepted={hideComposerAfterSubmission}
+										showPendingToolControls={showRuntimeControls && canRunPendingToolCalls}
+										canContinueWithoutDraft={continuationCanContinue && composerState.canContinueWithoutDraft}
+										onRunPendingTools={continueRun => {
+											runSessionAction(() => executePendingSessionToolCalls(continueRun));
+										}}
+										sessionToolCalls={activity?.calls ?? []}
+										sessionToolOutputs={activity?.outputs ?? []}
+										onRunSessionToolCall={call => {
+											if (tab.tabId !== activeTabId) {
+												return;
+											}
+											runSessionAction(() => executeSessionToolCall(call));
+										}}
+										onRetrySessionToolCall={call => {
+											if (tab.tabId !== activeTabId) {
+												return;
+											}
+											runSessionAction(() => retrySessionToolCall(call));
+										}}
+										onSkipSessionToolCall={call => {
+											if (tab.tabId !== activeTabId) {
+												return;
+											}
+											runSessionAction(() => skipSessionToolCall(call));
+										}}
+										stagedAppContextUpdateCount={tab.tabId === activeTabId ? stagedAppContextUpdateCount : 0}
+										onDiscardStagedAppContext={() => {
+											runSessionAction(clearStagedAppContext);
+										}}
+									/>
+								);
+							})()
+						)}
 					</div>
 				</div>
 			</div>
 
-			<div className="row-start-3 row-end-4 flex min-h-0 w-full min-w-0 items-end justify-center overflow-hidden">
-				<div className="max-h-full w-11/12 min-w-0 xl:w-5/6">
-					{mountedInputTabs.map(tab =>
-						(() => {
-							const tabRun = tab.sessionSnapshot ? selectedSessionRun(tab.sessionSnapshot, tab.activeRunID) : undefined;
-							const suppressRuntimeActivity =
-								Boolean(tab.editingMessageId) || tab.isHydrating || !(tab.isLoaded ?? true);
-							const activity = suppressRuntimeActivity
-								? undefined
-								: tab.tabId === activeTabId
-									? activeSessionToolActivity
-									: tab.sessionSnapshot
-										? projectSessionRunToolActivity(tab.sessionSnapshot, tabRun)
-										: undefined;
-							const composerState = getSessionRunComposerState(tabRun, (activity?.outputs.length ?? 0) > 0);
-							const allowContinuationInput = !suppressRuntimeActivity && composerState.canStageContinuationInput;
-							const continuationCanContinue = !suppressRuntimeActivity && composerState.canComposeContinuationInput;
-							const showRuntimeControls =
-								tab.tabId === activeTabId && !suppressRuntimeActivity && composerState.isActive;
-
-							return (
-								<TabInputPane
-									key={tab.tabId}
-									tabId={tab.tabId}
-									active={tab.tabId === selectedTabId}
-									isBusy={tab.isBusy}
-									isGenerating={runHasGeneratingModelOperation(tabRun)}
-									isHydrating={tab.isHydrating || !(tab.isLoaded ?? true)}
-									allowContinuationInput={allowContinuationInput}
-									continuationCanContinue={continuationCanContinue}
-									editingMessageId={tab.editingMessageId}
-									runtimeStateUpdatedAt={tabRun?.updatedAt}
-									setInputRef={setInputRef}
-									shortcutConfig={shortcutConfig}
-									sendMessage={sendMessageForTab}
-									sendContinuation={stageContinuationForTab}
-									cancelEditing={cancelEditingForTab}
-									cancelRun={cancelRunForTab}
-									showAutomationControl={showRuntimeControls && (hasAutomaticToolCalls || automationHoldEnabled)}
-									automationHoldEnabled={tab.tabId === activeTabId && automationHoldEnabled}
-									onToggleAutomationHold={() => {
-										runSessionAction(toggleAutomationHold);
-									}}
-									showPendingToolControls={showRuntimeControls && canRunPendingToolCalls}
-									canContinueWithoutDraft={continuationCanContinue && composerState.canContinueWithoutDraft}
-									onRunPendingTools={continueRun => {
-										runSessionAction(() => executePendingSessionToolCalls(continueRun));
-									}}
-									sessionToolCalls={activity?.calls ?? []}
-									sessionToolOutputs={activity?.outputs ?? []}
-									onRunSessionToolCall={call => {
-										if (tab.tabId !== activeTabId) {
-											return;
-										}
-										runSessionAction(() => executeSessionToolCall(call));
-									}}
-									onRetrySessionToolCall={call => {
-										if (tab.tabId !== activeTabId) {
-											return;
-										}
-										runSessionAction(() => retrySessionToolCall(call));
-									}}
-									onSkipSessionToolCall={call => {
-										if (tab.tabId !== activeTabId) {
-											return;
-										}
-										runSessionAction(() => skipSessionToolCall(call));
-									}}
-									stagedAppContextUpdateCount={tab.tabId === activeTabId ? stagedAppContextUpdateCount : 0}
-									onDiscardStagedAppContext={() => {
-										runSessionAction(clearStagedAppContext);
-									}}
-								/>
-							);
-						})()
-					)}
-				</div>
-			</div>
+			<DeleteConfirmationModal
+				isOpen={runCancellationConfirmationOpen}
+				onClose={() => {
+					setRunCancellationConfirmation(null);
+				}}
+				onConfirm={confirmCancelRun}
+				title="Cancel active run?"
+				message="Partial output already received remains in the conversation. Stop the request?"
+				confirmButtonText="Cancel run"
+			/>
 
 			{(() => {
 				const currentWaitState =

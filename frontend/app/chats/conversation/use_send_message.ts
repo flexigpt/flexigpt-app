@@ -325,18 +325,18 @@ export function useSendMessage({
 		(tabId: string, id: string) => {
 			const tab = tabsRef.current.find(t => t.tabId === tabId);
 			if (!tab) {
-				return;
+				return false;
 			}
 			if (tab.isBusy || tab.isHydrating) {
-				return;
+				return false;
 			}
 
 			const message = tab.conversation.messages.find(m => m.id === id);
 			if (!message) {
-				return;
+				return false;
 			}
 			if (message.role !== RoleEnum.User) {
-				return;
+				return false;
 			}
 
 			const external: EditorExternalMessage = {
@@ -358,6 +358,7 @@ export function useSendMessage({
 
 			inputRefs.current.get(tabId)?.loadExternalMessage(external);
 			updateTab(tabId, current => ({ ...current, editingMessageId: id }));
+			return true;
 		},
 		[inputRefs, tabsRef, updateTab]
 	);
