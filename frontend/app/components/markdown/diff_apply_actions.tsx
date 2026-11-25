@@ -3,7 +3,7 @@ import { FiGitPullRequest, FiInfo, FiLoader } from 'react-icons/fi';
 
 import type { DiffApplyController, DiffApplyFileView } from '@/components/markdown/diff_apply_controller';
 
-export type DiffActionTone = 'neutral' | 'success' | 'warning' | 'error' | 'info';
+export type DiffActionTone = 'neutral' | 'success' | 'warning' | 'error' | 'info' | 'content';
 
 export function getDiffActionButtonClassName(tone: DiffActionTone = 'neutral'): string {
 	const toneClassName = {
@@ -12,14 +12,15 @@ export function getDiffActionButtonClassName(tone: DiffActionTone = 'neutral'): 
 		warning: 'text-warning',
 		error: 'text-error',
 		info: 'text-info',
+		content: 'text-base-content',
 	}[tone];
 
 	return [
 		'inline-flex h-6 shrink-0 items-center justify-center gap-1 rounded-full',
-		'border border-base-300 px-2 text-[11px] font-medium leading-none',
+		'border px-2 text-[11px] font-medium leading-none',
 		'whitespace-nowrap tabular-nums transition-colors hover:bg-base-300/40',
 		'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2',
-		'focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-40',
+		'focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-40 shadow-none',
 		toneClassName,
 	].join(' ');
 }
@@ -86,6 +87,8 @@ interface DiffApplyActionsProps {
 	onReview: () => void;
 	onDetails?: () => void;
 	onApply: () => void;
+	reviewTone?: DiffActionTone;
+	applyTone?: DiffActionTone;
 	reviewDisabled?: boolean;
 	detailsDisabled?: boolean;
 	applyDisabled?: boolean;
@@ -109,6 +112,8 @@ export function DiffApplyActions({
 	applyDisabled = false,
 	reviewing = false,
 	applying = false,
+	reviewTone = 'neutral',
+	applyTone = 'success',
 	detailsLabel = 'Details / targets',
 	detailsTone = 'neutral',
 	detailsTitle = 'Inspect targets, source hunks, backend results, and parser notes.',
@@ -121,7 +126,7 @@ export function DiffApplyActions({
 		<div className={`flex min-w-0 flex-wrap items-center gap-1 ${className}`}>
 			<button
 				type="button"
-				className={getDiffActionButtonClassName()}
+				className={getDiffActionButtonClassName(reviewTone)}
 				disabled={reviewDisabled}
 				onClick={onReview}
 				title={reviewTitle}
@@ -145,7 +150,7 @@ export function DiffApplyActions({
 
 			<button
 				type="button"
-				className={getDiffActionButtonClassName('success')}
+				className={getDiffActionButtonClassName(applyTone)}
 				disabled={applyDisabled}
 				onClick={onApply}
 				title={applyTitle}

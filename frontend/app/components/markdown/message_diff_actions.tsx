@@ -1,5 +1,5 @@
 import { useId } from 'react';
-import { FiAlertTriangle, FiChevronDown, FiLoader, FiSquare } from 'react-icons/fi';
+import { FiAlertTriangle, FiChevronUp, FiLoader, FiSquare } from 'react-icons/fi';
 
 import { Popover, PopoverDisclosure, usePopoverStore, useStoreState } from '@ariakit/react';
 
@@ -94,9 +94,15 @@ export function MessageDiffActions() {
 	return (
 		<div className="flex shrink-0 items-center" data-message-diff-actions>
 			<fieldset
-				className="border-base-300 flex min-w-0 items-center overflow-hidden rounded-full border"
+				className="border-base-content flex min-w-0 items-center overflow-hidden rounded-full border bg-transparent"
 				aria-label="Diff actions for this assistant message"
 			>
+				<span
+					aria-hidden="true"
+					className="bg-base-300 text-base-content/70 border-base-content/60 pointer-events-none inline-flex h-6 shrink-0 items-center border-r px-2 text-[11px] font-semibold select-none"
+				>
+					Diff
+				</span>
 				{operation ? (
 					<>
 						<output className="inline-flex h-6 items-center gap-1 px-2 text-[11px] tabular-nums" aria-live="polite">
@@ -105,7 +111,7 @@ export function MessageDiffActions() {
 						</output>
 						<button
 							type="button"
-							className={`${getDiffActionButtonClassName('warning')} rounded-none border-y-0 border-r-0`}
+							className={`${getDiffActionButtonClassName('content')} rounded-none border-y-0 border-r-0`}
 							disabled={operation.stopping}
 							onClick={store.cancel}
 							title="Stop remaining work. Already submitted writes can still finish and cannot be undone."
@@ -115,10 +121,10 @@ export function MessageDiffActions() {
 						</button>
 					</>
 				) : (
-					<>
+					<div className="text-base-content flex items-center">
 						<button
 							type="button"
-							className={`${getDiffActionButtonClassName()} rounded-none border-0`}
+							className={`${getDiffActionButtonClassName('content')} rounded-none border-0`}
 							disabled={unavailable || summary.total === 0}
 							onClick={() => {
 								void store.reviewAll();
@@ -131,23 +137,25 @@ export function MessageDiffActions() {
 						>
 							Review all
 						</button>
-						<button
-							type="button"
-							className={`${getDiffActionButtonClassName('success')} rounded-none border-y-0 border-r-0`}
-							disabled={unavailable || summary.eligible === 0}
-							onClick={() => {
-								void store.applyAll();
-							}}
-							title={`${summaryText}\n\nSubmit eligible unfinished changes in message order. Explicit targets can permit submission without review.`}
-						>
-							{applyLabel}
-						</button>
-					</>
+						<div className="border-base-content/60 flex shrink-0 items-center border-l">
+							<button
+								type="button"
+								className={`${getDiffActionButtonClassName('content')} rounded-none border-0`}
+								disabled={unavailable || summary.eligible === 0}
+								onClick={() => {
+									void store.applyAll();
+								}}
+								title={`${summaryText}\n\nSubmit eligible unfinished changes in message order. Explicit targets can permit submission without review.`}
+							>
+								{applyLabel}
+							</button>
+						</div>
+					</div>
 				)}
 
 				<PopoverDisclosure
 					store={popover}
-					className={`${getDiffActionButtonClassName()} gap-1 rounded-none border-y-0 border-r-0 px-2`}
+					className={`${getDiffActionButtonClassName('content')} border-base-content/60 gap-1 rounded-none border-y-0 border-r-0 border-l px-2`}
 					aria-label={`Show file changes: ${summary.ready} ready, ${attention} need attention`}
 					title={summaryText}
 				>
@@ -158,7 +166,7 @@ export function MessageDiffActions() {
 							aria-hidden="true"
 						/>
 					) : null}
-					<FiChevronDown size={13} className={`transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
+					<FiChevronUp size={13} className={`transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
 				</PopoverDisclosure>
 			</fieldset>
 
@@ -249,7 +257,9 @@ export function MessageDiffActions() {
 										reviewing={reviewing}
 										applying={applying}
 										detailsLabel={presentation.label}
-										detailsTone={presentation.tone}
+										reviewTone="content"
+										applyTone="content"
+										detailsTone="content"
 										detailsTitle={
 											outcome?.message
 												? `${outcome.message}\nOpen patch details for this file change.`
