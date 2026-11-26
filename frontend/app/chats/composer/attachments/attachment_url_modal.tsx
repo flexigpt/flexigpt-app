@@ -91,11 +91,11 @@ function UrlAttachmentModalContent({ onAttachURL }: UrlAttachmentModalContentPro
 			if (!unmountingRef.current) {
 				requestClose(true);
 			}
-		} catch (err) {
+		} catch (attachErr) {
 			if (!unmountingRef.current) {
 				setErrors(prev => ({
 					...prev,
-					url: (err as Error).message || 'Something went wrong while attaching the URL.',
+					url: (attachErr as Error).message || 'Something went wrong while attaching the URL.',
 				}));
 				focusInputAtEnd();
 			}

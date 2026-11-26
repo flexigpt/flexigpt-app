@@ -571,7 +571,7 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 							isBusy: sessionRunIsActive(activeRun),
 						};
 					});
-				} catch (error) {
+				} catch (tabError) {
 					if (!isTabLoadCurrent(tabId, loadVersion)) {
 						return;
 					}
@@ -580,7 +580,7 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 						isLoaded: true,
 						isHydrating: false,
 						composerConfigurationRestored: false,
-						runtimeError: error instanceof Error ? error.message : 'Failed to load Session snapshot.',
+						runtimeError: tabError instanceof Error ? tabError.message : 'Failed to load Session snapshot.',
 					}));
 				}
 			})().finally(() => {

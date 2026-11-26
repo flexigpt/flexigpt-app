@@ -131,14 +131,14 @@ export function useSendMessage({
 				}));
 				scrollTabToBottomSoon(tabId);
 				return submission.configuration;
-			} catch (error) {
+			} catch (submitError) {
 				updateTab(tabId, current => ({
 					...current,
 					isBusy: false,
 					pendingRunID: undefined,
-					runtimeError: error instanceof Error ? error.message : 'Session submission failed.',
+					runtimeError: submitError instanceof Error ? submitError.message : 'Session submission failed.',
 				}));
-				throw error;
+				throw submitError;
 			}
 		},
 		[scrollTabToBottomSoon, tabExists, tabsRef, updateTab]

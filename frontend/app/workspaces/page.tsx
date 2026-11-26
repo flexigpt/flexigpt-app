@@ -255,10 +255,10 @@ export default function WorkspaceDirectoryManagement() {
 				const detail = await workspaceManagementAPI.getWorkspaceDirectory(directory.ref);
 				replaceDirectory(detail);
 				setManagedDirectoryKey(key);
-			} catch (cause) {
+			} catch (getError) {
 				setDirectoryErrors(previous => ({
 					...previous,
-					[key]: cause instanceof Error ? cause.message : 'Workspace directory details could not be loaded.',
+					[key]: getError instanceof Error ? getError.message : 'Workspace directory details could not be loaded.',
 				}));
 			} finally {
 				setLoadingDirectoryKeys(previous => {

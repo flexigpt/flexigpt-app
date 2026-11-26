@@ -85,19 +85,22 @@ export function useAsyncResource<T>(
 			});
 
 			return value;
-		} catch (error) {
+		} catch (abortError) {
 			const shouldIgnore =
-				controller.signal.aborted || !mountedRef.current || requestIDRef.current !== requestID || isAbortError(error);
+				controller.signal.aborted ||
+				!mountedRef.current ||
+				requestIDRef.current !== requestID ||
+				isAbortError(abortError);
 
 			if (!shouldIgnore) {
 				setState(previous => ({
 					...previous,
-					error,
+					abortError,
 					phase: 'error',
 				}));
 			}
 
-			throw error;
+			throw abortError;
 		} finally {
 			if (controllerRef.current === controller) {
 				controllerRef.current = null;

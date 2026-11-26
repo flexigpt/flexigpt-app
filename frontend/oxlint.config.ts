@@ -317,6 +317,7 @@ const reactRules: DummyRuleMap = {
 	// Restriction. Default on.
 	'react/only-export-components': ['error', { allowConstantExport: true }],
 
+	'react/invariant': 'off',
 	'react/todo': 'off',
 	'react/no-multi-comp': 'off',
 	'react/jsx-filename-extension': 'off',

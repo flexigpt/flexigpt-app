@@ -442,16 +442,16 @@ export default function SkillsPage() {
 					skillsLoading: false,
 					skillsError: result.diagnostics.length > 0 ? result.diagnostics.join('\n') : undefined,
 				}));
-			} catch (cause) {
+			} catch (getError) {
 				if (generation !== loadGenerationRef.current || pluginRequestsRef.current.get(key) !== request) {
 					return;
 				}
 				updatePluginRow(plugin, row => ({
 					...row,
 					skillsLoading: false,
-					skillsError: cause instanceof Error ? cause.message : 'Skill membership could not be resolved.',
+					skillsError: getError instanceof Error ? getError.message : 'Skill membership could not be resolved.',
 				}));
-				throw cause;
+				throw getError;
 			}
 		},
 		[updatePluginRow]

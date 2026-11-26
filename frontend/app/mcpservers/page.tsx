@@ -351,7 +351,7 @@ export default function MCPServersPage() {
 					if (mountedRef.current) {
 						applyStatus(pluginRef, statuses);
 					}
-				} catch (error) {
+				} catch (loadError) {
 					if (!mountedRef.current) {
 						return;
 					}
@@ -367,13 +367,13 @@ export default function MCPServersPage() {
 										readErrorsByArtifactID: {},
 										serversLoaded: false,
 										isLoadingServers: false,
-										serverLoadError: getErrorMessage(error, 'Failed to load MCP servers for this Plugin.'),
+										serverLoadError: getErrorMessage(loadError, 'Failed to load MCP servers for this Plugin.'),
 									}
 								: item
 						)
 					);
 
-					throw error;
+					throw loadError;
 				}
 			})();
 
