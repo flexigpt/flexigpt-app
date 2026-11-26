@@ -992,7 +992,6 @@ function ConversationAreaInner(
 			: !composerVisible && activeToolActivityCount > 0
 				? `Running ${activeToolActivityCount} tool${activeToolActivityCount === 1 ? '' : 's'}`
 				: undefined;
-	const sideActionButtonClass = 'btn btn-sm btn-circle btn-ghost border-none bg-transparent shadow-none';
 
 	const tabExists = useCallback((tabId: string) => tabIDSetRef.current.has(tabId), []);
 
@@ -1842,15 +1841,13 @@ function ConversationAreaInner(
 							<HoverTip content={activeTabIsGenerating ? 'Stop response' : 'Cancel active run'} placement="left">
 								<button
 									type="button"
-									className={`${sideActionButtonClass} ${
-										activeTabIsGenerating ? 'text-base-content hover:bg-base-200' : 'text-warning hover:bg-warning/10'
-									}`}
+									className="btn btn-md btn-circle btn-neutral p-2"
 									onClick={() => {
 										requestStopResponseForTab(activeTabId);
 									}}
 									aria-label={activeTabIsGenerating ? 'Stop response' : 'Cancel active run'}
 								>
-									<FiSquare size={20} />
+									<FiSquare size={24} />
 								</button>
 							</HoverTip>
 						) : null}
@@ -1866,10 +1863,8 @@ function ConversationAreaInner(
 							>
 								<button
 									type="button"
-									className={`${sideActionButtonClass} ${
-										automationHoldEnabled
-											? 'text-warning hover:bg-warning/10'
-											: 'text-base-content/80 hover:bg-base-200'
+									className={`btn btn-circle btn-neutral btn-md p-2 ${
+										automationHoldEnabled ? 'text-warning hover:bg-warning/10' : ''
 									}`}
 									onClick={() => {
 										runSessionAction(toggleAutomationHold);
@@ -1877,7 +1872,7 @@ function ConversationAreaInner(
 									aria-label={automationHoldEnabled ? 'Resume automation' : 'Hold automation'}
 									aria-pressed={automationHoldEnabled}
 								>
-									{automationHoldEnabled ? <FiPlay size={20} /> : <FiPause size={20} />}
+									{automationHoldEnabled ? <FiPlay size={24} /> : <FiPause size={24} />}
 								</button>
 							</HoverTip>
 						) : null}
@@ -1886,9 +1881,7 @@ function ConversationAreaInner(
 							<button
 								ref={composerToggleButtonRef}
 								type="button"
-								className={`${sideActionButtonClass} ${
-									composerVisible ? 'text-base-content/70 hover:bg-base-200' : 'text-base-content hover:bg-base-200'
-								}`}
+								className="btn btn-md btn-circle btn-neutral p-2"
 								onClick={() => {
 									if (!activeTabId) {
 										return;
@@ -1907,7 +1900,7 @@ function ConversationAreaInner(
 								aria-label={composerVisible ? 'Disable composer' : 'Enable composer'}
 								aria-pressed={composerVisible}
 							>
-								{composerVisible ? <FiMinimize2 size={20} /> : <FiEdit size={20} />}
+								{composerVisible ? <FiMinimize2 size={24} /> : <FiEdit size={24} />}
 							</button>
 						</HoverTip>
 					</section>
