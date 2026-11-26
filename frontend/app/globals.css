@@ -42,29 +42,63 @@
 }
 
 @plugin 'daisyui/theme' {
-	/* this is dracula with modified radius field and radius box */
-	name: 'appdark';
+	/* VS Code Monokai (from exact export) */
+	name: 'monokai';
 	color-scheme: dark;
-	--color-base-100: oklch(28.822% 0.022 277.508);
-	--color-base-200: oklch(26.805% 0.02 277.508);
-	--color-base-300: oklch(24.787% 0.019 277.508);
-	--color-base-content: oklch(97.747% 0.007 106.545);
-	--color-primary: oklch(75.461% 0.183 346.812);
-	--color-primary-content: oklch(15.092% 0.036 346.812);
-	--color-secondary: oklch(74.202% 0.148 301.883);
-	--color-secondary-content: oklch(14.84% 0.029 301.883);
-	--color-accent: oklch(83.392% 0.124 66.558);
-	--color-accent-content: oklch(16.678% 0.024 66.558);
-	--color-neutral: oklch(39.445% 0.032 275.524);
-	--color-neutral-content: oklch(87.889% 0.006 275.524);
-	--color-info: oklch(88.263% 0.093 212.846);
-	--color-info-content: oklch(17.652% 0.018 212.846);
-	--color-success: oklch(87.099% 0.219 148.024);
-	--color-success-content: oklch(17.419% 0.043 148.024);
-	--color-warning: oklch(95.533% 0.134 112.757);
-	--color-warning-content: oklch(19.106% 0.026 112.757);
-	--color-error: oklch(68.22% 0.206 24.43);
-	--color-error-content: oklch(13.644% 0.041 24.43);
+	--color-base-100: #272822; /* editor.background */
+	--color-base-200: #1e1f1c; /* sideBar.background & menu.background */
+	--color-base-300: #34352f; /* editorGroup.border & tab.inactiveBackground (subtle, not bright) */
+	--color-base-content: #f8f8f2; /* editor.foreground */
+	--color-primary: #a6e22e; /* entity.name.function / brightGreen */
+	--color-primary-content: #1e1f1c;
+	--color-secondary: #66d9ef; /* storage.type / brightCyan */
+	--color-secondary-content: #1e1f1c;
+	--color-accent: #f92672; /* keyword / brightRed */
+	--color-accent-content: #f8f8f2;
+	--color-neutral: #414339; /* input.background & statusBar.background */
+	--color-neutral-content: #f8f8f2;
+	--color-info: #819aff; /* inputValidation.infoBorder */
+	--color-info-content: #1e1f1c;
+	--color-success: #a6e22e; /* terminal.ansiBrightGreen */
+	--color-success-content: #1e1f1c;
+	--color-warning: #e2e22e; /* inputValidation.warningBorder */
+	--color-warning-content: #1e1f1c;
+	--color-error: #f92672; /* inputValidation.errorBorder */
+	--color-error-content: #f8f8f2;
+	--radius-selector: 1rem;
+	--radius-field: 0.25rem;
+	--radius-box: 0.5rem;
+	--size-selector: 0.25rem;
+	--size-field: 0.25rem;
+	--border: 1px;
+	--depth: 0;
+	--noise: 0;
+}
+
+@plugin 'daisyui/theme' {
+	/* VS Code Dark+ — tuned for base-200 shell + base-100 chat UI */
+	name: 'vscode';
+	color-scheme: dark;
+	--color-base-100: #1e1e1e; /* Chat / message surface (editor.background) */
+	--color-base-200: #252526; /* Main app background (sideBar.background) */
+	--color-base-300: #333333; /* Borders & code blocks (activityBar.background / borders) */
+	--color-base-content: #d4d4d4; /* Primary text (editor.foreground) */
+	--color-primary: #0078d4; /* Primary actions (menu.selectionBackground) */
+	--color-primary-content: #ffffff;
+	--color-secondary: #3794ff; /* Secondary actions (textLink.foreground) */
+	--color-secondary-content: #ffffff;
+	--color-accent: #4ec9b0; /* Accent highlights (support.class teal) */
+	--color-accent-content: #1e1e1e;
+	--color-neutral: #3a3d41; /* Active secondary controls (button.secondaryBackground) */
+	--color-neutral-content: #ffffff;
+	--color-info: #3794ff;
+	--color-info-content: #ffffff;
+	--color-success: #89d185;
+	--color-success-content: #1e1e1e;
+	--color-warning: #cca700;
+	--color-warning-content: #1e1e1e;
+	--color-error: #f14c4c;
+	--color-error-content: #ffffff;
 	--radius-selector: 1rem;
 	--radius-field: 0.25rem;
 	--radius-box: 0.5rem;
@@ -80,7 +114,7 @@
 	exclude: rootscrollgutter, properties;
 	themes:
 		'applight' --default,
-		'appdark' --prefersdark,
+		'vscode' --prefersdark,
 		'abyss',
 		'acid',
 		'aqua',
@@ -106,6 +140,7 @@
 		'light',
 		'lofi',
 		'luxury',
+		'monokai',
 		'night',
 		'nord',
 		'pastel',
@@ -156,7 +191,6 @@
 		--mermaid-header-text-dark: oklch(97.747% 0.007 106.545);
 	}
 
-	[data-theme='appdark'],
 	[data-theme='abyss'],
 	[data-theme='aqua'],
 	[data-theme='black'],
@@ -168,8 +202,10 @@
 	[data-theme='forest'],
 	[data-theme='halloween'],
 	[data-theme='luxury'],
+	[data-theme='monokai'],
 	[data-theme='night'],
 	[data-theme='sunset'],
+	[data-theme='vscode'],
 	[data-theme='synthwave'] {
 		--app-bg-mermaid: var(--app-bg-mermaid-dark);
 		--app-bg-code: var(--app-bg-code-dark);

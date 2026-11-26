@@ -1,6 +1,6 @@
 export const CustomThemeSystem = 'system';
 export const CustomThemeLight = 'applight';
-export const CustomThemeDark = 'appdark';
+export const CustomThemeDark = 'vscode';
 
 const DAISYUI_LIGHT_THEMES = [
 	'acid',
@@ -38,9 +38,11 @@ const DAISYUI_DARK_THEMES = [
 	'forest',
 	'halloween',
 	'luxury',
+	'monokai',
 	'night',
 	'sunset',
 	'synthwave',
+	'vscode',
 ];
 
 export const ALL_DARK_THEMES = [CustomThemeDark, ...DAISYUI_DARK_THEMES];

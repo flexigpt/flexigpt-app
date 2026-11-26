@@ -850,31 +850,11 @@ function ConversationAreaInner(
 	const composerVisibilityOverride = activeTabId ? composerVisibilityByTab[activeTabId] : undefined;
 	const defaultComposerVisible = activeTabStartsInWritingMode;
 
-	useLayoutEffect(() => {
-		tabsRef.current = tabs;
-		tabIDSetRef.current = new Set(tabs.map(tab => tab.tabId));
-	}, [tabs]);
-
-	useLayoutEffect(() => {
-		selectedTabIdRef.current = selectedTabId;
-	}, [selectedTabId]);
-
-	useLayoutEffect(() => {
-		if (!composerPanelElement || typeof ResizeObserver === 'undefined') {
-			return;
-		}
-
-		const observer = new ResizeObserver(() => {
-			const nextHeight = Math.ceil(composerPanelElement.getBoundingClientRect().height);
-			setComposerPanelHeight(current => (current === nextHeight ? current : nextHeight));
-		});
-
-		observer.observe(composerPanelElement);
-
-		return () => {
-			observer.disconnect();
-		};
-	}, [composerPanelElement]);
+	const hasContinuationAction =
+		!activeTabIsHydrating &&
+		!activeEditingMessageId &&
+		!activeTabIsGenerating &&
+		activeRunComposerState.canContinueWithoutDraft;
 
 	const manualToolActionCalls = useMemo(() => {
 		if (activeTabIsHydrating || activeEditingMessageId || !activeRunComposerState.isActive) {
@@ -902,12 +882,6 @@ function ConversationAreaInner(
 		automationHoldEnabled,
 	]);
 
-	const hasContinuationAction =
-		!activeTabIsHydrating &&
-		!activeEditingMessageId &&
-		!activeTabIsGenerating &&
-		activeRunComposerState.canContinueWithoutDraft;
-
 	const activeManualComposerRequirementKey = useMemo(() => {
 		const requirements = manualToolActionCalls.map(call => `tool:${call.id}:${call.status}`);
 
@@ -921,6 +895,7 @@ function ConversationAreaInner(
 	const dismissedManualComposerRequirementKey = activeTabId
 		? dismissedManualComposerRequirementKeyByTab[activeTabId]
 		: undefined;
+
 	const shouldAutoRevealComposer =
 		activeManualComposerRequirementKey !== undefined &&
 		dismissedManualComposerRequirementKey !== activeManualComposerRequirementKey;
@@ -931,6 +906,32 @@ function ConversationAreaInner(
 		(composerVisibilityOverride === true ||
 			(composerVisibilityOverride === undefined && defaultComposerVisible) ||
 			shouldAutoRevealComposer);
+
+	useLayoutEffect(() => {
+		tabsRef.current = tabs;
+		tabIDSetRef.current = new Set(tabs.map(tab => tab.tabId));
+	}, [tabs]);
+
+	useLayoutEffect(() => {
+		selectedTabIdRef.current = selectedTabId;
+	}, [selectedTabId]);
+
+	useLayoutEffect(() => {
+		if (!composerPanelElement || typeof ResizeObserver === 'undefined') {
+			return;
+		}
+
+		const observer = new ResizeObserver(() => {
+			const nextHeight = Math.ceil(composerPanelElement.getBoundingClientRect().height);
+			setComposerPanelHeight(current => (current === nextHeight ? current : nextHeight));
+		});
+
+		observer.observe(composerPanelElement);
+
+		return () => {
+			observer.disconnect();
+		};
+	}, [composerPanelElement]);
 
 	const setComposerVisibleForTab = useCallback(
 		(tabId: string, visible: boolean) => {
@@ -1751,36 +1752,38 @@ function ConversationAreaInner(
 					className="size-full overscroll-contain py-1"
 					style={{ scrollbarGutter: 'stable both-edges', overflowAnchor: 'none', overflowY: 'auto' }}
 				>
-					<div ref={setScrollContentRef} className="mx-auto w-11/12 pb-4">
-						{activeTab?.runtimeError ? (
-							<div className="alert alert-error mb-2 rounded-2xl text-sm" role="alert">
-								<span className="min-w-0 wrap-break-word">{activeTab.runtimeError}</span>
-							</div>
-						) : null}
-						{sessionActionError ? (
-							<div className="alert alert-error mb-2 rounded-2xl text-sm" role="alert">
-								<span className="min-w-0 wrap-break-word">{sessionActionError}</span>
-							</div>
-						) : null}
-						{pendingRunAcknowledgement ? (
-							<output className="border-info/30 bg-info/10 mb-2 flex items-center gap-2 rounded-2xl border px-3 py-2 text-sm">
-								<span className="loading loading-dots loading-sm" aria-hidden="true" />
-								<span className="min-w-0 wrap-break-word">Run accepted. Preparing the authoritative operation…</span>
-							</output>
-						) : null}
-						{activeTabIsHydrating && messageCount === 0 ? (
-							<div className="flex min-h-128 items-center justify-center py-8">
-								<span className="loading loading-dots loading-md" aria-label="Loading conversation" />
-							</div>
-						) : (
-							<ConversationMessageList
-								key={`${activeTabId}:${activeTab?.conversation.id ?? ''}`}
-								messages={messages}
-								renderItem={itemContent}
-								isBusy={activeTabIsGenerating}
-								deferRichWork={activeTabIsHydrating}
-							/>
-						)}
+					<div className="mx-auto w-11/12 pb-4">
+						<div ref={setScrollContentRef}>
+							{activeTab?.runtimeError ? (
+								<div className="alert alert-error mb-2 rounded-2xl text-sm" role="alert">
+									<span className="min-w-0 wrap-break-word">{activeTab.runtimeError}</span>
+								</div>
+							) : null}
+							{sessionActionError ? (
+								<div className="alert alert-error mb-2 rounded-2xl text-sm" role="alert">
+									<span className="min-w-0 wrap-break-word">{sessionActionError}</span>
+								</div>
+							) : null}
+							{pendingRunAcknowledgement ? (
+								<output className="border-info/30 bg-info/10 mb-2 flex items-center gap-2 rounded-2xl border px-3 py-2 text-sm">
+									<span className="loading loading-dots loading-sm" aria-hidden="true" />
+									<span className="min-w-0 wrap-break-word">Run accepted. Preparing the authoritative operation…</span>
+								</output>
+							) : null}
+							{activeTabIsHydrating && messageCount === 0 ? (
+								<div className="flex min-h-128 items-center justify-center py-8">
+									<span className="loading loading-dots loading-md" aria-label="Loading conversation" />
+								</div>
+							) : (
+								<ConversationMessageList
+									key={`${activeTabId}:${activeTab?.conversation.id ?? ''}`}
+									messages={messages}
+									renderItem={itemContent}
+									isBusy={activeTabIsGenerating}
+									deferRichWork={activeTabIsHydrating}
+								/>
+							)}
+						</div>
 						{composerVisible && composerPanelHeight > 0 ? (
 							<div aria-hidden="true" style={{ height: composerPanelHeight + FLOATING_COMPOSER_SCROLL_CLEARANCE }} />
 						) : null}

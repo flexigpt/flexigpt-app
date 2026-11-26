@@ -25,7 +25,7 @@ const (
 const (
 	ThemeNameSystem = "system"
 	ThemeNameLight  = "applight"
-	ThemeNameDark   = "appdark"
+	ThemeNameDark   = "vscode"
 )
 
 type AppTheme struct {
