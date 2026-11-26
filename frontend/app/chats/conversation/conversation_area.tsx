@@ -540,6 +540,7 @@ function scheduleDeferredUIWork(work: () => void): () => void {
 type MessageItemRenderer = (
 	index: number,
 	message: ConversationMessage,
+	turnContextMessage: ConversationMessage | undefined,
 	diffCandidatePaths: string[] | undefined,
 	diffCandidatePathsReady: boolean,
 	deferRichRendering: boolean
@@ -701,6 +702,7 @@ const ConversationMessageList = memo(function ConversationMessageList(props: {
 			{renderItem(
 				index,
 				message,
+				messages[index + 1],
 				diffCandidatePathsByMessageID.get(message.id),
 				diffCandidatePathsState?.has(message.id) ?? false,
 				deferRichWork || index >= richReadyCount || (isBusy && index === messages.length - 1)
@@ -982,6 +984,7 @@ function ConversationAreaInner(
 	const showStopRunControl = !activeTabIsHydrating && !activeEditingMessageId && activeRunComposerState.isActive;
 	const showAutomationRunControl =
 		showStopRunControl && (hasAutomaticToolCalls || hasAutomaticToolConfiguration || automationHoldEnabled);
+	const sideRunStatusIsRunning = !composerVisible && activeToolActivityCount > 0;
 	const sideRunStatus =
 		!composerVisible && activeManualComposerRequirementKey
 			? manualToolActionCalls.length > 0
@@ -989,7 +992,7 @@ function ConversationAreaInner(
 				: hasContinuationAction
 					? 'Ready to continue'
 					: undefined
-			: !composerVisible && activeToolActivityCount > 0
+			: sideRunStatusIsRunning
 				? `Running ${activeToolActivityCount} tool${activeToolActivityCount === 1 ? '' : 's'}`
 				: undefined;
 
@@ -1637,6 +1640,7 @@ function ConversationAreaInner(
 		(
 			index: number,
 			message: ConversationMessage,
+			turnContextMessage: ConversationMessage | undefined,
 			diffCandidatePaths: string[] | undefined,
 			diffCandidatePathsReady: boolean,
 			deferRichRendering: boolean
@@ -1652,6 +1656,7 @@ function ConversationAreaInner(
 						message={message}
 						isBusy={true}
 						isEditing={activeEditingMessageId === message.id}
+						turnContextMessage={turnContextMessage}
 						deferRichRendering={deferRichRendering}
 						tabId={activeTabId}
 						onEditMessage={beginEditMessageAndShowComposer}
@@ -1667,6 +1672,7 @@ function ConversationAreaInner(
 					message={message}
 					isBusy={false}
 					isEditing={activeEditingMessageId === message.id}
+					turnContextMessage={turnContextMessage}
 					deferRichRendering={deferRichRendering}
 					tabId={activeTabId}
 					onEditMessage={beginEditMessageAndShowComposer}
@@ -1747,18 +1753,18 @@ function ConversationAreaInner(
 					<div ref={setScrollContentRef} className="mx-auto w-11/12 pb-4 xl:w-5/6">
 						{activeTab?.runtimeError ? (
 							<div className="alert alert-error mb-2 rounded-2xl text-sm" role="alert">
-								<span>{activeTab.runtimeError}</span>
+								<span className="min-w-0 wrap-break-word">{activeTab.runtimeError}</span>
 							</div>
 						) : null}
 						{sessionActionError ? (
 							<div className="alert alert-error mb-2 rounded-2xl text-sm" role="alert">
-								<span>{sessionActionError}</span>
+								<span className="min-w-0 wrap-break-word">{sessionActionError}</span>
 							</div>
 						) : null}
 						{pendingRunAcknowledgement ? (
 							<output className="border-info/30 bg-info/10 mb-2 flex items-center gap-2 rounded-2xl border px-3 py-2 text-sm">
 								<span className="loading loading-dots loading-sm" aria-hidden="true" />
-								<span>Run accepted. Preparing the authoritative operation…</span>
+								<span className="min-w-0 wrap-break-word">Run accepted. Preparing the authoritative operation…</span>
 							</output>
 						) : null}
 						{activeTabIsHydrating && messageCount === 0 ? (
@@ -1833,10 +1839,6 @@ function ConversationAreaInner(
 					}
 				>
 					<section className="pointer-events-auto flex flex-col items-center gap-2" aria-label="Conversation actions">
-						{sideRunStatus ? (
-							<output className="text-base-content/70 max-w-32 text-center text-xs">{sideRunStatus}</output>
-						) : null}
-
 						{showStopRunControl ? (
 							<HoverTip content={activeTabIsGenerating ? 'Stop response' : 'Cancel active run'} placement="left">
 								<button
@@ -1877,7 +1879,10 @@ function ConversationAreaInner(
 							</HoverTip>
 						) : null}
 
-						<HoverTip content={composerVisible ? 'Disable composer' : 'Enable composer'} placement="left">
+						<HoverTip
+							content={sideRunStatus ?? (composerVisible ? 'Disable composer' : 'Enable composer')}
+							placement="left"
+						>
 							<button
 								ref={composerToggleButtonRef}
 								type="button"
@@ -1897,10 +1902,22 @@ function ConversationAreaInner(
 
 									focusComposerForTab(activeTabId);
 								}}
-								aria-label={composerVisible ? 'Disable composer' : 'Enable composer'}
+								aria-label={
+									sideRunStatus
+										? `${sideRunStatus}. ${composerVisible ? 'Disable composer' : 'Enable composer'}`
+										: composerVisible
+											? 'Disable composer'
+											: 'Enable composer'
+								}
 								aria-pressed={composerVisible}
 							>
-								{composerVisible ? <FiMinimize2 size={24} /> : <FiEdit size={24} />}
+								{sideRunStatusIsRunning ? (
+									<span className="loading loading-spinner loading-sm" aria-hidden="true" />
+								) : composerVisible ? (
+									<FiMinimize2 size={24} />
+								) : (
+									<FiEdit size={24} />
+								)}
 							</button>
 						</HoverTip>
 					</section>
