@@ -1751,7 +1751,7 @@ function ConversationAreaInner(
 					className="size-full overscroll-contain py-1"
 					style={{ scrollbarGutter: 'stable both-edges', overflowAnchor: 'none', overflowY: 'auto' }}
 				>
-					<div ref={setScrollContentRef} className="mx-auto w-11/12 pb-4 xl:w-5/6">
+					<div ref={setScrollContentRef} className="mx-auto w-11/12 pb-4">
 						{activeTab?.runtimeError ? (
 							<div className="alert alert-error mb-2 rounded-2xl text-sm" role="alert">
 								<span className="min-w-0 wrap-break-word">{activeTab.runtimeError}</span>

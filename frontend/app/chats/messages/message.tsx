@@ -186,9 +186,8 @@ export const ChatMessage = memo(function ChatMessage({
 }: ChatMessageProps) {
 	const isUser = message.role === RoleEnum.User;
 	const streamSnapshot = useMessageStreamSnapshot(streamSource, isBusy);
-	const align = !isUser ? 'items-end text-left' : 'items-start text-left';
-	const leftColSpan = !isUser ? 'col-span-1 lg:col-span-2' : 'col-span-1';
-	const rightColSpan = !isUser ? 'col-span-1' : 'col-span-1 lg:col-span-2';
+	const align = 'items-start text-left';
+	const sideColSpan = 'col-span-1';
 
 	const [renderMarkdown, setRenderMarkdown] = useState(!isUser);
 	const [toolDetailsState, setToolDetailsState] = useState<ToolDetailsState>(null);
@@ -349,7 +348,7 @@ export const ChatMessage = memo(function ChatMessage({
 				{/* Row 1 ── icon + message bubble (only when showCardRow) */}
 				{showBodyWithMedia && (
 					<>
-						<div className={`${leftColSpan} flex justify-end`}>
+						<div className={`${sideColSpan} flex justify-end`}>
 							{isUser && (
 								<div className="my-0 mr-2 ml-0 flex size-8 items-center justify-center self-end">
 									<FiUser size={24} />
@@ -357,9 +356,7 @@ export const ChatMessage = memo(function ChatMessage({
 							)}
 						</div>
 
-						<div
-							className={`bg-base-100 col-span-10 mt-1 min-w-0 overflow-x-hidden rounded-2xl p-0 lg:col-span-9 ${bubbleExtra}`}
-						>
+						<div className={`bg-base-100 col-span-10 mt-1 min-w-0 overflow-x-hidden rounded-2xl p-0 ${bubbleExtra}`}>
 							{!isUser && (hasAnyReasoning || (isBusy && streamSource)) && (
 								<MessageThinkingSection
 									isBusy={isBusy}
@@ -432,7 +429,7 @@ export const ChatMessage = memo(function ChatMessage({
 							)}
 						</div>
 
-						<div className={`${rightColSpan} flex justify-start`}>
+						<div className={`${sideColSpan} flex justify-start`}>
 							{!isUser && (
 								<div className="my-0 mr-0 ml-2 flex size-8 items-center justify-center self-end">
 									<FiCpu size={24} />
@@ -443,7 +440,7 @@ export const ChatMessage = memo(function ChatMessage({
 				)}
 
 				{/* Row 2 ── footer bar */}
-				<div className={`${leftColSpan} flex justify-end`}>
+				<div className={`${sideColSpan} flex justify-end`}>
 					{/* If the card row is hidden, keep the avatar aligned with the footer row */}
 					{!showBodyWithMedia && isUser && (
 						<div className="my-0 mr-2 ml-0 flex size-8 items-center justify-center">
@@ -451,10 +448,8 @@ export const ChatMessage = memo(function ChatMessage({
 						</div>
 					)}
 				</div>
-				<div className="col-span-10 min-w-0 lg:col-span-9">
-					<div
-						className={`flex min-w-0 items-center gap-2 overflow-x-auto overscroll-contain p-0 ${showBodyWithMedia ? '' : isUser ? 'justify-start' : 'justify-end'}`}
-					>
+				<div className="col-span-10 min-w-0">
+					<div className="flex min-w-0 items-center gap-2 overflow-x-auto overscroll-contain p-0">
 						{hasAttachmentsBar && (
 							<div className="flex min-w-0 items-center justify-start overflow-x-hidden px-1 py-0">
 								<MessageAttachmentsBar
@@ -474,9 +469,7 @@ export const ChatMessage = memo(function ChatMessage({
 							</div>
 						)}
 
-						<div
-							className={`flex min-w-0 flex-1 items-center px-1 py-0 ${!showBodyWithMedia ? (isUser ? 'justify-start' : 'justify-end') : ''}`}
-						>
+						<div className="flex min-w-0 flex-1 items-center px-1 py-0">
 							<MessageFooterArea
 								messageID={message.id}
 								isUser={isUser}
@@ -498,7 +491,7 @@ export const ChatMessage = memo(function ChatMessage({
 						</div>
 					</div>
 				</div>
-				<div className={`${rightColSpan} flex justify-start`}>
+				<div className={`${sideColSpan} flex justify-start`}>
 					{/* If the card row is hidden, keep the assistant icon aligned with the footer row */}
 					{!showBodyWithMedia && !isUser && (
 						<div className="my-0 mr-0 ml-2 flex size-8 items-center justify-center">

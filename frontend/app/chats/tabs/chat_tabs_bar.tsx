@@ -131,11 +131,11 @@ function ChatTabsBarContent({
 				id={tab.tabId}
 				render={<div />}
 				className={[
-					'focus-visible:outline-primary relative flex h-8 w-44 items-center p-0 select-none focus-visible:outline focus-visible:outline-offset-2',
+					'focus-visible:outline-primary relative flex w-44 shrink-0 items-center p-0 transition-colors duration-30 select-none focus-visible:z-30 focus-visible:outline focus-visible:outline-offset-2',
 					isActive
-						? 'bg-base-100 text-base-content border-base-300 rounded-xl border shadow-xs'
-						: 'bg-base-200/80 text-base-content/80 hover:bg-base-200 border-0',
-					tab.isBusy ? 'cursor-progress' : '',
+						? 'border-base-content/20 text-base-content bg-base-200 z-20 h-9 rounded-t-xl border-x border-t'
+						: 'border-base-content/10 bg-base-content/5 text-base-content/70 hover:border-base-content/20 hover:bg-base-content/10 hover:text-base-content/90 h-8 rounded-t-lg border-x border-t',
+					tab.isBusy ? 'cursor-progress' : 'cursor-pointer',
 				].join(' ')}
 				onClick={() => {
 					if (!isEditing) {
@@ -230,13 +230,20 @@ function ChatTabsBarContent({
 	}
 
 	return (
-		<div className="border-base-300 flex h-9 w-full items-center gap-2 border-b bg-inherit">
+		<div className="relative flex h-10 w-full items-center gap-2 bg-inherit">
+			<span
+				aria-hidden="true"
+				className="bg-base-content/20 pointer-events-none absolute inset-x-0 bottom-0 z-10 h-px"
+			/>
 			<div
-				className="app-scrollbar-thin flex min-w-0 flex-1 flex-nowrap items-center overflow-hidden p-0"
+				className="app-scrollbar-thin flex min-w-0 flex-1 flex-nowrap items-center self-stretch overflow-hidden p-0"
 				style={{ scrollbarGutter: 'stable' }}
 			>
-				<div ref={tabsViewportRef} className="min-w-0 overflow-x-auto overflow-y-hidden overscroll-contain p-1">
-					<TabList store={store} aria-label="Chat tabs" className="flex h-9 w-max items-end gap-1 p-0">
+				<div
+					ref={tabsViewportRef}
+					className="min-w-0 self-stretch overflow-x-auto overflow-y-hidden overscroll-contain px-1"
+				>
+					<TabList store={store} aria-label="Chat tabs" className="flex h-full w-max items-end gap-1 p-0">
 						{elements}
 					</TabList>
 				</div>
@@ -249,7 +256,7 @@ function ChatTabsBarContent({
 				>
 					<button
 						type="button"
-						className="btn btn-ghost btn-circle btn-xs shrink-0 p-0 opacity-80 hover:opacity-100"
+						className="btn btn-ghost btn-circle btn-xs mt-2 shrink-0 p-0 opacity-80 hover:opacity-100"
 						onClick={onNewTab}
 						aria-label="New chat"
 					>
