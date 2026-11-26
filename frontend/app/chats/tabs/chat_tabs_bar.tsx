@@ -232,11 +232,11 @@ function ChatTabsBarContent({
 	return (
 		<div className="border-base-300 flex h-9 w-full items-center gap-2 border-b bg-inherit">
 			<div
-				className="app-scrollbar-thin flex min-w-0 flex-1 flex-nowrap items-center overflow-hidden p-1"
+				className="app-scrollbar-thin flex min-w-0 flex-1 flex-nowrap items-center overflow-hidden p-0"
 				style={{ scrollbarGutter: 'stable' }}
 			>
-				<div ref={tabsViewportRef} className="min-w-0 overflow-x-auto overflow-y-hidden overscroll-contain">
-					<TabList store={store} aria-label="Chat tabs" className="flex h-9 w-max items-end gap-0 pr-1">
+				<div ref={tabsViewportRef} className="min-w-0 overflow-x-auto overflow-y-hidden overscroll-contain p-1">
+					<TabList store={store} aria-label="Chat tabs" className="flex h-9 w-max items-end gap-1 p-0">
 						{elements}
 					</TabList>
 				</div>
@@ -264,7 +264,7 @@ function ChatTabsBarContent({
 					valueFetcher={getConversationForExport}
 					size={18}
 					fileprefix="conversation"
-					className="btn btn-ghost btn-circle btn-xs shrink-0 p-0 opacity-80 hover:opacity-100"
+					className="btn btn-ghost btn-circle btn-xs mr-2 shrink-0 p-0 opacity-80 hover:opacity-100"
 					aria-label="Export Chat"
 					title="Export Chat"
 				/>

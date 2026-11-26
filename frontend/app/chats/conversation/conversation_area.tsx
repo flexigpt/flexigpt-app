@@ -927,6 +927,7 @@ function ConversationAreaInner(
 
 	const composerVisible =
 		activeTab !== undefined &&
+		!activeTabIsGenerating &&
 		(composerVisibilityOverride === true ||
 			(composerVisibilityOverride === undefined && defaultComposerVisible) ||
 			shouldAutoRevealComposer);
@@ -1886,7 +1887,8 @@ function ConversationAreaInner(
 							<button
 								ref={composerToggleButtonRef}
 								type="button"
-								className="btn btn-md btn-circle btn-neutral p-2"
+								disabled={activeTabIsGenerating}
+								className="btn btn-md btn-circle btn-neutral p-2 disabled:cursor-not-allowed disabled:opacity-40"
 								onClick={() => {
 									if (!activeTabId) {
 										return;
