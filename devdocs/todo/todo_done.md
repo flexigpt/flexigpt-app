@@ -1157,3 +1157,8 @@
 - [x] add text when a tool call or output is pending doesnt seem to work. this happens before a active tool call run is not done i.e composer has tool call.
 - [x] attachments that are not present have started to show that these are not there. may want to show that these are not there and do we want to continue.
 - [x] topology minor changes reallocates artifactids.
+
+- [x] tool results are not visible in assistant message
+- [x] need the composer to collapse as needed or auto when reading or some better ux.
+- [x] apply all diffs in convo is also needed in some way.
+- [x] anthropic released sdk v2 - temperature is not there in sdk, most probably cannot use current api version with new sdk.

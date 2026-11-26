@@ -9,11 +9,6 @@
   - [ ] test workspace
   - [ ] test all management pages again properly
 
-- [ ] tool results are not visible in user message
-- [x] need the composer to collapse as needed or auto when reading or some better ux.
-- [x] apply all diffs in convo is also needed in some way.
-- [x] anthropic released sdk v2 - temperature is not there in sdk, most probably cannot use current api version with new sdk.
-
 ## M-n
 
 - [ ] agent to agent and workflow support backend + ui.
