@@ -171,7 +171,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 
 	return (
 		<div
-			className="bg-base-200 w-full shrink-0 overflow-hidden"
+			className="bg-base-200 mx-1 max-w-full shrink-0 overflow-hidden p-0"
 			data-attachments-bottom-bar
 			aria-label="Workspace, attachments, MCP, tools, skills, and templates"
 		>

@@ -1580,7 +1580,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				) : null}
 
 				<Plate editor={editor} onChange={handleEditorDocumentChange}>
-					<div className="bg-base-100 border-base-200 flex max-h-full min-h-0 w-full max-w-full min-w-0 flex-[1_1_auto] overflow-hidden rounded-2xl border">
+					<div className="bg-base-100 border-base-200 mx-1 flex max-h-full min-h-0 max-w-full min-w-0 flex-[1_1_auto] overflow-hidden rounded-2xl border p-0">
 						<div className="flex min-h-0 min-w-0 grow flex-col p-0">
 							{editingMessageId ? (
 								<div className="flex min-h-0 items-center justify-end gap-2 pt-1 pr-3 pb-0 text-xs">
@@ -1599,7 +1599,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 								</div>
 							) : null}
 
-							<div className="flex min-h-18 min-w-0 grow gap-2 overflow-hidden p-1">
+							<div className="flex min-h-18 min-w-0 grow gap-2 overflow-hidden px-2 py-1">
 								<PlateContent
 									ref={contentRef}
 									placeholder="Type message..."

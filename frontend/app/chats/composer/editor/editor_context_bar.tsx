@@ -81,7 +81,7 @@ export function ContextBar({ context, agent }: ContextBarProps) {
 
 	if (!context.hasRunnableModel) {
 		return (
-			<div className="bg-base-200 mx-2 my-0 flex items-center justify-between gap-2 p-1 xl:mx-4">
+			<div className="bg-base-200 mx-1 flex items-center justify-between gap-2 p-1 xl:mx-4">
 				<ModelSetupAction
 					unavailableReason={context.modelCatalogUnavailableReason}
 					hasCatalogError={context.modelCatalogError !== null}
@@ -91,7 +91,7 @@ export function ContextBar({ context, agent }: ContextBarProps) {
 	}
 
 	return (
-		<div className="bg-base-200 mx-2 my-0 flex items-center justify-between gap-2 p-1 xl:mx-4">
+		<div className="bg-base-200 mx-1 flex items-center justify-between gap-2 p-1 xl:mx-4">
 			<AgentDropdown manager={agent} />
 
 			<ModelDropdown

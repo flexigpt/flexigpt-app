@@ -1782,7 +1782,7 @@ function ConversationAreaInner(
 					</div>
 				</div>
 
-				<div className="pointer-events-none absolute top-16 right-4 z-30 xl:right-24">
+				<div className="pointer-events-none absolute top-8 right-8 z-30 xl:right-24">
 					<nav className="pointer-events-auto flex flex-col items-center gap-1" aria-label="Conversation navigation">
 						<HoverTip content="Scroll to top" placement="left">
 							<ButtonScrollToTop
@@ -1828,7 +1828,7 @@ function ConversationAreaInner(
 				</div>
 
 				<div
-					className="pointer-events-none absolute right-4 bottom-16 z-30 xl:right-24"
+					className="pointer-events-none absolute right-8 bottom-16 z-30 xl:right-24"
 					style={
 						composerVisible ? { bottom: `${composerPanelHeight + FLOATING_COMPOSER_SCROLL_CLEARANCE}px` } : undefined
 					}
@@ -1850,7 +1850,7 @@ function ConversationAreaInner(
 									}}
 									aria-label={activeTabIsGenerating ? 'Stop response' : 'Cancel active run'}
 								>
-									<FiSquare size={24} />
+									<FiSquare size={20} />
 								</button>
 							</HoverTip>
 						) : null}
@@ -1877,7 +1877,7 @@ function ConversationAreaInner(
 									aria-label={automationHoldEnabled ? 'Resume automation' : 'Hold automation'}
 									aria-pressed={automationHoldEnabled}
 								>
-									{automationHoldEnabled ? <FiPlay size={24} /> : <FiPause size={24} />}
+									{automationHoldEnabled ? <FiPlay size={20} /> : <FiPause size={20} />}
 								</button>
 							</HoverTip>
 						) : null}
@@ -1907,7 +1907,7 @@ function ConversationAreaInner(
 								aria-label={composerVisible ? 'Disable composer' : 'Enable composer'}
 								aria-pressed={composerVisible}
 							>
-								{composerVisible ? <FiMinimize2 size={24} /> : <FiEdit size={24} />}
+								{composerVisible ? <FiMinimize2 size={20} /> : <FiEdit size={20} />}
 							</button>
 						</HoverTip>
 					</section>
@@ -1922,7 +1922,7 @@ function ConversationAreaInner(
 						className={[
 							'pointer-events-auto max-h-full w-11/12 min-w-0 xl:w-5/6',
 							composerVisible
-								? 'app-scrollbar-thin border-base-300 bg-base-100/95 ring-base-100/30 overflow-y-auto rounded-3xl border shadow-xl ring-1 backdrop-blur'
+								? 'app-scrollbar-thin border-base-content/20 bg-base-100/95 ring-base-100/30 overflow-y-auto rounded-2xl border shadow-none ring-1 backdrop-blur'
 								: 'overflow-hidden',
 						].join(' ')}
 					>

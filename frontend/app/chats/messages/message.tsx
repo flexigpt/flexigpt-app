@@ -453,7 +453,7 @@ export const ChatMessage = memo(function ChatMessage({
 				</div>
 				<div className="col-span-10 min-w-0 lg:col-span-9">
 					<div
-						className={`flex min-w-0 items-center gap-2 overflow-x-auto overscroll-contain px-2 ${showBodyWithMedia ? 'pt-1' : isUser ? 'justify-start' : 'justify-end'}`}
+						className={`flex min-w-0 items-center gap-2 overflow-x-auto overscroll-contain p-0 ${showBodyWithMedia ? '' : isUser ? 'justify-start' : 'justify-end'}`}
 					>
 						{hasAttachmentsBar && (
 							<div className="flex min-w-0 items-center justify-start overflow-x-hidden px-1 py-0">

@@ -19,7 +19,6 @@ export function ButtonScrollToBottom({
 		<button
 			type="button"
 			aria-label="Scroll To Bottom"
-			title="Scroll To Bottom"
 			disabled={!show}
 			onClick={e => {
 				onClick?.(e);
@@ -57,7 +56,6 @@ export function ButtonScrollToTop({
 		<button
 			type="button"
 			aria-label="Scroll To Top"
-			title="Scroll To Top"
 			disabled={!show}
 			onClick={e => {
 				onClick?.(e);

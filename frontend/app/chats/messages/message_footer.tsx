@@ -237,7 +237,7 @@ export const MessageFooterArea = memo(function MessageFooterArea({
 				</div>
 
 				{!isUser && !isBusy && <MessageDiffActions />}
-				<div className={`flex items-center justify-end space-x-6 ${!isBusy && !hasUsage ? 'w-full' : ''}`}>
+				<div className={`flex items-center justify-end space-x-6 p-1 ${!isBusy && !hasUsage ? 'w-full' : ''}`}>
 					{hasContent && !isBusy && (
 						<label className="ml-1 flex h-full items-center space-x-2 truncate p-1" title="Disable Markdown">
 							<input
