@@ -3,6 +3,7 @@ package sessionruntime
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
@@ -71,11 +72,15 @@ func decodeCompletionOutputs(
 			))
 			continue
 		}
-		if call.Name != "" && call.Name != proposal.Name {
+		if call.Name != "" && !strings.EqualFold(call.Name, proposal.Name) {
 			calls = append(calls, unresolvedCompletionToolCall(
 				call,
 				arguments,
-				"provider Tool call name does not match the immutable prepared binding",
+				fmt.Sprintf(
+					"provider Tool call name: %s does not match the immutable prepared binding %s",
+					call.Name,
+					proposal.Name,
+				),
 			))
 			continue
 		}

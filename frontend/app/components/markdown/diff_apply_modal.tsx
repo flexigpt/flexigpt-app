@@ -366,7 +366,7 @@ function FileCard({
 		<section
 			ref={sectionRef}
 			tabIndex={-1}
-			className="border-base-300 bg-base-100 focus-visible:outline-primary rounded-xl border p-4 shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2"
+			className="border-base-300 bg-base-200 focus-visible:outline-primary rounded-xl border p-4 shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2"
 			aria-busy={isActive}
 		>
 			<div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">

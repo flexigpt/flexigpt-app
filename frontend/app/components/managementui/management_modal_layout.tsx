@@ -27,7 +27,7 @@ interface ManagementModalPanelProps {
 export function ManagementModalPanel({ children, width = 'standard', className = '' }: ManagementModalPanelProps) {
 	return (
 		<div
-			className={`modal-box bg-base-200 flex max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] ${WIDTH_CLASSES[width]} min-h-0 flex-col overflow-hidden rounded-2xl p-0 ${className}`}
+			className={`modal-box bg-base-200 flex max-h-[calc(100dvh-1rem)] w-11/12 ${WIDTH_CLASSES[width]} min-h-0 flex-col overflow-hidden rounded-2xl p-0 ${className}`}
 		>
 			{children}
 		</div>
@@ -37,7 +37,7 @@ export function ManagementModalPanel({ children, width = 'standard', className =
 export function ManagementModalBody({ children, className = '' }: { children: ReactNode; className?: string }) {
 	return (
 		<div
-			className={`app-scrollbar-thin min-h-0 flex-1 space-y-4 overflow-x-hidden overflow-y-auto overscroll-contain p-4 sm:p-6 ${className}`}
+			className={`app-scrollbar-thin bg-base-100 min-h-0 flex-1 space-y-4 overflow-x-hidden overflow-y-auto overscroll-contain p-4 sm:p-6 ${className}`}
 		>
 			{children}
 		</div>

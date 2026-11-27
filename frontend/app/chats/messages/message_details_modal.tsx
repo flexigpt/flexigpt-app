@@ -69,10 +69,10 @@ function MessageDetailsModalContent({
 						requestClose();
 					}}
 				/>
-				<div className="min-h-0 flex-1 overflow-y-auto p-6">
+				<div className="bg-base-100 min-h-0 flex-1 overflow-y-auto p-6">
 					<div className="mt-2">
 						{hasReasoningSection && (
-							<div className="border-base-300 bg-base-100 mb-4 rounded-2xl border p-4">
+							<div className="border-base-300 mb-4 rounded-2xl border p-4">
 								<div className="mb-3 text-sm font-semibold">Thinking content</div>
 
 								{hasSummary && (
