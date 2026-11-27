@@ -69,7 +69,9 @@
 	// --- Markdown ---
 	"markdown.extension.toc.levels": "2..4",
 	"markdownlint.lintWorkspaceGlobs": ["!LICENSE"],
-
+	"markdownlint.config": {
+		"MD060": false
+	},
 	// --- Go ---
 	"go.lintTool": "golangci-lint",
 	"go.formatTool": "custom",
